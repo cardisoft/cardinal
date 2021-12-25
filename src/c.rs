@@ -1,10 +1,10 @@
 #[no_mangle]
-pub extern "C" fn init_sdk() {
+pub extern "C" fn c_init_sdk() {
     crate::init_sdk();
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn get_events(
+pub unsafe extern "C" fn c_get_events(
     context: *const i8,
     callback: Option<unsafe extern "C" fn(*const i8, *const i8)>,
 ) {

@@ -6,7 +6,9 @@ mod fsevent_pb;
 mod processor;
 mod runtime;
 
+pub use c::*;
 use fsevent::FsEvent;
+pub use processor::take_fs_events;
 
 use anyhow::{bail, Result};
 use core_foundation::{
@@ -106,7 +108,7 @@ fn spawn_processor(receiver: UnboundedReceiver<Vec<FsEvent>>) {
     runtime().spawn(processor::processor(receiver));
 }
 
-fn init_sdk() {
+pub fn init_sdk() {
     let receiver = spawn_watcher();
     spawn_processor(receiver);
 }
