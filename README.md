@@ -1,3 +1,7 @@
+# Cardinal
+
+The open-source and cross-platform Everything.
+
 ```
 cbindgen --config cbindgen.toml --crate cardinal --output cardinal.h
 ```

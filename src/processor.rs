@@ -1,3 +1,4 @@
+//! Platform independent fs event processor.
 use crate::fsevent::FsEvent;
 use anyhow::{bail, Result};
 use fsevent_sys::FSEventStreamEventId;
@@ -35,6 +36,8 @@ fn fill_fs_event(event: FsEvent) -> Result<()> {
     Ok(())
 }
 
+/// Get raw fs events from processor. Capacity is limited due to the memory
+/// pressure. So only the first few events are provided.
 pub fn take_fs_events() -> Vec<FsEvent> {
     let current_num = FS_EVENTS_CHANNEL_LEN - FS_EVENTS_CHANNEL.0.capacity();
     // Due to non atomic channel recv, double the size of possible receiving vec.
@@ -57,6 +60,7 @@ pub async fn processor(
     while let Some(events) = receiver.recv().await {
         for event in events {
             core_paths.insert(event.path.clone());
+            // Provide raw fs event.
             fill_fs_event(event)?;
         }
     }
