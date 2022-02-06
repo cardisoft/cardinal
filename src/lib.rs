@@ -4,15 +4,13 @@ mod consts;
 mod database;
 pub mod fs_entry;
 mod fsevent;
-mod fsevent_flags;
-mod fsevent_id;
 mod processor;
 mod runtime;
 mod utils;
 
 pub use c::*;
+use fsevent::EventId;
 use fsevent::FsEvent;
-use fsevent_id::EventId;
 pub use processor::take_fs_events;
 use processor::Processor;
 

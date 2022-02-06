@@ -1,7 +1,7 @@
 //! Platform independent fs event processor.
 use crate::consts::DB_PATH;
 use crate::database::{Database, PartialDatabase};
-use crate::fsevent_id::EventId;
+use crate::fsevent::EventId;
 use crate::{fs_entry::DiskEntry, fsevent::FsEvent};
 use crate::{runtime, utils};
 

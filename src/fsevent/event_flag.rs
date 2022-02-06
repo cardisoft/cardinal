@@ -28,3 +28,26 @@ bitflags! {
         const kFSEventStreamEventFlagItemCloned = fsevent_sys::kFSEventStreamEventFlagItemCloned;
     }
 }
+
+/// Abstract action of a file system event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum EventFlag {
+    Create,
+    Delete,
+    Modify,
+}
+
+impl TryFrom<MacEventFlag> for EventFlag {
+    type Error = ();
+    fn try_from(f: MacEventFlag) -> Result<Self, ()> {
+        if f.contains(MacEventFlag::kFSEventStreamEventFlagItemCreated) {
+            Ok(EventFlag::Create)
+        } else if f.contains(MacEventFlag::kFSEventStreamEventFlagItemRemoved) {
+            Ok(EventFlag::Delete)
+        } else if f.contains(MacEventFlag::kFSEventStreamEventFlagItemInodeMetaMod) {
+            Ok(EventFlag::Modify)
+        } else {
+            Err(())
+        }
+    }
+}
