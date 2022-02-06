@@ -1,7 +1,7 @@
 #![allow(non_upper_case_globals)]
 use bitflags::bitflags;
 bitflags! {
-    pub struct EventFlags: u32 {
+    pub struct MacEventFlag: u32 {
         const kFSEventStreamEventFlagNone = fsevent_sys::kFSEventStreamEventFlagNone;
         const kFSEventStreamEventFlagMustScanSubDirs = fsevent_sys::kFSEventStreamEventFlagMustScanSubDirs;
         const kFSEventStreamEventFlagUserDropped = fsevent_sys::kFSEventStreamEventFlagUserDropped;

@@ -1,8 +1,6 @@
-use super::fsevent_flags::EventFlags;
-use super::fsevent_pb as pb;
+use super::fsevent_flags::MacEventFlag;
 
 use fsevent_sys::FSEventStreamEventId;
-use prost::Message;
 
 use std::{
     ffi::{CStr, OsStr},
@@ -10,10 +8,33 @@ use std::{
     path::PathBuf,
 };
 
+/// Abstract action of a file system event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum EventFlag {
+    Create,
+    Delete,
+    Modify,
+}
+
+impl TryFrom<MacEventFlag> for EventFlag {
+    type Error = ();
+    fn try_from(f: MacEventFlag) -> Result<Self, ()> {
+        if f.contains(MacEventFlag::kFSEventStreamEventFlagItemCreated) {
+            Ok(EventFlag::Create)
+        } else if f.contains(MacEventFlag::kFSEventStreamEventFlagItemRemoved) {
+            Ok(EventFlag::Delete)
+        } else if f.contains(MacEventFlag::kFSEventStreamEventFlagItemInodeMetaMod) {
+            Ok(EventFlag::Modify)
+        } else {
+            Err(())
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct FsEvent {
     pub path: PathBuf,
-    pub flag: EventFlags,
+    pub flag: EventFlag,
     pub id: FSEventStreamEventId,
 }
 
@@ -22,21 +43,10 @@ impl FsEvent {
         let path = unsafe { CStr::from_ptr(path) };
         let path = OsStr::from_bytes(path.to_bytes());
         let path = PathBuf::from(path);
-        let flag = EventFlags::from_bits_truncate(flag);
+        let flag = MacEventFlag::from_bits_truncate(flag);
+        let flag = flag
+            .try_into()
+            .expect("convert mac event flag to abstract event flag failed.");
         FsEvent { path, flag, id }
     }
-
-    fn as_pb(&self) -> pb::RawFsEvent {
-        pb::RawFsEvent {
-            path: self.path.as_os_str().as_bytes().to_vec(),
-            flag: self.flag.bits(),
-            id: self.id,
-        }
-    }
-}
-
-pub fn write_events_to_bytes(events: &[FsEvent]) -> Vec<u8> {
-    let events = events.iter().map(|x| x.as_pb()).collect();
-    let events = pb::RawFsEvents { events };
-    events.encode_to_vec()
 }

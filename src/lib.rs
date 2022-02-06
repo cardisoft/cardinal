@@ -6,7 +6,6 @@ pub mod fs_entry;
 mod fsevent;
 mod fsevent_flags;
 mod fsevent_id;
-mod fsevent_pb;
 mod processor;
 mod runtime;
 mod utils;

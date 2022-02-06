@@ -5,7 +5,7 @@ use bincode::{Decode, Encode};
 use std::fs::File;
 use std::io::BufWriter;
 use std::{io::BufReader, path::Path};
-use tracing::{info, Instrument};
+use tracing::{info, instrument};
 
 /// The overall database of Cardinal.
 ///
@@ -54,14 +54,14 @@ pub struct PartialDatabase {
 
 impl PartialDatabase {
     /// Scan the hierarchy from file system.
-    pub fn scan_fs(&self) -> Result<Self> {
+    pub fn scan_fs() -> Self {
         let create_time = crate::utils::current_timestamp();
         info!(create_time, "The create time of fs scanning");
         let fs_entry = DiskEntry::from_fs(Path::new("/"));
-        Ok(Self {
+        Self {
             create_time,
             fs_entry,
-        })
+        }
     }
 
     pub fn merge(&mut self) {

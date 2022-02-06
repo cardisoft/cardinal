@@ -1,14 +1,16 @@
 //! Platform independent fs event processor.
 use crate::consts::DB_PATH;
-use crate::database::Database;
+use crate::database::{Database, PartialDatabase};
 use crate::fsevent_id::EventId;
 use crate::{fs_entry::DiskEntry, fsevent::FsEvent};
+use crate::{runtime, utils};
 
 use anyhow::{bail, Context, Result};
 use crossbeam::channel::{self, Receiver, Sender, TryRecvError, TrySendError};
 use fsevent_sys::FSEventStreamEventId;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
+use tracing::info;
 
 use std::path::Path;
 use std::{collections::BTreeSet, path::PathBuf};
@@ -88,7 +90,18 @@ impl Processor {
     }
 
     pub fn get_db(&self) -> Result<Database> {
-        let db = Database::from_fs(Path::new(DB_PATH)).context("load database failed.")?;
+        let db = match Database::from_fs(Path::new(DB_PATH)) {
+            Ok(x) => x,
+            Err(e) => {
+                info!(?e, "Get db failed, try scanning.");
+                let mut partial_db = PartialDatabase::scan_fs();
+                info!("Fs scanning completes.");
+                while let Ok(event) = self.events_receiver.try_recv() {
+                    partial_db.merge();
+                }
+                partial_db.complete_merge(utils::current_timestamp())
+            }
+        };
         Ok(db)
     }
 
@@ -110,3 +123,5 @@ pub fn take_fs_events() -> Vec<FsEvent> {
         .map(|x| x.take_fs_events())
         .unwrap_or_default()
 }
+
+fn on_db_completes() {}
