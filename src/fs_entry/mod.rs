@@ -5,7 +5,7 @@ use crate::fsevent::{EventFlag, FsEvent};
 
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::io::{self, BufWriter};
 use std::iter::Peekable;
 use std::{
@@ -94,80 +94,73 @@ impl DiskEntry {
     }
 
     /// This requires a mutable reference
-    pub fn merge(&mut self, event: &FsEvent) {
+    pub fn merge(&mut self, base_dir: PathBuf, event: &FsEvent) {
         debug!("merge {:?} into database", event);
-        let event_path = p2b(&event.path)
-            .strip_prefix(&*self.name)
+        let event_path = event
+            .path
+            .strip_prefix(&base_dir)
             .expect("event path doesn't share a common prefix with the root.");
-        let event_path = b2p(&event_path);
         let mut path_segs = event_path.into_iter().peekable();
-        // "foo" merge "foo/bar.txt" => pathsegs = ["/", "bar.txt"]
-        // So removing the separator is needed.
-        let _separator = path_segs.next().unwrap();
-        debug_assert_eq!("/", _separator);
         // Ensure we are not modifying the root. (When this feature is really
         // needed, add a match branch here for special-case this).
-        debug_assert!(path_segs.peek().is_some());
-        self.merge_inner(event, path_segs);
+        let seg = path_segs.next().unwrap();
+        let mut current_dir = base_dir;
+        self.merge_inner(event, &mut current_dir, seg, path_segs);
     }
 
     /// The `path_segs.next()` is ensured to be `Some`, it's the path segment we
     /// need to match in the `self.entries`.
-    fn merge_inner(&mut self, event: &FsEvent, mut path_segs: Peekable<std::path::Iter>) {
-        let seg = path_segs.next().map(o2b).unwrap();
-        // TODO: why to_vec is needed?
-        let entry = self.entries.entry(seg.to_vec());
+    fn merge_inner(
+        &mut self,
+        event: &FsEvent,
+        current_dir: &mut PathBuf,
+        seg: &OsStr,
+        mut path_segs: Peekable<std::path::Iter>,
+    ) {
+        let next_seg = path_segs.next();
+        let entry = self.entries.entry(o2b(seg).to_vec());
         match entry {
             Entry::Occupied(mut entry) => {
-                match event.flag {
-                    EventFlag::Create | EventFlag::Modify => {
-                        if path_segs.peek().is_none() {
-                            // If we are on the node being processed directly.
-                            if matches!(event.flag, EventFlag::Create) {
-                                // This should happen on racing. We are creating a present file.
-                                warn!(?event.path, "Creating an present file!");
-                            }
+                if let Some(next_seg) = next_seg {
+                    // middle node
+                    current_dir.push(seg);
+                    entry
+                        .get_mut()
+                        .merge_inner(event, current_dir, next_seg, path_segs);
+                    current_dir.pop();
+                } else {
+                    // leaf node
+                    match event.flag {
+                        EventFlag::Create | EventFlag::Modify | EventFlag::Delete => {
                             if let Some((name, metadata)) = fs_metadata(&event.path) {
                                 entry.insert(DiskEntry::new(name, metadata));
+                            } else {
+                                entry.remove_entry();
                             }
-                        } else {
-                            entry.get_mut().merge_inner(event, path_segs);
                         }
-                    }
-                    EventFlag::Delete => {
-                        entry.remove_entry();
                     }
                 }
             }
             Entry::Vacant(entry) => {
-                // `kFSEventStreamEventFlagItemRenamed` doesn't provide information about whether it's currently present, so modified unpresent file is acceptable.
-                match event.flag {
-                    EventFlag::Create | EventFlag::Modify => {
-                        if matches!(event.flag, EventFlag::Modify) {
-                            info!(?event.path, "Modifying an missing file");
-                        }
-
-                        // Fetching the metadata from fs, create the entry.
-
-                        // TODO(ldm0) There is a possibility of racing, e.g.
-                        //
-                        // Processing events:
-                        //
-                        // event1: modify /foo/bar
-                        // event2: modify /foo/bar
-                        //
-                        // The file state is newer than event2 occurs, but we are processing the event1.
-                        //
-                        // Since we are assuming the file system event as a
-                        // modification trigger rather than a data provider now,
-                        // This doesn't hurt much.
-                        if let Some((name, metadata)) = fs_metadata(&event.path) {
-                            entry.insert(DiskEntry::new(name, metadata));
-                        }
+                if let Some(next_seg) = next_seg {
+                    // middle node
+                    // Now we filling the middle node.
+                    current_dir.push(seg);
+                    if let Some((name, metadata)) = fs_metadata(current_dir) {
+                        let entry = entry.insert(DiskEntry::new(name, metadata));
+                        entry.merge_inner(event, current_dir, next_seg, path_segs);
+                    } else {
+                        debug!("But folder is not present: {:?}", current_dir);
                     }
-                    EventFlag::Delete => {
-                        // This should never happen. We are deleting an unpresent file.
-                        error!(?event.path, "Deleting an missing file!");
+                    current_dir.pop();
+                } else {
+                    // leaf node, just insert it to the entry if it's present
+                    match event.flag {
+                        EventFlag::Create | EventFlag::Modify | EventFlag::Delete => {
+                            if let Some((name, metadata)) = fs_metadata(&event.path) {
+                                entry.insert(DiskEntry::new(name, metadata));
+                            }
+                        }
                     }
                 }
             }
@@ -261,10 +254,7 @@ impl DiskWalker {
 /// - When the file is reachable, return `Some(filename, Some(filemeta))`.
 fn fs_metadata(path: &Path) -> Option<(&[u8], Option<Metadata>)> {
     match path.symlink_metadata() {
-        Ok(metadata) => Some((
-            o2b(path.file_name().expect("root path")),
-            Some(metadata.into()),
-        )),
+        Ok(metadata) => Some((o2b(path.file_name().unwrap()), Some(metadata.into()))),
         Err(error) => {
             // If the error is just a permission denied, we check
             // the ErrorKind, When a permission denied occurred,
@@ -279,7 +269,7 @@ fn fs_metadata(path: &Path) -> Option<(&[u8], Option<Metadata>)> {
                 }
             };
             if file_exists {
-                Some((o2b(path.file_name().expect("root path")), None))
+                Some((o2b(path.file_name().unwrap()), None))
             } else {
                 info!(?path, ?error, "Fetching metadata of event path failed.");
                 None

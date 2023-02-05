@@ -48,7 +48,7 @@ impl Database {
             event
         );
         self.time = EventId::now_with_id(event.id);
-        self.fs_entry.merge(event)
+        self.fs_entry.merge(Path::new("/").to_path_buf(), event)
     }
 
     /// Return event_id of the last merged event.
@@ -85,7 +85,7 @@ impl PartialDatabase {
         info!(?event, "Merge event into partial db");
         assert!(self.time.since < event.id);
         self.time = EventId::now_with_id(event.id);
-        self.fs_entry.merge(event)
+        self.fs_entry.merge(Path::new("/").to_path_buf(), event)
     }
 
     /// Complete modification merging. Convert self into a serializable database.
