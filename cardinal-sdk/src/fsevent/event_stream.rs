@@ -49,15 +49,7 @@ impl EventStream {
                 .iter()
                 .zip(event_flags)
                 .zip(event_ids)
-                .filter_map(
-                    |((&path, &flag), &id)| match FsEvent::from_raw(path, flag, id) {
-                        Ok(x) => Some(x),
-                        Err(error) => {
-                            warn!(?error, "bad fs event:");
-                            None
-                        }
-                    },
-                )
+                .map(|((&path, &flag), &id)| unsafe { FsEvent::from_raw(path, flag, id) })
                 .collect();
 
             let callback = unsafe { (callback_info as *mut EventsCallback).as_mut() }.unwrap();
@@ -102,18 +94,15 @@ impl EventStream {
     }
 }
 
-pub fn spawn_event_watcher(raw_event_id: FSEventStreamEventId) -> UnboundedReceiver<FsEvent> {
+pub fn spawn_event_watcher(raw_event_id: FSEventStreamEventId) -> UnboundedReceiver<Vec<FsEvent>> {
     let (sender, receiver) = unbounded_channel();
     std::thread::spawn(move || {
         EventStream::new(
             vec!["/".into()],
             raw_event_id,
-            Box::new(move |mut events| {
+            Box::new(move |events| {
                 // Fun fact, events here are not sorted by event id.
-                events.sort_by_key(|x| x.id);
-                for event in events {
-                    sender.send(event).unwrap();
-                }
+                sender.send(events).unwrap();
             }),
         )
         .block_watch()

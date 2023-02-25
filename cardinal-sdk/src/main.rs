@@ -34,9 +34,11 @@ async fn main() {
     });
     loop {
         tokio::select! {
-            fs_event = receiver.recv() => {
-                let fs_event = fs_event.unwrap();
-                merge_event(&mut db, fs_event);
+            fs_events = receiver.recv() => {
+                let fs_events = fs_events.unwrap();
+                for fs_event in fs_events {
+                    merge_event(&mut db, fs_event);
+                }
             }
             filter = filter_rx.recv() => {
                 let filter = filter.unwrap();

@@ -4,6 +4,8 @@ use crate::fs_visitor;
 use crate::fsevent::EventFlag;
 use crate::fsevent::EventId;
 use crate::fsevent::FsEvent;
+use crate::fsevent::MacEventFlag;
+use crate::fsevent::ScanType;
 use crate::models::DbMeta;
 use crate::models::DiskEntryRaw;
 use crate::schema;
@@ -16,33 +18,46 @@ use diesel::prelude::*;
 use diesel_migrations::MigrationHarness;
 use fsevent_sys::FSEventStreamEventId;
 use pathbytes::p2b;
+use std::path::Path;
 use std::path::PathBuf;
 use std::time::Instant;
 use tracing::info;
+
+fn walk_builder(path: &Path) -> ignore::WalkBuilder {
+    let mut builder = ignore::WalkBuilder::new(path);
+    builder
+        .follow_links(false)
+        .git_exclude(false)
+        .git_global(false)
+        .git_ignore(false)
+        .hidden(false)
+        .ignore(false)
+        .ignore_case_insensitive(false)
+        .max_depth(None)
+        .max_filesize(None)
+        .parents(false)
+        .require_git(false)
+        .same_file_system(true)
+        .skip_stdout(false)
+        .standard_filters(false);
+    builder
+}
+
+fn parallel_walker(path: &Path) -> ignore::WalkParallel {
+    let threads = num_cpus::get_physical();
+    dbg!(threads);
+    walk_builder(path).threads(threads).build_parallel()
+}
+
+fn single_walker(path: &Path) -> ignore::Walk {
+    walk_builder(path).build()
+}
 
 fn snapshot_fs(conn: &mut CardinalDbConnection) -> Result<()> {
     let (raw_entry_sender, raw_entry_receiver) = bounded(MAX_RAW_ENTRY_COUNT);
 
     std::thread::spawn(move || {
-        let threads = num_cpus::get_physical();
-        dbg!(threads);
-        let walkdir = ignore::WalkBuilder::new("/")
-            .follow_links(false)
-            .git_exclude(false)
-            .git_global(false)
-            .git_ignore(false)
-            .hidden(false)
-            .ignore(false)
-            .ignore_case_insensitive(false)
-            .max_depth(None)
-            .max_filesize(None)
-            .parents(false)
-            .require_git(false)
-            .same_file_system(true)
-            .skip_stdout(false)
-            .standard_filters(false)
-            .threads(threads)
-            .build_parallel();
+        let walkdir = parallel_walker(Path::new("/"));
         let mut visitor_builder = fs_visitor::VisitorBuilder { raw_entry_sender };
         walkdir.visit(&mut visitor_builder);
     });
@@ -197,17 +212,19 @@ impl Database {
     }
 
     pub fn merge_event(&mut self, fs_event: FsEvent) -> Result<()> {
-        match fs_event.flag {
-            EventFlag::Delete | EventFlag::Modify | EventFlag::Create => {
-                let path = &fs_event.path;
-                match std::fs::metadata(&path) {
+        let path = &fs_event.path;
+        let metadata = std::fs::metadata(&path);
+        match fs_event.flag.scan_type() {
+            ScanType::SingleNode => {
+                // single entry rescan
+                match metadata {
                     Ok(metadata) => {
                         let entry = DiskEntry {
                             path: fs_event.path,
                             meta: metadata.into(),
                         }
                         .to_raw()
-                        .context("Encode meta failed.")?;
+                        .context("Encode entry failed.")?;
                         self.conn.save_entry(&entry).context("Save entry failed.")?;
                     }
                     Err(_e) => {
@@ -216,6 +233,29 @@ impl Database {
                             .context("Delete entry failed.")?;
                     }
                 }
+            }
+            ScanType::Folder => {
+                // TODO: Remove all existing entries prefixed with this dir path
+                let walkdir = single_walker(&fs_event.path);
+                for entry in walkdir {
+                    if let Ok(entry) = entry {
+                        if let Ok(metadata) = entry.metadata() {
+                            let entry = DiskEntry {
+                                path: entry.path().to_path_buf(),
+                                meta: metadata.into(),
+                            }
+                            .to_raw()
+                            .context("Encode entry failed,")?;
+                            self.conn.save_entry(&entry).context("Save entry failed,")?;
+                        }
+                    }
+                }
+            }
+            ScanType::Nop => {
+                // do nothing
+            }
+            _ => {
+                panic!("fs_event: {:#?}", fs_event);
             }
         }
         self.conn
