@@ -18,13 +18,6 @@ pub struct Node {
     pub children: Vec<Arc<Node>>,
 }
 
-#[derive(Debug)]
-pub enum Operator {
-    Equal = 0,
-    LessThan = 1,
-    GreaterThan = 2,
-}
-
 #[derive(Default, Debug)]
 pub struct WalkData {
     pub num_files: AtomicUsize,

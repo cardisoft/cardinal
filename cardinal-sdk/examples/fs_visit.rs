@@ -1,14 +1,13 @@
 use cardinal_sdk::fs_visit::{Node, WalkData, walk_it};
-use rustc_hash::FxHashMap;
+use mimalloc::MiMalloc;
 use std::{
+    collections::BTreeMap,
     fs::{self, File},
     io::BufWriter,
     path::PathBuf,
     sync::Arc,
     time::Instant,
 };
-
-use mimalloc::MiMalloc;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -52,26 +51,28 @@ impl NamePool {
     }
 }
 
-fn construct_trie_and_namepool(
+/// Combine the construction routine of NamePool and BTreeMap since we can deduplicate node name for free.
+// TODO(ldm0): Memory optimization can be done by letting name index reference the name in the pool(gc need to be considered though)
+fn construct_name_index_and_namepool(
     node: &Arc<Node>,
-    node_trie: &mut FxHashMap<String, Vec<Arc<Node>>>,
+    name_index: &mut BTreeMap<String, Vec<Arc<Node>>>,
     name_pool: &mut NamePool,
 ) {
-    if let Some(nodes) = node_trie.get_mut(&node.name) {
+    if let Some(nodes) = name_index.get_mut(&node.name) {
         nodes.push(node.clone());
     } else {
         name_pool.push(&node.name);
-        node_trie.insert(node.name.clone(), vec![node.clone()]);
+        name_index.insert(node.name.clone(), vec![node.clone()]);
     };
     for node in &node.children {
-        if let Some(nodes) = node_trie.get_mut(&node.name) {
+        if let Some(nodes) = name_index.get_mut(&node.name) {
             nodes.push(node.clone());
         } else {
             name_pool.push(&node.name);
-            node_trie.insert(node.name.clone(), vec![node.clone()]);
+            name_index.insert(node.name.clone(), vec![node.clone()]);
         };
         for grand_child in &node.children {
-            construct_trie_and_namepool(&grand_child, node_trie, name_pool);
+            construct_name_index_and_namepool(&grand_child, name_index, name_pool);
         }
     }
 }
@@ -85,16 +86,17 @@ fn main() {
     dbg!(visit_time.elapsed());
 
     {
-        let cache_time = Instant::now();
-        let mut node_trie = FxHashMap::default();
+        let name_index_time = Instant::now();
+        let mut name_index = BTreeMap::default();
         let mut name_pool = NamePool::new();
-        construct_trie_and_namepool(&node, &mut node_trie, &mut name_pool);
-        dbg!(cache_time.elapsed());
-        dbg!(node_trie.len());
+        construct_name_index_and_namepool(&node, &mut name_index, &mut name_pool);
+        dbg!(name_index_time.elapsed());
+        dbg!(name_index.len());
 
         let search_time = Instant::now();
         for (i, name) in name_pool.search_substr("athbyt").enumerate() {
-            if let Some(nodes) = node_trie.get(name) {
+            // TODO(ldm0): this can be parallelized
+            if let Some(nodes) = name_index.get(name) {
                 for node in nodes {
                     println!("[{}] key: {}", i, node.name);
                 }
