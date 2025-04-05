@@ -1,8 +1,6 @@
 use bincode::{Decode, Encode};
-use cardinal_sdk::{
-    fs_visit::{Node, WalkData, walk_it},
-    name_pool::NamePool,
-};
+use cardinal_sdk::name_pool::NamePool;
+use fswalk::{Node, WalkData, walk_it};
 use mimalloc::MiMalloc;
 use serde::{Deserialize, Serialize};
 use slab::Slab;
@@ -25,6 +23,7 @@ struct SlabNode {
 }
 
 impl SlabNode {
+    /// Get the path of the node in the slab.
     pub fn path(&self, slab: &Slab<SlabNode>) -> String {
         let mut segments = vec![self.name.clone()];
         // Write code like this to avoid the root node, which has no node name and shouldn't be put into semgents.

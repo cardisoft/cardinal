@@ -1,0 +1,10 @@
+[package]
+name = "fswalk"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bincode = "2.0.0"
+serde = { version = "1", features = ["derive", "rc"] }
+rayon = "1"
+memchr = "2.7.4"

@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "cardinal",
     "cardinal-sdk",
+    "fswalk",
     "pathbytes",
     "was",
     "xtask",

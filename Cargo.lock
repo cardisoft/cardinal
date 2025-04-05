@@ -168,6 +168,7 @@ dependencies = [
  "diesel_migrations",
  "dispatch2",
  "fsevent-sys",
+ "fswalk",
  "ignore",
  "libc",
  "memchr",
@@ -468,6 +469,16 @@ source = "git+https://github.com/ldm0/fsevent-rust#50312045e119e14507edde92f9c00
 dependencies = [
  "dispatch2",
  "libc",
+]
+
+[[package]]
+name = "fswalk"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "memchr",
+ "rayon",
+ "serde",
 ]
 
 [[package]]

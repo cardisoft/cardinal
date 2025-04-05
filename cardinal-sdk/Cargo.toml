@@ -34,3 +34,4 @@ cbor4ii = { version = "1.0.0", features = ["serde1", "use_std"] }
 mimalloc = "0.1.44"
 slab = { git = "https://github.com/ldm0/slab", branch = "bincode_support", features = ["serde", "bincode"] }
 zstd = "0.13"
+fswalk.path = "../fswalk"
