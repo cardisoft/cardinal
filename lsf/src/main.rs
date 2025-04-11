@@ -205,12 +205,12 @@ fn main() -> Result<()> {
                     eprintln!("bad query: {:?}", segments);
                     continue;
                 }
-                // /<first>
-                ["", first] => {
+                // "/<first>"
+                ["", prefix] => {
                     let search_time = Instant::now();
-                    let mut prefix = vec![0u8];
-                    prefix.extend_from_slice(first.as_bytes());
-                    for (i, name) in name_pool.search_prefix(&prefix).enumerate() {
+                    let mut buffer = vec![0u8];
+                    buffer.extend_from_slice(prefix.as_bytes());
+                    for (i, name) in name_pool.search_prefix(&buffer).enumerate() {
                         if let Some(nodes) = name_index.get(name) {
                             for &node in nodes {
                                 println!("[{}] {}", i, slab[node].path(&slab));
@@ -219,10 +219,25 @@ fn main() -> Result<()> {
                     }
                     dbg!(search_time.elapsed());
                 }
-                [last, ""] => {
-                    // TODO(ldm0): this is not a good design, we should use the last segment to search
+                // "/<exact>/"
+                ["", exact, ""] => {
                     let search_time = Instant::now();
-                    let suffix = CString::new(*last).context("Query contains nul")?;
+                    let mut buffer = vec![0u8];
+                    buffer.extend_from_slice(exact.as_bytes());
+                    buffer.push(0);
+                    for (i, name) in name_pool.search_exact(&buffer).enumerate() {
+                        if let Some(nodes) = name_index.get(name) {
+                            for &node in nodes {
+                                println!("[{}] {}", i, slab[node].path(&slab));
+                            }
+                        }
+                    }
+                    dbg!(search_time.elapsed());
+                }
+                // "<suffix>/"
+                [suffix, ""] => {
+                    let search_time = Instant::now();
+                    let suffix = CString::new(*suffix).context("Query contains nul")?;
                     for (i, name) in name_pool.search_suffix(&suffix).enumerate() {
                         if let Some(nodes) = name_index.get(name) {
                             for &node in nodes {

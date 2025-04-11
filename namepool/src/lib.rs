@@ -92,6 +92,17 @@ impl NamePool {
                 })
             })
     }
+
+    // `exact` should starts with a '\0', and ends with a '\0',
+    // e.g. b"\0hello\0"
+    pub fn search_exact<'a>(&'a self, exact: &'a [u8]) -> impl Iterator<Item = &'a str> + 'a {
+        assert_eq!(exact[0], 0);
+        assert_eq!(exact[exact.len() - 1], 0);
+        memchr::memmem::find_iter(&self.pool, exact).map(|x| {
+            let (_, s) = self.get(x + exact.len() - 1);
+            s
+        })
+    }
 }
 
 #[cfg(test)]
@@ -339,5 +350,108 @@ mod tests {
         // This should panic because the prefix does not start with \0
         let prefix = b"hello";
         let _result: Vec<_> = pool.search_prefix(prefix).collect();
+    }
+
+    #[test]
+    fn test_search_exact() {
+        let mut pool = NamePool::new();
+        pool.push("hello");
+        pool.push("world");
+        pool.push("hello world");
+        pool.push("hello world hello");
+
+        let exact = b"\0hello\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "hello");
+
+        let exact = b"\0world\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "world");
+
+        let exact = b"\0hello world\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "hello world");
+
+        let exact = b"\0hello world hello\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "hello world hello");
+    }
+
+    #[test]
+    fn test_search_exact_nonexistent() {
+        let mut pool = NamePool::new();
+        pool.push("hello");
+        pool.push("world");
+
+        let exact = b"\0nonexistent\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_search_exact_partial_match() {
+        let mut pool = NamePool::new();
+        pool.push("hello");
+        pool.push("world");
+        pool.push("hell");
+
+        let exact = b"\0hell\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "hell");
+
+        let exact = b"\0hello\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "hello");
+    }
+
+    #[test]
+    fn test_search_exact_unicode() {
+        let mut pool = NamePool::new();
+        pool.push("こんにちは");
+        pool.push("世界");
+        pool.push("こんにちは世界");
+
+        let exact = "\0こんにちは\0".as_bytes();
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "こんにちは");
+
+        let exact = "\0世界\0".as_bytes();
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "世界");
+
+        let exact = "\0こんにちは世界\0".as_bytes();
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "こんにちは世界");
+    }
+
+    #[test]
+    #[should_panic(expected = "assertion `left == right` failed\n  left: 104\n right: 0")]
+    fn test_search_exact_should_panic_no_leading_null() {
+        let mut pool = NamePool::new();
+        pool.push("hello");
+
+        // This should panic because the exact string does not start with \0
+        let exact = b"hello\0";
+        let _result: Vec<_> = pool.search_exact(exact).collect();
+    }
+
+    #[test]
+    #[should_panic(expected = "assertion `left == right` failed\n  left: 111\n right: 0")]
+    fn test_search_exact_should_panic_no_trailing_null() {
+        let mut pool = NamePool::new();
+        pool.push("hello");
+
+        // This should panic because the exact string does not end with \0
+        let exact = b"\0hello";
+        let _result: Vec<_> = pool.search_exact(exact).collect();
     }
 }
