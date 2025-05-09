@@ -26,26 +26,6 @@ struct SlabNode {
     name: String,
 }
 
-impl SlabNode {
-    /// Get the path of the node in the slab.
-    pub fn path(&self, slab: &Slab<SlabNode>) -> String {
-        let mut segments = vec![self.name.clone()];
-        // Write code like this to avoid the root node, which has no node name and shouldn't be put into semgents.
-        if let Some(mut parent) = self.parent {
-            while let Some(new_parent) = slab[parent].parent {
-                segments.push(slab[parent].name.clone());
-                parent = new_parent
-            }
-        }
-        let mut result = String::new();
-        for segment in segments.into_iter().rev() {
-            result.push('/');
-            result.push_str(&segment);
-        }
-        result
-    }
-}
-
 pub struct SlabNodeData {
     pub name: String,
     pub ctime: Option<u64>,
@@ -229,8 +209,50 @@ impl SearchCache {
         Ok(node_set.unwrap())
     }
 
+    /// Get the path of the node in the slab.
     fn node_path(&self, index: usize) -> String {
-        self.slab[index].path(&self.slab)
+        let node = &self.slab[index];
+        let mut segments = vec![node.name.clone()];
+        // Write code like this to avoid the root node, which has no node name and shouldn't be put into semgents.
+        if let Some(mut parent) = node.parent {
+            while let Some(new_parent) = self.slab[parent].parent {
+                segments.push(self.slab[parent].name.clone());
+                parent = new_parent;
+            }
+        }
+        let mut result = String::new();
+        for segment in segments.into_iter().rev() {
+            result.push('/');
+            result.push_str(&segment);
+        }
+        result
+    }
+
+    fn push_node(&mut self, node: SlabNode) {
+        let node_name = node.name.clone();
+        let index = self.slab.insert(node);
+        if let Some(indexes) = self.name_index.get_mut(&node_name) {
+            indexes.push(index);
+        } else {
+            self.name_pool.push(&node_name);
+            self.name_index.insert(node_name, vec![index]);
+        }
+    }
+
+    fn remove_node(&mut self, index: usize) {
+        if let Some(node) = self.slab.try_remove(index) {
+            let indexes = self
+                .name_index
+                .get_mut(&node.name)
+                .expect("inconsistent name index and node");
+            indexes.retain(|&x| x != index);
+            if indexes.is_empty() {
+                self.name_index.remove(&node.name);
+                // TODO(ldm0): actually we need to remove name in the name pool,
+                // but currently name pool doesn't support remove. (GC is needed for name pool)
+                // self.name_pool.remove(&node.name);
+            }
+        }
     }
 
     fn into_persistent_storage(self) -> PersistentStorage {
