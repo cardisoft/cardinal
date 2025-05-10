@@ -4,7 +4,13 @@ mod query;
 use anyhow::{Context, Result, bail};
 use bincode::{Decode, Encode};
 use cache::{PersistentStorage, cache_exists, read_cache_from_file, write_cache_to_file};
+use cardinal_sdk::{
+    fsevent::{EventFlag, EventStream, FsEvent, ScanType},
+    fsevent_sys::FSEventStreamEventId,
+    utils::current_event_id,
+};
 use clap::Parser;
+use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
 use fswalk::{Node, WalkData, walk_it};
 use namepool::NamePool;
 use query::{Segment, query_segmentation};
@@ -14,10 +20,11 @@ use std::{
     collections::BTreeMap,
     ffi::CString,
     fs::Metadata,
-    io::Write,
+    io::{ErrorKind, Write},
     path::{Path, PathBuf},
     time::{Instant, UNIX_EPOCH},
 };
+use typed_num::Num;
 
 #[derive(Serialize, Deserialize, Encode, Decode)]
 struct SlabNode {
@@ -132,6 +139,7 @@ fn name_pool(name_index: &BTreeMap<String, Vec<usize>>) -> NamePool {
 }
 
 struct SearchCache {
+    last_event_id: u64,
     slab_root: usize,
     slab: Slab<SlabNode>,
     name_index: BTreeMap<String, Vec<usize>>,
@@ -140,6 +148,7 @@ struct SearchCache {
 
 impl SearchCache {
     fn new(
+        last_event_id: u64,
         slab_root: usize,
         slab: Slab<SlabNode>,
         name_index: BTreeMap<String, Vec<usize>>,
@@ -147,6 +156,7 @@ impl SearchCache {
         // name pool construction speed is fast enough that caching it doesn't worth it.
         let name_pool = name_pool(&name_index);
         Self {
+            last_event_id,
             slab_root,
             slab,
             name_index,
@@ -246,6 +256,27 @@ impl SearchCache {
         index
     }
 
+    /// Removes a node by path and its children recursively.
+    fn remove_node_path(&mut self, path: &Path) -> Option<usize> {
+        let mut current = self.slab_root;
+        for name in path
+            .components()
+            .map(|x| x.as_os_str().to_string_lossy().into_owned())
+        {
+            if let Some(&index) = self.slab[current]
+                .children
+                .iter()
+                .find(|&&x| self.slab[x].name == name)
+            {
+                current = index;
+            } else {
+                return None;
+            }
+        }
+        self.remove_node(current);
+        Some(current)
+    }
+
     // create_node_chain just blindly try create node chain, it doesn't check if the path is really exist on disk.
     fn create_node_chain(&mut self, path: &Path) -> usize {
         let mut current = self.slab_root;
@@ -274,10 +305,11 @@ impl SearchCache {
         current
     }
 
-    // `Self::scan_dir`function returns index of the constructed node.
+    // `Self::scan_path_recursive`function returns index of the constructed node.
     // Procedure contains metadata fetching, if fetching failed, None is returned.
-    fn scan_dir(&mut self, path: &Path) -> Option<usize> {
-        if path.metadata().is_err() {
+    fn scan_path_recursive(&mut self, path: &Path) -> Option<usize> {
+        if path.metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
+            self.remove_node_path(path);
             return None;
         };
         // Ensure node of the path parent is existed
@@ -292,47 +324,75 @@ impl SearchCache {
         }
     }
 
-    // `Self::scan_file`function returns index of the constructed node.
+    // `Self::scan_path_nonrecursive`function returns index of the constructed node.
     // Procedure contains metadata fetching, if fetching failed, None is returned.
-    fn scan_file(&mut self, path: &Path) -> Option<usize> {
-        if path.metadata().is_err() {
+    #[allow(dead_code)]
+    fn scan_path_nonrecursive(&mut self, path: &Path) -> Option<usize> {
+        if path.metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
+            self.remove_node_path(path);
             return None;
         };
         Some(self.create_node_chain(path))
     }
 
+    fn rescan(&mut self) -> Option<usize> {
+        unimplemented!()
+    }
+
+    /// Removes a node and its children recursively by index.
     fn remove_node(&mut self, index: usize) {
-        if let Some(node) = self.slab.try_remove(index) {
-            let indexes = self
-                .name_index
-                .get_mut(&node.name)
-                .expect("inconsistent name index and node");
-            indexes.retain(|&x| x != index);
-            if indexes.is_empty() {
-                self.name_index.remove(&node.name);
-                // TODO(ldm0): actually we need to remove name in the name pool,
-                // but currently name pool doesn't support remove. (GC is needed for name pool)
-                // self.name_pool.remove(&node.name);
+        fn remove_single_node(cache: &mut SearchCache, index: usize) {
+            if let Some(node) = cache.slab.try_remove(index) {
+                if let Some(parent) = node.parent {
+                    cache.slab[parent].children.retain(|&x| x != index);
+                }
+                let indexes = cache
+                    .name_index
+                    .get_mut(&node.name)
+                    .expect("inconsistent name index and node");
+                indexes.retain(|&x| x != index);
+                if indexes.is_empty() {
+                    cache.name_index.remove(&node.name);
+                    // TODO(ldm0): actually we need to remove name in the name pool,
+                    // but currently name pool doesn't support remove. (GC is needed for name pool)
+                    // self.name_pool.remove(&node.name);
+                }
             }
+        }
+
+        let mut stack = vec![index];
+        while let Some(current) = stack.pop() {
+            stack.extend_from_slice(&self.slab[current].children);
+            remove_single_node(self, current);
         }
     }
 
     fn into_persistent_storage(self) -> PersistentStorage {
         PersistentStorage {
+            version: Num,
             slab_root: self.slab_root,
             slab: self.slab,
             name_index: self.name_index,
         }
     }
+
+    fn update_event_id(&mut self, event_id: u64) {
+        if event_id <= self.last_event_id {
+            eprintln!("Event id is not increasing, ignoring");
+            return;
+        }
+        self.last_event_id = event_id;
+    }
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    let last_event_id = current_event_id();
     let mut cache = if cli.refresh || !cache_exists() {
         println!("Walking filesystem...");
         let (slab_root, slab) = walkfs_to_slab();
         let name_index = name_index(&slab);
-        SearchCache::new(slab_root, slab, name_index)
+        SearchCache::new(last_event_id, slab_root, slab, name_index)
     } else {
         println!("Reading cache...");
         read_cache_from_file()
@@ -341,15 +401,71 @@ fn main() -> Result<()> {
                      slab_root,
                      slab,
                      name_index,
-                 }| SearchCache::new(slab_root, slab, name_index),
+                     ..
+                 }| SearchCache::new(last_event_id, slab_root, slab, name_index),
             ) // 从 PersistentStorage 中解构
             .unwrap_or_else(|e| {
                 eprintln!("Failed to read cache: {:?}. Re-walking filesystem...", e);
                 let (slab_root, slab) = walkfs_to_slab();
                 let name_index = name_index(&slab);
-                SearchCache::new(slab_root, slab, name_index)
+                SearchCache::new(last_event_id, slab_root, slab, name_index)
             })
     };
+
+    let (finish_tx, finish_rx) = bounded::<Sender<SearchCache>>(1);
+    let (search_tx, search_rx) = unbounded::<String>();
+    let (search_result_tx, search_result_rx) = unbounded::<Result<Vec<String>>>();
+
+    std::thread::spawn(move || {
+        let event_stream = spawn_event_watcher("/".to_string(), last_event_id);
+        println!("Processing changes during processing");
+        loop {
+            crossbeam_channel::select! {
+                recv(finish_rx) -> tx => {
+                    let tx = tx.expect("finish_tx is closed");
+                    tx.send(cache).expect("finish_tx is closed");
+                    break;
+                }
+                recv(search_rx) -> query => {
+                    let query = query.expect("search_tx is closed");
+                    search_result_tx.send(cache.search(&query).map(|nodes| nodes.into_iter().map(|node| cache.node_path(node)).collect())).expect("search_result_tx is closed");
+                }
+                recv(event_stream) -> events => {
+                    let events = events.expect("event_stream is closed");
+                    for event in events {
+                        if event.flag.contains(EventFlag::HistoryDone) {
+                            println!("History processing done");
+                        } else {
+                            match event.flag.scan_type() {
+                                ScanType::SingleNode => {
+                                    // TODO(ldm0): use scan_path_nonrecursive until we are confident about each event flag meaning.
+                                    let file = cache.scan_path_recursive(&event.path);
+                                    if file.is_some() {
+                                        println!("File changed: {:?}", event.path);
+                                    }
+                                }
+                                ScanType::Folder => {
+                                    println!("Folder changed: {:?}", event.path);
+                                    let folder = cache.scan_path_recursive(&event.path);
+                                    if folder.is_some() {
+                                        println!("Folder changed: {:?}", event.path);
+                                    }
+                                }
+                                ScanType::ReScan => {
+                                    println!("!!! Rescanning");
+                                    let root = cache.rescan();
+                                    println!("Rescan done: {:?}", root);
+                                }
+                                ScanType::Nop => {}
+                            }
+                        }
+                        cache.update_event_id(event.id);
+                    }
+                }
+            }
+        }
+        println!("fsevent processing is done");
+    });
 
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
@@ -365,10 +481,16 @@ fn main() -> Result<()> {
             break;
         }
 
-        match cache.search(line) {
-            Ok(node_set) => {
-                for (i, node) in node_set.into_iter().enumerate() {
-                    println!("[{}] {}", i, cache.node_path(node));
+        search_tx
+            .send(line.to_string())
+            .context("search_tx is closed")?;
+        let search_result = search_result_rx
+            .recv()
+            .context("search_result_rx is closed")?;
+        match search_result {
+            Ok(path_set) => {
+                for (i, path) in path_set.into_iter().enumerate() {
+                    println!("[{}] {}", i, path);
                 }
             }
             Err(e) => {
@@ -377,8 +499,33 @@ fn main() -> Result<()> {
         }
     }
 
+    let (cache_tx, cache_rx) = bounded::<SearchCache>(1);
+    finish_tx.send(cache_tx).context("cache_tx is closed")?;
+    let cache = cache_rx.recv().context("cache_tx is closed")?;
     write_cache_to_file(cache.into_persistent_storage()).context("Write cache to file failed.")?;
+    println!("Processing changes done");
+
     Ok(())
+}
+
+fn spawn_event_watcher(
+    path: String,
+    since_event_id: FSEventStreamEventId,
+) -> Receiver<Vec<FsEvent>> {
+    let (sender, receiver) = unbounded();
+    std::thread::spawn(move || {
+        EventStream::new(
+            &[&path],
+            since_event_id,
+            0.1,
+            Box::new(move |events| {
+                sender.send(events).unwrap();
+            }),
+        )
+        .block_on()
+        .unwrap();
+    });
+    receiver
 }
 
 // TODO(ldm0):

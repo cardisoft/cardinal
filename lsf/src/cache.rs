@@ -10,9 +10,13 @@ use std::{
     thread::available_parallelism,
     time::Instant,
 };
+use typed_num::Num;
+
+const LSF_VERSION: i64 = 0;
 
 #[derive(Encode, Decode)]
 pub struct PersistentStorage {
+    pub version: Num<LSF_VERSION>,
     pub slab_root: usize,
     pub slab: Slab<SlabNode>,
     pub name_index: BTreeMap<String, Vec<usize>>,
@@ -50,9 +54,15 @@ pub fn write_cache_to_file(storage: PersistentStorage) -> Result<()> {
         )
         .context("Failed to encode cache")?;
     }
-    fs::rename(CACHE_TMP_PATH, CACHE_PATH).unwrap();
+    fs::rename(CACHE_TMP_PATH, CACHE_PATH).context("Failed to rename cache file")?;
     dbg!(cache_encode_time.elapsed());
-    dbg!(fs::metadata(CACHE_PATH).unwrap().len() / 1024 / 1024);
+    dbg!(
+        fs::metadata(CACHE_PATH)
+            .context("Failed to get cache file metadata")?
+            .len()
+            / 1024
+            / 1024
+    );
     Ok(())
 }
 
