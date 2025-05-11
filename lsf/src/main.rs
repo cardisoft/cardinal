@@ -1,10 +1,11 @@
+mod cache;
 mod cli;
 mod persistent;
 mod query;
-mod cache;
 
 use anyhow::{Context, Result};
 use bincode::{Decode, Encode};
+use cache::SearchCache;
 use cardinal_sdk::{
     fsevent::{EventStream, FsEvent},
     fsevent_sys::FSEventStreamEventId,
@@ -13,7 +14,6 @@ use cardinal_sdk::{
 use clap::Parser;
 use cli::Cli;
 use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
-use cache::SearchCache;
 use serde::{Deserialize, Serialize};
 use std::{fs::Metadata, io::Write, time::UNIX_EPOCH};
 

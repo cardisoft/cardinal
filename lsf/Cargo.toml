@@ -15,4 +15,4 @@ clap = { version = "4", features = ["derive"] }
 anyhow = "1.0.97"
 crossbeam-channel = "0.5.15"
 chrono = "0.4.41"
-typed-num = { version = "0.3.0", features = ["bincode"] }
+typed-num = { version = "0.3.0", default-features = false, features = ["bincode"] }
