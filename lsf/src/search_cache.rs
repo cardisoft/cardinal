@@ -42,6 +42,49 @@ impl SearchCache {
     }
 
     pub fn walk_fs() -> Self {
+        fn walkfs_to_slab() -> (usize, Slab<SlabNode>) {
+            // 先多线程构建树形文件名列表(不能直接创建 slab 因为 slab 无法多线程构建(slab 节点有相互引用，不想加锁))
+            let walk_data = WalkData::with_ignore_directory(PathBuf::from("/System/Volumes/Data"));
+            let visit_time = Instant::now();
+            let node = walk_it(Path::new("/"), &walk_data).expect("failed to walk");
+            dbg!(walk_data);
+            dbg!(visit_time.elapsed());
+
+            // 然后创建 slab
+            let slab_time = Instant::now();
+            let mut slab = Slab::new();
+            let slab_root = construct_node_slab(None, &node, &mut slab);
+            dbg!(slab_time.elapsed());
+            dbg!(slab_root);
+            dbg!(slab.len());
+
+            (slab_root, slab)
+        }
+        fn name_index(slab: &Slab<SlabNode>) -> BTreeMap<String, Vec<usize>> {
+            /// Combine the construction routine of NamePool and BTreeMap since we can deduplicate node name for free.
+            // TODO(ldm0): Memory optimization can be done by letting name index reference the name in the pool(gc need to be considered though)
+            fn construct_name_index(
+                slab: &Slab<SlabNode>,
+                name_index: &mut BTreeMap<String, Vec<usize>>,
+            ) {
+                // The slab is newly constructed, thus though slab.iter() iterates all slots, it won't waste too much.
+                for (i, node) in slab.iter() {
+                    if let Some(nodes) = name_index.get_mut(&node.name) {
+                        nodes.push(i);
+                    } else {
+                        name_index.insert(node.name.clone(), vec![i]);
+                    };
+                }
+            }
+
+            let name_index_time = Instant::now();
+            let mut name_index = BTreeMap::default();
+            construct_name_index(slab, &mut name_index);
+            dbg!(name_index_time.elapsed());
+            println!("name index len: {}", name_index.len());
+            name_index
+        }
+
         let last_event_id = current_event_id();
         println!("Walking filesystem...");
         let (slab_root, slab) = walkfs_to_slab();
@@ -286,76 +329,7 @@ impl SearchCache {
         }
         self.last_event_id = event_id;
     }
-}
 
-fn construct_node_slab(parent: Option<usize>, node: &Node, slab: &mut Slab<SlabNode>) -> usize {
-    let slab_node = SlabNode {
-        parent,
-        children: vec![],
-        name: node.name.clone(),
-    };
-    let index = slab.insert(slab_node);
-    slab[index].children = node
-        .children
-        .iter()
-        .map(|node| construct_node_slab(Some(index), node, slab))
-        .collect();
-    index
-}
-
-/// Combine the construction routine of NamePool and BTreeMap since we can deduplicate node name for free.
-// TODO(ldm0): Memory optimization can be done by letting name index reference the name in the pool(gc need to be considered though)
-fn construct_name_index(slab: &Slab<SlabNode>, name_index: &mut BTreeMap<String, Vec<usize>>) {
-    // The slab is newly constructed, thus though slab.iter() iterates all slots, it won't waste too much.
-    for (i, node) in slab.iter() {
-        if let Some(nodes) = name_index.get_mut(&node.name) {
-            nodes.push(i);
-        } else {
-            name_index.insert(node.name.clone(), vec![i]);
-        };
-    }
-}
-
-pub fn walkfs_to_slab() -> (usize, Slab<SlabNode>) {
-    // 先多线程构建树形文件名列表(不能直接创建 slab 因为 slab 无法多线程构建(slab 节点有相互引用，不想加锁))
-    let walk_data = WalkData::with_ignore_directory(PathBuf::from("/System/Volumes/Data"));
-    let visit_time = Instant::now();
-    let node = walk_it(Path::new("/"), &walk_data).expect("failed to walk");
-    dbg!(walk_data);
-    dbg!(visit_time.elapsed());
-
-    // 然后创建 slab
-    let slab_time = Instant::now();
-    let mut slab = Slab::new();
-    let slab_root = construct_node_slab(None, &node, &mut slab);
-    dbg!(slab_time.elapsed());
-    dbg!(slab_root);
-    dbg!(slab.len());
-
-    (slab_root, slab)
-}
-
-pub fn name_index(slab: &Slab<SlabNode>) -> BTreeMap<String, Vec<usize>> {
-    let name_index_time = Instant::now();
-    let mut name_index = BTreeMap::default();
-    construct_name_index(slab, &mut name_index);
-    dbg!(name_index_time.elapsed());
-    println!("name index len: {}", name_index.len());
-    name_index
-}
-
-fn name_pool(name_index: &BTreeMap<String, Vec<usize>>) -> NamePool {
-    let name_pool_time = Instant::now();
-    let mut name_pool = NamePool::new();
-    for name in name_index.keys() {
-        name_pool.push(name);
-    }
-    dbg!(name_pool_time.elapsed());
-    println!("name pool size: {}MB", name_pool.len() / 1024 / 1024);
-    name_pool
-}
-
-impl SearchCache {
     pub fn query_files(&self, query: String) -> Result<Vec<String>> {
         self.search(&query)
             .map(|nodes| nodes.into_iter().map(|node| self.node_path(node)).collect())
@@ -392,4 +366,30 @@ impl SearchCache {
             self.update_event_id(event.id);
         }
     }
+}
+
+fn construct_node_slab(parent: Option<usize>, node: &Node, slab: &mut Slab<SlabNode>) -> usize {
+    let slab_node = SlabNode {
+        parent,
+        children: vec![],
+        name: node.name.clone(),
+    };
+    let index = slab.insert(slab_node);
+    slab[index].children = node
+        .children
+        .iter()
+        .map(|node| construct_node_slab(Some(index), node, slab))
+        .collect();
+    index
+}
+
+fn name_pool(name_index: &BTreeMap<String, Vec<usize>>) -> NamePool {
+    let name_pool_time = Instant::now();
+    let mut name_pool = NamePool::new();
+    for name in name_index.keys() {
+        name_pool.push(name);
+    }
+    dbg!(name_pool_time.elapsed());
+    println!("name pool size: {}MB", name_pool.len() / 1024 / 1024);
+    name_pool
 }

@@ -55,12 +55,13 @@ pub fn write_cache_to_file(storage: PersistentStorage) -> Result<()> {
     }
     fs::rename(CACHE_TMP_PATH, CACHE_PATH).context("Failed to rename cache file")?;
     dbg!(cache_encode_time.elapsed());
-    dbg!(
+    println!(
+        "Cache size: {} MB",
         fs::metadata(CACHE_PATH)
             .context("Failed to get cache file metadata")?
-            .len()
-            / 1024
-            / 1024
+            .len() as f32
+            / 1024.
+            / 1024.
     );
     Ok(())
 }
