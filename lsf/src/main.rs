@@ -6,7 +6,7 @@ mod search_cache;
 use anyhow::{Context, Result};
 use bincode::{Decode, Encode};
 use cardinal_sdk::{
-    fsevent::{EventFlag, EventStream, FsEvent, ScanType},
+    fsevent::{EventStream, FsEvent},
     fsevent_sys::FSEventStreamEventId,
     utils::current_event_id,
 };
@@ -85,39 +85,14 @@ fn main() -> Result<()> {
                 }
                 recv(search_rx) -> query => {
                     let query = query.expect("search_tx is closed");
-                    search_result_tx.send(cache.search(&query).map(|nodes| nodes.into_iter().map(|node| cache.node_path(node)).collect())).expect("search_result_tx is closed");
+                    let files = cache.query_files(query);
+                    search_result_tx
+                        .send(files)
+                        .expect("search_result_tx is closed");
                 }
                 recv(event_stream) -> events => {
                     let events = events.expect("event_stream is closed");
-                    for event in events {
-                        if event.flag.contains(EventFlag::HistoryDone) {
-                            println!("History processing done");
-                        } else {
-                            match event.flag.scan_type() {
-                                ScanType::SingleNode => {
-                                    // TODO(ldm0): use scan_path_nonrecursive until we are confident about each event flag meaning.
-                                    let file = cache.scan_path_recursive(&event.path);
-                                    if file.is_some() {
-                                        println!("File changed: {:?}", event.path);
-                                    }
-                                }
-                                ScanType::Folder => {
-                                    println!("Folder changed: {:?}", event.path);
-                                    let folder = cache.scan_path_recursive(&event.path);
-                                    if folder.is_some() {
-                                        println!("Folder changed: {:?}", event.path);
-                                    }
-                                }
-                                ScanType::ReScan => {
-                                    println!("!!! Rescanning");
-                                    let root = cache.rescan();
-                                    println!("Rescan done: {root:?}");
-                                }
-                                ScanType::Nop => {}
-                            }
-                        }
-                        cache.update_event_id(event.id);
-                    }
+                    cache.handle_fs_events(events);
                 }
             }
         }

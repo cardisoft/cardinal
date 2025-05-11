@@ -4,7 +4,10 @@ use crate::{
     query::{Segment, query_segmentation},
 };
 use anyhow::{Context, Result, bail};
-use cardinal_sdk::utils::current_event_id;
+use cardinal_sdk::{
+    fsevent::{EventFlag, FsEvent, ScanType},
+    utils::current_event_id,
+};
 use fswalk::{Node, WalkData, walk_it};
 use namepool::NamePool;
 use slab::Slab;
@@ -350,4 +353,43 @@ fn name_pool(name_index: &BTreeMap<String, Vec<usize>>) -> NamePool {
     dbg!(name_pool_time.elapsed());
     println!("name pool size: {}MB", name_pool.len() / 1024 / 1024);
     name_pool
+}
+
+impl SearchCache {
+    pub fn query_files(&self, query: String) -> Result<Vec<String>> {
+        self.search(&query)
+            .map(|nodes| nodes.into_iter().map(|node| self.node_path(node)).collect())
+    }
+
+    pub fn handle_fs_events(&mut self, events: Vec<FsEvent>) {
+        for event in events {
+            if event.flag.contains(EventFlag::HistoryDone) {
+                println!("History processing done");
+            } else {
+                match event.flag.scan_type() {
+                    ScanType::SingleNode => {
+                        // TODO(ldm0): use scan_path_nonrecursive until we are confident about each event flag meaning.
+                        let file = self.scan_path_recursive(&event.path);
+                        if file.is_some() {
+                            println!("File changed: {:?}", event.path);
+                        }
+                    }
+                    ScanType::Folder => {
+                        println!("Folder changed: {:?}", event.path);
+                        let folder = self.scan_path_recursive(&event.path);
+                        if folder.is_some() {
+                            println!("Folder changed: {:?}", event.path);
+                        }
+                    }
+                    ScanType::ReScan => {
+                        println!("!!! Rescanning");
+                        let root = self.rescan();
+                        println!("Rescan done: {root:?}");
+                    }
+                    ScanType::Nop => {}
+                }
+            }
+            self.update_event_id(event.id);
+        }
+    }
 }
