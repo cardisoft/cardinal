@@ -9,7 +9,6 @@ use cache::SearchCache;
 use cardinal_sdk::{
     fsevent::{EventStream, FsEvent},
     fsevent_sys::FSEventStreamEventId,
-    utils::current_event_id,
 };
 use clap::Parser;
 use cli::Cli;
@@ -57,7 +56,6 @@ fn ctime_mtime_from_metadata(metadata: &Metadata) -> (Option<u64>, Option<u64>) 
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let last_event_id = current_event_id();
     let path = cli.path;
     let mut cache = if cli.refresh {
         println!("Walking filesystem...");
@@ -75,7 +73,7 @@ fn main() -> Result<()> {
     let (search_result_tx, search_result_rx) = unbounded::<Result<Vec<String>>>();
 
     std::thread::spawn(move || {
-        let event_stream = spawn_event_watcher("/".to_string(), last_event_id);
+        let event_stream = spawn_event_watcher("/".to_string(), cache.last_event_id());
         println!("Processing changes during processing");
         loop {
             crossbeam_channel::select! {

@@ -385,12 +385,16 @@ impl SearchCache {
         .context("Write cache to file failed.")
     }
 
-    fn update_event_id(&mut self, event_id: u64) {
+    fn update_last_event_id(&mut self, event_id: u64) {
         if event_id <= self.last_event_id {
             eprintln!("Event id is not increasing, ignoring");
             return;
         }
         self.last_event_id = event_id;
+    }
+
+    pub fn last_event_id(&mut self) -> u64 {
+        self.last_event_id
     }
 
     pub fn query_files(&self, query: String) -> Result<Vec<String>> {
@@ -420,7 +424,7 @@ impl SearchCache {
             }
             ScanType::Nop => {}
         }
-        self.update_event_id(event.id);
+        self.update_last_event_id(event.id);
     }
 
     pub fn handle_fs_events(&mut self, events: Vec<FsEvent>) {
