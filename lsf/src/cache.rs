@@ -280,7 +280,6 @@ impl SearchCache {
     // `Self::scan_path_recursive`function returns index of the constructed node.
     // - If path is not under the watch root, None is returned.
     // - Procedure contains metadata fetching, if metadata fetching failed, None is returned.
-    // - `raw_path` is not allowed to be root.
     pub fn scan_path_recursive(&mut self, raw_path: &Path) -> Option<usize> {
         // Ensure path is under the watch root
         let Ok(path) = raw_path.strip_prefix(&self.path) else {
@@ -290,10 +289,13 @@ impl SearchCache {
             self.remove_node_path(path);
             return None;
         };
-        // Root scanning is not allowed, under such circumstances, we should
-        // clear all things and do a full rescan(It should be processed outside
-        // this function or add a separate branch to prune name index slab namepool etc.).
-        let parent = path.parent().expect("Scanning root?");
+        let Some(parent) = path.parent() else {
+            println!("!!! Full rescan is needed");
+            // If path is watch root, we need to do a full rescan
+            self.rescan();
+            println!("!!! Full rescan done: {:?}", self.slab_root);
+            return Some(self.slab_root);
+        };
         // Ensure node of the path parent is existed
         let parent = self.create_node_chain(parent);
         // Remove node(if exists) and do a full rescan
@@ -335,8 +337,13 @@ impl SearchCache {
         Some(self.create_node_chain(path))
     }
 
-    pub fn rescan(&mut self) -> Option<usize> {
-        unimplemented!()
+    pub fn rescan(&mut self) {
+        // Remove all memory consuming cache
+        self.slab = Slab::new();
+        self.name_index = BTreeMap::default();
+        self.name_pool = NamePool::new();
+        let path = std::mem::take(&mut self.path);
+        *self = Self::walk_fs(path);
     }
 
     /// Removes a node and its children recursively by index.
@@ -408,8 +415,8 @@ impl SearchCache {
             }
             ScanType::ReScan => {
                 println!("!!! Rescanning");
-                let root = self.rescan();
-                println!("Rescan done: {root:?}");
+                self.rescan();
+                println!("!!! Rescan done: {:?}", self.slab_root);
             }
             ScanType::Nop => {}
         }
