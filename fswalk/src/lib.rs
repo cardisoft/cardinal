@@ -75,14 +75,16 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
     if walk_data.ignore_directory.as_deref() == Some(path) {
         return None;
     }
-    let metadata = match path.metadata() {
+    // doesn't traverse symlink
+    let metadata = match path.symlink_metadata() {
         Ok(metadata) => Some(metadata),
         // If it's not found, we definitely don't want it.
         Err(e) if e.kind() == ErrorKind::NotFound => return None,
         // If it's permission denied or something, we still want to insert it into the tree.
         Err(e) => {
             if handle_error_and_retry(&e) {
-                path.metadata().ok()
+                // doesn't traverse symlink
+                path.symlink_metadata().ok()
             } else {
                 None
             }
@@ -101,6 +103,7 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
                             if walk_data.ignore_directory.as_deref() == Some(path) {
                                 return None;
                             }
+                            // doesn't traverse symlink
                             if let Ok(data) = entry.file_type() {
                                 if data.is_dir() {
                                     return walk(&entry.path(), walk_data);
@@ -109,8 +112,7 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
                                     let name = entry
                                         .path()
                                         .file_name()
-                                        .and_then(|x| x.to_str())
-                                        .map(|x| x.to_string())
+                                        .map(|x| x.to_string_lossy().into_owned())
                                         .unwrap_or_default();
                                     return Some(Node {
                                         children: vec![],
@@ -119,6 +121,7 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
                                             .need_metadata
                                             .then_some(entry)
                                             .and_then(|entry| {
+                                                // doesn't traverse symlink
                                                 entry.metadata().ok().map(NodeMetadata::from)
                                             }),
                                     });
