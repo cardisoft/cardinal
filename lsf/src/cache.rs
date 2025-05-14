@@ -26,11 +26,11 @@ pub struct SlabNode {
     metadata: Option<SlabNodeMetadata>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Encode, Decode)]
-struct SlabNodeMetadata {
-    ctime: Option<u64>,
-    mtime: Option<u64>,
-    size: u64,
+#[derive(Debug, Serialize, Deserialize, Encode, Decode, Clone, Copy)]
+pub struct SlabNodeMetadata {
+    pub ctime: Option<u64>,
+    pub mtime: Option<u64>,
+    pub size: u64,
 }
 
 impl SlabNodeMetadata {
@@ -50,6 +50,12 @@ pub struct SearchCache {
     slab: Slab<SlabNode>,
     name_index: BTreeMap<String, Vec<usize>>,
     name_pool: NamePool,
+}
+
+#[derive(Debug)]
+pub struct SearchNode {
+    pub path: String,
+    pub metadata: Option<SlabNodeMetadata>,
 }
 
 impl SearchCache {
@@ -124,7 +130,6 @@ impl SearchCache {
         }
 
         let last_event_id = current_event_id();
-        println!("Walking filesystem...");
         let (slab_root, slab) = walkfs_to_slab(&path);
         let name_index = name_index(&slab);
         Self::new(path, last_event_id, slab_root, slab, name_index)
@@ -215,6 +220,7 @@ impl SearchCache {
     }
 
     /// Get the path of the node in the slab.
+    /// TODO(ldm0): fix root node path badcase: `/var/folders/2b/kq1p5svj1mq0sdbxwy1j564c0000gn/T/test_walk_fs_meta.wfYzYPRu9Col/test_walk_fs_meta.wfYzYPRu9Col`
     pub fn node_path(&self, index: usize) -> String {
         let node = &self.slab[index];
         let mut segments = vec![node.name.clone()];
@@ -423,9 +429,16 @@ impl SearchCache {
         self.last_event_id
     }
 
-    pub fn query_files(&self, query: String) -> Result<Vec<String>> {
-        self.search(&query)
-            .map(|nodes| nodes.into_iter().map(|node| self.node_path(node)).collect())
+    pub fn query_files(&self, query: String) -> Result<Vec<SearchNode>> {
+        self.search(&query).map(|nodes| {
+            nodes
+                .into_iter()
+                .map(|node| SearchNode {
+                    path: self.node_path(node),
+                    metadata: self.slab[node].metadata.clone(),
+                })
+                .collect()
+        })
     }
 
     fn handle_fs_event(&mut self, event: FsEvent) {
@@ -469,7 +482,7 @@ fn construct_node_slab(parent: Option<usize>, node: &Node, slab: &mut Slab<SlabN
         parent,
         children: vec![],
         name: node.name.clone(),
-        metadata: None,
+        metadata: node.metadata.as_ref().map(SlabNodeMetadata::new),
     };
     let index = slab.insert(slab_node);
     slab[index].children = node
@@ -904,5 +917,163 @@ mod tests {
         assert_eq!(cache.search("/foo").unwrap().len(), 1);
         assert_eq!(cache.search("oo.rs/").unwrap().len(), 2);
         assert_eq!(cache.search("oo").unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_walk_fs_metadata_is_always_none() {
+        let temp_dir = TempDir::new("test_walk_fs_meta").expect("Failed to create temp directory");
+        let root_path = temp_dir.path();
+
+        fs::File::create(&root_path.join("file1.txt")).expect("Failed to create file1.txt");
+        fs::create_dir(&root_path.join("subdir1")).expect("Failed to create subdir1");
+        fs::File::create(&root_path.join("subdir1/file2.txt")).expect("Failed to create file1.txt");
+
+        let cache = SearchCache::walk_fs(root_path.to_path_buf());
+
+        // 目录的 metadata 都会是 Some()
+        assert!(cache.slab[cache.slab_root].metadata.is_some());
+
+        // Check metadata for a file node
+        let file_nodes = cache
+            .search("file1.txt")
+            .expect("Search for file1.txt failed");
+        assert_eq!(file_nodes.len(), 1, "Expected 1 node for file1.txt");
+        let file_node_idx = file_nodes[0];
+        // 文件的 metadata 都会是 None
+        assert!(
+            cache.slab[file_node_idx].metadata.is_none(),
+            "Metadata for file node created by walk_fs should be None"
+        );
+
+        // Check metadata for a file node
+        let file_nodes = cache
+            .search("file2.txt")
+            .expect("Search for file1.txt failed");
+        assert_eq!(file_nodes.len(), 1);
+        let file_node_idx = file_nodes[0];
+        // 文件的 metadata 都会是 None
+        assert!(
+            cache.slab[file_node_idx].metadata.is_none(),
+            "Metadata for file node created by walk_fs should be None"
+        );
+
+        // Check metadata for a subdirectory node
+        let dir_nodes = cache.search("subdir1").expect("Search for subdir1 failed");
+        assert_eq!(dir_nodes.len(), 1, "Expected 1 node for subdir1");
+        let dir_node_idx = dir_nodes[0];
+        // 目录的 metadata 都会是 Some()
+        assert!(
+            cache.slab[dir_node_idx].metadata.is_some(),
+            "Metadata for directory node created by walk_fs should be None"
+        );
+    }
+
+    #[test]
+    fn test_handle_fs_events_metadata() {
+        let temp_dir = TempDir::new("test_event_meta").expect("Failed to create temp directory");
+        let root_path = temp_dir.path();
+
+        fs::File::create(&root_path.join("file1.txt")).expect("Failed to create file1.txt");
+        fs::create_dir(&root_path.join("subdir1")).expect("Failed to create subdir1");
+        fs::File::create(&root_path.join("subdir1/file2.txt")).expect("Failed to create file1.txt");
+
+        let mut cache = SearchCache::walk_fs(root_path.to_path_buf());
+        let mut last_event_id = cache.last_event_id();
+
+        let new_file_path = root_path.join("event_file.txt");
+        fs::write(&new_file_path, b"heck").expect("Failed to create event_file.txt");
+
+        let new_file_meta_on_disk = fs::metadata(&new_file_path).unwrap();
+        last_event_id += 1;
+
+        let file_event = FsEvent {
+            path: new_file_path.clone(),
+            id: last_event_id,
+            flag: EventFlag::ItemCreated,
+        };
+        cache.handle_fs_events(vec![file_event]);
+
+        let file_nodes = cache
+            .search("event_file.txt")
+            .expect("Search for event_file.txt failed");
+        assert_eq!(
+            file_nodes.len(),
+            1,
+            "Expected 1 node for event_file.txt after event"
+        );
+        let file_node_idx = file_nodes[0];
+        let file_slab_meta = cache.slab[file_node_idx]
+            .metadata
+            .as_ref()
+            .expect("Metadata for event_file.txt should be populated by event handler");
+        assert_eq!(
+            file_slab_meta.size,
+            new_file_meta_on_disk.len(),
+            "Size mismatch for event_file.txt"
+        );
+        assert_eq!(file_slab_meta.size, 4, "Size mismatch for event_file.txt");
+        assert!(
+            file_slab_meta.mtime.is_some(),
+            "mtime should be populated for event_file.txt"
+        );
+
+        // Part 2: Event for a newly created directory (should populate metadata for itself and its children)
+        let new_subdir_path = root_path.join("event_subdir");
+        fs::create_dir(&new_subdir_path).expect("Failed to create event_subdir");
+
+        let file_in_subdir_path = new_subdir_path.join("file_in_event_subdir.txt");
+        fs::File::create(&file_in_subdir_path).expect("Failed to create file_in_event_subdir.txt");
+        let file_in_subdir_meta_on_disk = fs::metadata(&file_in_subdir_path).unwrap();
+        last_event_id += 1;
+
+        let dir_event = FsEvent {
+            path: new_subdir_path.clone(), // Event is for the directory
+            id: last_event_id,
+            flag: EventFlag::ItemCreated | EventFlag::ItemIsDir,
+        };
+        cache.handle_fs_events(vec![dir_event]);
+
+        // Check metadata for the directory itself
+        let dir_nodes = cache
+            .search("/event_subdir/")
+            .expect("Search for event_subdir failed");
+        assert_eq!(
+            dir_nodes.len(),
+            1,
+            "Expected 1 node for event_subdir after event"
+        );
+        let dir_node_idx = dir_nodes[0];
+        let dir_slab_meta = cache.slab[dir_node_idx]
+            .metadata
+            .as_ref()
+            .expect("Metadata for event_subdir should be populated by event handler");
+        assert!(
+            dir_slab_meta.mtime.is_some(),
+            "mtime should be populated for event_subdir"
+        );
+
+        // Check metadata for the file inside the directory
+        let file_in_subdir_nodes = cache
+            .search("file_in_event_subdir.txt")
+            .expect("Search for file_in_event_subdir.txt failed");
+        assert_eq!(
+            file_in_subdir_nodes.len(),
+            1,
+            "Expected 1 node for file_in_event_subdir.txt after event"
+        );
+        let file_in_subdir_node_idx = file_in_subdir_nodes[0];
+        let file_in_subdir_slab_meta = cache.slab[file_in_subdir_node_idx]
+            .metadata
+            .as_ref()
+            .expect("Metadata for file_in_event_subdir.txt should be populated");
+        assert_eq!(
+            file_in_subdir_slab_meta.size,
+            file_in_subdir_meta_on_disk.len(),
+            "Size mismatch for file_in_event_subdir.txt"
+        );
+        assert!(
+            file_in_subdir_slab_meta.mtime.is_some(),
+            "mtime should be populated for file_in_event_subdir.txt"
+        );
     }
 }

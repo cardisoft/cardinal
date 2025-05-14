@@ -4,7 +4,7 @@ mod persistent;
 mod query;
 
 use anyhow::{Context, Result};
-use cache::SearchCache;
+use cache::{SearchCache, SearchNode};
 use cardinal_sdk::{EventStream, FSEventStreamEventId, FsEvent};
 use clap::Parser;
 use cli::Cli;
@@ -15,6 +15,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let path = cli.path;
     let mut cache = if cli.refresh {
+        println!("Walking filesystem...");
         SearchCache::walk_fs(path)
     } else {
         println!("Try reading cache...");
@@ -26,7 +27,7 @@ fn main() -> Result<()> {
 
     let (finish_tx, finish_rx) = bounded::<Sender<SearchCache>>(1);
     let (search_tx, search_rx) = unbounded::<String>();
-    let (search_result_tx, search_result_rx) = unbounded::<Result<Vec<String>>>();
+    let (search_result_tx, search_result_rx) = unbounded::<Result<Vec<SearchNode>>>();
 
     std::thread::spawn(move || {
         let event_stream = spawn_event_watcher("/".to_string(), cache.last_event_id());
@@ -77,7 +78,7 @@ fn main() -> Result<()> {
         match search_result {
             Ok(path_set) => {
                 for (i, path) in path_set.into_iter().enumerate() {
-                    println!("[{i}] {path}");
+                    println!("[{i}] \"{}\" {:?}", path.path, path.metadata);
                 }
             }
             Err(e) => {
@@ -120,4 +121,5 @@ fn spawn_event_watcher(
 // - segment search cache(same search routine will be triggered while user is typing, should cache exact[..], suffix, suffix/exact[..])
 // [] tui?
 // - lazy metadata design
+//     - fill metadata when not busy(record the process when interrupted)
 // 或许最后可以在首次扫描过程中就把中间结果 在索引逻辑和搜索逻辑之间抛来抛去，做到边索引边搜索
