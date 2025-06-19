@@ -9,7 +9,6 @@ use ratatui::{
     text::{Line, Text},
     widgets::{Block, Paragraph, Widget},
 };
-use std::result;
 
 #[derive(Debug)]
 pub struct App {
@@ -19,6 +18,7 @@ pub struct App {
     queries: Vec<String>,
 
     results: Vec<String>,
+    #[allow(dead_code)]
     updates: Vec<String>,
     exit: bool,
 }
