@@ -1504,6 +1504,7 @@ version = "0.1.0"
 dependencies = [
  "cardinal-sdk",
  "chrono",
+ "clap",
  "crossbeam",
 ]
 

@@ -7,3 +7,4 @@ edition = "2024"
 cardinal-sdk.path = "../cardinal-sdk"
 crossbeam = "0.8"
 chrono = "0.4"
+clap = { version = "4", features = ["derive"] }
