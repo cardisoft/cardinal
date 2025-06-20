@@ -35,6 +35,10 @@ function App() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search for files and folders..."
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          spellCheck={false}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
         />
         <button onClick={handleSearch}>Search</button>
       </div>
