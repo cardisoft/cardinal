@@ -444,23 +444,22 @@ impl SearchCache {
 
     fn handle_fs_event(&mut self, event: FsEvent) {
         match event.flag.scan_type() {
-            ScanType::SingleNode => {
-                // TODO(ldm0): use scan_path_nonrecursive until we are confident about each event flag meaning.
-                let file = self.scan_path_recursive(&event.path);
-                if file.is_some() {
-                    info!("File changed: {:?}, {file:?}", event.path);
-                }
-            }
-            ScanType::Folder => {
+            // Sometimes there are rediculous events assuming dir as file, so we always scan them as folder
+            ScanType::SingleNode | ScanType::Folder => {
                 let folder = self.scan_path_recursive(&event.path);
                 if folder.is_some() {
-                    info!("Folder changed: {:?}, {folder:?}", event.path);
+                    info!("Node changed: {:?}, {folder:?}", event.path);
                 }
             }
             ScanType::ReScan => {
+                // TOOD(ldm0): if rescan happens, we should re-listen the fsevents with latest event id.
+                // send a signal to root, try reset the whole process.
+                todo!("no rescan");
+                /*
                 info!("!!! Rescanning");
                 self.rescan();
                 info!("!!! Rescan done: {:?}", self.slab_root);
+                    */
             }
             ScanType::Nop => {}
         }
