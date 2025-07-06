@@ -149,7 +149,7 @@ pub fn run() -> Result<()> {
 
                     info!("Cache flushed successfully");
 
-                    app_handle.exit(66);
+                    app_handle.exit(0);
                 }
             }
             _ => (),
