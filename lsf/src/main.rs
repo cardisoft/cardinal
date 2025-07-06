@@ -117,3 +117,4 @@ fn main() -> Result<()> {
 // - lazy metadata design
 //     - fill metadata when not busy(record the process when interrupted)
 // 或许最后可以在首次扫描过程中就把中间结果 在索引逻辑和搜索逻辑之间抛来抛去，做到边索引边搜索
+// - !! 如果 cardinal 能搜索已经被删除的文件？(不知道有没有用,但是有了肯定是 killer feature)
