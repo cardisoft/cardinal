@@ -247,6 +247,7 @@ impl SearchCache {
     }
 
     /// Get the path of the node in the slab.
+    /// TODO(ldm0): defend non-existing nodes.
     pub fn node_path(&self, index: usize) -> PathBuf {
         let mut current = index;
         let mut segments = vec![];
@@ -444,14 +445,18 @@ impl SearchCache {
 
     pub fn query_files(&self, query: String) -> Result<Vec<SearchNode>> {
         self.search(&query).map(|nodes| {
-            nodes
-                .into_iter()
-                .map(|node| SearchNode {
-                    path: self.node_path(node),
-                    metadata: self.slab[node].metadata.clone(),
-                })
-                .collect()
+            self.expand_file_nodes(nodes)
         })
+    }
+
+    pub fn expand_file_nodes(&self, nodes: Vec<usize>) -> Vec<SearchNode> {
+        nodes
+            .into_iter()
+            .map(|node| SearchNode {
+                path: self.node_path(node),
+                metadata: self.slab[node].metadata.clone(),
+            })
+            .collect()
     }
 
     fn handle_fs_event(&mut self, event: FsEvent) -> Result<(), HandleFSEError> {

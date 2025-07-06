@@ -10,32 +10,50 @@ use tracing_subscriber::EnvFilter;
 
 struct SearchState {
     search_tx: Sender<String>,
-    result_rx: Receiver<Result<Vec<SearchNode>>>,
+    result_rx: Receiver<Result<Vec<usize>>>,
+
+    node_info_tx: Sender<Vec<usize>>,
+    node_info_results_rx: Receiver<Vec<SearchNode>>,
 }
 
 #[tauri::command]
-async fn search(query: &str, state: State<'_, SearchState>) -> Result<Vec<String>, String> {
+async fn search(query: &str, state: State<'_, SearchState>) -> Result<Vec<usize>, String> {
     // 发送搜索请求到后台线程
     state
         .search_tx
         .send(query.to_string())
-        .map_err(|e| format!("Failed to send search request: {e}"))?;
+        .map_err(|e| format!("Failed to send search request: {:?}", e))?;
 
     // 等待搜索结果
     let search_result = state
         .result_rx
         .recv()
-        .map_err(|e| format!("Failed to receive search result: {e}"))?;
+        .map_err(|e| format!("Failed to receive search result: {:?}", e))?;
 
     // 处理搜索结果
     search_result
+        .map_err(|e| format!("Failed to process search result: {:?}", e))
+}
+
+#[tauri::command]
+async fn get_nodes_info(results: Vec<usize>, state: State<'_, SearchState>) -> Result<Vec<String>, String> {
+    state
+        .node_info_tx
+        .send(results)
+        .map_err(|e| format!("Failed to send node info request: {:?}", e))?;
+
+    let node_info_results = state
+        .node_info_results_rx
+        .recv()
         .map(|nodes| {
             nodes
                 .into_iter()
                 .map(|n| n.path.to_string_lossy().into_owned())
                 .collect()
         })
-        .map_err(|e| e.to_string())
+        .map_err(|e| format!("Failed to receive node info results: {:?}", e))?;
+
+    Ok(node_info_results)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -51,15 +69,21 @@ pub fn run() -> Result<()> {
     // Create communication channels
     let (finish_tx, finish_rx) = bounded::<Sender<SearchCache>>(1);
     let (search_tx, search_rx) = unbounded::<String>();
-    let (result_tx, result_rx) = unbounded::<Result<Vec<SearchNode>>>();
+    let (result_tx, result_rx) = unbounded::<Result<Vec<usize>>>();
+    let (node_info_tx, node_info_rx) = unbounded::<Vec<usize>>();
+    let (node_info_results_tx, node_info_results_rx) = unbounded::<Vec<SearchNode>>();
+
+
     // 运行Tauri应用
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(SearchState {
             search_tx,
             result_rx,
+            node_info_tx,
+            node_info_results_rx,
         })
-        .invoke_handler(tauri::generate_handler![search])
+        .invoke_handler(tauri::generate_handler![search, get_nodes_info])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
@@ -119,8 +143,13 @@ pub fn run() -> Result<()> {
                 }
                 recv(search_rx) -> query => {
                     let query = query.expect("Search channel closed");
-                    let result = cache.query_files(query);
+                    let result = cache.search(&query);
                     result_tx.send(result).expect("Failed to send result");
+                }
+                recv(node_info_rx) -> results => {
+                    let results = results.expect("Node info channel closed");
+                    let node_info_results = cache.expand_file_nodes(results);
+                    node_info_results_tx.send(node_info_results).expect("Failed to send node info results");
                 }
                 recv(event_watcher.receiver) -> events => {
                     let events = events.expect("Event stream closed");
