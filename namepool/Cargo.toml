@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 memchr = "2"
 bincode = "2"
+rayon = "1"

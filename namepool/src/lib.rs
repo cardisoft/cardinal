@@ -1,5 +1,12 @@
 use bincode::{Decode, Encode};
-use std::ffi::CStr;
+use rayon::prelude::*;
+use std::{collections::BTreeMap, ffi::CStr};
+
+fn get_parallelism() -> usize {
+    std::thread::available_parallelism()
+        .map_or(4, |n| n.get())
+        .min(32)
+}
 
 #[derive(Encode, Decode)]
 pub struct NamePool {
@@ -114,6 +121,146 @@ impl NamePool {
             let (_, s) = self.get(x + exact.len() - 1);
             s
         })
+    }
+
+    pub fn par_search_substr<'a>(&'a self, substr: &'a str) -> Vec<&'a str> {
+        let substr_bytes = substr.as_bytes();
+        let pool_len = self.pool.len();
+        if pool_len == 0 || substr_bytes.is_empty() {
+            return vec![];
+        }
+        let chunk_size = (pool_len / get_parallelism()).max(1024).min(pool_len);
+
+        (0..pool_len)
+            .into_par_iter()
+            .step_by(chunk_size)
+            .flat_map(|i| {
+                let search_end = (i + chunk_size).min(pool_len);
+                let read_end = (search_end + substr_bytes.len() - 1).min(pool_len);
+                let slice = &self.pool[i..read_end];
+                memchr::memmem::find_iter(slice, substr_bytes)
+                    .filter(move |&x| i + x < search_end)
+                    .map(move |x| self.get(i + x))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<BTreeMap<_, _>>()
+            .into_values()
+            .collect()
+    }
+
+    pub fn par_search_subslice<'search, 'pool: 'search>(
+        &'pool self,
+        subslice: &'search [u8],
+    ) -> Vec<&'pool str> {
+        let pool_len = self.pool.len();
+        if pool_len == 0 || subslice.is_empty() {
+            return vec![];
+        }
+        let chunk_size = (pool_len / get_parallelism()).max(1024).min(pool_len);
+
+        (0..pool_len)
+            .into_par_iter()
+            .step_by(chunk_size)
+            .flat_map(|i| {
+                let search_end = (i + chunk_size).min(pool_len);
+                let read_end = (search_end + subslice.len() - 1).min(pool_len);
+                let slice = &self.pool[i..read_end];
+                memchr::memmem::find_iter(slice, subslice)
+                    .filter(move |&x| i + x < search_end)
+                    .map(move |x| self.get(i + x))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<BTreeMap<_, _>>()
+            .into_values()
+            .collect()
+    }
+
+    pub fn par_search_suffix<'search, 'pool: 'search>(
+        &'pool self,
+        suffix: &'search CStr,
+    ) -> Vec<&'pool str> {
+        let suffix_bytes = suffix.to_bytes_with_nul();
+        let pool_len = self.pool.len();
+        if pool_len == 0 || suffix_bytes.is_empty() {
+            return vec![];
+        }
+        let chunk_size = (pool_len / get_parallelism()).max(1024).min(pool_len);
+
+        (0..pool_len)
+            .into_par_iter()
+            .step_by(chunk_size)
+            .flat_map(|i| {
+                let search_end = (i + chunk_size).min(pool_len);
+                let read_end = (search_end + suffix_bytes.len() - 1).min(pool_len);
+                let slice = &self.pool[i..read_end];
+                memchr::memmem::find_iter(slice, suffix_bytes)
+                    .filter(move |&x| i + x < search_end)
+                    .map(move |x| self.get(i + x))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<BTreeMap<_, _>>()
+            .into_values()
+            .collect()
+    }
+
+    // prefix should starts with a '\0', e.g. b"\0hello"
+    pub fn par_search_prefix<'search, 'pool: 'search>(
+        &'pool self,
+        prefix: &'search [u8],
+    ) -> Vec<&'pool str> {
+        assert_eq!(prefix[0], 0);
+        let pool_len = self.pool.len();
+        if pool_len == 0 {
+            return vec![];
+        }
+        let chunk_size = (pool_len / get_parallelism()).max(1024).min(pool_len);
+
+        (0..pool_len)
+            .into_par_iter()
+            .step_by(chunk_size)
+            .flat_map(|i| {
+                let search_end = (i + chunk_size).min(pool_len);
+                let read_end = (search_end + prefix.len() - 1).min(pool_len);
+                let slice = &self.pool[i..read_end];
+                memchr::memmem::find_iter(slice, prefix)
+                    .filter(move |&x| i + x < search_end)
+                    .map(move |x| self.get(i + x + prefix.len() - 1))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<BTreeMap<_, _>>()
+            .into_values()
+            .collect()
+    }
+
+    // `exact` should starts with a '\0', and ends with a '\0',
+    // e.g. b"\0hello\0"
+    pub fn par_search_exact<'search, 'pool: 'search>(
+        &'pool self,
+        exact: &'search [u8],
+    ) -> Vec<&'pool str> {
+        assert_eq!(exact[0], 0);
+        assert_eq!(exact[exact.len() - 1], 0);
+        let pool_len = self.pool.len();
+        if pool_len == 0 {
+            return vec![];
+        }
+        let chunk_size = (pool_len / get_parallelism()).max(1024).min(pool_len);
+
+        (0..pool_len)
+            .into_par_iter()
+            .step_by(chunk_size)
+            .flat_map(|i| {
+                let search_end = (i + chunk_size).min(pool_len);
+                let read_end = (search_end + exact.len() - 1).min(pool_len);
+                let slice = &self.pool[i..read_end];
+                memchr::memmem::find_iter(slice, exact)
+                    .filter(move |&x| i + x < search_end)
+                    .map(move |x| self.get(i + x + exact.len() - 1))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<BTreeMap<_, _>>()
+            .into_values()
+            .collect()
     }
 }
 
@@ -462,8 +609,276 @@ mod tests {
         let mut pool = NamePool::new();
         pool.push("hello");
 
-        // This should panic because the exact string does not end with \0
+        // This should panic because the exact string does not end with '\0'
         let exact = b"\0hello";
         let _result: Vec<_> = pool.search_exact(exact).collect();
+    }
+
+    #[test]
+    fn test_par_search_substr() {
+        let mut pool = NamePool::new();
+        pool.push("hello");
+        pool.push("world");
+        pool.push("hello world");
+        pool.push("hello world hello");
+
+        let substr = "hello";
+        let mut result = pool.par_search_substr(substr);
+        result.sort(); // The order is not guaranteed
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], "hello");
+        assert_eq!(result[1], "hello world");
+        assert_eq!(result[2], "hello world hello");
+    }
+
+    #[test]
+    fn test_par_search_substr_boundary() {
+        let mut pool = NamePool::new();
+        // Let's construct the pool first, then calculate chunk size.
+        pool.push(&"a".repeat(1000));
+        pool.push("b");
+        pool.push(&"c".repeat(1000));
+
+        let pool_len = pool.pool.len();
+        let chunk_size = (pool_len / get_parallelism()).max(1024);
+
+        // We need to place a name across a chunk boundary.
+        // Let's clear and rebuild the pool.
+        pool = NamePool::new();
+        let prefix_len = chunk_size - 50;
+        let name_to_find = "b".repeat(100);
+
+        pool.push(&"a".repeat(prefix_len));
+        let name_start_pos = pool.pool.len();
+        pool.push(&name_to_find);
+        pool.push(&"c".repeat(1000));
+
+        // Check if the name is actually across the boundary
+        assert!(
+            name_start_pos < chunk_size,
+            "Test setup failed: name does not start before chunk boundary"
+        );
+        assert!(
+            name_start_pos + name_to_find.len() > chunk_size,
+            "Test setup failed: name does not cross chunk boundary"
+        );
+
+        let result = pool.par_search_substr(&name_to_find);
+        assert_eq!(result.len(), 1, "The name at the boundary was not found");
+        assert_eq!(result[0], name_to_find);
+    }
+
+    #[test]
+    fn test_par_search_exact() {
+        let mut pool = NamePool::new();
+        pool.push("hello");
+        pool.push("world");
+        pool.push("hello world");
+        pool.push("hello world hello");
+
+        let exact = b"\0hello\0";
+        let result = pool.par_search_exact(exact);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "hello");
+    }
+
+    #[test]
+    fn test_par_search_empty_pool() {
+        let pool = NamePool::new();
+        let result = pool.par_search_substr("hello");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_par_search_empty_query() {
+        let mut pool = NamePool::new();
+        pool.push("hello");
+        let result = pool.par_search_substr("");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_par_search_unicode() {
+        let mut pool = NamePool::new();
+        pool.push("こんにちは");
+        pool.push("世界");
+        pool.push("こんにちは世界");
+
+        let substr = "世界";
+        let result = pool.par_search_substr(substr);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "世界");
+        assert_eq!(result[1], "こんにちは世界");
+    }
+
+    #[test]
+    fn test_par_search_nonexistent() {
+        let mut pool = NamePool::new();
+        pool.push("hello");
+        pool.push("world");
+
+        let substr = "nonexistent";
+        let result = pool.par_search_substr(substr);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_par_search_subslice_boundary() {
+        let mut pool = NamePool::new();
+        // Let's construct the pool first, then calculate chunk size.
+        pool.push(&"a".repeat(1000));
+        pool.push("b");
+        pool.push(&"c".repeat(1000));
+
+        let pool_len = pool.pool.len();
+        let chunk_size = (pool_len / get_parallelism()).max(1024);
+
+        // We need to place a name across a chunk boundary.
+        // Let's clear and rebuild the pool.
+        pool = NamePool::new();
+        let prefix_len = chunk_size - 50;
+        let name_to_find = "b".repeat(100);
+
+        pool.push(&"a".repeat(prefix_len));
+        let name_start_pos = pool.pool.len();
+        pool.push(&name_to_find);
+        pool.push(&"c".repeat(1000));
+
+        // Check if the name is actually across the boundary
+        assert!(
+            name_start_pos < chunk_size,
+            "Test setup failed: name does not start before chunk boundary"
+        );
+        assert!(
+            name_start_pos + name_to_find.len() > chunk_size,
+            "Test setup failed: name does not cross chunk boundary"
+        );
+
+        let result = pool.par_search_subslice(name_to_find.as_bytes());
+        assert_eq!(result.len(), 1, "The name at the boundary was not found");
+        assert_eq!(result[0], name_to_find);
+    }
+
+    #[test]
+    fn test_par_search_suffix_boundary() {
+        let mut pool = NamePool::new();
+        // Let's construct the pool first, then calculate chunk size.
+        pool.push(&"a".repeat(1000));
+        pool.push("b");
+        pool.push(&"c".repeat(1000));
+
+        let pool_len = pool.pool.len();
+        let chunk_size = (pool_len / get_parallelism()).max(1024);
+
+        // We need to place a name across a chunk boundary.
+        // Let's clear and rebuild the pool.
+        pool = NamePool::new();
+        let suffix_to_find = "b".repeat(100);
+        let full_name = "a".repeat(50) + &suffix_to_find;
+
+        // Place the name such that the suffix crosses the chunk boundary
+        let before_name_len = chunk_size - 100; // 50 for prefix, 50 for first part of suffix
+        pool.push(&"c".repeat(before_name_len));
+        let name_start_pos = pool.pool.len();
+        pool.push(&full_name);
+        pool.push(&"d".repeat(1000));
+
+        let suffix_start_pos = name_start_pos + 50;
+
+        // Check if the suffix is actually across the boundary
+        assert!(
+            suffix_start_pos < chunk_size,
+            "Test setup failed: suffix does not start before chunk boundary"
+        );
+        assert!(
+            suffix_start_pos + suffix_to_find.len() > chunk_size,
+            "Test setup failed: suffix does not cross chunk boundary"
+        );
+
+        let suffix_cstring = std::ffi::CString::new(suffix_to_find.as_bytes()).unwrap();
+        let result = pool.par_search_suffix(&suffix_cstring);
+        assert_eq!(result.len(), 1, "The name at the boundary was not found");
+        assert_eq!(result[0], full_name);
+    }
+
+    #[test]
+    fn test_par_search_prefix_boundary() {
+        let mut pool = NamePool::new();
+        // Let's construct the pool first, then calculate chunk size.
+        pool.push(&"a".repeat(1000));
+        pool.push("b");
+        pool.push(&"c".repeat(1000));
+
+        let pool_len = pool.pool.len();
+        let chunk_size = (pool_len / get_parallelism()).max(1024);
+
+        // We need to place a name across a chunk boundary.
+        // Let's clear and rebuild the pool.
+        pool = NamePool::new();
+        let prefix_to_find = "b".repeat(100);
+        let full_name = prefix_to_find.clone() + &"a".repeat(50);
+
+        // Place the name such that the prefix crosses the chunk boundary
+        let before_name_len = chunk_size - 50;
+        pool.push(&"c".repeat(before_name_len));
+        let name_start_pos = pool.pool.len();
+        pool.push(&full_name);
+        pool.push(&"d".repeat(1000));
+
+        // The search is for \0prefix. The \0 is at name_start_pos - 1.
+        // We want the prefix part to cross the boundary.
+        assert!(
+            name_start_pos < chunk_size,
+            "Test setup failed: prefix does not start before chunk boundary"
+        );
+        assert!(
+            name_start_pos + prefix_to_find.len() > chunk_size,
+            "Test setup failed: prefix does not cross chunk boundary"
+        );
+
+        let prefix_bytes = [b"\0".as_slice(), prefix_to_find.as_bytes()].concat();
+        let result = pool.par_search_prefix(&prefix_bytes);
+        assert_eq!(result.len(), 1, "The name at the boundary was not found");
+        assert_eq!(result[0], full_name);
+    }
+
+    #[test]
+    fn test_par_search_exact_boundary() {
+        let mut pool = NamePool::new();
+        // Let's construct the pool first, then calculate chunk size.
+        pool.push(&"a".repeat(1000));
+        pool.push("b");
+        pool.push(&"c".repeat(1000));
+
+        let pool_len = pool.pool.len();
+        let chunk_size = (pool_len / get_parallelism()).max(1024);
+
+        // We need to place a name across a chunk boundary.
+        // Let's clear and rebuild the pool.
+        pool = NamePool::new();
+        let name_to_find = "b".repeat(100);
+
+        // Place the name such that it crosses the chunk boundary
+        let before_name_len = chunk_size - 50;
+        pool.push(&"c".repeat(before_name_len));
+        let name_start_pos = pool.pool.len();
+        pool.push(&name_to_find);
+        pool.push(&"d".repeat(1000));
+
+        // The search is for \0exact\0. The \0 is at name_start_pos - 1.
+        // We want the exact part to cross the boundary.
+        assert!(
+            name_start_pos < chunk_size,
+            "Test setup failed: name does not start before chunk boundary"
+        );
+        assert!(
+            name_start_pos + name_to_find.len() > chunk_size,
+            "Test setup failed: name does not cross chunk boundary"
+        );
+
+        let exact_bytes = [b"\0".as_slice(), name_to_find.as_bytes(), b"\0".as_slice()].concat();
+        let result = pool.par_search_exact(&exact_bytes);
+        assert_eq!(result.len(), 1, "The name at the boundary was not found");
+        assert_eq!(result[0], name_to_find);
     }
 }
