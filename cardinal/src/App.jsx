@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useEffect } from "react";
 import { InfiniteLoader, Grid, AutoSizer } from 'react-virtualized';
 import 'react-virtualized/styles.css';
 import "./App.css";
@@ -20,6 +20,13 @@ function App() {
   const headerRef = useRef(null);
   const listRef = useRef(null);
   const scrollAreaRef = useRef(null);
+
+  // 当列宽改变时，重新计算Grid尺寸
+  useEffect(() => {
+    if (listRef.current && listRef.current.recomputeGridSize) {
+      listRef.current.recomputeGridSize();
+    }
+  }, [colWidths]);
 
   // 滚动同步处理 - 单向同步版本（Grid -> Header）
   const handleGridScroll = useCallback(({ scrollLeft }) => {
