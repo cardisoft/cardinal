@@ -12,7 +12,7 @@
 .horizontal-scrollbar-inner {
   position: absolute;
   height: 7px;
-  background: rgba(255,255,255,0.41114);
+  background: var(--color-scrollbar);
   border-radius: 6px;
   box-shadow: 0 0 2px 0 rgba(0,0,0,0.10);
   transition: background 0.5s;
@@ -20,7 +20,7 @@
   cursor: pointer;
 }
 .horizontal-scrollbar-inner:hover {
-  background: rgba(255,255,255,0.43554);
+  background: var(--color-scrollbar-hover);
 }
 /* === Base & Theme Tokens === */
 
@@ -43,6 +43,8 @@
   --row-even: #ffffff;
   --row-odd: #f7f8fa;
   --row-hover: #eef2f7;
+  --color-scrollbar: rgba(0, 0, 0, 0.4);
+  --color-scrollbar-hover: rgba(0, 0, 0, 0.5);
 
   color: var(--color-text);
   background-color: var(--color-bg);
@@ -157,6 +159,10 @@ button:active {
   /* 让横向滚动条属于scroll-area */
 }
 
+.scroll-area::-webkit-scrollbar {
+  display: none;
+}
+
 /* 悬浮竖直滚动条 */
 .vertical-scrollbar {
   position: absolute;
@@ -175,7 +181,7 @@ button:active {
   width: 7px;
   border-radius: 6px;
   /* 255 * x + 32 * (1 - x) = 150   =>   x = 0.41114 */
-  background: rgba(255,255,255,0.41114);
+  background: var(--color-scrollbar);
   box-shadow: 0 0 2px 0 rgba(0,0,0,0.10);
   transition: background 0.5s;
   pointer-events: auto;
@@ -185,7 +191,7 @@ button:active {
 /* 鼠标悬停时略微加深 */
 .vertical-scrollbar-inner:hover {
   /* 255 * x + 32 * (1 - x) = 157   =>   x = 0.43554 */
-  background: rgba(255,255,255,0.43554);
+  background: var(--color-scrollbar-hover);
 }
 
 /* === Columns (Grid) === */
@@ -260,8 +266,11 @@ button:active {
 /* === Virtual List === */
 .virtual-list {
   height: 100%;
-  overflow-x: auto;
   flex: 1;
+}
+
+.virtual-list::-webkit-scrollbar {
+  display: none;
 }
 
 /* Let wrapper control horizontal scroll; List keeps vertical scroll only */
