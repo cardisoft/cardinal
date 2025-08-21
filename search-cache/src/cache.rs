@@ -72,8 +72,8 @@ pub struct SearchNode {
 
 impl SearchCache {
     /// The `path` is the root path of the constructed cache and fsevent watch path.
-    pub fn try_read_persistent_cache(path: &Path) -> Result<Self> {
-        read_cache_from_file()
+    pub fn try_read_persistent_cache(path: &Path, cache_path: &Path) -> Result<Self> {
+        read_cache_from_file(cache_path)
             .and_then(|x| {
                 (x.path == path)
                     .then(|| ())
@@ -419,15 +419,18 @@ impl SearchCache {
         }
     }
 
-    pub fn flush_to_file(self) -> Result<()> {
-        write_cache_to_file(PersistentStorage {
-            version: Num,
-            path: self.path,
-            slab_root: self.slab_root,
-            slab: self.slab,
-            name_index: self.name_index,
-            last_event_id: self.last_event_id,
-        })
+    pub fn flush_to_file(self, cache_path: &Path) -> Result<()> {
+        write_cache_to_file(
+            cache_path,
+            PersistentStorage {
+                version: Num,
+                path: self.path,
+                slab_root: self.slab_root,
+                slab: self.slab,
+                name_index: self.name_index,
+                last_event_id: self.last_event_id,
+            },
+        )
         .context("Write cache to file failed.")
     }
 

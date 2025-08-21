@@ -6,7 +6,7 @@ use std::{
     collections::BTreeMap,
     fs::{self, File},
     io::{BufReader, BufWriter},
-    path::PathBuf,
+    path::{Path, PathBuf},
     thread::available_parallelism,
     time::Instant,
 };
@@ -28,13 +28,11 @@ pub struct PersistentStorage {
     pub name_index: BTreeMap<String, Vec<usize>>,
 }
 
-const CACHE_PATH: &str = "target/cache.zstd";
-const CACHE_TMP_PATH: &str = "target/cache.zstd.tmp";
 const BINCODE_CONDFIG: Configuration = bincode::config::standard();
 
-pub fn read_cache_from_file() -> Result<PersistentStorage> {
+pub fn read_cache_from_file(path: &Path) -> Result<PersistentStorage> {
     let cache_decode_time = Instant::now();
-    let input = File::open(CACHE_PATH).context("Failed to open cache file")?;
+    let input = File::open(path).context("Failed to open cache file")?;
     let input = zstd::Decoder::new(input).context("Failed to create zstd decoder")?;
     let mut input = BufReader::new(input);
     let storage: PersistentStorage = bincode::decode_from_std_read(&mut input, BINCODE_CONDFIG)
@@ -43,10 +41,12 @@ pub fn read_cache_from_file() -> Result<PersistentStorage> {
     Ok(storage)
 }
 
-pub fn write_cache_to_file(storage: PersistentStorage) -> Result<()> {
+pub fn write_cache_to_file(path: &Path, storage: PersistentStorage) -> Result<()> {
     let cache_encode_time = Instant::now();
+    let _ = fs::create_dir_all(path.parent().unwrap());
+    let tmp_path = &path.with_extension(".sctmp");
     {
-        let output = File::create(CACHE_TMP_PATH).context("Failed to create cache file")?;
+        let output = File::create(tmp_path).context("Failed to create cache file")?;
         let mut output = zstd::Encoder::new(output, 6).context("Failed to create zstd encoder")?;
         output
             .multithread(available_parallelism().map(|x| x.get() as u32).unwrap_or(4))
@@ -60,11 +60,11 @@ pub fn write_cache_to_file(storage: PersistentStorage) -> Result<()> {
         )
         .context("Failed to encode cache")?;
     }
-    fs::rename(CACHE_TMP_PATH, CACHE_PATH).context("Failed to rename cache file")?;
+    fs::rename(tmp_path, path).context("Failed to rename cache file")?;
     info!("Cache encode time: {:?}", cache_encode_time.elapsed());
     info!(
         "Cache size: {} MB",
-        fs::metadata(CACHE_PATH)
+        fs::metadata(path)
             .context("Failed to get cache file metadata")?
             .len() as f32
             / 1024.

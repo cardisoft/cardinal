@@ -6,8 +6,10 @@ use clap::Parser;
 use cli::Cli;
 use crossbeam_channel::{Sender, bounded, unbounded};
 use search_cache::{HandleFSEError, SearchCache, SearchNode};
-use std::io::Write;
+use std::{io::Write, path::Path};
 use tracing_subscriber::{EnvFilter, filter::LevelFilter};
+
+const CACHE_PATH: &str = "target/cache.zstd";
 
 fn main() -> Result<()> {
     let builder = tracing_subscriber::fmt();
@@ -24,7 +26,7 @@ fn main() -> Result<()> {
         SearchCache::walk_fs(path)
     } else {
         println!("Try reading cache...");
-        SearchCache::try_read_persistent_cache(&path).unwrap_or_else(|e| {
+        SearchCache::try_read_persistent_cache(&path, Path::new(CACHE_PATH)).unwrap_or_else(|e| {
             println!("Failed to read cache: {e:?}. Re-walking filesystem...");
             SearchCache::walk_fs(path)
         })
@@ -105,7 +107,7 @@ fn main() -> Result<()> {
     let cache = cache_rx.recv().context("cache_tx is closed")?;
     println!("start writing cache: {:?}", cache);
     cache
-        .flush_to_file()
+        .flush_to_file(Path::new(CACHE_PATH))
         .context("Failed to write cache to file")?;
 
     Ok(())

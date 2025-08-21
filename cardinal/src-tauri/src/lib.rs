@@ -9,13 +9,23 @@ use std::{
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Once,
+        Arc, LazyLock, Once,
     },
     time::Duration,
 };
 use tauri::{Emitter, RunEvent, State};
 use tracing::{info, level_filters::LevelFilter};
 use tracing_subscriber::EnvFilter;
+
+static CACHE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
+    directories::ProjectDirs::from("", "", "Cardinal")
+        .expect(
+            "Failed to get ProjectDirs: no valid home directory \
+                path could be retrieved from the operating system",
+        )
+        .config_dir()
+        .join("cardinal.db")
+});
 
 struct SearchState {
     search_tx: Sender<String>,
@@ -117,7 +127,9 @@ pub fn run() -> Result<()> {
             LazyCell::new(move || app_handle_clone.emit("init_completed", ()).unwrap())
         };
         // 初始化搜索缓存
-        let mut cache = if let Ok(cached) = SearchCache::try_read_persistent_cache(&path) {
+        let mut cache = if let Ok(cached) =
+            SearchCache::try_read_persistent_cache(&path, &CACHE_PATH)
+        {
             info!("Loaded existing cache");
             // If using cache, defer the emit init process to HistoryDone event processing
             cached
@@ -243,10 +255,10 @@ fn flush_cache_to_file_once(finish_tx: &Sender<Sender<SearchCache>>) {
             .unwrap();
         let cache = cache_rx.recv().context("cache_tx is closed").unwrap();
         cache
-            .flush_to_file()
+            .flush_to_file(&CACHE_PATH)
             .context("Failed to write cache to file")
             .unwrap();
 
-        info!("Cache flushed successfully");
+        info!("Cache flushed successfully to {:?}", CACHE_PATH);
     });
 }
