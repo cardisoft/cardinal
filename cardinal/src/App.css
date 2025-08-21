@@ -42,7 +42,7 @@
   --color-accent: #0d6efd;
   --row-even: #ffffff;
   --row-odd: #f7f8fa;
-  --row-hover: #eef2f7;
+  --row-hover: rgb(220, 220, 220);
   --color-scrollbar: rgba(0, 0, 0, 0.4);
   --color-scrollbar-hover: rgba(0, 0, 0, 0.5);
 
