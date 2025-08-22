@@ -47,6 +47,13 @@
   margin: 0;
   padding: 0;
   border: 0;
+  /* 禁止文本选择 */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  /* 禁止文本光标 */
+  cursor: default;
 }
 
 /* === Global Resets === */
@@ -117,6 +124,16 @@ button {
   box-shadow: 0 2px 2px rgba(0, 0, 0, 0.05);
   /* 减淡阴影 */
   outline: none;
+  /* 允许输入框中的文本选择 */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+input {
+  /* 输入框恢复文本光标 */
+  cursor: text;
 }
 
 button {
