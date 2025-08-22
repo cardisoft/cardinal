@@ -1,9 +1,9 @@
 import React, { forwardRef } from 'react';
 
-export const ColumnHeader = forwardRef(({ colWidths, onResizeStart }, ref) => {
+export const ColumnHeader = forwardRef(({ colWidths, onResizeStart, onContextMenu }, ref) => {
   return (
     <div ref={ref} className="header-row-container">
-      <div className="header-row columns">
+      <div className="header-row columns" onContextMenu={onContextMenu}>
         <span className="filename-text header header-cell">
           Filename
           <span className="col-resizer" onMouseDown={onResizeStart('filename')} />

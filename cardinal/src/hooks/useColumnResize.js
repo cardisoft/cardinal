@@ -26,6 +26,12 @@ export function useColumnResize() {
     document.body.style.cursor = 'col-resize';
   }, [colWidths]);
 
+  const autoFitColumns = useCallback(() => {
+    const windowWidth = window.innerWidth;
+    const newColWidths = calculateInitialColWidths(windowWidth);
+    setColWidths(newColWidths);
+  }, []);
+
   const onResizing = useCallback((e) => {
     const ctx = resizingRef.current;
     if (!ctx) return;
@@ -47,6 +53,7 @@ export function useColumnResize() {
 
   return {
     colWidths,
-    onResizeStart
+    onResizeStart,
+    autoFitColumns
   };
 }

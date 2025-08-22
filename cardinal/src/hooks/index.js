@@ -79,3 +79,8 @@ export function useVirtualizedList(results) {
     loadMoreRows
   };
 }
+
+// Re-export other hooks
+export { useColumnResize } from './useColumnResize';
+export { useContextMenu } from './useContextMenu';
+export { useHeaderContextMenu } from './useHeaderContextMenu';

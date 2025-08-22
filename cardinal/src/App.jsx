@@ -6,16 +6,17 @@ import { ContextMenu } from "./components/ContextMenu";
 import { ColumnHeader } from "./components/ColumnHeader";
 import { FileRow } from "./components/FileRow";
 import StatusBar from "./components/StatusBar";
-import { useAppState, useSearch, useVirtualizedList } from "./hooks";
+import { useAppState, useSearch, useVirtualizedList, useHeaderContextMenu } from "./hooks";
 import { useColumnResize } from "./hooks/useColumnResize";
 import { useContextMenu } from "./hooks/useContextMenu";
 import { ROW_HEIGHT, OVERSCAN_ROW_COUNT, calculateColumnsTotal } from "./constants";
 
 function App() {
   const { results, setResults, isInitialized, scannedFiles, processedEvents } = useAppState();
-  const { colWidths, onResizeStart } = useColumnResize();
+  const { colWidths, onResizeStart, autoFitColumns } = useColumnResize();
   const { lruCache, infiniteLoaderRef, isCellLoaded, loadMoreRows } = useVirtualizedList(results);
   const { contextMenu, showContextMenu, closeContextMenu, menuItems } = useContextMenu();
+  const { headerContextMenu, showHeaderContextMenu, closeHeaderContextMenu, headerMenuItems } = useHeaderContextMenu(autoFitColumns);
   const { onQueryChange } = useSearch(setResults, lruCache);
   
   const headerRef = useRef(null);
@@ -82,6 +83,7 @@ function App() {
             ref={headerRef} 
             colWidths={colWidths} 
             onResizeStart={onResizeStart}
+            onContextMenu={showHeaderContextMenu}
           />
           <div style={{ flex: 1, minHeight: 0 }}>
             <InfiniteLoader
@@ -127,6 +129,14 @@ function App() {
           y={contextMenu.y}
           items={menuItems}
           onClose={closeContextMenu}
+        />
+      )}
+      {headerContextMenu.visible && (
+        <ContextMenu
+          x={headerContextMenu.x}
+          y={headerContextMenu.y}
+          items={headerMenuItems}
+          onClose={closeHeaderContextMenu}
         />
       )}
       <StatusBar 
