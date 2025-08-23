@@ -11,6 +11,7 @@
     - 增加 fsevent path merger: 
         - /app/good + /app/good/Cargo.toml == /app/good
         - /app/good/aaa.txt + /app/good/aaa.txt == /app/good/aaa.txt
+    - 只要有足够快速的 fsevent 处理，我们就可以做到搜索曾经曾经存在过的文件
 - 支持普通搜索，正则搜索, glob search
     - 不同的格式有开关按钮，类似于 vscode
     - 在输入不同的内容的时候自动推断是 glob 还是正则还是普通 substr 搜索，然后对应的按钮变成浅色
