@@ -13,6 +13,10 @@ use std::{
     ffi::{CString, OsStr},
     io::ErrorKind,
     path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc,
+    },
     time::Instant,
 };
 use tracing::{debug, info};
@@ -601,6 +605,72 @@ impl SearchCache {
         }
         Ok(())
     }
+
+    pub fn replenish_metadata(
+        &mut self,
+        stop: Arc<AtomicBool>,
+        count: Arc<AtomicUsize>,
+    ) -> ReplenishResult {
+        // # Safety
+        //
+        // 1. replenish_metadata 函数持有 `slab` 的可变引用，因此在调用时没有其他线程同时访问 `slab`。
+        // 2. replenish_metadata 函数里面不会扩容 `slab`, 只会更改存在的节点的 metadata 字段，因此预期不会有 dangle slab node 出现
+        // 3. 每个 slab node 至多只会被访问一次，因此不会有竞争
+        unsafe fn inner(
+            slab: *mut Slab<SlabNode>,
+            current: usize,
+            current_path: PathBuf,
+            stop: Arc<AtomicBool>,
+            count: Arc<AtomicUsize>,
+        ) -> ReplenishResult {
+            let slab_imm = unsafe { &*slab };
+            let slab_mut = unsafe { &mut *slab };
+            let mut path = current_path;
+            for (i, &child_index) in slab_imm[current].children.iter().enumerate() {
+                count.fetch_add(1, Ordering::Relaxed);
+                // 128 is a magic number, means we occasionally check if we should stop
+                if i % 128 == 0 && stop.load(Ordering::Relaxed) {
+                    return ReplenishResult::Stopped;
+                }
+                let child = &mut slab_mut[child_index];
+                path.push(child.name.clone());
+                if child.metadata.is_none() {
+                    let metadata = std::fs::symlink_metadata(&path)
+                        .map(NodeMetadata::from)
+                        .ok();
+                    let metadata = match metadata {
+                        Some(metadata) => SlabNodeMetadata::Some(metadata),
+                        None => SlabNodeMetadata::Unaccessible,
+                    };
+                    child.metadata = metadata;
+                }
+                if !child.children.is_empty() {
+                    if inner(slab, child_index, path.clone(), stop.clone(), count.clone())
+                        == ReplenishResult::Stopped
+                    {
+                        return ReplenishResult::Stopped;
+                    }
+                }
+                path.pop();
+            }
+            return ReplenishResult::Finished;
+        }
+        unsafe {
+            inner(
+                &mut self.slab,
+                self.slab_root,
+                self.path.clone(),
+                stop,
+                count,
+            )
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReplenishResult {
+    Stopped,
+    Finished,
 }
 
 #[derive(Encode, Decode)]

@@ -3,13 +3,14 @@ use anyhow::{Context, Result};
 use cardinal_sdk::{EventFlag, EventWatcher};
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use fswalk::NodeMetadata;
-use search_cache::{HandleFSEError, SearchCache, SearchResultNode, WalkData};
+use parking_lot::Mutex;
+use search_cache::{HandleFSEError, ReplenishResult, SearchCache, SearchResultNode, WalkData};
 use serde::Serialize;
 use std::{
     cell::LazyCell,
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, LazyLock, Once,
     },
     time::Duration,
@@ -224,49 +225,106 @@ pub fn run() -> Result<()> {
             cache.last_event_id(),
             FSE_LATENCY_SECS,
         );
-        info!("Started background processing thread");
+        let cache = Arc::new(Mutex::new(cache));
+        let meta_cache = cache.clone();
+        let stop = Arc::new(AtomicBool::new(false));
+        let halt = Arc::new(AtomicBool::new(false));
+        let finished = Arc::new(AtomicBool::new(false));
+        let stop_clone = stop.clone();
+        let halt_clone = halt.clone();
+        let finished_clone = finished.clone();
+        std::thread::spawn(move || {
+            info!("background metadata fetching started");
+            let count = Arc::new(AtomicUsize::new(0));
+            loop {
+                if !stop_clone.load(Ordering::Relaxed) {
+                    let mut cache = meta_cache.lock();
+                    info!("replenishing metadata");
+                    if cache.replenish_metadata(stop_clone.clone(), count.clone()) == ReplenishResult::Finished {
+                        finished_clone.store(true, Ordering::Relaxed);
+                        info!("metadata replenishment finished: {}", count.load(Ordering::Relaxed));
+                        return;
+                    }
+                    info!("replenishing metadata count: {}", count.load(Ordering::Relaxed));
+                }
+                while stop_clone.load(Ordering::Relaxed) {
+                    if halt_clone.load(Ordering::Relaxed) {
+                        finished_clone.store(true, Ordering::Relaxed);
+                        info!("metadata replenishment worker halted");
+                        return;
+                    } else {
+                        std::thread::sleep(Duration::from_secs(1));
+                    }
+                }
+                count.store(0, Ordering::Relaxed);
+            }
+        });
         loop {
             crossbeam_channel::select! {
                 recv(finish_rx) -> tx => {
-                    let tx = tx.expect("Finish channel closed");
-                    tx.send(cache).expect("Failed to send cache");
+                    // Waiting for metadata fetching thread finish
+                    {
+                        stop.store(true, Ordering::Relaxed);
+                        halt.store(true, Ordering::Relaxed);
+                        while !finished.load(Ordering::Relaxed) {
+                            std::thread::sleep(Duration::from_millis(100));
+                        }
+                    }
+                    tx.expect("Finish channel closed")
+                        .send(Arc::try_unwrap(cache).expect("Failed to unwrap cache").into_inner())
+                        .expect("Failed to send cache");
                     break;
                 }
                 recv(search_rx) -> query => {
-                    let query = query.expect("Search channel closed");
-                    let result = if query.is_empty() {
-                        Ok(cache.search_empty())
-                    } else {
-                        cache.search(&query)
-                    };
-                    result_tx.send(result).expect("Failed to send result");
+                    stop.store(true, Ordering::Relaxed);
+                    let cache = cache.lock();
+                    {
+                        let query = query.expect("Search channel closed");
+                        let result = if query.is_empty() {
+                            Ok(cache.search_empty())
+                        } else {
+                            cache.search(&query)
+                        };
+                        result_tx.send(result).expect("Failed to send result");
+                    }
+                    stop.store(false, Ordering::Relaxed);
                 }
                 recv(node_info_rx) -> results => {
-                    let results = results.expect("Node info channel closed");
-                    let node_info_results = cache.expand_file_nodes(results);
-                    node_info_results_tx.send(node_info_results).expect("Failed to send node info results");
+                    stop.store(true, Ordering::Relaxed);
+                    let mut cache = cache.lock();
+                    {
+                        let results = results.expect("Node info channel closed");
+                        let node_info_results = cache.expand_file_nodes(results);
+                        node_info_results_tx.send(node_info_results).expect("Failed to send node info results");
+                    }
+                    stop.store(false, Ordering::Relaxed);
                 }
                 recv(event_watcher.receiver) -> events => {
-                    let events = events.expect("Event stream closed");
-                    processed_events += events.len();
+                    stop.store(true, Ordering::Relaxed);
+                    let mut cache = cache.lock();
+                    {
+                        let events = events.expect("Event stream closed");
+                        processed_events += events.len();
 
-                    // 发送状态栏更新事件，包含文件扫描数和处理的事件数
-                    app_handle.emit("status_bar_update", StatusBarUpdate {
-                        scanned_files: cache.get_total_files(),
-                        processed_events
-                    }).unwrap();
+                        // 发送状态栏更新事件，包含文件扫描数和处理的事件数
+                        app_handle.emit("status_bar_update", StatusBarUpdate {
+                            scanned_files: cache.get_total_files(),
+                            processed_events
+                        }).unwrap();
 
-                    // Emit HistoryDone inform frontend that cache is ready.
-                    if events.iter().any(|x| x.flag == EventFlag::HistoryDone) {
-                        *emit_init;
+                        // Emit HistoryDone inform frontend that cache is ready.
+                        if events.iter().any(|x| x.flag == EventFlag::HistoryDone) {
+                            *emit_init;
+                        }
+                        if let Err(HandleFSEError::Rescan) = cache.handle_fs_events(events) {
+                            info!("!!!!!!!!!! Rescan triggered !!!!!!!!");
+                            // Here we clear event_watcher first as rescan may take a lot of time
+                            event_watcher.clear();
+                            cache.rescan();
+                            event_watcher = EventWatcher::spawn(WATCH_ROOT.to_string(), cache.last_event_id(), FSE_LATENCY_SECS);
+                        }
                     }
-                    if let Err(HandleFSEError::Rescan) = cache.handle_fs_events(events) {
-                        info!("!!!!!!!!!! Rescan triggered !!!!!!!!");
-                        // Here we clear event_watcher first as rescan may take a lot of time
-                        event_watcher.clear();
-                        cache.rescan();
-                        event_watcher = EventWatcher::spawn(WATCH_ROOT.to_string(), cache.last_event_id(), FSE_LATENCY_SECS);
-                    }
+                    stop.store(false, Ordering::Relaxed);
                 }
             }
         }

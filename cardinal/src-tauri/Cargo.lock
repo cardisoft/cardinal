@@ -423,6 +423,7 @@ dependencies = [
  "crossbeam-channel",
  "directories",
  "fswalk",
+ "parking_lot",
  "search-cache",
  "serde",
  "serde_json",

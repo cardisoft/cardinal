@@ -24,6 +24,7 @@
     - name_index & MetadataCache::* 用 IndexSet 看看
 - metadata 启动后自动 fetching
 - Windows/NTFS 支持
+- fs::metadata 几乎要全部换成 fs::symlink_metadata
 
 
 ```bash
