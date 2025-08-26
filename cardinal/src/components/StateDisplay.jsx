@@ -22,13 +22,11 @@ export function StateDisplay({ state, message, query }) {
 
   if (state === 'empty') {
     const icon = (
-      <svg width="72" height="72" viewBox="0 0 72 72" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <circle cx="32" cy="32" r="18" strokeOpacity="0.5" />
-        <path d="M45 45 L60 60" strokeLinecap="round" />
-        <circle cx="24" cy="30" r="2" fill="currentColor" />
-        <circle cx="32" cy="30" r="2" fill="currentColor" />
-        <circle cx="40" cy="30" r="2" fill="currentColor" />
-        <path d="M25 38 Q32 44 39 38" strokeLinecap="round" strokeLinejoin="round" />
+      <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        <line x1="13" y1="9" x2="9" y2="13"></line>
+        <line x1="9" y1="9" x2="13" y2="13"></line>
       </svg>
     );
     return <State icon={icon} title={`No results for "${query}"`} message="Try adjusting your keywords or filters." />;
