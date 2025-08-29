@@ -16,8 +16,7 @@ function App() {
   const { colWidths, onResizeStart, autoFitColumns } = useColumnResize();
   const { getItem, ensureRangeLoaded } = useRowData(results);
   const {
-    contextMenu, showContextMenu, closeContextMenu, menuItems,
-    headerContextMenu, showHeaderContextMenu, closeHeaderContextMenu, headerMenuItems
+    menu, showContextMenu, showHeaderContextMenu, closeMenu, getMenuItems
   } = useContextMenu(autoFitColumns);
   const { onQueryChange, currentQuery, showLoadingUI, initialFetchCompleted, durationMs, resultCount, searchError } = useSearch(setResults);
 
@@ -123,20 +122,12 @@ function App() {
           </div>
         </div>
       </div>
-      {contextMenu.visible && (
+      {menu.visible && (
         <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          items={menuItems}
-          onClose={closeContextMenu}
-        />
-      )}
-      {headerContextMenu.visible && (
-        <ContextMenu
-          x={headerContextMenu.x}
-          y={headerContextMenu.y}
-          items={headerMenuItems}
-          onClose={closeHeaderContextMenu}
+          x={menu.x}
+          y={menu.y}
+          items={getMenuItems()}
+          onClose={closeMenu}
         />
       )}
       <StatusBar

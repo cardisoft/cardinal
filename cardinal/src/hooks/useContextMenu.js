@@ -1,80 +1,65 @@
 import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
-// 简化的上下文菜单 hook，同时处理文件和头部菜单
+// 简化的上下文菜单 hook，统一处理两种菜单类型
 export function useContextMenu(autoFitColumns = null) {
-  const [contextMenu, setContextMenu] = useState({ 
+  const [menu, setMenu] = useState({ 
     visible: false, 
     x: 0, 
     y: 0, 
     type: null,
     data: null 
   });
-  
-  const [headerContextMenu, setHeaderContextMenu] = useState({ 
-    visible: false, 
-    x: 0, 
-    y: 0 
-  });
 
-  // 文件上下文菜单
-  const showContextMenu = useCallback((e, path) => {
+  // 统一的菜单显示函数
+  const showMenu = useCallback((e, type, data = null) => {
     e.preventDefault();
     e.stopPropagation();
-    setContextMenu({ 
+    setMenu({ 
       visible: true, 
       x: e.clientX, 
       y: e.clientY, 
-      type: 'file',
-      data: path
+      type,
+      data
     });
   }, []);
 
-  const closeContextMenu = useCallback(() => {
-    setContextMenu(prev => ({ ...prev, visible: false }));
-  }, []);
+  // 文件菜单
+  const showContextMenu = useCallback((e, path) => {
+    showMenu(e, 'file', path);
+  }, [showMenu]);
 
-  // 头部上下文菜单
+  // 头部菜单
   const showHeaderContextMenu = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setHeaderContextMenu({ 
-      visible: true, 
-      x: e.clientX, 
-      y: e.clientY 
-    });
+    showMenu(e, 'header');
+  }, [showMenu]);
+
+  const closeMenu = useCallback(() => {
+    setMenu(prev => ({ ...prev, visible: false }));
   }, []);
 
-  const closeHeaderContextMenu = useCallback(() => {
-    setHeaderContextMenu(prev => ({ ...prev, visible: false }));
-  }, []);
-
-  // 文件菜单项
-  const menuItems = contextMenu.type === 'file' ? [
-    {
-      label: 'Open in Finder',
-      action: () => invoke('open_in_finder', { path: contextMenu.data }),
-    },
-  ] : [];
-
-  // 头部菜单项
-  const headerMenuItems = [
-    {
-      label: 'Reset Column Widths',
-      action: () => {
-        if (autoFitColumns) autoFitColumns();
-      },
-    },
-  ];
+  // 根据类型生成菜单项
+  const getMenuItems = () => {
+    if (menu.type === 'file') {
+      return [{
+        label: 'Open in Finder',
+        action: () => invoke('open_in_finder', { path: menu.data }),
+      }];
+    }
+    if (menu.type === 'header' && autoFitColumns) {
+      return [{
+        label: 'Reset Column Widths',
+        action: autoFitColumns,
+      }];
+    }
+    return [];
+  };
 
   return {
-    contextMenu,
+    menu,
     showContextMenu,
-    closeContextMenu,
-    menuItems,
-    headerContextMenu,
     showHeaderContextMenu,
-    closeHeaderContextMenu,
-    headerMenuItems
+    closeMenu,
+    getMenuItems
   };
 }
