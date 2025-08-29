@@ -11,8 +11,8 @@ export const COL_WIDTH_RATIOS = {
 
 // 根据窗口宽度计算初始列宽
 export const calculateInitialColWidths = (windowWidth) => {
-  // 减去间隙和额外空间
-  const availableWidth = windowWidth - (Object.keys(COL_WIDTH_RATIOS).length - 1) * COL_GAP - COLUMNS_EXTRA - CONTAINER_PADDING * 2;
+  // 使用常量滚动条宽度（需与 CSS 中的 --virtual-scrollbar-width 保持一致）
+  const availableWidth = windowWidth - (Object.keys(COL_WIDTH_RATIOS).length - 1) * COL_GAP - COLUMNS_EXTRA - CONTAINER_PADDING - SCROLLBAR_WIDTH;
   
   const calculatedWidths = {};
   
@@ -28,16 +28,14 @@ export const COL_GAP = 12;
 export const COLUMNS_EXTRA = 20; // 与 CSS --columns-extra 一致，避免多余宽度溢出
 export const ROW_HEIGHT = 24;
 export const CONTAINER_PADDING = 10;
+// 与 CSS 变量 --virtual-scrollbar-width 保持同步
+export const SCROLLBAR_WIDTH = 14;
 
 // Cache and Performance
 export const CACHE_SIZE = 1000;
 export const SEARCH_DEBOUNCE_MS = 300;
 export const STATUS_FADE_DELAY_MS = 2000;
-export const OVERSCAN_ROW_COUNT = 5;
+export const OVERSCAN_ROW_COUNT = 1;
 
 export const MIN_COL_WIDTH = 30;
 export const MAX_COL_WIDTH = 10000;
-
-// Grid calculations
-export const calculateColumnsTotal = (colWidths) =>
-  Object.values(colWidths).reduce((sum, width) => sum + width, 0) + (Object.keys(colWidths).length - 1) * COL_GAP + COLUMNS_EXTRA;

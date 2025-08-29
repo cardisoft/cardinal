@@ -1,18 +1,13 @@
-import React, { useRef, useState, useCallback, useLayoutEffect, useEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useState, useCallback, useLayoutEffect, useEffect, forwardRef, useImperativeHandle, useMemo } from 'react';
 
 /**
- * 等高行虚拟列表 (支持任意滚动位置, 不会在底部/中间跳动)
- * Props:
- *  - rowCount: 总行数
- *  - rowHeight: 行高 (px)
- *  - overscan: 额外预渲染的行数 (上/下 各 overscan)
- *  - renderRow(rowIndex, style): 行渲染函数
- *  - onRangeChange(start, end): 当可见+overscan区间变化时回调 (用于数据预加载)
- *  - onScrollSync(scrollLeft): 水平滚动同步 (用于列头同步)
- *  - className: 自定义 class
- * Exposed imperative API via ref:
- *  - scrollToTop()
- *  - scrollToIndex(index, align = 'start')  // 可选: 'start' | 'center' | 'end'
+ * 虚拟滚动列表组件
+ * 
+ * 特性:
+ * - 虚拟滚动，只渲染可见区域
+ * - 支持大数据量
+ * - 自定义滚动条
+ * - 水平滚动同步
  */
 export const VirtualList = forwardRef(function VirtualList({
 	rowCount = 0,
@@ -23,126 +18,267 @@ export const VirtualList = forwardRef(function VirtualList({
 	onScrollSync,
 	className = ''
 }, ref) {
-	const scrollRef = useRef(null);
+	const containerRef = useRef(null);
+	const viewportRef = useRef(null);
+	const scrollTrackRef = useRef(null);
+	const scrollThumbRef = useRef(null);
+	const isDraggingRef = useRef(false);
+	const hideTimerRef = useRef(null);
+
+	// 自动隐藏滚动条的延迟（ms）
+	const HIDE_DELAY = 900;
 	const lastScrollLeftRef = useRef(0);
-	const rafRef = useRef(0);
+	
+	const [scrollTop, setScrollTop] = useState(0);
+	const [viewportHeight, setViewportHeight] = useState(0);
 	const [range, setRange] = useState({ start: 0, end: -1 });
 
-	const computeRange = useCallback((el) => {
-		if (!el) return { start: 0, end: -1 };
-		if (rowCount === 0) return { start: 0, end: -1 };
-		const viewportHeight = el.clientHeight || 0;
-		const rawStart = Math.floor(el.scrollTop / rowHeight);
-		const visible = viewportHeight > 0 ? Math.ceil(viewportHeight / rowHeight) : 0;
-		const rawEnd = rawStart + visible - 1;
+	// 计算总虚拟高度和滚动范围
+	const { totalHeight, maxScrollTop } = useMemo(() => ({
+		totalHeight: rowCount * rowHeight,
+		maxScrollTop: Math.max(0, rowCount * rowHeight - viewportHeight)
+	}), [rowCount, rowHeight, viewportHeight]);
+	
+	// 计算可见范围
+	const computeRange = useCallback((currentScrollTop, vh) => {
+		if (!rowCount || !vh) return { start: 0, end: -1 };
+		const startIndex = Math.floor(currentScrollTop / rowHeight);
+		const endIndex = startIndex + Math.ceil(vh / rowHeight) - 1;
 		return {
-			start: Math.max(0, rawStart - overscan),
-			end: Math.min(rowCount - 1, rawEnd + overscan)
+			start: Math.max(0, startIndex - overscan),
+			end: Math.min(rowCount - 1, endIndex + overscan)
 		};
 	}, [rowCount, rowHeight, overscan]);
 
-	const updateRange = useCallback(() => {
-		const el = scrollRef.current;
-		const next = computeRange(el);
+	// 统一的 range 更新封装
+	const setRangeIfChanged = useCallback((nextRange) => {
 		setRange(prev => {
-			// 1. 如果计算出的新范围与当前范围相同，则不执行任何操作以避免不必要的重新渲染。
-			// 这是性能优化的关键。
-			if (prev.start === next.start && prev.end === next.end) return prev;
-
-			// 2. 如果范围确实发生了变化，则触发 onRangeChange 回调。
-			// 此回调通常用于父组件，以预先加载新可见范围内项目的数据。
-			if (onRangeChange && next.end >= next.start && rowCount > 0) {
-				onRangeChange(next.start, next.end);
+			const changed = prev.start !== nextRange.start || prev.end !== nextRange.end;
+			if (changed && onRangeChange && nextRange.end >= nextRange.start && rowCount > 0) {
+				onRangeChange(nextRange.start, nextRange.end);
 			}
-
-			// 3. 返回新的范围对象。
-			// React 的 useState hook 将检测到状态变化（因为返回了一个新的对象引用），
-			// 并安排组件的重新渲染。
-			return next;
+			return changed ? nextRange : prev;
 		});
-	}, [computeRange, onRangeChange, rowCount]);
+	}, [onRangeChange, rowCount]);
 
-	const handleScroll = useCallback(() => {
-		// 使用 requestAnimationFrame 来对滚动事件进行节流，确保滚动处理函数不会在每一帧中执行超过一次。
-		// 这对于防止性能瓶颈至关重要。
-		if (rafRef.current) cancelAnimationFrame(rafRef.current);
-		rafRef.current = requestAnimationFrame(() => {
-			// 在下一帧更新渲染的范围
-			updateRange();
-			const el = scrollRef.current;
-			if (!el) return;
-
-			// 同步水平滚动位置，通常用于使外部组件（如列头）与列表的滚动同步。
-			const sl = el.scrollLeft;
-			if (onScrollSync && sl !== lastScrollLeftRef.current) {
-				lastScrollLeftRef.current = sl;
-				onScrollSync(sl);
-			}
-		});
-	}, [updateRange, onScrollSync]);
-
-	// 当组件挂载或其尺寸发生变化时，使用 ResizeObserver 来更新渲染范围。
-	// 这确保了即使在视口大小动态改变（例如，窗口大小调整）的情况下，列表也能正确显示。
-	// useLayoutEffect 用于在 DOM 更新后同步读取布局信息，防止闪烁。
-	useLayoutEffect(() => {
-		const el = scrollRef.current;
+	// 滚动条显示/隐藏辅助函数
+	const showScrollbar = useCallback(() => {
+		const el = containerRef.current;
 		if (!el) return;
-		const ro = new ResizeObserver(() => updateRange());
-		ro.observe(el);
-		updateRange(); // Initial update
-		return () => ro.disconnect();
-	}, [rowCount, rowHeight, updateRange]);
+		el.classList.add('show-scrollbar');
+		if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+	}, []);
 
-	// Recalc when dependencies change explicitly
-	useEffect(() => { updateRange(); }, [rowCount, rowHeight, overscan, updateRange]);
+	const scheduleHideScrollbar = useCallback(() => {
+		if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+		hideTimerRef.current = setTimeout(() => {
+			if (!isDraggingRef.current) {
+				containerRef.current?.classList.remove('show-scrollbar');
+			}
+		}, HIDE_DELAY);
+	}, []);
 
-	useEffect(() => () => rafRef.current && cancelAnimationFrame(rafRef.current), []);
-
-	useImperativeHandle(ref, () => ({
-		scrollToTop: () => {
-			const el = scrollRef.current; if (!el) return;
-			el.scrollTo({ top: 0, behavior: 'instant' });
-			updateRange();
-		},
-		scrollToIndex: (index, align = 'start') => {
-			const el = scrollRef.current; if (!el) return;
-			if (index < 0 || index >= rowCount) return;
-			const viewportHeight = el.clientHeight || 0;
-			const targetTop = index * rowHeight;
-			let scrollTop = targetTop;
-			if (align === 'center') scrollTop = targetTop - (viewportHeight - rowHeight) / 2;
-			else if (align === 'end') scrollTop = targetTop - (viewportHeight - rowHeight);
-			scrollTop = Math.max(0, Math.min(scrollTop, rowCount * rowHeight - viewportHeight));
-			el.scrollTo({ top: scrollTop });
-			updateRange();
+	// 更新滚动条外观
+	const updateScrollbar = useCallback((scrollTop) => {
+		const track = scrollTrackRef.current;
+		const thumb = scrollThumbRef.current;
+		
+		if (!track || !thumb) return;
+		
+		const trackHeight = track.clientHeight;
+		const shouldShow = totalHeight > viewportHeight && trackHeight > 0;
+		
+		if (!shouldShow) {
+			thumb.style.display = 'none';
+			return;
 		}
-	}), [rowCount, rowHeight, updateRange]);
+		
+		thumb.style.display = 'block';
+		const thumbHeight = Math.max(20, (viewportHeight / totalHeight) * trackHeight);
+		const scrollRatio = scrollTop / maxScrollTop;
+		const thumbTop = scrollRatio * (trackHeight - thumbHeight);
+		
+		thumb.style.height = `${thumbHeight}px`;
+		thumb.style.transform = `translateY(${thumbTop}px)`;
+	}, [totalHeight, viewportHeight, maxScrollTop]);
 
-	const { start, end } = range;
-	const totalHeight = rowCount * rowHeight;
-	const count = end >= start && rowCount > 0 ? end - start + 1 : 0;
-	const items = count > 0 ? Array.from({ length: count }, (_, i) => {
-		const rowIndex = start + i;
-		return renderRow(rowIndex, {
-			position: 'absolute',
-			top: i * rowHeight,
-			height: rowHeight,
-			left: 0,
-			right: 0
+	// 更新滚动位置和范围 - 合并逻辑
+	const updateScrollAndRange = useCallback((nextScrollTop) => {
+		const clamped = Math.max(0, Math.min(nextScrollTop, maxScrollTop));
+		setScrollTop(clamped);
+		setRangeIfChanged(computeRange(clamped, viewportHeight));
+		updateScrollbar(clamped);
+	}, [maxScrollTop, computeRange, viewportHeight, updateScrollbar, setRangeIfChanged]);
+
+	// 事件处理函数
+	const handleWheel = useCallback((e) => {
+		e.preventDefault();
+		showScrollbar();
+		scheduleHideScrollbar();
+		updateScrollAndRange(scrollTop + e.deltaY);
+	}, [scrollTop, updateScrollAndRange, showScrollbar, scheduleHideScrollbar]);
+
+	const handleHorizontalScroll = useCallback((e) => {
+		const scrollLeft = e.target.scrollLeft;
+		if (onScrollSync && scrollLeft !== lastScrollLeftRef.current) {
+			lastScrollLeftRef.current = scrollLeft;
+			onScrollSync(scrollLeft);
+		}
+	}, [onScrollSync]);
+
+	// 滚动条拖拽处理
+	const handleThumbMouseDown = useCallback((e) => {
+		e.preventDefault();
+		isDraggingRef.current = true;
+		
+		const track = scrollTrackRef.current;
+		const thumb = scrollThumbRef.current;
+		if (!track || !thumb) return;
+
+		// 添加拖拽状态样式（使 track 始终保持 hover 高亮）
+		track.classList.add('is-dragging');
+		showScrollbar();
+		
+		const trackRect = track.getBoundingClientRect();
+		const thumbRect = thumb.getBoundingClientRect();
+		const trackHeight = trackRect.height;
+		const thumbHeight = thumbRect.height;
+		
+		// 计算鼠标在thumb内的相对位置
+		const mouseOffsetInThumb = e.clientY - thumbRect.top;
+		
+		const handleMouseMove = (moveEvent) => {
+			if (!isDraggingRef.current) return;
+			
+			// 计算鼠标相对于track顶部的位置，减去在thumb内的偏移
+			const mousePositionInTrack = moveEvent.clientY - trackRect.top - mouseOffsetInThumb;
+			
+			// 计算滚动比例，限制在有效范围内
+			const maxThumbTop = trackHeight - thumbHeight;
+			const clampedThumbTop = Math.max(0, Math.min(mousePositionInTrack, maxThumbTop));
+			const scrollRatio = maxThumbTop > 0 ? clampedThumbTop / maxThumbTop : 0;
+			
+			const newScrollTop = scrollRatio * maxScrollTop;
+			updateScrollAndRange(newScrollTop);
+		};
+		
+		const handleMouseUp = () => {
+			isDraggingRef.current = false;
+			// 移除拖拽状态样式
+			track.classList.remove('is-dragging');
+			scheduleHideScrollbar();
+			document.removeEventListener('mousemove', handleMouseMove);
+			document.removeEventListener('mouseup', handleMouseUp);
+		};
+		
+		document.addEventListener('mousemove', handleMouseMove);
+		document.addEventListener('mouseup', handleMouseUp);
+	}, [maxScrollTop, updateScrollAndRange, showScrollbar, scheduleHideScrollbar]);
+
+	const handleTrackClick = useCallback((e) => {
+		if (e.target === scrollThumbRef.current) return;
+		
+		const rect = scrollTrackRef.current?.getBoundingClientRect();
+		if (!rect) return;
+		
+		const clickY = e.clientY - rect.top;
+		const scrollRatio = clickY / rect.height;
+		const newScrollTop = scrollRatio * maxScrollTop;
+		updateScrollAndRange(newScrollTop);
+	}, [maxScrollTop, updateScrollAndRange]);
+
+	// 监听容器尺寸变化
+	useLayoutEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+		
+		const updateViewport = () => {
+			const newHeight = container.clientHeight;
+			setViewportHeight(newHeight);
+		};
+		
+		const resizeObserver = new ResizeObserver(updateViewport);
+		resizeObserver.observe(container);
+		updateViewport(); // 初始更新
+		
+		return () => resizeObserver.disconnect();
+	}, []);
+
+	// 当参数变化时重新计算
+	useEffect(() => {
+		if (viewportHeight > 0) {
+			setRangeIfChanged(computeRange(scrollTop, viewportHeight));
+			updateScrollbar(scrollTop);
+		}
+	}, [rowCount, rowHeight, overscan, viewportHeight, scrollTop, computeRange, updateScrollbar, setRangeIfChanged]);
+
+	// 暴露的API
+	useImperativeHandle(ref, () => ({
+		scrollToTop: () => updateScrollAndRange(0),
+		scrollToIndex: (index, align = 'start') => {
+			if (index < 0 || index >= rowCount) return;
+			const targetTop = index * rowHeight;
+			let next = targetTop;
+			if (align === 'center') next = targetTop - (viewportHeight - rowHeight) / 2;
+			else if (align === 'end') next = targetTop - (viewportHeight - rowHeight);
+			updateScrollAndRange(next);
+		},
+		getScrollTop: () => scrollTop
+	}), [rowCount, rowHeight, viewportHeight, scrollTop, updateScrollAndRange]);
+
+	// 渲染的项目
+	const renderedItems = useMemo(() => {
+		const { start, end } = range;
+		if (!(rowCount > 0 && end >= start)) return null;
+		const count = end - start + 1;
+		const offsetTop = start * rowHeight - scrollTop;
+		return Array.from({ length: count }, (_, i) => {
+			const rowIndex = start + i;
+			return renderRow(rowIndex, {
+				position: 'absolute',
+				top: offsetTop + i * rowHeight,
+				height: rowHeight,
+				left: 0,
+				right: 0
+			});
 		});
-	}) : null;
+	}, [range, rowCount, rowHeight, scrollTop, renderRow]);
 
 	return (
-		<div
-			ref={scrollRef}
-			className={className}
-			onScroll={handleScroll}
+		<div 
+			ref={containerRef}
+			className={`virtual-list ${className}`}
+			onWheel={handleWheel}
 			role="list"
 			aria-rowcount={rowCount}
 		>
-			<div style={{ height: totalHeight, position: 'relative' }}>
-				<div className="virtual-list-items" style={{ top: start * rowHeight }}>
-					{items}
+			{/* 水平滚动视口 */}
+			<div 
+				ref={viewportRef}
+				className="virtual-list-viewport"
+				onScroll={handleHorizontalScroll}
+			>
+				<div className="virtual-list-items">
+					{renderedItems}
+				</div>
+			</div>
+			
+			{/* 虚拟滚动条 */}
+			<div 
+				className="virtual-scrollbar"
+				onMouseEnter={showScrollbar}
+				onMouseLeave={() => { if (!isDraggingRef.current) scheduleHideScrollbar(); }}
+			>
+				<div
+					ref={scrollTrackRef}
+					className="virtual-scrollbar-track"
+					onClick={handleTrackClick}
+				>
+					<div
+						ref={scrollThumbRef}
+						className="virtual-scrollbar-thumb"
+						onMouseDown={handleThumbMouseDown}
+					/>
 				</div>
 			</div>
 		</div>

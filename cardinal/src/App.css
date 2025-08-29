@@ -40,6 +40,7 @@
   --col-min-width: 30px;             /* 列宽最小值 */
   --col-max-width: 10000px;          /* 列宽最大值 */
   --container-padding: 10px;
+  --virtual-scrollbar-width: 18px;   /* 虚拟滚动条宽度 */
   /* Horizontal padding for header & data cells */
   --cell-hpad: 0.4rem;
 }
@@ -174,7 +175,7 @@ button:active {
   display: flex;
   flex-direction: column;
   min-height: 0; /* 防止子元素撑破 */
-  padding: 0 var(--container-padding);
+  padding: 0 0 0 var(--container-padding);
 }
 
 
@@ -264,36 +265,9 @@ button:active {
 .virtual-list {
   height: 100%;
   flex: 1;
-  overflow-y: auto;   /* 允许垂直滚动 */
-  overflow-x: auto;   /* 允许水平滚动，并显示滚动条 */
+  overflow: hidden;   /* 外层隐藏溢出 */
   position: relative; /* 允许内部绝对定位 */
   width: 100%;
-}
-
-/* 隐藏垂直滚动条，但保留水平滚动条 */
-.virtual-list::-webkit-scrollbar {
-  width: 10px;         /* 垂直滚动条宽度为0（隐藏） */
-  height: 18px;       /* 水平滚动条高度 */
-}
-
-.virtual-list::-webkit-scrollbar-track {
-  background: var(--color-elevated-bg);
-  border-radius: 6px;
-}
-
-.virtual-list::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 6px;
-}
-
-.virtual-list::-webkit-scrollbar-thumb:hover {
-  background: var(--color-muted);
-}
-
-/* Firefox */
-.virtual-list {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border) var(--color-elevated-bg);
 }
 
 /* === Empty State === */
@@ -493,6 +467,19 @@ button:active {
   button:active {
     background-color: #343a40;
   }
+
+  /* 暗色模式下的虚拟滚动条 (Safari 风格) */
+  .virtual-scrollbar-thumb {
+    background: rgba(255,255,255,0.35);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.5);
+  }
+  .virtual-scrollbar-track:hover .virtual-scrollbar-thumb,
+  .virtual-scrollbar-track.is-dragging .virtual-scrollbar-thumb {
+    background: rgba(255,255,255,0.55);
+  }
+  .virtual-scrollbar-thumb:active {
+    background: rgba(255,255,255,0.75);
+  }
 }
 
 /* === Merged: StatusBar.css === */
@@ -571,3 +558,75 @@ button:active {
 
 /* Virtual list internal positioning */
 .virtual-list-items { position: absolute; left: 0; right: 0; }
+
+/* === Virtual List Styles === */
+.virtual-list {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* 虚拟滚动条样式 - Safari 原生风格 (overlay + auto-hide) */
+.virtual-scrollbar {
+  width: 14px; /* 对齐 JS SCROLLBAR_WIDTH */
+  position: relative;
+  flex-shrink: 0;
+  padding: 0 3px; /* 形成留白轨道 */
+  box-sizing: border-box;
+  display: flex;
+  user-select: none;
+  -webkit-user-select: none;
+  contain: layout paint;
+  transition: opacity .25s ease;
+  opacity: 0; /* 默认隐藏 */
+  pointer-events: none; /* 隐藏时不响应事件 */
+}
+
+/* 外层容器在交互中添加 show-scrollbar 类显示 */
+.virtual-list.show-scrollbar .virtual-scrollbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.virtual-scrollbar-track {
+  flex: 1;
+  position: relative;
+  border-radius: 7px;
+  background: transparent;
+}
+
+.virtual-scrollbar-thumb {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  min-height: 24px; /* 不小于行高，易抓取 */
+  background: rgba(0,0,0,0.35);
+  background-clip: padding-box;
+  border-radius: 7px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.35), 0 1px 2px rgba(0,0,0,0.35);
+  opacity: .9;
+  transition: background .15s ease, opacity .2s ease;
+  cursor: default;
+}
+
+.virtual-scrollbar-track:hover .virtual-scrollbar-thumb,
+.virtual-scrollbar-track.is-dragging .virtual-scrollbar-thumb {
+  background: rgba(0,0,0,0.55);
+}
+
+.virtual-scrollbar-thumb:active {
+  background: rgba(0,0,0,0.7);
+  transition: none;
+}
+
+/* 水平滚动视口 */
+.virtual-list-viewport {
+  position: relative;
+  height: 100%;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
