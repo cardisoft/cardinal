@@ -9,9 +9,12 @@ export function FileRow({ item, rowIndex, style, onContextMenu, searchQuery }) {
   }
 
   const path = typeof item === 'string' ? item : item?.path;
-  const filename = path ? path.split(/[\\/]/).pop() : '';
-  // 获取不包含文件名的目录路径
-  const directoryPath = path ? path.split(/[\\/]/).slice(0, -1).join('/') : '';
+  let filename = '', directoryPath = '';
+  if (path) {
+    const parts = path.split(/[\\/]/);
+    filename = parts.pop() || '';
+    directoryPath = parts.join('/');
+  }
 
   const mtimeSec = typeof item !== 'string' ? (item?.metadata?.mtime ?? item?.mtime) : undefined;
   const mtimeText = mtimeSec != null ? new Date(mtimeSec * 1000).toLocaleString() : null;
