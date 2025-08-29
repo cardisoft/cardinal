@@ -27,24 +27,21 @@ function App() {
   const prevQueryRef = useRef('');
   const prevResultsLenRef = useRef(0);
 
-  // 当搜索结果更新时，立即预加载前面的数据并重置滚动位置
+  // 优化的搜索结果处理逻辑（保持使用 useRef，但简化其他逻辑）
   useEffect(() => {
-    if (results.length > 0) {
-      const isNewQuery = prevQueryRef.current !== currentQuery;
-      const wasEmpty = prevResultsLenRef.current === 0;
+    if (results.length === 0) return; // 提前返回，减少嵌套
+    const isNewQuery = prevQueryRef.current !== currentQuery;
+    const wasEmpty = prevResultsLenRef.current === 0;
 
-      // 仅在新查询的第一次结果出现时滚动到顶部
-      if (isNewQuery && virtualListRef.current) {
-        virtualListRef.current.scrollToTop();
-      }
+    // 新查询时滚动到顶部
+    if (isNewQuery && virtualListRef.current) {
+      virtualListRef.current.scrollToTop();
+    }
 
-      // 预加载：新查询第一次出现结果 或 之前为空（首次流式填充）
-      if (isNewQuery || wasEmpty) {
-        const estimatedViewportHeight = 600; // 默认估计高度, 无法测量时的备选
-        const visibleRows = Math.ceil(estimatedViewportHeight / ROW_HEIGHT);
-        const preloadCount = Math.min(visibleRows + OVERSCAN_ROW_COUNT * 2, results.length);
-        ensureRangeLoaded(0, preloadCount - 1);
-      }
+    // 预加载首屏数据（简化预加载逻辑）
+    if (isNewQuery || wasEmpty) {
+      const preloadCount = Math.min(30, results.length); // 简化为固定预加载30行
+      ensureRangeLoaded(0, preloadCount - 1);
     }
     prevQueryRef.current = currentQuery;
     prevResultsLenRef.current = results.length;
