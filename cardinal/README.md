@@ -29,7 +29,8 @@
     - 性能不是特别好
 - metadata 启动后自动 fetching
 - Windows/NTFS 支持
-+ File icon
+- File icon
+- 文件夹不显示文件大小
 - native 内存泄漏排查
 - native 内存占用高(mmap?)
     - namepool 和索引内存共享
