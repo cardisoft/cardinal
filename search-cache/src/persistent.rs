@@ -65,7 +65,7 @@ pub fn write_cache_to_file(path: &Path, storage: PersistentStorage) -> Result<()
     info!("Cache encode time: {:?}", cache_encode_time.elapsed());
     info!(
         "Cache size: {} MB",
-        fs::metadata(path)
+        fs::symlink_metadata(path)
             .context("Failed to get cache file metadata")?
             .len() as f32
             / 1024.

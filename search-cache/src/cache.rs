@@ -374,7 +374,7 @@ impl SearchCache {
                 index
             } else {
                 // TODO(ldm0): optimize: slab node children is empty, we can create a node chain directly.
-                let metadata = std::fs::metadata(&current_path)
+                let metadata = std::fs::symlink_metadata(&current_path)
                     .map(NodeMetadata::from)
                     .ok();
                 let node = SlabNode {
@@ -402,7 +402,7 @@ impl SearchCache {
         let Ok(path) = raw_path.strip_prefix(&self.path) else {
             return None;
         };
-        if raw_path.metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
+        if raw_path.symlink_metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
             self.remove_node_path(path);
             return None;
         };
@@ -438,7 +438,7 @@ impl SearchCache {
         let Ok(path) = raw_path.strip_prefix(&self.path) else {
             return None;
         };
-        if raw_path.metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
+        if raw_path.symlink_metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
             self.remove_node_path(path);
             return None;
         };
@@ -553,7 +553,8 @@ impl SearchCache {
                                 None
                             } else if let Some(path) = &path {
                                 // try fetching metadata if it's not cached and cache them
-                                let metadata = std::fs::metadata(path).map(NodeMetadata::from).ok();
+                                let metadata =
+                                    std::fs::symlink_metadata(path).map(NodeMetadata::from).ok();
                                 node.metadata = match metadata {
                                     Some(metadata) => SlabNodeMetadata::Some(metadata),
                                     None => SlabNodeMetadata::Unaccessible,
@@ -1250,7 +1251,7 @@ mod tests {
         let new_file_path = root_path.join("event_file.txt");
         fs::write(&new_file_path, b"heck").expect("Failed to create event_file.txt");
 
-        let new_file_meta_on_disk = fs::metadata(&new_file_path).unwrap();
+        let new_file_meta_on_disk = fs::symlink_metadata(&new_file_path).unwrap();
         last_event_id += 1;
 
         let file_event = FsEvent {
@@ -1290,7 +1291,7 @@ mod tests {
 
         let file_in_subdir_path = new_subdir_path.join("file_in_event_subdir.txt");
         fs::File::create(&file_in_subdir_path).expect("Failed to create file_in_event_subdir.txt");
-        let file_in_subdir_meta_on_disk = fs::metadata(&file_in_subdir_path).unwrap();
+        let file_in_subdir_meta_on_disk = fs::symlink_metadata(&file_in_subdir_path).unwrap();
         last_event_id += 1;
 
         let dir_event = FsEvent {
