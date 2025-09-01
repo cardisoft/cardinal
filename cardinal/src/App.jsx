@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import './App.css';
 import { ContextMenu } from './components/ContextMenu';
 import { ColumnHeader } from './components/ColumnHeader';
@@ -20,7 +20,6 @@ function App() {
   const { onQueryChange, currentQuery, showLoadingUI, initialFetchCompleted, durationMs, resultCount, searchError } = useSearch(setResults);
 
   const headerRef = useRef(null);
-  const scrollAreaRef = useRef(null);
   const virtualListRef = useRef(null);
   const prevQueryRef = useRef('');
   const prevResultsLenRef = useRef(0);
@@ -92,7 +91,7 @@ function App() {
           ['--w-created']: `${colWidths.created}px`,
         }}
       >
-        <div className="scroll-area" ref={scrollAreaRef}>
+        <div className="scroll-area">
           <ColumnHeader
             ref={headerRef}
             onResizeStart={onResizeStart}

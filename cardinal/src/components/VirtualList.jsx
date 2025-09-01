@@ -3,13 +3,7 @@ import { SCROLLBAR_THUMB_MIN } from '../constants';
 import { invoke } from '@tauri-apps/api/core';
 
 /**
- * 虚拟滚动列表组件
- * 
- * 特性:
- * - 虚拟滚动，只渲染可见区域
- * - 支持大数据量
- * - 自定义滚动条
- * - 水平滚动同步
+ * 虚拟滚动列表组件（含行数据按需加载缓存）
  */
 export const VirtualList = forwardRef(function VirtualList({
 	// 若传入 results，则 rowCount 可省略
@@ -105,9 +99,7 @@ export const VirtualList = forwardRef(function VirtualList({
 		if (range.end >= range.start) ensureRangeLoaded(range.start, range.end);
 	}, [range, ensureRangeLoaded]);
 
-	// 移除滚动条显示/隐藏逻辑，滚动条将始终可见（当需要时）
-
-	// 简化的滚动条更新
+	// 滚动条更新
 	const updateScrollbar = useCallback((scrollTop) => {
 		const track = scrollTrackRef.current;
 		const thumb = scrollThumbRef.current;
@@ -126,7 +118,7 @@ export const VirtualList = forwardRef(function VirtualList({
 		thumb.style.transform = `translateY(${thumbTop}px)`;
 	}, [totalHeight, viewportHeight, maxScrollTop]);
 
-	// 更新滚动位置和范围 - 合并逻辑
+	// 更新滚动位置和范围
 	const updateScrollAndRange = useCallback((nextScrollTop) => {
 		const clamped = Math.max(0, Math.min(nextScrollTop, maxScrollTop));
 		setScrollTop(clamped);
@@ -134,7 +126,7 @@ export const VirtualList = forwardRef(function VirtualList({
 		updateScrollbar(clamped);
 	}, [maxScrollTop, computeRange, viewportHeight, updateScrollbar, setRangeIfChanged]);
 
-	// 事件处理函数
+	// 垂直滚动（阻止默认以获得一致行为）
 	const handleWheel = useCallback((e) => {
 		e.preventDefault();
 		updateScrollAndRange(scrollTop + e.deltaY);
