@@ -37,5 +37,6 @@
 
 
 ```bash
-npm run tauri dev -- --release
+npm run tauri dev -- --release --features dev
+npm run tauri build
 ```
