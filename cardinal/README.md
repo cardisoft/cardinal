@@ -34,6 +34,9 @@
 - native 内存泄漏排查
 - native 内存占用高(mmap?)
     - namepool 和索引内存共享
++ shareded-slab + parking_lot::Mutex(+1 byte，内存体积友好)
+    + 问题在于并行读写的正确处理，如 parent 消失场景
+        + fsevent 改 slab 结构， metadata fetching 只增添 metadata 不改 slab 结构
 
 
 ```bash
