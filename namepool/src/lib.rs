@@ -1,11 +1,13 @@
 use bincode::{Decode, Encode};
 use rayon::prelude::*;
-use std::{collections::BTreeMap, ffi::CStr};
+use std::{collections::BTreeMap, ffi::CStr, sync::LazyLock};
 
 fn get_parallelism() -> usize {
-    std::thread::available_parallelism()
-        .map_or(4, |n| n.get())
-        .min(32)
+    *LazyLock::new(|| {
+        std::thread::available_parallelism()
+            .map_or(4, |n| n.get())
+            .min(32)
+    })
 }
 
 #[derive(Encode, Decode)]
