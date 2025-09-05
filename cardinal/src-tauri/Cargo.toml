@@ -3,7 +3,7 @@ name = "cardinal"
 version = "0.1.0"
 description = "Cardinal is a cross platform file searching tool"
 authors = ["ldm2993593805@163.com"]
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
