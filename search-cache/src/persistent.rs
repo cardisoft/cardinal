@@ -1,6 +1,7 @@
 use crate::{MetadataCache, cache::SlabNode};
 use anyhow::{Context, Result};
-use bincode::{Decode, Encode, config::Configuration};
+use bincode::{config::Configuration, serde::Compat};
+use serde::{Deserialize, Serialize};
 use slab::Slab;
 use std::{
     collections::BTreeMap,
@@ -15,7 +16,7 @@ use typed_num::Num;
 
 const LSF_VERSION: i64 = 1;
 
-#[derive(Encode, Decode)]
+#[derive(Serialize, Deserialize)]
 pub struct PersistentStorage {
     pub version: Num<LSF_VERSION>,
     /// The last event id of the cache.
@@ -36,7 +37,7 @@ pub fn read_cache_from_file(path: &Path) -> Result<PersistentStorage> {
     let input = File::open(path).context("Failed to open cache file")?;
     let input = zstd::Decoder::new(input).context("Failed to create zstd decoder")?;
     let mut input = BufReader::new(input);
-    let storage: PersistentStorage = bincode::decode_from_std_read(&mut input, BINCODE_CONDFIG)
+    let Compat(storage): Compat<PersistentStorage> = bincode::decode_from_std_read(&mut input, BINCODE_CONDFIG)
         .context("Failed to decode cache")?;
     info!("Cache decode time: {:?}", cache_decode_time.elapsed());
     Ok(storage)
@@ -55,7 +56,7 @@ pub fn write_cache_to_file(path: &Path, storage: PersistentStorage) -> Result<()
         let output = output.auto_finish();
         let mut output = BufWriter::new(output);
         bincode::encode_into_std_write(
-            &storage, // 使用传入的 storage
+            &Compat(storage), // 使用传入的 storage
             &mut output,
             BINCODE_CONDFIG,
         )
