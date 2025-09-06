@@ -34,7 +34,6 @@
             - 好像速度也能接受
 + 加一个页面渲染文件体积 treemap, 支持钻取（点击文件夹展开子项）。
     + 磁盘整理需求
-+ 右键菜单提供“打开”、“复制路径”、“在 Finder/Explorer 中显示”等选项。
 
 ```bash
 npm run tauri dev -- --release --features dev

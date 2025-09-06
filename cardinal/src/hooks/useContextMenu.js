@@ -43,13 +43,13 @@ export function useContextMenu(autoFitColumns = null) {
     if (menu.type === 'file') {
       return [
         {
+          label: 'Open in Finder',
+          action: () => invoke('open_in_finder', { path: menu.data }),
+        },
+        {
           label: 'Copy Path',
           action: () => navigator.clipboard.writeText(menu.data),
         },
-        {
-          label: 'Open in Finder',
-          action: () => invoke('open_in_finder', { path: menu.data }),
-        }
       ];
     }
     if (menu.type === 'header' && autoFitColumns) {
