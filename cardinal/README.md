@@ -1,4 +1,4 @@
-# DONE
+# PENDING
 - fs-icon 仍差强人意，目前显示的和 finder 仍然不一致，怀疑Finder用的别的预览 API(QLThumbnailGenerator?)
     + 改成 QLThumbnailGenerator + NSWorkspace 之后仍然和Finder实现不一样，尽力了尽力了
 - 需要在内容没有返回时阻塞滚动条
@@ -17,8 +17,10 @@
             + capacity + length 都用 u32 表示 24 byte -> 16 byte
         + 最后使用了 ThinVec，反正大多数Node都是文件，ThinVec::new() 也不会产生额外的卫星内存
             + 24 byte -> 8 byte
+- Windows/NTFS 支持
 
 # TODO
+- 文件空格预览支持
 - 支持普通搜索，正则搜索, glob search
     - 不同的格式有开关按钮，类似于 vscode
     - 在输入不同的内容的时候自动推断是 glob 还是正则还是普通 substr 搜索，然后对应的按钮变成浅色
@@ -26,7 +28,6 @@
 - 搜索结果自动更新
     - FSEvent 更新之后要重新拉取搜索结果
 - 搜索结果排序
-- Windows/NTFS 支持
 - native 内存占用高(mmap?)
     - namepool 和索引内存共享
 + shareded-slab + parking_lot::Mutex(+1 byte，内存体积友好)
