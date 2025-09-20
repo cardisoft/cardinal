@@ -55,6 +55,7 @@ impl NamePool {
 
     pub fn search_substr<'a>(&'a self, substr: &'a str) -> impl Iterator<Item = &'a str> + 'a {
         let mut last_end = 0;
+        // TODO(ldm0): remove x > last_end check
         memchr::memmem::find_iter(&self.pool, substr.as_bytes()).filter_map(move |x| {
             (x > last_end).then(|| {
                 let (new_end, s) = self.get(x);

@@ -86,7 +86,8 @@ mod extra {
         let cache = SearchCache::walk_fs(tmp.path().to_path_buf());
         let original_total = cache.get_total_files();
         cache.flush_to_file(&cache_path).unwrap();
-        let loaded = SearchCache::try_read_persistent_cache(tmp.path(), &cache_path).unwrap();
+        let loaded =
+            SearchCache::try_read_persistent_cache(tmp.path(), &cache_path, None, None).unwrap();
         assert_eq!(loaded.get_total_files(), original_total);
     }
 }

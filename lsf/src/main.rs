@@ -10,6 +10,7 @@ use std::{io::Write, path::Path};
 use tracing_subscriber::{EnvFilter, filter::LevelFilter};
 
 const CACHE_PATH: &str = "target/cache.zstd";
+const IGNORE_PATH: &str = "/System/Volumes/Data"; // macOS specific ignore path
 
 fn main() -> Result<()> {
     let builder = tracing_subscriber::fmt();
@@ -23,12 +24,18 @@ fn main() -> Result<()> {
     let path = cli.path;
     let mut cache = if cli.refresh {
         println!("Walking filesystem...");
-        SearchCache::walk_fs(path)
+        SearchCache::walk_fs_with_ignore(path, Path::new(IGNORE_PATH))
     } else {
         println!("Try reading cache...");
-        SearchCache::try_read_persistent_cache(&path, Path::new(CACHE_PATH)).unwrap_or_else(|e| {
+        SearchCache::try_read_persistent_cache(
+            &path,
+            Path::new(CACHE_PATH),
+            Some(Path::new(IGNORE_PATH)),
+            None,
+        )
+        .unwrap_or_else(|e| {
             println!("Failed to read cache: {e:?}. Re-walking filesystem...");
-            SearchCache::walk_fs(path)
+            SearchCache::walk_fs_with_ignore(path, Path::new(IGNORE_PATH))
         })
     };
 

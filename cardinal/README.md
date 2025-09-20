@@ -52,6 +52,7 @@
         + 改成用 namepool 变成偏移可以 24 byte -> (usize + u16)10 byte
         + https://superuser.com/questions/1561484/what-is-the-maximum-length-of-a-filename-apfs
         + NamePool 需要增加全局单例，且内部结构需要改造（改造成链表 + 内存块）（类似于 allocator）
++ 为什么扫描 /Library/Developer/CoreSimulator/Volumes/iOS_23A343 是单线程的？
 
 ```bash
 npm run tauri dev -- --release --features dev

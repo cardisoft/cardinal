@@ -16,6 +16,7 @@ use std::{
     io::ErrorKind,
     num::NonZeroU32,
     path::{Path, PathBuf},
+    sync::atomic::AtomicBool,
     time::Instant,
 };
 use thin_vec::ThinVec;
@@ -160,6 +161,8 @@ pub struct SearchCache {
     slab: ThinSlab<SlabNode>,
     name_index: BTreeMap<Box<str>, Vec<SlabIndex>>,
     name_pool: NamePool,
+    ignore_path: Option<&'static Path>,
+    cancel: Option<&'static AtomicBool>,
 }
 
 impl std::fmt::Debug for SearchCache {
@@ -176,7 +179,12 @@ impl std::fmt::Debug for SearchCache {
 
 impl SearchCache {
     /// The `path` is the root path of the constructed cache and fsevent watch path.
-    pub fn try_read_persistent_cache(path: &Path, cache_path: &Path) -> Result<Self> {
+    pub fn try_read_persistent_cache(
+        path: &Path,
+        cache_path: &Path,
+        ignore_path: Option<&'static Path>,
+        cancel: Option<&'static AtomicBool>,
+    ) -> Result<Self> {
         read_cache_from_file(cache_path)
             .and_then(|x| {
                 (x.path == path)
@@ -198,7 +206,17 @@ impl SearchCache {
                      slab,
                      name_index,
                      last_event_id,
-                 }| { Self::new(path, last_event_id, slab_root, slab, name_index) },
+                 }| {
+                    Self::new(
+                        path,
+                        last_event_id,
+                        slab_root,
+                        slab,
+                        name_index,
+                        ignore_path,
+                        cancel,
+                    )
+                },
             )
     }
 
@@ -207,19 +225,36 @@ impl SearchCache {
         self.slab.len()
     }
 
-    pub fn walk_fs(path: PathBuf) -> Self {
+    pub fn walk_fs_with_ignore(path: PathBuf, ignore_path: &'static Path) -> Self {
         Self::walk_fs_with_walk_data(
             path,
-            &WalkData::new(PathBuf::from("/System/Volumes/Data"), false),
+            &WalkData::new(Some(ignore_path), false, None),
+            Some(ignore_path),
+            None,
         )
+        .unwrap()
+    }
+
+    pub fn walk_fs(path: PathBuf) -> Self {
+        Self::walk_fs_with_walk_data(path, &WalkData::new(None, false, None), None, None).unwrap()
     }
 
     /// This function is expected to be called with WalkData which metadata is not fetched.
-    pub fn walk_fs_with_walk_data(path: PathBuf, walk_data: &WalkData) -> Self {
-        fn walkfs_to_slab(path: &Path, walk_data: &WalkData) -> (SlabIndex, ThinSlab<SlabNode>) {
+    /// If cancelled during walking, None is returned.
+    pub fn walk_fs_with_walk_data(
+        path: PathBuf,
+        walk_data: &WalkData,
+        ignore_path: Option<&'static Path>,
+        cancel: Option<&'static AtomicBool>,
+    ) -> Option<Self> {
+        // Return None if cancelled
+        fn walkfs_to_slab(
+            path: &Path,
+            walk_data: &WalkData,
+        ) -> Option<(SlabIndex, ThinSlab<SlabNode>)> {
             // 先多线程构建树形文件名列表(不能直接创建 slab 因为 slab 无法多线程构建(slab 节点有相互引用，不想加锁))
             let visit_time = Instant::now();
-            let node = walk_it(path, &walk_data).expect("failed to walk");
+            let node = walk_it(path, &walk_data)?;
             info!(
                 "Walk data: {:?}, time: {:?}",
                 walk_data,
@@ -237,7 +272,7 @@ impl SearchCache {
                 slab.len()
             );
 
-            (slab_root, slab)
+            Some((slab_root, slab))
         }
         fn name_index(slab: &ThinSlab<SlabNode>) -> BTreeMap<Box<str>, Vec<SlabIndex>> {
             // TODO(ldm0): Memory optimization can be done by letting name index reference the name in the pool(gc need to be considered though)
@@ -270,18 +305,28 @@ impl SearchCache {
         }
 
         let last_event_id = current_event_id();
-        let (slab_root, slab) = walkfs_to_slab(&path, walk_data);
+        let (slab_root, slab) = walkfs_to_slab(&path, walk_data)?;
         let name_index = name_index(&slab);
         // metadata cache inits later
-        Self::new(path, last_event_id, slab_root, slab, name_index)
+        Some(Self::new(
+            path,
+            last_event_id,
+            slab_root,
+            slab,
+            name_index,
+            ignore_path,
+            cancel,
+        ))
     }
 
-    pub fn new(
+    fn new(
         path: PathBuf,
         last_event_id: u64,
         slab_root: SlabIndex,
         slab: ThinSlab<SlabNode>,
         name_index: BTreeMap<Box<str>, Vec<SlabIndex>>,
+        ignore_path: Option<&'static Path>,
+        cancel: Option<&'static AtomicBool>,
     ) -> Self {
         // name pool construction speed is fast enough that caching it doesn't worth it.
         let name_pool = name_pool(&name_index);
@@ -292,6 +337,8 @@ impl SearchCache {
             slab,
             name_index,
             name_pool,
+            ignore_path,
+            cancel,
         }
     }
 
@@ -453,7 +500,7 @@ impl SearchCache {
     // `Self::scan_path_recursive`function returns index of the constructed node(with metadata provided).
     // - If path is not under the watch root, None is returned.
     // - Procedure contains metadata fetching, if metadata fetching failed, None is returned.
-    pub fn scan_path_recursive(&mut self, raw_path: &Path) -> Option<SlabIndex> {
+    fn scan_path_recursive(&mut self, raw_path: &Path) -> Option<SlabIndex> {
         // Ensure path is under the watch root
         let Ok(path) = raw_path.strip_prefix(&self.path) else {
             return None;
@@ -476,7 +523,7 @@ impl SearchCache {
             self.remove_node(old_node);
         }
         // For incremental data, we need metadata
-        let walk_data = WalkData::new(PathBuf::from("/System/Volumes/Data"), true);
+        let walk_data = WalkData::new(self.ignore_path.clone(), true, self.cancel);
         walk_it(raw_path, &walk_data).map(|node| {
             let node = self.create_node_slab_update_name_index_and_name_pool(Some(parent), &node);
             // Push the newly created node to the parent's children
@@ -502,12 +549,17 @@ impl SearchCache {
     }
 
     pub fn rescan(&mut self) {
-        // Remove all memory consuming cache early for memory consumption in Self::walk_fs.
-        self.slab = ThinSlab::new();
-        self.name_index = BTreeMap::default();
-        self.name_pool = NamePool::new();
-        let path = std::mem::take(&mut self.path);
-        *self = Self::walk_fs(path);
+        // Remove all memory consuming cache early for memory consumption in Self::walk_fs_new.
+        let Some(new_cache) = Self::walk_fs_with_walk_data(
+            self.path.clone(),
+            &WalkData::new(self.ignore_path, false, self.cancel),
+            self.ignore_path,
+            self.cancel,
+        ) else {
+            info!("Rescan cancelled.");
+            return;
+        };
+        *self = new_cache;
     }
 
     /// Removes a node and its children recursively by index.
@@ -547,6 +599,8 @@ impl SearchCache {
             slab,
             name_index,
             name_pool: _,
+            ignore_path: _,
+            cancel: _,
         } = self;
         write_cache_to_file(
             cache_path,
@@ -1137,8 +1191,9 @@ mod tests {
     }
 
     #[test]
-    fn test_walk_fs_metadata_is_always_none() {
-        let temp_dir = TempDir::new("test_walk_fs_meta").expect("Failed to create temp directory");
+    fn test_walk_fs_new_metadata_is_always_none() {
+        let temp_dir =
+            TempDir::new("test_walk_fs_new_meta").expect("Failed to create temp directory");
         let root_path = temp_dir.path();
 
         fs::File::create(&root_path.join("file1.txt")).expect("Failed to create file1.txt");
@@ -1159,7 +1214,7 @@ mod tests {
         // 文件的 metadata 都会是 None
         assert!(
             cache.slab[file_node_idx].metadata.is_none(),
-            "Metadata for file node created by walk_fs should be None"
+            "Metadata for file node created by walk_fs_new should be None"
         );
 
         // Check metadata for a file node
@@ -1171,7 +1226,7 @@ mod tests {
         // 文件的 metadata 都会是 None
         assert!(
             cache.slab[file_node_idx].metadata.is_none(),
-            "Metadata for file node created by walk_fs should be None"
+            "Metadata for file node created by walk_fs_new should be None"
         );
 
         // Check metadata for a subdirectory node
@@ -1181,7 +1236,7 @@ mod tests {
         // 目录的 metadata 都会是 Some()
         assert!(
             cache.slab[dir_node_idx].metadata.is_some(),
-            "Metadata for directory node created by walk_fs should be None"
+            "Metadata for directory node created by walk_fs_new should be Some"
         );
     }
 
@@ -1315,7 +1370,7 @@ mod tests {
         );
         assert!(
             results1[0].metadata.is_none(),
-            "File metadata should be None after walk_fs"
+            "File metadata should be None after walk_fs_new"
         );
 
         // 2. Query for a file in a subdirectory
@@ -1338,7 +1393,7 @@ mod tests {
         );
         assert!(
             results3[0].metadata.is_some(),
-            "Directory metadata should be Some after walk_fs"
+            "Directory metadata should be Some after walk_fs_new"
         );
 
         // 4. Query with no results
@@ -1495,19 +1550,19 @@ mod tests {
 
         let mut cache = SearchCache::walk_fs(root_path.to_path_buf());
 
-        // Check metadata from initial walk_fs
+        // Check metadata from initial walk_fs_new
         let results_file_walk = cache.query_files("walk_file.txt".to_string()).unwrap();
         assert_eq!(results_file_walk.len(), 1);
         assert!(
             results_file_walk[0].metadata.is_none(),
-            "File metadata from walk_fs should be None"
+            "File metadata from walk_fs_new should be None"
         );
 
         let results_dir_walk = cache.query_files("walk_dir".to_string()).unwrap();
         assert_eq!(results_dir_walk.len(), 1);
         assert!(
             results_dir_walk[0].metadata.is_some(),
-            "Directory metadata from walk_fs should be Some"
+            "Directory metadata from walk_fs_new should be Some"
         );
 
         // Simulate an event for a new file

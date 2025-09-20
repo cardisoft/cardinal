@@ -6,8 +6,8 @@ use std::{
     io::{Error, ErrorKind},
     num::NonZeroU64,
     os::unix::fs::MetadataExt,
-    path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering},
+    path::Path,
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     time::UNIX_EPOCH,
 };
 
@@ -80,21 +80,38 @@ impl From<fs::FileType> for NodeFileType {
     }
 }
 
-#[derive(Default, Debug)]
-pub struct WalkData {
+#[derive(Debug)]
+pub struct WalkData<'w> {
     pub num_files: AtomicUsize,
     pub num_dirs: AtomicUsize,
-    ignore_directory: Option<PathBuf>,
+    /// Cancellation will be checked periodically.
+    cancel: Option<&'w AtomicBool>,
+    ignore_directory: Option<&'w Path>,
     /// If set, metadata will be collected for each file node(folder node will get free metadata).
     need_metadata: bool,
 }
 
-impl WalkData {
-    pub const fn new(path: PathBuf, need_metadata: bool) -> Self {
+impl<'w> WalkData<'w> {
+    pub const fn simple(need_metadata: bool) -> Self {
         Self {
             num_files: AtomicUsize::new(0),
             num_dirs: AtomicUsize::new(0),
-            ignore_directory: Some(path),
+            cancel: None,
+            ignore_directory: None,
+            need_metadata,
+        }
+    }
+
+    pub const fn new(
+        ignore_directory: Option<&'w Path>,
+        need_metadata: bool,
+        cancel: Option<&'w AtomicBool>,
+    ) -> Self {
+        Self {
+            num_files: AtomicUsize::new(0),
+            num_dirs: AtomicUsize::new(0),
+            cancel,
+            ignore_directory,
             need_metadata,
         }
     }
@@ -133,6 +150,13 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
                 .filter_map(|entry| {
                     match &entry {
                         Ok(entry) => {
+                            if walk_data
+                                .cancel
+                                .map(|x| x.load(Ordering::Relaxed))
+                                .unwrap_or_default()
+                            {
+                                return None;
+                            }
                             if walk_data.ignore_directory.as_deref() == Some(path) {
                                 return None;
                             }
@@ -182,6 +206,13 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
         walk_data.num_files.fetch_add(1, Ordering::Relaxed);
         vec![]
     };
+    if walk_data
+        .cancel
+        .map(|x| x.load(Ordering::Relaxed))
+        .unwrap_or_default()
+    {
+        return None;
+    }
     let name = path
         .file_name()
         .map(|x| x.to_string_lossy().into_owned().into_boxed_str())
@@ -200,7 +231,11 @@ fn handle_error_and_retry(failed: &Error) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs, io::Write};
+    use std::{
+        fs,
+        io::Write,
+        time::{Duration, Instant},
+    };
     use tempdir::TempDir;
 
     #[test]
@@ -210,7 +245,7 @@ mod tests {
         fs::create_dir(root.join("dir_a")).unwrap();
         fs::File::create(root.join("file_a.txt")).unwrap();
         fs::File::create(root.join("dir_a/file_b.log")).unwrap();
-        let walk_data = WalkData::new(PathBuf::from("/ignore/this"), false);
+        let walk_data = WalkData::simple(false);
         let node = walk_it(root, &walk_data).unwrap();
         assert_eq!(&*node.name, root.file_name().unwrap().to_str().unwrap());
         // Root + dir + 2 files
@@ -253,7 +288,7 @@ mod tests {
         let tmp = TempDir::new("fswalk_meta").unwrap();
         let root = tmp.path();
         fs::File::create(root.join("meta_file.txt")).unwrap();
-        let walk_data = WalkData::new(PathBuf::from("/ignore/this"), true);
+        let walk_data = WalkData::simple(true);
         let node = walk_it(root, &walk_data).unwrap();
         fn find<'a>(node: &'a Node, name: &str) -> Option<&'a Node> {
             if &*node.name == name {
@@ -281,7 +316,7 @@ mod tests {
         fs::File::create(root.join("real_dir/file.txt")).unwrap();
         #[cfg(unix)]
         std::os::unix::fs::symlink(root.join("real_dir"), root.join("link_dir")).unwrap();
-        let walk_data = WalkData::new(PathBuf::from("/ignore/this"), true);
+        let walk_data = WalkData::simple(true);
         let node = walk_it(root, &walk_data).unwrap();
         // Ensure link_dir exists as a file system entry but not traversed (should be a file node with no children)
         fn get_child<'a>(n: &'a Node, name: &str) -> Option<&'a Node> {
@@ -310,7 +345,7 @@ mod tests {
             let mut f = fs::File::create(root.join(format!("f{i}.txt"))).unwrap();
             writeln!(f, "hello {i}").unwrap();
         }
-        let walk_data = WalkData::new(PathBuf::from("/ignore/this"), false);
+        let walk_data = WalkData::simple(false);
         let node = walk_it(root, &walk_data).unwrap();
         // Expect 1 (root) + 50 file children
         assert_eq!(
@@ -318,5 +353,56 @@ mod tests {
             50,
             "expected 50 files directly under root"
         );
+    }
+
+    #[test]
+    #[ignore]
+    fn test_search_root() {
+        let done = AtomicBool::new(false);
+        let walk_data = WalkData::new(Some(Path::new("/System/Volumes/Data")), false, None);
+        std::thread::scope(|s| {
+            s.spawn(|| {
+                let node = walk_it(Path::new("/"), &walk_data).unwrap();
+                println!("root has {} children", node.children.len());
+                done.store(true, Ordering::Relaxed);
+            });
+            s.spawn(|| {
+                while done.load(Ordering::Relaxed) == false {
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    let files = walk_data.num_files.load(Ordering::Relaxed);
+                    let dirs = walk_data.num_dirs.load(Ordering::Relaxed);
+                    println!("so far: {files} files, {dirs} dirs");
+                }
+            });
+        });
+    }
+
+    #[test]
+    fn test_search_cancel() {
+        let cancel = AtomicBool::new(false);
+        let done = AtomicBool::new(false);
+        let walk_data = WalkData::new(
+            Some(Path::new("/System/Volumes/Data")),
+            false,
+            Some(&cancel),
+        );
+        std::thread::scope(|s| {
+            s.spawn(|| {
+                let node = walk_it(Path::new("/"), &walk_data);
+                done.store(true, Ordering::Relaxed);
+                assert!(node.is_none(), "expected walk to be cancelled");
+            });
+            s.spawn(|| {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                let time = Instant::now();
+                cancel.store(true, Ordering::Relaxed);
+                while done.load(Ordering::Relaxed) == false {
+                    std::thread::yield_now();
+                }
+                // Ensure cancellation happened quickly
+                dbg!(time.elapsed());
+                assert!(time.elapsed() < Duration::from_secs(1));
+            });
+        });
     }
 }

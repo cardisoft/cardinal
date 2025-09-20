@@ -1,23 +1,25 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use anyhow::{Context, Result};
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 use cardinal_sdk::{EventFlag, EventWatcher};
-use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
-use search_cache::{HandleFSEError, SearchCache, SearchResultNode, SlabIndex, SlabNodeMetadata, WalkData};
+use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
+use rayon::prelude::*;
+use search_cache::{
+    HandleFSEError, SearchCache, SearchResultNode, SlabIndex, SlabNodeMetadata, WalkData,
+};
 use serde::Serialize;
 use std::{
     cell::LazyCell,
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, LazyLock, Once,
+        atomic::{AtomicBool, Ordering},
     },
     time::Duration,
 };
 use tauri::{Emitter, RunEvent, State};
 use tracing::{info, level_filters::LevelFilter};
 use tracing_subscriber::EnvFilter;
-use rayon::prelude::*;
 
 static CACHE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
     directories::ProjectDirs::from("", "", "Cardinal")
@@ -28,6 +30,7 @@ static CACHE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
         .config_dir()
         .join("cardinal.db")
 });
+static APP_QUIT: AtomicBool = AtomicBool::new(false);
 
 struct SearchState {
     search_tx: Sender<String>,
@@ -103,15 +106,12 @@ async fn get_nodes_info(
         .map(|x| {
             x.into_par_iter()
                 .map(|SearchResultNode { path, metadata }| {
-                    let icon = path
-                        .to_str()
-                        .and_then(fs_icon::icon_of_path)
-                        .map(|data| {
-                            format!(
-                                "data:image/png;base64,{}",
-                                general_purpose::STANDARD.encode(&data)
-                            )
-                        });
+                    let icon = path.to_str().and_then(fs_icon::icon_of_path).map(|data| {
+                        format!(
+                            "data:image/png;base64,{}",
+                            general_purpose::STANDARD.encode(&data)
+                        )
+                    });
                     NodeInfo {
                         path: path.to_string_lossy().into_owned(),
                         metadata: metadata.as_ref().map(NodeInfoMetadata::from_metadata),
@@ -177,7 +177,7 @@ pub fn run() -> Result<()> {
     }
 
     // Create communication channels
-    let (finish_tx, finish_rx) = bounded::<Sender<SearchCache>>(1);
+    let (finish_tx, finish_rx) = bounded::<Sender<Option<SearchCache>>>(1);
     let (search_tx, search_rx) = unbounded::<String>();
     let (result_tx, result_rx) = unbounded::<Result<Vec<SlabIndex>>>();
     let (node_info_tx, node_info_rx) = unbounded::<Vec<SlabIndex>>();
@@ -212,7 +212,12 @@ pub fn run() -> Result<()> {
             LazyCell::new(move || app_handle_clone.emit("init_completed", ()).unwrap())
         };
         // 初始化搜索缓存
-        let mut cache = match SearchCache::try_read_persistent_cache(&path, &CACHE_PATH) {
+        let mut cache = match SearchCache::try_read_persistent_cache(
+            &path,
+            &CACHE_PATH,
+            Some(Path::new("/System/Volumes/Data")),
+            Some(&APP_QUIT),
+        ) {
             Ok(cached) => {
                 info!("Loaded existing cache");
                 // If using cache, defer the emit init process to HistoryDone event processing
@@ -232,8 +237,11 @@ pub fn run() -> Result<()> {
             }
             Err(e) => {
                 info!("Walking filesystem: {:?}", e);
-                let walk_data =
-                    Arc::new(WalkData::new(PathBuf::from("/System/Volumes/Data"), false));
+                let walk_data = Arc::new(WalkData::new(
+                    Some(Path::new("/System/Volumes/Data")),
+                    false,
+                    Some(&APP_QUIT),
+                ));
                 let walk_data_clone = walk_data.clone();
                 let app_handle_clone = app_handle.clone();
                 let walking_done = Arc::new(AtomicBool::new(false));
@@ -257,7 +265,20 @@ pub fn run() -> Result<()> {
                     }
                 });
 
-                let cache = SearchCache::walk_fs_with_walk_data(path.clone(), &walk_data);
+                let Some(cache) = SearchCache::walk_fs_with_walk_data(
+                    path.clone(),
+                    &walk_data,
+                    Some(Path::new("/System/Volumes/Data")),
+                    Some(&APP_QUIT),
+                ) else {
+                    info!("Walk filesystem cancelled, app quitting");
+                    finish_rx
+                        .recv()
+                        .expect("Failed to receive finish signal")
+                        .send(None)
+                        .expect("Failed to send None cache");
+                    return;
+                };
                 walking_done.store(true, Ordering::Relaxed);
 
                 // 发送初始状态栏信息
@@ -288,7 +309,7 @@ pub fn run() -> Result<()> {
             crossbeam_channel::select! {
                 recv(finish_rx) -> tx => {
                     let tx = tx.expect("Finish channel closed");
-                    tx.send(cache).expect("Failed to send cache");
+                    tx.send(Some(cache)).expect("Failed to send cache");
                     break;
                 }
                 recv(search_rx) -> query => {
@@ -335,6 +356,7 @@ pub fn run() -> Result<()> {
     app.run(move |app_handle, event| {
         match &event {
             RunEvent::Exit => {
+                APP_QUIT.store(true, Ordering::Relaxed);
                 // 右键关闭的时候会被调用
                 // TODO(ldm0): 未来这里可以优化成不时保存一下，然后关闭的时候如果10秒内之前存过就不再存了
 
@@ -348,6 +370,7 @@ pub fn run() -> Result<()> {
                 // This allow us to catch tray icon events when there is no window
                 // if we manually requested an exit (code is Some(_)) we will let it go through
                 if code.is_none() {
+                    APP_QUIT.store(true, Ordering::Relaxed);
                     info!("Tauri application exited, flushing cache...");
 
                     // TODO(ldm0): is this necessary?
@@ -367,20 +390,23 @@ pub fn run() -> Result<()> {
 }
 
 /// Write cache to file before app exit
-fn flush_cache_to_file_once(finish_tx: &Sender<Sender<SearchCache>>) {
+fn flush_cache_to_file_once(finish_tx: &Sender<Sender<Option<SearchCache>>>) {
     static FLUSH_ONCE: Once = Once::new();
     FLUSH_ONCE.call_once(move || {
-        let (cache_tx, cache_rx) = bounded::<SearchCache>(1);
+        let (cache_tx, cache_rx) = bounded::<Option<SearchCache>>(1);
         finish_tx
             .send(cache_tx)
             .context("cache_tx is closed")
             .unwrap();
-        let cache = cache_rx.recv().context("cache_tx is closed").unwrap();
-        cache
-            .flush_to_file(&CACHE_PATH)
-            .context("Failed to write cache to file")
-            .unwrap();
+        if let Some(cache) = cache_rx.recv().context("cache_tx is closed").unwrap() {
+            cache
+                .flush_to_file(&CACHE_PATH)
+                .context("Failed to write cache to file")
+                .unwrap();
 
-        info!("Cache flushed successfully to {:?}", &*CACHE_PATH);
+            info!("Cache flushed successfully to {:?}", &*CACHE_PATH);
+        } else {
+            info!("Canncelled during data construction, no cache to flush");
+        }
     });
 }
