@@ -76,7 +76,7 @@ function App() {
   usePreventRefresh();
   const [state, dispatch] = useReducer(reducer, initialState);
   const [useRegex, setUseRegex] = useState(false);
-  const [caseInsensitive, setCaseInsensitive] = useState(false);
+  const [caseSensitive, setCaseSensitive] = useState(false);
   const {
     results,
     isInitialized,
@@ -163,7 +163,7 @@ function App() {
         query,
         options: {
           useRegex,
-          caseInsensitive,
+          caseInsensitive: !caseSensitive,
         }
       });
 
@@ -205,7 +205,7 @@ function App() {
     } finally {
       hasInitialSearchRunRef.current = true;
     }
-  }, [caseInsensitive, dispatch, useRegex]);
+  }, [caseSensitive, dispatch, useRegex]);
 
   const onQueryChange = useCallback((e) => {
     const inputValue = e.target.value;
@@ -222,8 +222,8 @@ function App() {
     setUseRegex(event.target.checked);
   }, []);
 
-  const onToggleCaseInsensitive = useCallback((event) => {
-    setCaseInsensitive(event.target.checked);
+  const onToggleCaseSensitive = useCallback((event) => {
+    setCaseSensitive(event.target.checked);
   }, []);
 
   useEffect(() => () => {
@@ -246,7 +246,7 @@ function App() {
       return;
     }
     handleSearch(latestQueryRef.current);
-  }, [caseInsensitive, handleSearch, useRegex]);
+  }, [caseSensitive, handleSearch, useRegex]);
 
   // 优化的搜索结果处理逻辑（保持使用 useRef，但简化其他逻辑）
   useEffect(() => {
@@ -280,7 +280,7 @@ function App() {
       style={{ ...rowStyle, width: 'var(--columns-total)' }}
       onContextMenu={showContextMenu}
       searchQuery={currentQuery}
-      caseInsensitive={caseInsensitive}
+      caseInsensitive={!caseSensitive}
     />
   );
 
@@ -310,13 +310,13 @@ function App() {
           <div className="search-options">
             <label
               className="search-option"
-              title="Toggle case-insensitive matching"
+              title="Toggle case-sensitive matching"
             >
               <input
                 type="checkbox"
-                checked={caseInsensitive}
-                onChange={onToggleCaseInsensitive}
-                aria-label="Toggle case-insensitive matching"
+                checked={caseSensitive}
+                onChange={onToggleCaseSensitive}
+                aria-label="Toggle case-sensitive matching"
               />
               <span
                 className="search-option__display"
@@ -324,7 +324,7 @@ function App() {
               >
                 Aa
               </span>
-              <span className="sr-only">Toggle case-insensitive matching</span>
+              <span className="sr-only">Toggle case-sensitive matching</span>
             </label>
             <label
               className="search-option"
