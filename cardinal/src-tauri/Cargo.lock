@@ -2282,6 +2282,7 @@ dependencies = [
  "memchr",
  "parking_lot",
  "rayon",
+ "regex",
  "rustc-hash",
  "serde",
 ]
@@ -3427,6 +3428,7 @@ dependencies = [
  "namepool",
  "postcard",
  "query-segmentation",
+ "regex",
  "serde",
  "slab",
  "thin-vec",

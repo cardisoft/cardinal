@@ -955,6 +955,7 @@ dependencies = [
  "memchr",
  "parking_lot",
  "rayon",
+ "regex",
  "rustc-hash",
  "serde",
 ]
@@ -1339,6 +1340,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "regex"
+version = "1.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23d7fd106d8c02486a8d64e778353d1cffe08ce79ac2e82f540c86d0facf6912"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
 name = "regex-automata"
 version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1442,6 +1455,7 @@ dependencies = [
  "namepool",
  "postcard",
  "query-segmentation",
+ "regex",
  "serde",
  "slab",
  "tempdir",

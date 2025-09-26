@@ -7,6 +7,7 @@ mod slab_node;
 mod type_and_size;
 
 pub use cache::*;
+pub use fswalk::WalkData;
 pub use metadata_cache::*;
 pub use persistent::*;
 pub use slab::*;

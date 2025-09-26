@@ -1,6 +1,7 @@
 #![feature(str_from_raw_parts)]
 use core::str;
 use parking_lot::Mutex;
+use regex::Regex;
 use std::collections::BTreeSet;
 
 pub struct NamePool {
@@ -89,6 +90,20 @@ impl NamePool {
             .iter()
             .filter(|&x| x.starts_with(prefix))
             .map(|x| unsafe { str::from_raw_parts(x.as_ptr(), x.len()) })
+            .collect()
+    }
+
+    pub fn search_regex<'search, 'pool: 'search>(
+        &'pool self,
+        pattern: &Regex,
+    ) -> BTreeSet<&'pool str> {
+        self.inner
+            .lock()
+            .iter()
+            .filter_map(|x| {
+                let existing = unsafe { str::from_raw_parts(x.as_ptr(), x.len()) };
+                pattern.is_match(existing).then_some(existing)
+            })
             .collect()
     }
 
@@ -230,6 +245,39 @@ mod tests {
         let result = pool.search_exact(exact);
         assert_eq!(result.len(), 1);
         assert!(result.contains("world"));
+    }
+
+    #[test]
+    fn test_search_regex_basic() {
+        use regex::Regex;
+
+        let pool = NamePool::new();
+        pool.push("hello");
+        pool.push("world");
+        pool.push("helloworld");
+
+        let regex = Regex::new("hell.*").unwrap();
+        let result = pool.search_regex(&regex);
+        assert_eq!(result.len(), 2);
+        assert!(result.contains("hello"));
+        assert!(result.contains("helloworld"));
+    }
+
+    #[test]
+    fn test_search_regex_case_insensitive() {
+        use regex::RegexBuilder;
+
+        let pool = NamePool::new();
+        pool.push("Alpha");
+        pool.push("beta");
+
+        let regex = RegexBuilder::new("alpha")
+            .case_insensitive(true)
+            .build()
+            .unwrap();
+        let result = pool.search_regex(&regex);
+        assert_eq!(result.len(), 1);
+        assert!(result.contains("Alpha"));
     }
 
     #[test]

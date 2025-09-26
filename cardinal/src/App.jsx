@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useReducer } from 'react';
+import { useRef, useCallback, useEffect, useReducer, useState } from 'react';
 import './App.css';
 import { ContextMenu } from './components/ContextMenu';
 import { ColumnHeader } from './components/ColumnHeader';
@@ -76,6 +76,8 @@ function reducer(state, action) {
 function App() {
   usePreventRefresh();
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [useRegex, setUseRegex] = useState(false);
+  const [caseInsensitive, setCaseInsensitive] = useState(false);
   const {
     results,
     isInitialized,
@@ -100,6 +102,7 @@ function App() {
   const debounceTimerRef = useRef(null);
   const loadingDelayTimerRef = useRef(null);
   const hasInitialSearchRunRef = useRef(false);
+  const latestQueryRef = useRef('');
 
   useEffect(() => {
     let isMounted = true;
@@ -139,6 +142,7 @@ function App() {
   }, []);
 
   const handleSearch = useCallback(async (query) => {
+    latestQueryRef.current = query;
     const startTs = performance.now();
     const isInitial = !hasInitialSearchRunRef.current;
     const trimmedQuery = query.trim();
@@ -156,7 +160,13 @@ function App() {
     }
 
     try {
-      const searchResults = await invoke('search', { query });
+      const searchResults = await invoke('search', {
+        query,
+        options: {
+          useRegex,
+          caseInsensitive,
+        }
+      });
 
       if (loadingDelayTimerRef.current) {
         clearTimeout(loadingDelayTimerRef.current);
@@ -196,10 +206,11 @@ function App() {
     } finally {
       hasInitialSearchRunRef.current = true;
     }
-  }, []);
+  }, [caseInsensitive, dispatch, useRegex]);
 
   const onQueryChange = useCallback((e) => {
     const inputValue = e.target.value;
+    latestQueryRef.current = inputValue;
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
@@ -207,6 +218,14 @@ function App() {
       handleSearch(inputValue);
     }, SEARCH_DEBOUNCE_MS);
   }, [handleSearch]);
+
+  const onToggleRegex = useCallback((event) => {
+    setUseRegex(event.target.checked);
+  }, []);
+
+  const onToggleCaseInsensitive = useCallback((event) => {
+    setCaseInsensitive(event.target.checked);
+  }, []);
 
   useEffect(() => () => {
     if (debounceTimerRef.current) {
@@ -222,6 +241,13 @@ function App() {
       handleSearch('');
     }
   }, [handleSearch]);
+
+  useEffect(() => {
+    if (!hasInitialSearchRunRef.current) {
+      return;
+    }
+    handleSearch(latestQueryRef.current);
+  }, [caseInsensitive, handleSearch, useRegex]);
 
   // 优化的搜索结果处理逻辑（保持使用 useRef，但简化其他逻辑）
   useEffect(() => {
@@ -270,15 +296,55 @@ function App() {
   return (
     <main className="container">
       <div className="search-container">
-        <input
-          id="search-input"
-          onChange={onQueryChange}
-          placeholder="Search for files and folders..."
-          spellCheck={false}
-          autoCorrect="off"
-          autoComplete="off"
-          autoCapitalize="off"
-        />
+        <div className="search-bar">
+          <input
+            id="search-input"
+            onChange={onQueryChange}
+            placeholder="Search for files and folders..."
+            spellCheck={false}
+            autoCorrect="off"
+            autoComplete="off"
+            autoCapitalize="off"
+          />
+          <div className="search-options">
+            <label
+              className="search-option"
+              title="Toggle case-insensitive matching"
+            >
+              <input
+                type="checkbox"
+                checked={caseInsensitive}
+                onChange={onToggleCaseInsensitive}
+                aria-label="Toggle case-insensitive matching"
+              />
+              <span
+                className="search-option__display"
+                aria-hidden="true"
+              >
+                Aa
+              </span>
+              <span className="sr-only">Toggle case-insensitive matching</span>
+            </label>
+            <label
+              className="search-option"
+              title="Enable regular expression search"
+            >
+              <input
+                type="checkbox"
+                checked={useRegex}
+                onChange={onToggleRegex}
+                aria-label="Enable regular expression search"
+              />
+              <span
+                className="search-option__display"
+                aria-hidden="true"
+              >
+                .*
+              </span>
+              <span className="sr-only">Enable regular expression search</span>
+            </label>
+          </div>
+        </div>
       </div>
       <div
         className="results-container"

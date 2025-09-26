@@ -5,9 +5,10 @@ use cardinal_sdk::{EventFlag, EventWatcher};
 use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
 use rayon::prelude::*;
 use search_cache::{
-    HandleFSEError, SearchCache, SearchResultNode, SlabIndex, SlabNodeMetadata, WalkData,
+    HandleFSEError, SearchCache, SearchOptions, SearchResultNode, SlabIndex,
+    SlabNodeMetadata, WalkData,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     cell::LazyCell,
     path::{Path, PathBuf},
@@ -32,8 +33,32 @@ static CACHE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
 });
 static APP_QUIT: AtomicBool = AtomicBool::new(false);
 
+#[derive(Debug, Clone, Copy, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct SearchOptionsPayload {
+    #[serde(default)]
+    use_regex: bool,
+    #[serde(default)]
+    case_insensitive: bool,
+}
+
+impl From<SearchOptionsPayload> for SearchOptions {
+    fn from(value: SearchOptionsPayload) -> Self {
+        SearchOptions {
+            use_regex: value.use_regex,
+            case_insensitive: value.case_insensitive,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SearchJob {
+    query: String,
+    options: SearchOptionsPayload,
+}
+
 struct SearchState {
-    search_tx: Sender<String>,
+    search_tx: Sender<SearchJob>,
     result_rx: Receiver<Result<Vec<SlabIndex>>>,
 
     node_info_tx: Sender<Vec<SlabIndex>>,
@@ -41,11 +66,16 @@ struct SearchState {
 }
 
 #[tauri::command]
-async fn search(query: String, state: State<'_, SearchState>) -> Result<Vec<SlabIndex>, String> {
+async fn search(
+    query: String,
+    options: Option<SearchOptionsPayload>,
+    state: State<'_, SearchState>,
+) -> Result<Vec<SlabIndex>, String> {
+    let options = options.unwrap_or_default();
     // 发送搜索请求到后台线程
     state
         .search_tx
-        .send(query)
+        .send(SearchJob { query, options })
         .map_err(|e| format!("Failed to send search request: {:?}", e))?;
 
     // 等待搜索结果
@@ -178,7 +208,7 @@ pub fn run() -> Result<()> {
 
     // Create communication channels
     let (finish_tx, finish_rx) = bounded::<Sender<Option<SearchCache>>>(1);
-    let (search_tx, search_rx) = unbounded::<String>();
+    let (search_tx, search_rx) = unbounded::<SearchJob>();
     let (result_tx, result_rx) = unbounded();
     let (node_info_tx, node_info_rx) = unbounded();
     let (node_info_results_tx, node_info_results_rx) = unbounded::<Vec<SearchResultNode>>();
@@ -312,12 +342,13 @@ pub fn run() -> Result<()> {
                     tx.send(Some(cache)).expect("Failed to send cache");
                     break;
                 }
-                recv(search_rx) -> query => {
-                    let query = query.expect("Search channel closed");
+                recv(search_rx) -> job => {
+                    let SearchJob { query, options } = job.expect("Search channel closed");
+                    let opts: SearchOptions = options.into();
                     let result = if query.is_empty() {
                         Ok(cache.search_empty())
                     } else {
-                        cache.search(&query)
+                        cache.search_with_options(&query, opts)
                     };
                     result_tx.send(result).expect("Failed to send result");
                 }

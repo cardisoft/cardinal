@@ -21,6 +21,7 @@
   --row-even: #ffffff;
   --row-odd: #f7f8fa;
   --row-hover: rgb(220, 220, 220);
+  --search-toggle-hover-bg: rgba(0, 0, 0, 0.06);
   /* 去除自定义滚动条颜色变量 */
 
   color: var(--color-text);
@@ -94,20 +95,124 @@ main,
 
 /* === Search Bar === */
 .search-container {
+  margin: var(--container-padding) var(--container-padding) 0;
+  padding: 0;
+  width: calc(100% - var(--container-padding) * 2);
+}
+
+.search-bar {
   display: flex;
-  justify-content: center;
-  margin-top: var(--container-padding);
-  padding: 0 var(--container-padding);
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--color-accent-rgb), 0.12);
+  background-color: var(--color-elevated-bg);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 #search-input {
-  width: 100%;
+  flex: 1;
+  width: auto;
+  padding: 0.45rem 0.65rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  font-size: 1rem;
   overflow: hidden;
-  /* ensure search bar area cannot overflow */
+}
+
+#search-input:focus {
+  outline: none;
+}
+
+#search-input::placeholder {
+  color: var(--color-muted);
+}
+
+.search-options {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.search-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.search-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.search-option__display {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  margin: 0.2rem 0.1rem;
+  border-radius: 0.65rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.01em;
+  color: var(--color-muted);
+  background-color: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease, box-shadow 0.2s ease;
+  user-select: none;
+}
+
+.search-option input:not(:checked) + .search-option__display:hover,
+.search-option:hover input:not(:checked) + .search-option__display {
+  background-color: var(--search-toggle-hover-bg);
+}
+
+.search-option input:checked + .search-option__display {
+  background-color: var(--color-accent);
+  color: #fff;
+  border-color: rgba(var(--color-accent-rgb), 0.6);
+  box-shadow: 0 0 0 1px rgba(var(--color-accent-rgb), 0.35);
+}
+
+.search-option input:focus-visible + .search-option__display {
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.5);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .search-bar {
+    flex-wrap: wrap;
+  }
+
+  .search-options {
+    width: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+    padding-top: 0.35rem;
+  }
 }
 
 /* Inputs and buttons (used in search area) */
-input,
+input:not([type="checkbox"]),
 button {
   border-radius: 8px;
   border: 1px solid transparent;
@@ -129,7 +234,7 @@ button {
   user-select: text;
 }
 
-input {
+input:not([type="checkbox"]) {
   /* 输入框恢复文本光标 */
   cursor: text;
 }
@@ -453,6 +558,7 @@ button:active {
     --row-even: rgb(32, 32, 32);
     --row-odd: rgb(43, 43, 42);
     --row-hover: rgb(70, 70, 70);
+    --search-toggle-hover-bg: rgba(255, 255, 255, 0.14);
   }
 
   a:hover {

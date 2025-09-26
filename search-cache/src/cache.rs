@@ -4,11 +4,11 @@ use crate::{
 };
 use anyhow::{Context, Result, anyhow, bail};
 use cardinal_sdk::{EventFlag, FsEvent, ScanType, current_event_id};
-use fswalk::WalkData;
-use fswalk::{Node, NodeMetadata, walk_it};
+use fswalk::{Node, NodeMetadata, WalkData, walk_it};
 use hashbrown::HashSet;
 use namepool::NamePool;
 use query_segmentation::{Segment, query_segmentation};
+use regex::{Regex, RegexBuilder};
 use std::{
     collections::{BTreeMap, BTreeSet},
     ffi::OsStr,
@@ -29,6 +29,91 @@ pub struct SearchCache {
     name_index: BTreeMap<&'static str, HashSet<SlabIndex>>,
     ignore_path: Option<&'static Path>,
     cancel: Option<&'static AtomicBool>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SearchOptions {
+    pub use_regex: bool,
+    pub case_insensitive: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum SegmentKind {
+    Substr,
+    Prefix,
+    Suffix,
+    Exact,
+}
+
+enum SegmentMatcher {
+    Plain { kind: SegmentKind, needle: String },
+    Regex { regex: Regex },
+}
+
+impl SegmentMatcher {
+    fn matches(&self, candidate: &str) -> bool {
+        match self {
+            SegmentMatcher::Plain { kind, needle } => match kind {
+                SegmentKind::Substr => candidate.contains(needle),
+                SegmentKind::Prefix => candidate.starts_with(needle),
+                SegmentKind::Suffix => candidate.ends_with(needle),
+                SegmentKind::Exact => candidate == needle,
+            },
+            SegmentMatcher::Regex { regex } => regex.is_match(candidate),
+        }
+    }
+}
+
+fn segment_kind(segment: &Segment<'_>) -> SegmentKind {
+    match segment {
+        Segment::Substr(_) => SegmentKind::Substr,
+        Segment::Prefix(_) => SegmentKind::Prefix,
+        Segment::Suffix(_) => SegmentKind::Suffix,
+        Segment::Exact(_) => SegmentKind::Exact,
+    }
+}
+
+fn segment_value<'s>(segment: &Segment<'s>) -> &'s str {
+    match segment {
+        Segment::Substr(value)
+        | Segment::Prefix(value)
+        | Segment::Suffix(value)
+        | Segment::Exact(value) => value,
+    }
+}
+
+fn build_segment_matchers(
+    segments: &[Segment<'_>],
+    options: SearchOptions,
+) -> Result<Vec<SegmentMatcher>, regex::Error> {
+    segments
+        .iter()
+        .map(|segment| {
+            let kind = segment_kind(segment);
+            let value = segment_value(segment);
+            if options.use_regex || options.case_insensitive {
+                let base = if options.use_regex {
+                    value.to_owned()
+                } else {
+                    regex::escape(value)
+                };
+                let pattern = match kind {
+                    SegmentKind::Substr => base,
+                    SegmentKind::Prefix => format!("^(?:{base})"),
+                    SegmentKind::Suffix => format!("(?:{base})$"),
+                    SegmentKind::Exact => format!("^(?:{base})$"),
+                };
+                let mut builder = RegexBuilder::new(&pattern);
+                builder.case_insensitive(options.case_insensitive);
+                builder.build().map(|regex| SegmentMatcher::Regex { regex })
+            } else {
+                Ok(SegmentMatcher::Plain {
+                    kind,
+                    needle: value.to_string(),
+                })
+            }
+        })
+        .collect()
 }
 
 impl std::fmt::Debug for SearchCache {
@@ -211,32 +296,29 @@ impl SearchCache {
     }
 
     pub fn search(&self, line: &str) -> Result<Vec<SlabIndex>> {
+        self.search_with_options(line, SearchOptions::default())
+    }
+
+    pub fn search_with_options(
+        &self,
+        line: &str,
+        options: SearchOptions,
+    ) -> Result<Vec<SlabIndex>> {
         let segments = query_segmentation(line);
         if segments.is_empty() {
             bail!("Unprocessable query: {:?}", line);
         }
+        let matchers = build_segment_matchers(&segments, options)
+            .map_err(|err| anyhow!("Invalid regex pattern: {err}"))?;
         let search_time = Instant::now();
         let mut node_set: Option<Vec<SlabIndex>> = None;
-        for segment in &segments {
+        for matcher in &matchers {
             if let Some(nodes) = &node_set {
                 let mut new_node_set = Vec::with_capacity(nodes.len());
                 for &node in nodes {
                     let childs = &self.slab[node].children;
                     for &child in childs.iter() {
-                        if match segment {
-                            Segment::Substr(substr) => {
-                                self.slab[child].name_and_parent.contains(*substr)
-                            }
-                            Segment::Prefix(prefix) => {
-                                self.slab[child].name_and_parent.starts_with(*prefix)
-                            }
-                            Segment::Exact(exact) => {
-                                self.slab[child].name_and_parent.as_str() == *exact
-                            }
-                            Segment::Suffix(suffix) => {
-                                self.slab[child].name_and_parent.ends_with(*suffix)
-                            }
-                        } {
+                        if matcher.matches(self.slab[child].name_and_parent.as_str()) {
                             new_node_set.push(child);
                         }
                     }
@@ -246,11 +328,14 @@ impl SearchCache {
                 // Use BTreeSet here to:
                 // 1. deduplicate names
                 // 2. keep the search result in order
-                let names: BTreeSet<_> = match segment {
-                    Segment::Substr(substr) => NAME_POOL.search_substr(substr),
-                    Segment::Prefix(prefix) => NAME_POOL.search_prefix(prefix),
-                    Segment::Exact(exact) => NAME_POOL.search_exact(exact),
-                    Segment::Suffix(suffix) => NAME_POOL.search_suffix(suffix),
+                let names: BTreeSet<_> = match matcher {
+                    SegmentMatcher::Plain { kind, needle } => match kind {
+                        SegmentKind::Substr => NAME_POOL.search_substr(needle),
+                        SegmentKind::Prefix => NAME_POOL.search_prefix(needle),
+                        SegmentKind::Exact => NAME_POOL.search_exact(needle),
+                        SegmentKind::Suffix => NAME_POOL.search_suffix(needle),
+                    },
+                    SegmentMatcher::Regex { regex } => NAME_POOL.search_regex(regex),
                 };
                 let mut nodes = Vec::with_capacity(names.len());
                 names.into_iter().for_each(|name| {
@@ -487,7 +572,15 @@ impl SearchCache {
 
     /// Note that this function doesn't fetch metadata(even if it's not cahced) for the nodes.
     pub fn query_files(&mut self, query: String) -> Result<Vec<SearchResultNode>> {
-        self.search(&query)
+        self.query_files_with_options(query, SearchOptions::default())
+    }
+
+    pub fn query_files_with_options(
+        &mut self,
+        query: String,
+        options: SearchOptions,
+    ) -> Result<Vec<SearchResultNode>> {
+        self.search_with_options(&query, options)
             .map(|nodes| self.expand_file_nodes_inner::<false>(nodes))
     }
 
@@ -781,6 +874,61 @@ mod tests {
         assert_eq!(cache.slab.len(), 2);
         assert_eq!(cache.name_index.len(), 2);
         assert_eq!(cache.search("new_file.txt").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_search_with_regex_option() {
+        let temp_dir = TempDir::new("test_search_regex_option").unwrap();
+        let dir = temp_dir.path();
+
+        fs::File::create(dir.join("foo123.txt")).unwrap();
+        fs::File::create(dir.join("bar.txt")).unwrap();
+
+        let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+        let opts = SearchOptions {
+            use_regex: true,
+            case_insensitive: false,
+        };
+        let indices = cache.search_with_options("foo\\d+", opts).unwrap();
+        assert_eq!(indices.len(), 1);
+        let nodes = cache.expand_file_nodes(indices.clone());
+        assert_eq!(nodes.len(), 1);
+        assert!(nodes[0].path.ends_with("foo123.txt"));
+
+        // ensure other names are not matched
+        let opts = SearchOptions {
+            use_regex: true,
+            case_insensitive: false,
+        };
+        let miss = cache.search_with_options("bar\\d+", opts).unwrap();
+        assert!(miss.is_empty());
+    }
+
+    #[test]
+    fn test_search_case_insensitive_option() {
+        let temp_dir = TempDir::new("test_search_case_insensitive_option").unwrap();
+        let dir = temp_dir.path();
+
+        fs::File::create(dir.join("Alpha.TXT")).unwrap();
+        fs::File::create(dir.join("beta.txt")).unwrap();
+
+        let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+        let opts = SearchOptions {
+            use_regex: false,
+            case_insensitive: true,
+        };
+        let indices = cache.search_with_options("alpha.txt", opts).unwrap();
+        assert_eq!(indices.len(), 1);
+        let nodes = cache.expand_file_nodes(indices.clone());
+        assert_eq!(nodes.len(), 1);
+        assert!(nodes[0].path.ends_with("Alpha.TXT"));
+
+        let opts = SearchOptions {
+            use_regex: false,
+            case_insensitive: true,
+        };
+        let miss = cache.search_with_options("gamma.txt", opts).unwrap();
+        assert!(miss.is_empty());
     }
 
     #[test]
