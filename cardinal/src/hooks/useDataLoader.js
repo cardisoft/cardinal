@@ -6,9 +6,11 @@ import { invoke } from '@tauri-apps/api/core';
  */
 export function useDataLoader(results) {
     const loadingRef = useRef(new Set());
+    const versionRef = useRef(0);
 
     // 当 results 变化时清除加载状态
     useEffect(() => {
+        versionRef.current += 1;
         loadingRef.current.clear();
     }, [results]);
 
@@ -23,10 +25,16 @@ export function useDataLoader(results) {
             }
         }
         if (needLoading.length === 0) return;
+        const versionAtRequest = versionRef.current;
         try {
             const slice = needLoading.map(i => results[i]);
             const fetched = await invoke('get_nodes_info', { results: slice });
+            if (versionRef.current !== versionAtRequest) {
+                needLoading.forEach(i => loadingRef.current.delete(i));
+                return;
+            }
             setCache(prev => {
+                if (versionRef.current !== versionAtRequest) return prev;
                 const newCache = new Map(prev);
                 needLoading.forEach((originalIndex, idx) => {
                     newCache.set(originalIndex, fetched[idx]);
