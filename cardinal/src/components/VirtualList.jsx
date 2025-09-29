@@ -42,9 +42,12 @@ export const VirtualList = forwardRef(function VirtualList({
 
 	// ----- callbacks: pure calculations first -----
 	// 计算可见范围
-	const hasViewport = rowCount > 0 && viewportHeight > 0;
-	const start = hasViewport ? Math.max(0, Math.floor(scrollTop / rowHeight) - overscan) : 0;
-	const end = hasViewport ? Math.min(rowCount - 1, Math.ceil((scrollTop + viewportHeight) / rowHeight) + overscan - 1) : -1;
+	const start = rowCount && viewportHeight
+		? Math.max(0, Math.floor(scrollTop / rowHeight) - overscan)
+		: 0;
+	const end = rowCount && viewportHeight
+		? Math.min(rowCount - 1, Math.ceil((scrollTop + viewportHeight) / rowHeight) + overscan - 1)
+		: -1;
 
 	// 更新滚动位置
 	const updateScrollAndRange = useCallback((nextScrollTop) => {
@@ -98,13 +101,14 @@ export const VirtualList = forwardRef(function VirtualList({
 
 	// ----- rendered items memo -----
 	// 渲染的项目
-	const renderedItems = hasViewport && end >= start
+	const baseTop = start * rowHeight - scrollTop;
+	const renderedItems = end >= start
 		? Array.from({ length: end - start + 1 }, (_, i) => {
 			const rowIndex = start + i;
 			const item = cache.get(rowIndex);
 			return renderRow(rowIndex, item, {
 				position: 'absolute',
-				top: start * rowHeight - scrollTop + i * rowHeight,
+				top: baseTop + i * rowHeight,
 				height: rowHeight,
 				left: 0,
 				right: 0
