@@ -29,7 +29,6 @@ export const VirtualList = forwardRef(function VirtualList({
 	// ----- state -----
 	const [scrollTop, setScrollTop] = useState(0);
 	const [viewportHeight, setViewportHeight] = useState(0);
-	const [range, setRange] = useState({ start: 0, end: -1 });
 
 	// ----- derived -----
 	// 行数直接来自 results（不再支持显式 rowCount）
@@ -57,12 +56,10 @@ export const VirtualList = forwardRef(function VirtualList({
 	// 更新滚动位置和范围
 	const updateScrollAndRange = useCallback((nextScrollTop) => {
 		const clamped = Math.max(0, Math.min(nextScrollTop, maxScrollTop));
-		setScrollTop(clamped);
-		setRange(prev => {
-			const nextRange = computeRange(clamped, viewportHeight);
-			return (prev.start !== nextRange.start || prev.end !== nextRange.end) ? nextRange : prev;
-		});
-	}, [maxScrollTop, computeRange, viewportHeight]);
+		setScrollTop(prev => (prev === clamped ? prev : clamped));
+	}, [maxScrollTop]);
+
+	const { start, end } = computeRange(scrollTop, viewportHeight);
 
 	// ----- event handlers -----
 	// 垂直滚动（阻止默认以获得一致行为）
@@ -81,10 +78,10 @@ export const VirtualList = forwardRef(function VirtualList({
 	}, [onScrollSync]);
 
 	// ----- effects -----
-	// range 变化时自动加载
+	// 可见窗口变化时自动加载
 	useEffect(() => { // auto load
-		if (range.end >= range.start) ensureRangeLoaded(range.start, range.end);
-	}, [range, ensureRangeLoaded]);
+		if (end >= start) ensureRangeLoaded(start, end);
+	}, [start, end, ensureRangeLoaded]);
 
 	// 监听容器尺寸变化
 	useLayoutEffect(() => { // observe container height
@@ -98,25 +95,20 @@ export const VirtualList = forwardRef(function VirtualList({
 	}, []);
 
 	// 当参数变化时重新计算
-	useEffect(() => { // recompute on deps
-		if (viewportHeight > 0) {
-			setRange(prev => {
-				const nextRange = computeRange(scrollTop, viewportHeight);
-				return (prev.start !== nextRange.start || prev.end !== nextRange.end) ? nextRange : prev;
-			});
-		}
-	}, [viewportHeight, scrollTop, computeRange]);
+	useEffect(() => {
+		const clamped = Math.max(0, Math.min(scrollTop, maxScrollTop));
+		if (clamped !== scrollTop) setScrollTop(clamped);
+	}, [maxScrollTop, scrollTop]);
 
 	// ----- imperative API -----
 	// 暴露的API
 	useImperativeHandle(ref, () => ({
 		scrollToTop: () => updateScrollAndRange(0),
-		ensureRangeLoaded,
+		ensureRangeLoaded: (from, to) => ensureRangeLoaded(from, to),
 	}), [updateScrollAndRange, ensureRangeLoaded]);
 
 	// ----- rendered items memo -----
 	// 渲染的项目
-	const { start, end } = range;
 	let renderedItems = null;
 	if (rowCount > 0 && end >= start) {
 		const count = end - start + 1;
