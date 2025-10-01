@@ -18,7 +18,7 @@ use std::{
     },
     time::Duration,
 };
-use tauri::{AppHandle, Emitter, RunEvent, State};
+use tauri::{Emitter, RunEvent, State};
 use tracing::{info, level_filters::LevelFilter};
 use tracing_subscriber::EnvFilter;
 
@@ -63,6 +63,8 @@ struct SearchState {
 
     node_info_tx: Sender<Vec<SlabIndex>>,
     node_info_results_rx: Receiver<Vec<SearchResultNode>>,
+
+    icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
 }
 
 #[tauri::command]
@@ -130,7 +132,6 @@ struct IconPayload {
 async fn get_nodes_info(
     results: Vec<SlabIndex>,
     state: State<'_, SearchState>,
-    app_handle: AppHandle,
 ) -> Result<Vec<NodeInfo>, String> {
     if results.is_empty() {
         return Ok(Vec::new());
@@ -146,37 +147,27 @@ async fn get_nodes_info(
         .recv()
         .map_err(|e| format!("Failed to receive node info results: {:?}", e))?;
 
-    let handle = app_handle.clone();
-    let node_infos: Vec<_> = nodes
+    let node_infos = nodes
         .into_iter()
-        .zip(results.into_iter())
-        .map(|(SearchResultNode { path, metadata }, slab_index)| {
-            let handle = handle.clone();
-            let icon_path = path.clone();
-            spawn(move || {
-                let icon = icon_path
-                    .to_str()
-                    .and_then(fs_icon::icon_of_path)
-                    .map(|data| {
-                        format!(
-                            "data:image/png;base64,{}",
-                            general_purpose::STANDARD.encode(&data)
-                        )
-                    });
-
-                if let Err(err) = handle.emit("icon_update", IconPayload { slab_index, icon }) {
-                    tracing::warn!("Failed to emit icon update: {}", err);
-                }
-            });
-
-            NodeInfo {
-                path: path.to_string_lossy().into_owned(),
-                metadata: metadata.as_ref().map(NodeInfoMetadata::from_metadata),
-            }
+        .map(|SearchResultNode { path, metadata }| NodeInfo {
+            path: path.to_string_lossy().into_owned(),
+            metadata: metadata.as_ref().map(NodeInfoMetadata::from_metadata),
         })
         .collect();
 
     Ok(node_infos)
+}
+
+#[tauri::command]
+async fn update_icon_viewport(
+    id: u64,
+    viewport: Vec<SlabIndex>,
+    state: State<'_, SearchState>,
+) -> Result<(), String> {
+    state
+        .icon_viewport_tx
+        .send((id, viewport))
+        .map_err(|e| format!("Failed to send icon viewport update: {:?}", e))
 }
 
 #[tauri::command]
@@ -236,6 +227,7 @@ pub fn run() -> Result<()> {
     let (result_tx, result_rx) = unbounded();
     let (node_info_tx, node_info_rx) = unbounded();
     let (node_info_results_tx, node_info_results_rx) = unbounded::<Vec<SearchResultNode>>();
+    let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>)>();
 
     // 运行Tauri应用
     let app = tauri::Builder::default()
@@ -245,10 +237,12 @@ pub fn run() -> Result<()> {
             result_rx,
             node_info_tx,
             node_info_results_rx,
+            icon_viewport_tx: icon_viewport_tx.clone(),
         })
         .invoke_handler(tauri::generate_handler![
             search,
             get_nodes_info,
+            update_icon_viewport,
             open_in_finder
         ])
         .build(tauri::generate_context!())
@@ -380,6 +374,42 @@ pub fn run() -> Result<()> {
                     let results = results.expect("Node info channel closed");
                     let node_info_results = cache.expand_file_nodes(results);
                     node_info_results_tx.send(node_info_results).expect("Failed to send node info results");
+                }
+                recv(icon_viewport_rx) -> update => {
+                    let (_request_id, viewport) = update.expect("Icon viewport channel closed");
+
+                    let nodes = cache.expand_file_nodes(viewport.clone());
+                    let icon_jobs: Vec<_> = viewport
+                        .into_iter()
+                        .zip(nodes.into_iter())
+                        .map(|(slab_index, SearchResultNode { path, .. })| {
+                                (slab_index, path)
+                        })
+                        .collect();
+
+                    if icon_jobs.is_empty() {
+                        continue;
+                    }
+
+                    let handle = app_handle.clone();
+                    spawn(move || {
+                        icon_jobs.into_iter().for_each(|(slab_index, path)| {
+                            let icon = path
+                                .to_str()
+                                .and_then(fs_icon::icon_of_path)
+                                .map(|data| format!(
+                                    "data:image/png;base64,{}",
+                                    general_purpose::STANDARD.encode(&data)
+                                ));
+
+                            if let Err(err) = handle.emit(
+                                "icon_update",
+                                IconPayload { slab_index, icon },
+                            ) {
+                                tracing::warn!("Failed to emit icon update: {}", err);
+                            }
+                        });
+                    });
                 }
                 recv(event_watcher.receiver) -> events => {
                     let events = events.expect("Event stream closed");

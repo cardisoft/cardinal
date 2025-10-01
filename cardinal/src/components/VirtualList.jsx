@@ -8,6 +8,7 @@ import React, {
 	forwardRef,
 	useImperativeHandle
 } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import Scrollbar from './Scrollbar';
 import { useDataLoader } from '../hooks/useDataLoader';
 
@@ -24,6 +25,7 @@ export const VirtualList = forwardRef(function VirtualList({
 }, ref) {
 	// ----- refs -----
 	const containerRef = useRef(null);
+	const iconRequestIdRef = useRef(0);
 
 	// ----- state -----
 	const [scrollTop, setScrollTop] = useState(0);
@@ -68,10 +70,42 @@ export const VirtualList = forwardRef(function VirtualList({
 	}, [onScrollSync]);
 
 	// ----- effects -----
+	const updateIconViewport = useCallback((viewport) => {
+		const requestId = iconRequestIdRef.current + 1;
+		iconRequestIdRef.current = requestId;
+		// console.log('Updating icon viewport', requestId, viewport );
+		invoke('update_icon_viewport', { id: requestId, viewport }).catch(error => {
+			console.error('Failed to update icon viewport', error);
+		});
+	}, []);
+
 	// 可见窗口变化时自动加载
 	useEffect(() => { // auto load
 		if (end >= start) ensureRangeLoaded(start, end);
 	}, [start, end, ensureRangeLoaded]);
+
+	useEffect(() => {
+		if (!Array.isArray(results) || results.length === 0 || end < start) {
+			updateIconViewport([]);
+			return;
+		}
+
+		const clampedStart = Math.max(0, start);
+		const clampedEnd = Math.min(end, results.length - 1);
+		if (clampedEnd < clampedStart) {
+			updateIconViewport([]);
+			return;
+		}
+
+		const viewport = results
+			.slice(clampedStart, clampedEnd + 1);
+
+		updateIconViewport(viewport);
+	}, [results, start, end, updateIconViewport]);
+
+	useEffect(() => () => {
+		updateIconViewport([]);
+	}, [updateIconViewport]);
 
 	// 监听容器尺寸变化
 	useLayoutEffect(() => { // observe container height

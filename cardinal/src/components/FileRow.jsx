@@ -15,8 +15,7 @@ function deriveHighlightTerm(query) {
 
 export function FileRow({ item, rowIndex, style, onContextMenu, searchQuery, caseInsensitive }) {
   const highlightTerm = useMemo(() => deriveHighlightTerm(searchQuery), [searchQuery]);
-  if (!item) {
-    // 显示加载状态而不是空白
+  if (!item || (typeof item !== 'string' && !item?.path)) {
     return null
   }
 

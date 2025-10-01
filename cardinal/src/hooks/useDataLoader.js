@@ -31,6 +31,7 @@ export function useDataLoader(results) {
         (async () => {
             try {
                 unlistenIconUpdate = await listen('icon_update', (event) => {
+                    // console.log('Received icon_update event', event);
                     const payload = event?.payload;
                     if (!payload || typeof payload.slabIndex !== 'number') return;
                     const { slabIndex, icon } = payload;
