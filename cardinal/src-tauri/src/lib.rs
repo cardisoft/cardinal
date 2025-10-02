@@ -171,13 +171,13 @@ fn run_background_event_loop<F>(
             }
             recv(node_info_rx) -> results => {
                 let results = results.expect("Node info channel closed");
-                let node_info_results = cache.expand_file_nodes(results);
+                let node_info_results = cache.expand_file_nodes(&results);
                 node_info_results_tx.send(node_info_results).expect("Failed to send node info results");
             }
             recv(icon_viewport_rx) -> update => {
                 let (_request_id, viewport) = update.expect("Icon viewport channel closed");
 
-                let nodes = cache.expand_file_nodes(viewport.clone());
+                let nodes = cache.expand_file_nodes(&viewport);
                 let icon_jobs: Vec<_> = viewport
                     .into_iter()
                     .zip(nodes.into_iter())

@@ -581,22 +581,23 @@ impl SearchCache {
         options: SearchOptions,
     ) -> Result<Vec<SearchResultNode>> {
         self.search_with_options(&query, options)
-            .map(|nodes| self.expand_file_nodes_inner::<false>(nodes))
+            .map(|nodes| self.expand_file_nodes_inner::<false>(&nodes))
     }
 
     /// Returns a node info vector with the same length as the input nodes.
     /// If the given node is not found, an empty SearchResultNode is returned.
-    pub fn expand_file_nodes(&mut self, nodes: Vec<SlabIndex>) -> Vec<SearchResultNode> {
+    pub fn expand_file_nodes(&mut self, nodes: &[SlabIndex]) -> Vec<SearchResultNode> {
         self.expand_file_nodes_inner::<true>(nodes)
     }
 
     // TODO(ldm0): use nodes as slice
     fn expand_file_nodes_inner<const FETCH_META: bool>(
         &mut self,
-        nodes: impl IntoIterator<Item = SlabIndex>,
+        nodes: &[SlabIndex],
     ) -> Vec<SearchResultNode> {
         nodes
-            .into_iter()
+            .iter()
+            .copied()
             .map(|node_index| {
                 let path = self.node_path(node_index);
                 let metadata = self
@@ -892,7 +893,7 @@ mod tests {
         };
         let indices = cache.search_with_options("foo\\d+", opts).unwrap();
         assert_eq!(indices.len(), 1);
-        let nodes = cache.expand_file_nodes(indices.clone());
+        let nodes = cache.expand_file_nodes(&indices);
         assert_eq!(nodes.len(), 1);
         assert!(nodes[0].path.ends_with("foo123.txt"));
 
@@ -920,7 +921,7 @@ mod tests {
         };
         let indices = cache.search_with_options("alpha.txt", opts).unwrap();
         assert_eq!(indices.len(), 1);
-        let nodes = cache.expand_file_nodes(indices.clone());
+        let nodes = cache.expand_file_nodes(&indices);
         assert_eq!(nodes.len(), 1);
         assert!(nodes[0].path.ends_with("Alpha.TXT"));
 
