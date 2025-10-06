@@ -40,6 +40,8 @@
 + 考虑类LSM/WAL设计?
 + 重启+reopen window之后会很慢
 + viewport range + icon generation pool
++ UI 搜索特定文件夹下的文件
++ 拖动进UI后添加文件路径
 
 ```bash
 npm run tauri dev -- --release --features dev
