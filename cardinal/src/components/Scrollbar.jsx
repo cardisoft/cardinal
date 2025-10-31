@@ -50,7 +50,7 @@ export const Scrollbar = ({
         const clampedThumbTop = Math.max(0, Math.min(mousePositionInTrack, maxThumbTop));
         const scrollRatio = maxThumbTop > 0 ? clampedThumbTop / maxThumbTop : 0;
         const newScrollTop = scrollRatio * maxScrollTop;
-        onScrollUpdate(newScrollTop);
+        onScrollUpdate(() => newScrollTop);
       };
       const handleMouseUp = () => {
         isDraggingRef.current = false;
@@ -73,7 +73,7 @@ export const Scrollbar = ({
       const clickY = e.clientY - rect.top;
       const scrollRatio = clickY / rect.height;
       const newScrollTop = scrollRatio * maxScrollTop;
-      onScrollUpdate(newScrollTop);
+      onScrollUpdate(() => newScrollTop);
     },
     [maxScrollTop, onScrollUpdate],
   );

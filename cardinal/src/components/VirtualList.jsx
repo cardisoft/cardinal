@@ -49,22 +49,30 @@ export const VirtualList = forwardRef(function VirtualList(
       : -1;
 
   // 更新滚动位置
-  const updateScrollAndRange = useCallback(
-    (nextScrollTop) => {
-      const clamped = Math.max(0, Math.min(nextScrollTop, maxScrollTop));
-      setScrollTop((prev) => (prev === clamped ? prev : clamped));
-    },
-    [maxScrollTop],
-  );
+  const updateScrollAndRange = useCallback((updater) => {
+    setScrollTop((prev) => {
+      const nextValue = updater(prev);
+      const clamped = Math.max(0, Math.min(nextValue, maxScrollTop));
+      return prev === clamped ? prev : clamped;
+    });
+  }, [maxScrollTop]);
 
   // ----- event handlers -----
   // 垂直滚动（阻止默认以获得一致行为）
   const handleWheel = useCallback(
     (e) => {
       e.preventDefault();
-      updateScrollAndRange(scrollTop + e.deltaY);
+      const { deltaMode, deltaY } = e;
+      let delta = deltaY;
+      if (deltaMode === 1) {
+        delta = deltaY * rowHeight;
+      } else if (deltaMode === 2) {
+        const pageSize = viewportHeight || rowHeight * 10;
+        delta = deltaY * pageSize;
+      }
+      updateScrollAndRange((prev) => prev + delta);
     },
-    [scrollTop, updateScrollAndRange],
+    [rowHeight, viewportHeight, updateScrollAndRange],
   );
 
   // 水平滚动同步
@@ -141,7 +149,7 @@ export const VirtualList = forwardRef(function VirtualList(
   useImperativeHandle(
     ref,
     () => ({
-      scrollToTop: () => updateScrollAndRange(0),
+      scrollToTop: () => updateScrollAndRange(() => 0),
       ensureRangeLoaded,
     }),
     [updateScrollAndRange, ensureRangeLoaded],
