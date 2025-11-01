@@ -158,14 +158,12 @@ const FSEventsPanel = forwardRef(({
           {COLUMNS.map(({ key, label }, index) => (
             <span key={key} className={`event-${key}-header header header-cell`}>
               {label}
-              {index < COLUMNS.length - 1 && (
-                <span
-                  className="col-resizer"
-                  onMouseDown={(e) => onResizeStart(e, key)}
-                  role="separator"
-                  aria-orientation="vertical"
-                />
-              )}
+              <span
+                className="col-resizer"
+                onMouseDown={(e) => onResizeStart(e, key)}
+                role="separator"
+                aria-orientation="vertical"
+              />
             </span>
           ))}
         </div>
