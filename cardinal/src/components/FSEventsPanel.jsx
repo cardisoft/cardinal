@@ -99,13 +99,29 @@ const FSEventsPanel = forwardRef(({
 
   // Handle scrolling - sync horizontal scroll to header and track bottom position
   const handleScroll = useCallback(({ scrollLeft, scrollTop, scrollHeight, clientHeight }) => {
-    if (headerRef.current) {
-      headerRef.current.scrollLeft = scrollLeft;
-    }
-
     // Check if user is at or near the bottom
     const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
     isAtBottomRef.current = distanceFromBottom <= BOTTOM_THRESHOLD;
+  }, []);
+
+  // Set up scroll listener on the actual Grid element for horizontal scroll sync
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || !list.Grid) return;
+
+    const gridElement = list.Grid._scrollingContainer;
+    if (!gridElement) return;
+
+    const handleHorizontalScroll = () => {
+      if (headerRef.current && gridElement) {
+        headerRef.current.scrollLeft = gridElement.scrollLeft;
+      }
+    };
+
+    gridElement.addEventListener('scroll', handleHorizontalScroll);
+    return () => {
+      gridElement.removeEventListener('scroll', handleHorizontalScroll);
+    };
   }, []);
 
   // Render individual row
