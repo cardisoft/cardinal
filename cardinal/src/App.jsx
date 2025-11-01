@@ -232,15 +232,37 @@ function App() {
 
     const setupEventsListener = async () => {
       try {
+        const normalizeEvent = (rawEvent) => {
+          if (!rawEvent || typeof rawEvent !== 'object') {
+            return rawEvent;
+          }
+
+          if (typeof rawEvent.eventId === 'number') {
+            return rawEvent;
+          }
+
+          const eventId =
+            typeof rawEvent.event_id === 'number'
+              ? rawEvent.event_id
+              : typeof rawEvent.eventID === 'number'
+              ? rawEvent.eventID
+              : undefined;
+
+          return eventId === undefined ? rawEvent : { ...rawEvent, eventId };
+        };
+
         unlistenEvents = await listen('fs_events_batch', (event) => {
           if (!isMountedRef.current) return;
           const newEvents = Array.isArray(event?.payload) ? event.payload : [];
           if (newEvents.length === 0) return;
 
           setRecentEvents((prev) => {
-            // Prepend new events, keep only the most recent MAX_EVENTS
-            const updated = [...newEvents, ...prev];
-            return updated.slice(0, MAX_EVENTS);
+            const normalizedIncoming = newEvents.map(normalizeEvent);
+            let updated = [...prev, ...normalizedIncoming];
+            if (updated.length > MAX_EVENTS) {
+              updated = updated.slice(updated.length - MAX_EVENTS);
+            }
+            return updated;
           });
         });
       } catch (error) {
@@ -473,20 +495,23 @@ function App() {
   const displayState = getDisplayState();
 
   // Handle tab change: clear search input when switching tabs
-  const handleTabChange = useCallback((newTab) => {
-    setActiveTab(newTab);
-    if (newTab === 'events') {
-      setEventFilterQuery('');
-    } else {
-      // Clear the search input for files tab
-      const searchInput = document.getElementById('search-input');
-      if (searchInput) {
-        searchInput.value = '';
+  const handleTabChange = useCallback(
+    (newTab) => {
+      setActiveTab(newTab);
+      if (newTab === 'events') {
+        setEventFilterQuery('');
+      } else {
+        // Clear the search input for files tab
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) {
+          searchInput.value = '';
+        }
+        updateSearchParams({ query: '' });
+        cancelTimer(debounceTimerRef);
       }
-      updateSearchParams({ query: '' });
-      cancelTimer(debounceTimerRef);
-    }
-  }, [updateSearchParams]);
+    },
+    [updateSearchParams],
+  );
 
   // Get the current search input value based on active tab
   const searchInputValue = activeTab === 'events' ? eventFilterQuery : searchParams.query;

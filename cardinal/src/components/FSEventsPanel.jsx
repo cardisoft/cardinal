@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, memo } from 'react';
+import React, { useCallback, useRef, memo, useEffect } from 'react';
 import AutoSizer from 'react-virtualized/dist/commonjs/AutoSizer';
 import List from 'react-virtualized/dist/commonjs/List';
 import 'react-virtualized/styles.css';
@@ -88,7 +88,14 @@ const EventRow = memo(function EventRow({ item: event, rowIndex, style, onContex
   );
 });
 
-const FSEventsPanel = ({ events, onResizeStart, onContextMenu, onHeaderContextMenu, searchQuery, caseInsensitive }) => {
+const FSEventsPanel = ({
+  events,
+  onResizeStart,
+  onContextMenu,
+  onHeaderContextMenu,
+  searchQuery,
+  caseInsensitive,
+}) => {
   const headerRef = useRef(null);
   const listRef = useRef(null);
 

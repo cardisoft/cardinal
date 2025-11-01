@@ -144,8 +144,14 @@ fn forward_new_events(
         return;
     }
 
-    let new_events: Vec<RecentEvent> = snapshots
-        .iter()
+    let mut ordered_events: Vec<&EventSnapshot> = snapshots.iter().collect();
+    ordered_events.sort_unstable_by(|a, b| {
+        a.timestamp
+            .cmp(&b.timestamp)
+            .then_with(|| a.event_id.cmp(&b.event_id))
+    });
+    let new_events: Vec<RecentEvent> = ordered_events
+        .into_iter()
         .map(|event| RecentEvent {
             path: event.path.to_string_lossy().into_owned(),
             flag_bits: event.flag.bits(),
