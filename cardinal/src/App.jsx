@@ -10,7 +10,6 @@ import { ROW_HEIGHT, OVERSCAN_ROW_COUNT, SEARCH_DEBOUNCE_MS } from './constants'
 import { VirtualList } from './components/VirtualList';
 import { StateDisplay } from './components/StateDisplay';
 import FSEventsPanel from './components/FSEventsPanel';
-import { usePreventRefresh } from './hooks/usePreventRefresh';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, once } from '@tauri-apps/api/event';
 
@@ -81,7 +80,6 @@ function reducer(state, action) {
 }
 
 function App() {
-  usePreventRefresh();
   const [state, dispatch] = useReducer(reducer, initialState);
   const {
     results,

@@ -29,6 +29,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 base64 = "0.22"
 rayon = "1.10"
 parking_lot = "0.12"
+tauri-plugin-prevent-default = "3"
 
 cardinal-sdk.path = "../../cardinal-sdk"
 search-cache.path = "../../search-cache"

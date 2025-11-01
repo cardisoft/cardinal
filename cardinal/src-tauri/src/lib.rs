@@ -136,10 +136,7 @@ struct EventSnapshot {
 }
 
 // Forward new events to frontend without storing them in Rust
-fn forward_new_events(
-    app_handle: &tauri::AppHandle,
-    snapshots: &[EventSnapshot],
-) {
+fn forward_new_events(app_handle: &tauri::AppHandle, snapshots: &[EventSnapshot]) {
     if snapshots.is_empty() {
         return;
     }
@@ -413,9 +410,14 @@ pub fn run() -> Result<()> {
     let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>)>();
     let (icon_update_tx, icon_update_rx) = unbounded::<IconPayload>();
 
+    let mut builder = tauri::Builder::default();
+    #[cfg(not(feature = "dev"))]
+    {
+        builder = builder.plugin(tauri_plugin_prevent_default::init());
+    }
+    builder = builder.plugin(tauri_plugin_opener::init());
     // 运行Tauri应用
-    let app = tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+    let app = builder
         .manage(SearchState {
             search_tx,
             result_rx,
