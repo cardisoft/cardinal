@@ -1,22 +1,26 @@
 import { useState, useCallback } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { calculateInitialColWidths, MAX_COL_WIDTH, MIN_COL_WIDTH } from '../constants';
+import type { ColumnKey } from '../constants';
+
+type ColumnWidths = Record<ColumnKey, number>;
 
 export function useColumnResize() {
-  const [colWidths, setColWidths] = useState(() => {
+  const [colWidths, setColWidths] = useState<ColumnWidths>(() => {
     const windowWidth = window.innerWidth;
     return calculateInitialColWidths(windowWidth);
   });
 
   const onResizeStart = useCallback(
-    (key) => (e) => {
+    (key: ColumnKey) => (e: ReactMouseEvent<HTMLSpanElement>) => {
       e.preventDefault();
       e.stopPropagation();
 
       const startX = e.clientX;
       const startWidth = colWidths[key];
 
-      const handleMouseMove = (e) => {
-        const delta = e.clientX - startX;
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        const delta = moveEvent.clientX - startX;
         const newWidth = Math.max(MIN_COL_WIDTH, Math.min(MAX_COL_WIDTH, startWidth + delta));
         setColWidths((prev) => ({ ...prev, [key]: newWidth }));
       };

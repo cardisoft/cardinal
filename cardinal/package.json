@@ -21,7 +21,12 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2",
     "@vitejs/plugin-react": "^5.1.0",
+    "@types/node": "^22.10.1",
+    "@types/react": "^19.0.3",
+    "@types/react-dom": "^19.0.3",
+    "@types/react-virtualized": "^9.21.27",
     "prettier": "^3.6.2",
+    "typescript": "^5.7.3",
     "vite": "^7.1.12"
   }
 }

@@ -1,13 +1,13 @@
 // Format bytes into KB with one decimal place (legacy function)
-export function formatKB(bytes) {
-  if (bytes == null || !isFinite(bytes)) return null;
+export function formatKB(bytes: number | null | undefined): string | null {
+  if (bytes == null || !Number.isFinite(bytes)) return null;
   const kb = bytes / 1024;
   return `${kb.toFixed(kb < 10 ? 1 : 0)} KB`;
 }
 
 // Format timestamp (in seconds) as YYYY-MM-DD HH:mm:ss
-export function formatTimestamp(timestampSec) {
-  if (timestampSec == null) return null;
+export function formatTimestamp(timestampSec: number | null | undefined): string | null {
+  if (timestampSec == null || !Number.isFinite(timestampSec)) return null;
   const date = new Date(timestampSec * 1000);
 
   const year = date.getFullYear();

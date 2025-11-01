@@ -1,14 +1,19 @@
 import { useCallback, useState } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { CONTAINER_PADDING } from '../constants';
 
 const MIN_COLUMN_WIDTH = 80;
 const MAX_COLUMN_WIDTH = 800;
 
-const clampWidth = (value) => Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, value));
+const clampWidth = (value: number): number =>
+  Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, value));
+
+export type EventColumnKey = 'time' | 'name' | 'path';
+type EventColumnWidths = Record<EventColumnKey, number>;
 
 export function useEventColumnWidths() {
-  // Compute initial column sizes using viewport width so the events table feels balanced
-  const calculateEventColWidths = useCallback(() => {
+  // Compute initial column sizes using viewport width so the events table feels balanced.
+  const calculateEventColWidths = useCallback((): EventColumnWidths => {
     const totalWidth = window.innerWidth - CONTAINER_PADDING * 2;
     return {
       time: clampWidth(Math.floor(totalWidth * 0.2)),
@@ -17,18 +22,18 @@ export function useEventColumnWidths() {
     };
   }, []);
 
-  const [eventColWidths, setEventColWidths] = useState(calculateEventColWidths);
+  const [eventColWidths, setEventColWidths] = useState<EventColumnWidths>(calculateEventColWidths);
 
   const onEventResizeStart = useCallback(
-    (e, key) => {
-      // Reuse the existing DOM drag pattern from the files table to keep UX consistent
+    (e: ReactMouseEvent<HTMLSpanElement>, key: EventColumnKey) => {
+      // Reuse the existing DOM drag pattern from the files table to keep UX consistent.
       e.preventDefault();
       e.stopPropagation();
 
       const startX = e.clientX;
       const startWidth = eventColWidths[key];
 
-      const handleMouseMove = (moveEvent) => {
+      const handleMouseMove = (moveEvent: MouseEvent) => {
         const delta = moveEvent.clientX - startX;
         const newWidth = clampWidth(startWidth + delta);
         setEventColWidths((prev) => ({ ...prev, [key]: newWidth }));
@@ -50,7 +55,7 @@ export function useEventColumnWidths() {
   );
 
   const autoFitEventColumns = useCallback(() => {
-    // Snap columns back to their original ratios (invoked from context menu)
+    // Snap columns back to their original ratios (invoked from the context menu).
     setEventColWidths(calculateEventColWidths());
   }, [calculateEventColWidths]);
 

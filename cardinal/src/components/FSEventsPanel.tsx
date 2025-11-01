@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import AutoSizer from 'react-virtualized/dist/commonjs/AutoSizer';
 import List from 'react-virtualized/dist/commonjs/List';
+import type { List as VirtualizedList, ListRowProps } from 'react-virtualized';
 import 'react-virtualized/styles.css';
 import { ROW_HEIGHT } from '../constants';
 import { MiddleEllipsisHighlight } from './MiddleEllipsisHighlight';
@@ -17,13 +18,29 @@ const COLUMNS = [
   { key: 'time', label: 'Time' },
   { key: 'name', label: 'Filename' },
   { key: 'path', label: 'Path' },
-];
+] as const;
 
-// Distance (px) from the bottom that still counts as "user is at the end"
+type EventColumnKey = (typeof COLUMNS)[number]['key'];
+
+// Distance (px) from the bottom that still counts as "user is at the end".
 const BOTTOM_THRESHOLD = 50;
 
-// Normalize platform-specific paths and extract a display name + parent directory
-const splitPath = (path) => {
+export type FileSystemEvent = {
+  path?: string;
+  timestamp?: number;
+  [key: string]: unknown;
+};
+
+type EventRowProps = {
+  item: FileSystemEvent | undefined;
+  rowIndex: number;
+  style: React.CSSProperties;
+  onContextMenu?: (event: React.MouseEvent<HTMLDivElement>, path: string) => void;
+  searchQuery: string;
+  caseInsensitive: boolean;
+};
+
+const splitPath = (path: string | undefined): { name: string; directory: string } => {
   if (!path) {
     return { name: '—', directory: '' };
   }
@@ -47,15 +64,14 @@ const EventRow = memo(function EventRow({
   onContextMenu,
   searchQuery,
   caseInsensitive,
-}) {
+}: EventRowProps): React.JSX.Element {
   const pathSource = event?.path ?? '';
   const { name, directory } = splitPath(pathSource);
-  const timestamp = event?.timestamp;
-
+  const timestamp = typeof event?.timestamp === 'number' ? event.timestamp : undefined;
   const formattedDate = formatTimestamp(timestamp) || '—';
 
   const handleContextMenu = useCallback(
-    (e) => {
+    (e: React.MouseEvent<HTMLDivElement>) => {
       if (pathSource && onContextMenu) {
         onContextMenu(e, pathSource);
       }
@@ -88,17 +104,29 @@ const EventRow = memo(function EventRow({
   );
 });
 
-const FSEventsPanel = forwardRef(
-  (
-    { events, onResizeStart, onContextMenu, onHeaderContextMenu, searchQuery, caseInsensitive },
-    ref,
-  ) => {
-    const headerRef = useRef(null);
-    const listRef = useRef(null);
-    const isAtBottomRef = useRef(true); // Track whether the viewport is watching the newest events
+EventRow.displayName = 'EventRow';
+
+type FSEventsPanelProps = {
+  events: FileSystemEvent[];
+  onResizeStart: (event: React.MouseEvent<HTMLSpanElement>, columnKey: EventColumnKey) => void;
+  onContextMenu?: (event: React.MouseEvent<HTMLDivElement>, path: string) => void;
+  onHeaderContextMenu?: (event: React.MouseEvent<HTMLDivElement>) => void;
+  searchQuery: string;
+  caseInsensitive: boolean;
+};
+
+export type FSEventsPanelHandle = {
+  scrollToBottom: () => void;
+};
+
+const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
+  ({ events, onResizeStart, onContextMenu, onHeaderContextMenu, searchQuery, caseInsensitive }, ref) => {
+    const headerRef = useRef<HTMLDivElement | null>(null);
+    const listRef = useRef<VirtualizedList | null>(null);
+    const isAtBottomRef = useRef(true); // Track whether the viewport is watching the newest events.
     const prevEventsLengthRef = useRef(events.length);
 
-    // Allow the parent (App) to imperatively jump to the latest event after tab switches
+    // Allow the parent (App) to imperatively jump to the latest event after tab switches.
     useImperativeHandle(
       ref,
       () => ({
@@ -107,28 +135,30 @@ const FSEventsPanel = forwardRef(
           if (!list || events.length === 0) return;
 
           list.scrollToRow(events.length - 1);
-          isAtBottomRef.current = true; // Mark as at bottom
+          isAtBottomRef.current = true; // Mark as at bottom.
         },
       }),
       [events.length],
     );
 
-    // Track viewport proximity to the bottom so streams only auto-scroll when the user expects it
-    const handleScroll = useCallback(({ scrollLeft, scrollTop, scrollHeight, clientHeight }) => {
-      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
-      isAtBottomRef.current = distanceFromBottom <= BOTTOM_THRESHOLD;
-    }, []);
+    // Track viewport proximity to the bottom so streams only auto-scroll when the user expects it.
+    const handleScroll = useCallback(
+      ({ scrollTop, scrollHeight, clientHeight }: { scrollTop: number; scrollHeight: number; clientHeight: number }) => {
+        const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+        isAtBottomRef.current = distanceFromBottom <= BOTTOM_THRESHOLD;
+      },
+      [],
+    );
 
-    // Mirror the virtualized grid's horizontal scroll onto the sticky header element
+    // Mirror the virtualized grid's horizontal scroll onto the sticky header element.
     useEffect(() => {
       const list = listRef.current;
-      if (!list || !list.Grid) return;
-
-      const gridElement = list.Grid._scrollingContainer;
+      const grid = list?.Grid as { _scrollingContainer?: HTMLElement } | undefined;
+      const gridElement = grid?._scrollingContainer;
       if (!gridElement) return;
 
       const handleHorizontalScroll = () => {
-        if (headerRef.current && gridElement) {
+        if (headerRef.current) {
           headerRef.current.scrollLeft = gridElement.scrollLeft;
         }
       };
@@ -139,9 +169,9 @@ const FSEventsPanel = forwardRef(
       };
     }, []);
 
-    // Render individual row
+    // Render individual row.
     const rowRenderer = useCallback(
-      ({ index, key, style }) => {
+      ({ index, key, style }: ListRowProps) => {
         const event = events[index];
         return (
           <EventRow
@@ -158,25 +188,17 @@ const FSEventsPanel = forwardRef(
       [events, onContextMenu, searchQuery, caseInsensitive],
     );
 
-    // Keep appending events visible when the user is already watching the feed tail
+    // Keep appending events visible when the user is already watching the feed tail.
     useEffect(() => {
       const prevLength = prevEventsLengthRef.current;
       const currentLength = events.length;
-
-      // Update the ref for next time
       prevEventsLengthRef.current = currentLength;
 
-      // Only auto-scroll if:
-      // 1. There are new events (length increased)
-      // 2. User was at the bottom
       if (currentLength > prevLength && isAtBottomRef.current) {
         const list = listRef.current;
         if (list && currentLength > 0) {
-          // Use queueMicrotask to ensure List has updated
           queueMicrotask(() => {
-            if (listRef.current) {
-              listRef.current.scrollToRow(currentLength - 1);
-            }
+            listRef.current?.scrollToRow(currentLength - 1);
           });
         }
       }
@@ -186,7 +208,7 @@ const FSEventsPanel = forwardRef(
       <div className="events-panel-wrapper">
         <div ref={headerRef} className="header-row-container">
           <div className="header-row columns-events" onContextMenu={onHeaderContextMenu}>
-            {COLUMNS.map(({ key, label }, index) => (
+            {COLUMNS.map(({ key, label }) => (
               <span key={key} className={`event-${key}-header header header-cell`}>
                 {label}
                 <span
@@ -207,7 +229,7 @@ const FSEventsPanel = forwardRef(
             </div>
           ) : (
             <AutoSizer>
-              {({ width, height }) => (
+              {({ width, height }: { width: number; height: number }) => (
                 <List
                   ref={listRef}
                   width={width}

@@ -1,8 +1,21 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 
-const CHAR_WIDTH = 8; // approximate monospace character width in pixels – used for quick truncation math
+const CHAR_WIDTH = 8; // Approximate monospace character width in pixels – used for quick truncation math.
 
-export function splitTextWithHighlight(text, searchTerm, options = {}) {
+export type HighlightSegment = {
+  text: string;
+  isHighlight: boolean;
+};
+
+type SplitOptions = {
+  caseInsensitive?: boolean;
+};
+
+export function splitTextWithHighlight(
+  text: string,
+  searchTerm: string | undefined,
+  options: SplitOptions = {},
+): HighlightSegment[] {
   const { caseInsensitive = false } = options;
   if (!searchTerm) return [{ text, isHighlight: false }];
 
@@ -10,9 +23,9 @@ export function splitTextWithHighlight(text, searchTerm, options = {}) {
   const needle = caseInsensitive ? searchTerm.toLocaleLowerCase() : searchTerm;
   if (!needle.length) return [{ text, isHighlight: false }];
 
-  const parts = [];
+  const parts: HighlightSegment[] = [];
   let startIndex = 0;
-  let matchIndex;
+  let matchIndex: number;
 
   while ((matchIndex = haystack.indexOf(needle, startIndex)) !== -1) {
     if (matchIndex > startIndex) {
@@ -31,7 +44,7 @@ export function splitTextWithHighlight(text, searchTerm, options = {}) {
   return parts;
 }
 
-function applyMiddleEllipsis(parts, maxChars) {
+function applyMiddleEllipsis(parts: HighlightSegment[], maxChars: number): HighlightSegment[] {
   if (maxChars <= 2) {
     return [{ text: '…', isHighlight: false }];
   }
@@ -41,11 +54,11 @@ function applyMiddleEllipsis(parts, maxChars) {
     return parts;
   }
 
-  const leftChars = Math.floor((maxChars - 1) / 2); // reserve one slot for the ellipsis glyph
+  const leftChars = Math.floor((maxChars - 1) / 2); // Reserve one slot for the ellipsis glyph.
   const rightChars = maxChars - leftChars - 1;
 
-  // Populate the leading slice (stop once we run out of space)
-  const leftParts = [];
+  // Populate the leading slice (stop once we run out of space).
+  const leftParts: HighlightSegment[] = [];
   let leftCount = 0;
   for (const part of parts) {
     const remainingSpace = leftChars - leftCount;
@@ -63,8 +76,8 @@ function applyMiddleEllipsis(parts, maxChars) {
     }
   }
 
-  // Populate the trailing slice (build from the end backwards)
-  const rightParts = [];
+  // Populate the trailing slice (build from the end backwards).
+  const rightParts: HighlightSegment[] = [];
   let rightCount = 0;
   for (let i = parts.length - 1; i >= 0; i--) {
     const part = parts[i];
@@ -86,24 +99,36 @@ function applyMiddleEllipsis(parts, maxChars) {
   return [...leftParts, { text: '…', isHighlight: false }, ...rightParts];
 }
 
-export function MiddleEllipsisHighlight({ text, className, highlightTerm, caseInsensitive }) {
-  const containerRef = useRef(null);
+type MiddleEllipsisHighlightProps = {
+  text: string;
+  className?: string;
+  highlightTerm?: string;
+  caseInsensitive?: boolean;
+};
+
+export function MiddleEllipsisHighlight({
+  text,
+  className,
+  highlightTerm,
+  caseInsensitive,
+}: MiddleEllipsisHighlightProps): React.JSX.Element {
+  const containerRef = useRef<HTMLSpanElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // Break the string into highlight + non-highlight chunks only when inputs change
+  // Break the string into highlight + non-highlight chunks only when inputs change.
   const highlightedParts = useMemo(() => {
     return text ? splitTextWithHighlight(text, highlightTerm, { caseInsensitive }) : [];
   }, [text, highlightTerm, caseInsensitive]);
 
-  // Replace the middle of the string with an ellipsis so we preserve both ends
+  // Replace the middle of the string with an ellipsis so we preserve both ends.
   const displayParts = useMemo(() => {
-    if (!containerWidth || !highlightedParts.length) return highlightedParts;
+    if (!containerWidth || highlightedParts.length === 0) return highlightedParts;
 
     const maxChars = Math.floor(containerWidth / CHAR_WIDTH) - 1;
     return applyMiddleEllipsis(highlightedParts, maxChars);
   }, [highlightedParts, containerWidth]);
 
-  // Prefer a ResizeObserver so truncation reacts quickly to layout shifts
+  // Prefer a ResizeObserver so truncation reacts quickly to layout shifts.
   const updateWidth = useCallback(() => {
     const el = containerRef.current;
     if (el) {
@@ -131,9 +156,9 @@ export function MiddleEllipsisHighlight({ text, className, highlightTerm, caseIn
     >
       {displayParts.map((part, index) =>
         part.isHighlight ? (
-          <strong key={index}>{part.text}</strong>
+          <strong key={`${part.text}-${index}`}>{part.text}</strong>
         ) : (
-          <span key={index}>{part.text}</span>
+          <span key={`${part.text}-${index}`}>{part.text}</span>
         ),
       )}
     </span>

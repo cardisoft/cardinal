@@ -1,5 +1,14 @@
 import React, { useRef, useCallback, useEffect } from 'react';
+import type { MutableRefObject } from 'react';
 import { SCROLLBAR_THUMB_MIN } from '../constants';
+
+type ScrollbarProps = {
+  totalHeight: number;
+  viewportHeight: number;
+  maxScrollTop: number;
+  scrollTop: number;
+  onScrollUpdate: (updater: (previous: number) => number) => void;
+};
 
 export const Scrollbar = ({
   totalHeight,
@@ -7,10 +16,10 @@ export const Scrollbar = ({
   maxScrollTop,
   scrollTop,
   onScrollUpdate,
-}) => {
-  const scrollTrackRef = useRef(null);
-  const scrollThumbRef = useRef(null);
-  const isDraggingRef = useRef(false);
+}: ScrollbarProps): React.JSX.Element => {
+  const scrollTrackRef = useRef<HTMLDivElement | null>(null);
+  const scrollThumbRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingRef: MutableRefObject<boolean> = useRef(false);
 
   // Keep the custom scrollbar thumb sized and positioned relative to the virtual height
   const updateScrollbar = useCallback(() => {
@@ -31,7 +40,7 @@ export const Scrollbar = ({
 
   // Allow dragging the thumb to control the virtual list scroll position
   const handleThumbMouseDown = useCallback(
-    (e) => {
+    (e: React.MouseEvent<HTMLDivElement>) => {
       e.preventDefault();
       isDraggingRef.current = true;
       const track = scrollTrackRef.current;
@@ -43,7 +52,7 @@ export const Scrollbar = ({
       const trackHeight = trackRect.height;
       const thumbHeight = thumbRect.height;
       const mouseOffsetInThumb = e.clientY - thumbRect.top;
-      const handleMouseMove = (moveEvent) => {
+      const handleMouseMove = (moveEvent: MouseEvent) => {
         if (!isDraggingRef.current) return;
         const mousePositionInTrack = moveEvent.clientY - trackRect.top - mouseOffsetInThumb;
         const maxThumbTop = trackHeight - thumbHeight;
@@ -66,7 +75,7 @@ export const Scrollbar = ({
 
   // Jump to a new scroll offset when the user clicks the track directly
   const handleTrackClick = useCallback(
-    (e) => {
+    (e: React.MouseEvent<HTMLDivElement>) => {
       if (e.target === scrollThumbRef.current) return;
       const rect = scrollTrackRef.current?.getBoundingClientRect();
       if (!rect) return;

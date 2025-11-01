@@ -1,6 +1,19 @@
 import React, { useCallback, useRef, useLayoutEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 
-const TABS = [
+export type StatusTabKey = 'files' | 'events';
+
+type StatusBarProps = {
+  scannedFiles: number;
+  processedEvents: number;
+  isReady: boolean;
+  searchDurationMs?: number | null;
+  resultCount?: number | null;
+  activeTab?: StatusTabKey;
+  onTabChange?: (tab: StatusTabKey) => void;
+};
+
+const TABS: Array<{ key: StatusTabKey; label: string }> = [
   { key: 'files', label: 'Files' },
   { key: 'events', label: 'Events' },
 ];
@@ -13,14 +26,14 @@ const StatusBar = ({
   resultCount,
   activeTab = 'files',
   onTabChange,
-}) => {
-  const tabsRef = useRef(null);
-  const filesTabRef = useRef(null);
-  const eventsTabRef = useRef(null);
-  const [sliderStyle, setSliderStyle] = useState({});
+}: StatusBarProps): React.JSX.Element => {
+  const tabsRef = useRef<HTMLDivElement | null>(null);
+  const filesTabRef = useRef<HTMLButtonElement | null>(null);
+  const eventsTabRef = useRef<HTMLButtonElement | null>(null);
+  const [sliderStyle, setSliderStyle] = useState<CSSProperties>({});
 
   useLayoutEffect(() => {
-    // Keep the active-tab underline aligned even when labels resize or counters update
+    // Keep the active-tab underline aligned even when labels resize or counters update.
     const updateSliderPosition = () => {
       const activeTabRef = activeTab === 'files' ? filesTabRef : eventsTabRef;
       if (activeTabRef.current && tabsRef.current) {
@@ -35,17 +48,15 @@ const StatusBar = ({
     };
 
     updateSliderPosition();
-    // Re-align the slider when the viewport changes width
+    // Re-align the slider when the viewport changes width.
     window.addEventListener('resize', updateSliderPosition);
     return () => window.removeEventListener('resize', updateSliderPosition);
   }, [activeTab, scannedFiles, processedEvents]);
 
   const handleSelect = useCallback(
-    (tabKey) => {
+    (tabKey: StatusTabKey) => {
       if (tabKey === activeTab) return;
-      if (typeof onTabChange === 'function') {
-        onTabChange(tabKey);
-      }
+      onTabChange?.(tabKey);
     },
     [activeTab, onTabChange],
   );
@@ -54,7 +65,8 @@ const StatusBar = ({
     typeof resultCount === 'number'
       ? `${resultCount.toLocaleString()} result${resultCount === 1 ? '' : 's'}`
       : '—';
-  const durationText = searchDurationMs != null ? `${Math.round(searchDurationMs)}ms` : null;
+  const durationText =
+    typeof searchDurationMs === 'number' ? `${Math.round(searchDurationMs)}ms` : null;
   const searchDisplay = durationText ? `${resultsText} • ${durationText}` : resultsText;
 
   return (

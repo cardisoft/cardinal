@@ -10,16 +10,32 @@ import React, {
   useImperativeHandle,
 } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import type { CSSProperties, UIEvent as ReactUIEvent } from 'react';
 import Scrollbar from './Scrollbar';
 import { useDataLoader } from '../hooks/useDataLoader';
+import type { SearchResultItem } from './FileRow';
+
+export type VirtualListHandle = {
+  scrollToTop: () => void;
+  ensureRangeLoaded: (startIndex: number, endIndex: number) => Promise<void> | void;
+};
+
+type VirtualListProps = {
+  results?: SearchResultItem[] | null;
+  rowHeight?: number;
+  overscan?: number;
+  renderRow: (rowIndex: number, item: SearchResultItem | undefined, rowStyle: CSSProperties) => React.ReactNode;
+  onScrollSync?: (scrollLeft: number) => void;
+  className?: string;
+};
 
 // Virtualized list with lazy row hydration and synchronized column scrolling
-export const VirtualList = forwardRef(function VirtualList(
-  { results = null, rowHeight = 24, overscan = 5, renderRow, onScrollSync, className = '' },
+export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(function VirtualList(
+  { results = [], rowHeight = 24, overscan = 5, renderRow, onScrollSync, className = '' },
   ref,
 ) {
   // ----- refs -----
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const iconRequestIdRef = useRef(0);
 
   // ----- state -----
@@ -28,10 +44,11 @@ export const VirtualList = forwardRef(function VirtualList(
 
   // ----- derived -----
   // Row count is inferred from the results array; explicit rowCount is no longer supported
-  const rowCount = results?.length ?? 0;
+  const resultsList = Array.isArray(results) ? results : [];
+  const rowCount = resultsList.length;
 
   // ----- data loader -----
-  const { cache, ensureRangeLoaded } = useDataLoader(results);
+  const { cache, ensureRangeLoaded } = useDataLoader(resultsList);
 
   // Virtualized height powers the scrollbar math
   const totalHeight = rowCount * rowHeight;
@@ -48,7 +65,7 @@ export const VirtualList = forwardRef(function VirtualList(
 
   // Clamp scroll updates so callers cannot push the viewport outside legal bounds
   const updateScrollAndRange = useCallback(
-    (updater) => {
+    (updater: (value: number) => number) => {
       setScrollTop((prev) => {
         const nextValue = updater(prev);
         const clamped = Math.max(0, Math.min(nextValue, maxScrollTop));
@@ -61,7 +78,7 @@ export const VirtualList = forwardRef(function VirtualList(
   // ----- event handlers -----
   // Normalise wheel deltas (line/page vs pixel) for consistent vertical scrolling
   const handleWheel = useCallback(
-    (e) => {
+    (e: React.WheelEvent<HTMLDivElement>) => {
       e.preventDefault();
       const { deltaMode, deltaY } = e;
       let delta = deltaY;
@@ -78,14 +95,14 @@ export const VirtualList = forwardRef(function VirtualList(
 
   // Propagate horizontal scroll offset to the parent (keeps column headers aligned)
   const handleHorizontalScroll = useCallback(
-    (e) => {
-      if (onScrollSync) onScrollSync(e.target.scrollLeft);
+    (e: ReactUIEvent<HTMLDivElement>) => {
+      if (onScrollSync) onScrollSync((e.target as HTMLDivElement).scrollLeft);
     },
     [onScrollSync],
   );
 
   // ----- effects -----
-  const updateIconViewport = useCallback((viewport) => {
+  const updateIconViewport = useCallback((viewport: SearchResultItem[]) => {
     const requestId = iconRequestIdRef.current + 1;
     iconRequestIdRef.current = requestId;
     // Notify the backend which rows are visible so icon thumbnails can stream lazily
@@ -100,22 +117,22 @@ export const VirtualList = forwardRef(function VirtualList(
   }, [start, end, ensureRangeLoaded]);
 
   useEffect(() => {
-    if (!Array.isArray(results) || results.length === 0 || end < start) {
+    if (resultsList.length === 0 || end < start) {
       updateIconViewport([]);
       return;
     }
 
     const clampedStart = Math.max(0, start);
-    const clampedEnd = Math.min(end, results.length - 1);
+    const clampedEnd = Math.min(end, resultsList.length - 1);
     if (clampedEnd < clampedStart) {
       updateIconViewport([]);
       return;
     }
 
-    const viewport = results.slice(clampedStart, clampedEnd + 1);
+    const viewport = resultsList.slice(clampedStart, clampedEnd + 1);
 
     updateIconViewport(viewport);
-  }, [results, start, end, updateIconViewport]);
+  }, [resultsList, start, end, updateIconViewport]);
 
   useEffect(
     () => () => {
@@ -162,7 +179,7 @@ export const VirtualList = forwardRef(function VirtualList(
     const baseTop = start * rowHeight - scrollTop;
     return Array.from({ length: end - start + 1 }, (_, i) => {
       const rowIndex = start + i;
-      const item = cache.get(rowIndex);
+      const item = cache.get(rowIndex) ?? resultsList[rowIndex];
       return renderRow(rowIndex, item, {
         position: 'absolute',
         top: baseTop + i * rowHeight,

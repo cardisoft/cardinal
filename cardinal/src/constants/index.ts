@@ -1,22 +1,24 @@
-// UI Constants
+// UI constants
 
-// 列宽比例 - 基于窗口宽度的百分比分配
+// Column width ratios derived from the viewport width percentages.
 export const COL_WIDTH_RATIOS = {
   filename: 0.25, // 25%
   path: 0.38, // 38%
   size: 0.08, // 8%
   modified: 0.145, // 14.5%
   created: 0.145, // 14.5%
-};
+} as const;
 
-// 根据窗口宽度计算初始列宽
-export const calculateInitialColWidths = (windowWidth) => {
-  // 使用常量滚动条宽度（需与 CSS 中的 --virtual-scrollbar-width 保持一致）
+export type ColumnKey = keyof typeof COL_WIDTH_RATIOS;
+
+// Derive the initial column widths given the available window width.
+export const calculateInitialColWidths = (windowWidth: number): Record<ColumnKey, number> => {
+  // Reserve space for padding and the custom scrollbar so column math aligns with CSS.
   const availableWidth = windowWidth - CONTAINER_PADDING - SCROLLBAR_WIDTH;
 
-  const calculatedWidths = {};
+  const calculatedWidths = {} as Record<ColumnKey, number>;
 
-  for (const [key, ratio] of Object.entries(COL_WIDTH_RATIOS)) {
+  for (const [key, ratio] of Object.entries(COL_WIDTH_RATIOS) as [ColumnKey, number][]) {
     const calculatedWidth = Math.floor(availableWidth * ratio);
     calculatedWidths[key] = Math.max(calculatedWidth, MIN_COL_WIDTH);
   }
@@ -26,14 +28,14 @@ export const calculateInitialColWidths = (windowWidth) => {
 
 export const ROW_HEIGHT = 24;
 export const CONTAINER_PADDING = 10;
-// 与 CSS 变量 --virtual-scrollbar-width 保持同步
+// Keep in sync with the CSS variable --virtual-scrollbar-width.
 export const SCROLLBAR_WIDTH = 14;
 
 // Minimum thumb height for the virtual scrollbar (in px). Keep this in sync with
 // the CSS variable --virtual-scrollbar-thumb-min in src/App.css.
 export const SCROLLBAR_THUMB_MIN = 24;
 
-// Cache and Performance
+// Cache and performance tuning
 export const CACHE_SIZE = 1000;
 export const SEARCH_DEBOUNCE_MS = 300;
 export const STATUS_FADE_DELAY_MS = 2000;

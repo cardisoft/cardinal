@@ -1,9 +1,12 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
+import type { ChangeEvent, CSSProperties } from 'react';
 import './App.css';
 import { ContextMenu } from './components/ContextMenu';
 import { ColumnHeader } from './components/ColumnHeader';
 import { FileRow } from './components/FileRow';
+import type { SearchResultItem } from './components/FileRow';
 import StatusBar from './components/StatusBar';
+import type { StatusTabKey } from './components/StatusBar';
 import { useColumnResize } from './hooks/useColumnResize';
 import { useContextMenu } from './hooks/useContextMenu';
 import { useFileSearch } from './hooks/useFileSearch';
@@ -11,9 +14,20 @@ import { useEventColumnWidths } from './hooks/useEventColumnWidths';
 import { useRecentFSEvents } from './hooks/useRecentFSEvents';
 import { ROW_HEIGHT, OVERSCAN_ROW_COUNT } from './constants';
 import { VirtualList } from './components/VirtualList';
+import type { VirtualListHandle } from './components/VirtualList';
 import { StateDisplay } from './components/StateDisplay';
 import FSEventsPanel from './components/FSEventsPanel';
+import type { FSEventsPanelHandle } from './components/FSEventsPanel';
 import { listen, once } from '@tauri-apps/api/event';
+import type { UnlistenFn } from '@tauri-apps/api/event';
+
+type ActiveTab = StatusTabKey;
+
+type StatusUpdatePayload = {
+  scanned_files: number;
+  processed_events: number;
+};
+
 
 function App() {
   const {
@@ -38,10 +52,10 @@ function App() {
     resultCount,
     searchError,
   } = state;
-  const [activeTab, setActiveTab] = useState('files');
-  const eventsPanelRef = useRef(null);
-  const headerRef = useRef(null);
-  const virtualListRef = useRef(null);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('files');
+  const eventsPanelRef = useRef<FSEventsPanelHandle | null>(null);
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const virtualListRef = useRef<VirtualListHandle | null>(null);
   const isMountedRef = useRef(false);
   const { colWidths, onResizeStart, autoFitColumns } = useColumnResize();
   const { useRegex, caseSensitive } = searchParams;
@@ -76,13 +90,15 @@ function App() {
 
   useEffect(() => {
     isMountedRef.current = true;
-    let unlistenStatus;
-    let unlistenInit;
+    let unlistenStatus: UnlistenFn | undefined;
+    let unlistenInit: UnlistenFn | undefined;
 
-    const setupListeners = async () => {
-      unlistenStatus = await listen('status_bar_update', (event) => {
+    const setupListeners = async (): Promise<void> => {
+      unlistenStatus = await listen<StatusUpdatePayload>('status_bar_update', (event) => {
         if (!isMountedRef.current) return;
-        const { scanned_files, processed_events } = event.payload;
+        const payload = event.payload;
+        if (!payload) return;
+        const { scanned_files, processed_events } = payload;
         handleStatusUpdate(scanned_files, processed_events);
       });
 
@@ -92,21 +108,17 @@ function App() {
       });
     };
 
-    setupListeners();
+    void setupListeners();
 
     return () => {
       isMountedRef.current = false;
-      if (typeof unlistenStatus === 'function') {
-        unlistenStatus();
-      }
-      if (typeof unlistenInit === 'function') {
-        unlistenInit();
-      }
+      unlistenStatus?.();
+      unlistenInit?.();
     };
   }, [handleStatusUpdate, markInitialized]);
 
   const onQueryChange = useCallback(
-    (e) => {
+    (e: ChangeEvent<HTMLInputElement>) => {
       const inputValue = e.target.value;
 
       if (activeTab === 'events') {
@@ -119,7 +131,7 @@ function App() {
   );
 
   const onToggleRegex = useCallback(
-    (event) => {
+    (event: ChangeEvent<HTMLInputElement>) => {
       const nextValue = event.target.checked;
       updateSearchParams({ useRegex: nextValue });
     },
@@ -127,7 +139,7 @@ function App() {
   );
 
   const onToggleCaseSensitive = useCallback(
-    (event) => {
+    (event: ChangeEvent<HTMLInputElement>) => {
       const nextValue = event.target.checked;
       updateSearchParams({ caseSensitive: nextValue });
     },
@@ -149,7 +161,7 @@ function App() {
     list.ensureRangeLoaded(0, preloadCount - 1);
   }, [results]);
 
-  const handleHorizontalSync = useCallback((scrollLeft) => {
+  const handleHorizontalSync = useCallback((scrollLeft: number) => {
     // VirtualList drives the scroll position; mirror it onto the sticky header for alignment
     if (headerRef.current) {
       headerRef.current.scrollLeft = scrollLeft;
@@ -157,10 +169,10 @@ function App() {
   }, []);
 
   const renderRow = useCallback(
-    (rowIndex, item, rowStyle) => (
+    (rowIndex: number, item: SearchResultItem | undefined, rowStyle: CSSProperties) => (
       <FileRow
         key={rowIndex}
-        item={item}
+        item={item ?? ''}
         rowIndex={rowIndex}
         style={{ ...rowStyle, width: 'var(--columns-total)' }} // Enforce column width CSS vars for virtualization rows
         onContextMenu={showContextMenu}
@@ -171,7 +183,7 @@ function App() {
     [showContextMenu, currentQuery, caseSensitive],
   );
 
-  const getDisplayState = () => {
+  const getDisplayState = (): 'loading' | 'error' | 'empty' | 'results' => {
     // Derive the UI state from search lifecycle, preserving existing semantics
     if (!initialFetchCompleted) return 'loading';
     if (showLoadingUI) return 'loading';
@@ -181,6 +193,8 @@ function App() {
   };
 
   const displayState = getDisplayState();
+  const searchErrorMessage =
+    typeof searchError === 'string' ? searchError : searchError?.message ?? null;
 
   useEffect(() => {
     if (activeTab === 'events') {
@@ -192,7 +206,7 @@ function App() {
   }, [activeTab]);
 
   const handleTabChange = useCallback(
-    (newTab) => {
+    (newTab: ActiveTab) => {
       setActiveTab(newTab);
       if (newTab === 'events') {
         // Switch to events: always show newest items and clear transient filters
@@ -207,6 +221,20 @@ function App() {
   );
 
   const searchInputValue = activeTab === 'events' ? eventFilterQuery : searchParams.query;
+
+  const containerStyle = {
+    '--w-filename': `${colWidths.filename}px`,
+    '--w-path': `${colWidths.path}px`,
+    '--w-size': `${colWidths.size}px`,
+    '--w-modified': `${colWidths.modified}px`,
+    '--w-created': `${colWidths.created}px`,
+    '--w-event-name': `${eventColWidths.name}px`,
+    '--w-event-path': `${eventColWidths.path}px`,
+    '--w-event-time': `${eventColWidths.time}px`,
+    '--columns-events-total': `${
+      eventColWidths.name + eventColWidths.path + eventColWidths.time
+    }px`,
+  } as CSSProperties;
 
   return (
     <main className="container">
@@ -254,22 +282,7 @@ function App() {
           </div>
         </div>
       </div>
-      <div
-        className="results-container"
-        style={{
-          ['--w-filename']: `${colWidths.filename}px`,
-          ['--w-path']: `${colWidths.path}px`,
-          ['--w-size']: `${colWidths.size}px`,
-          ['--w-modified']: `${colWidths.modified}px`,
-          ['--w-created']: `${colWidths.created}px`,
-          ['--w-event-name']: `${eventColWidths.name}px`,
-          ['--w-event-path']: `${eventColWidths.path}px`,
-          ['--w-event-time']: `${eventColWidths.time}px`,
-          ['--columns-events-total']: `${
-            eventColWidths.name + eventColWidths.path + eventColWidths.time
-          }px`,
-        }}
-      >
+      <div className="results-container" style={containerStyle}>
         {activeTab === 'events' ? (
           <FSEventsPanel
             ref={eventsPanelRef}
@@ -289,7 +302,11 @@ function App() {
             />
             <div className="flex-fill">
               {displayState !== 'results' ? (
-                <StateDisplay state={displayState} message={searchError} query={currentQuery} />
+                <StateDisplay
+                  state={displayState}
+                  message={searchErrorMessage}
+                  query={currentQuery}
+                />
               ) : (
                 <VirtualList
                   ref={virtualListRef}
