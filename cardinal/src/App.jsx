@@ -97,6 +97,7 @@ function App() {
   } = state;
   const [activeTab, setActiveTab] = useState('files');
   const [recentEvents, setRecentEvents] = useState([]);
+  const [eventFilterQuery, setEventFilterQuery] = useState('');
   const { colWidths, onResizeStart, autoFitColumns } = useColumnResize();
   
   // Files context menu
@@ -256,6 +257,44 @@ function App() {
     };
   }, []);
 
+  // Filter events based on eventFilterQuery
+  const filteredEvents = useMemo(() => {
+    if (!eventFilterQuery.trim()) {
+      return recentEvents;
+    }
+
+    const query = eventFilterQuery;
+    
+    // Use regex if enabled
+    if (useRegex) {
+      try {
+        const flags = caseSensitive ? '' : 'i';
+        const regex = new RegExp(query, flags);
+        return recentEvents.filter((event) => {
+          const path = event.path || '';
+          const name = path.split('/').pop() || '';
+          return regex.test(path) || regex.test(name);
+        });
+      } catch (error) {
+        // Invalid regex, return all events
+        return recentEvents;
+      }
+    }
+    
+    // Simple string matching
+    const searchQuery = caseSensitive ? query : query.toLowerCase();
+    return recentEvents.filter((event) => {
+      const path = event.path || '';
+      const name = path.split('/').pop() || '';
+      const testPath = caseSensitive ? path : path.toLowerCase();
+      const testName = caseSensitive ? name : name.toLowerCase();
+      return (
+        testPath.includes(searchQuery) ||
+        testName.includes(searchQuery)
+      );
+    });
+  }, [recentEvents, eventFilterQuery, caseSensitive, useRegex]);
+
   const handleSearch = useCallback(
     async (overrides = {}) => {
       const nextSearch = { ...latestSearchRef.current, ...overrides };
@@ -334,13 +373,20 @@ function App() {
   const onQueryChange = useCallback(
     (e) => {
       const inputValue = e.target.value;
-      updateSearchParams({ query: inputValue });
-      cancelTimer(debounceTimerRef);
-      debounceTimerRef.current = setTimeout(() => {
-        handleSearch({ query: inputValue });
-      }, SEARCH_DEBOUNCE_MS);
+      
+      if (activeTab === 'events') {
+        // For events tab, just update the filter query (no debounce, instant filter)
+        setEventFilterQuery(inputValue);
+      } else {
+        // For files tab, perform the search with debounce
+        updateSearchParams({ query: inputValue });
+        cancelTimer(debounceTimerRef);
+        debounceTimerRef.current = setTimeout(() => {
+          handleSearch({ query: inputValue });
+        }, SEARCH_DEBOUNCE_MS);
+      }
     },
-    [handleSearch, updateSearchParams],
+    [activeTab, handleSearch, updateSearchParams],
   );
 
   const onToggleRegex = useCallback(
@@ -421,12 +467,32 @@ function App() {
 
   const displayState = getDisplayState();
 
+  // Handle tab change: clear search input when switching tabs
+  const handleTabChange = useCallback((newTab) => {
+    setActiveTab(newTab);
+    if (newTab === 'events') {
+      setEventFilterQuery('');
+    } else {
+      // Clear the search input for files tab
+      const searchInput = document.getElementById('search-input');
+      if (searchInput) {
+        searchInput.value = '';
+      }
+      updateSearchParams({ query: '' });
+      cancelTimer(debounceTimerRef);
+    }
+  }, [updateSearchParams]);
+
+  // Get the current search input value based on active tab
+  const searchInputValue = activeTab === 'events' ? eventFilterQuery : currentQuery;
+
   return (
     <main className="container">
       <div className="search-container">
         <div className="search-bar">
           <input
             id="search-input"
+            value={searchInputValue}
             onChange={onQueryChange}
             placeholder={
               activeTab === 'files'
@@ -483,10 +549,12 @@ function App() {
         {activeTab === 'events' ? (
           <div className="events-view">
             <FSEventsPanel
-              events={recentEvents}
+              events={filteredEvents}
               onResizeStart={onEventResizeStart}
               onContextMenu={showContextMenu}
               onHeaderContextMenu={showHeaderContextMenu}
+              searchQuery={eventFilterQuery}
+              caseInsensitive={!caseSensitive}
             />
           </div>
         ) : (
@@ -524,7 +592,7 @@ function App() {
         searchDurationMs={durationMs}
         resultCount={resultCount}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
       />
     </main>
   );

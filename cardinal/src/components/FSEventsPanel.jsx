@@ -3,9 +3,10 @@ import AutoSizer from 'react-virtualized/dist/commonjs/AutoSizer';
 import List from 'react-virtualized/dist/commonjs/List';
 import 'react-virtualized/styles.css';
 import { ROW_HEIGHT } from '../constants';
+import { MiddleEllipsisHighlight } from './MiddleEllipsisHighlight';
 
 const COLUMNS = [
-  { key: 'name', label: 'Name' },
+  { key: 'name', label: 'Filename' },
   { key: 'path', label: 'Path' },
   { key: 'time', label: 'Time' },
 ];
@@ -45,7 +46,7 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 });
 
 // EventRow component for rendering individual rows
-const EventRow = memo(function EventRow({ item: event, rowIndex, style, onContextMenu }) {
+const EventRow = memo(function EventRow({ item: event, rowIndex, style, onContextMenu, searchQuery, caseInsensitive }) {
   const pathSource = event?.path ?? '';
   const { name, directory } = splitPath(pathSource);
   const timestamp = event?.timestamp;
@@ -70,7 +71,12 @@ const EventRow = memo(function EventRow({ item: event, rowIndex, style, onContex
       onContextMenu={handleContextMenu}
     >
       <div className="event-name-column">
-        <span className="event-name-text">{name || '—'}</span>
+        <MiddleEllipsisHighlight
+          text={name || '—'}
+          className="event-name-text"
+          highlightTerm={searchQuery}
+          caseInsensitive={caseInsensitive}
+        />
       </div>
       <span className="event-path-text" title={directory}>
         {directory || (pathSource ? '/' : '—')}
@@ -82,7 +88,7 @@ const EventRow = memo(function EventRow({ item: event, rowIndex, style, onContex
   );
 });
 
-const FSEventsPanel = ({ events, onResizeStart, onContextMenu, onHeaderContextMenu }) => {
+const FSEventsPanel = ({ events, onResizeStart, onContextMenu, onHeaderContextMenu, searchQuery, caseInsensitive }) => {
   const headerRef = useRef(null);
   const listRef = useRef(null);
 
@@ -104,10 +110,12 @@ const FSEventsPanel = ({ events, onResizeStart, onContextMenu, onHeaderContextMe
           rowIndex={index}
           style={{ ...style, width: 'var(--columns-events-total)' }}
           onContextMenu={onContextMenu}
+          searchQuery={searchQuery}
+          caseInsensitive={caseInsensitive}
         />
       );
     },
-    [events, onContextMenu],
+    [events, onContextMenu, searchQuery, caseInsensitive],
   );
 
   return (
