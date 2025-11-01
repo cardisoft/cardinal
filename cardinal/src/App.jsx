@@ -589,17 +589,15 @@ function App() {
         }}
       >
         {activeTab === 'events' ? (
-          <div className="events-view">
-            <FSEventsPanel
-              ref={eventsPanelRef}
-              events={filteredEvents}
-              onResizeStart={onEventResizeStart}
-              onContextMenu={showContextMenu}
-              onHeaderContextMenu={showHeaderContextMenu}
-              searchQuery={eventFilterQuery}
-              caseInsensitive={!caseSensitive}
-            />
-          </div>
+          <FSEventsPanel
+            ref={eventsPanelRef}
+            events={filteredEvents}
+            onResizeStart={onEventResizeStart}
+            onContextMenu={showContextMenu}
+            onHeaderContextMenu={showHeaderContextMenu}
+            searchQuery={eventFilterQuery}
+            caseInsensitive={!caseSensitive}
+          />
         ) : (
           <div className="scroll-area">
             <ColumnHeader
