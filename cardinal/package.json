@@ -14,8 +14,8 @@
   "dependencies": {
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "react": "^18",
+    "react-dom": "^18",
     "react-virtualized": "^9.22.5"
   },
   "devDependencies": {
