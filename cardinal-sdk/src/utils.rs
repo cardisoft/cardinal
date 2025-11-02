@@ -25,9 +25,9 @@ pub fn event_id_to_timestamp(dev: dev_t, event_id: u64, cache: &mut HashMap<i64,
         if mid == begin || mid == end {
             return mid;
         }
-        let mid_event_id = *cache.entry(mid).or_insert_with(||
-            last_event_id_before_time(dev, mid)
-        );
+        let mid_event_id = *cache
+            .entry(mid)
+            .or_insert_with(|| last_event_id_before_time(dev, mid));
         if mid_event_id < event_id {
             begin = mid
         } else if mid_event_id > event_id {

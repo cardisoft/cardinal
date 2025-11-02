@@ -11,7 +11,12 @@ use objc2_core_services::{
     FSEventStreamStop, kFSEventStreamCreateFlagFileEvents, kFSEventStreamCreateFlagNoDefer,
     kFSEventStreamCreateFlagWatchRoot,
 };
-use std::{ffi::c_void, ptr::NonNull, slice};
+use std::{
+    ffi::c_void,
+    ops::{Deref, DerefMut},
+    ptr::NonNull,
+    slice,
+};
 
 type EventsCallback = Box<dyn FnMut(Vec<FsEvent>) + Send>;
 
@@ -130,8 +135,22 @@ impl Drop for EventStreamWithQueue {
 }
 
 pub struct EventWatcher {
-    pub receiver: Receiver<Vec<FsEvent>>,
+    receiver: Receiver<Vec<FsEvent>>,
     _cancellation_token: Sender<()>,
+}
+
+impl Deref for EventWatcher {
+    type Target = Receiver<Vec<FsEvent>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.receiver
+    }
+}
+
+impl DerefMut for EventWatcher {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.receiver
+    }
 }
 
 impl EventWatcher {

@@ -26,12 +26,9 @@ fn main() {
     loop {
         let events = if history_done {
             // If history is done, we try to drain the event stream with a timeout.
-            event_stream
-                .receiver
-                .recv_timeout(Duration::from_secs_f32(0.5))
-                .ok()
+            event_stream.recv_timeout(Duration::from_secs_f32(0.5)).ok()
         } else {
-            event_stream.receiver.recv().ok()
+            event_stream.recv().ok()
         };
         let Some(events) = events else {
             break;

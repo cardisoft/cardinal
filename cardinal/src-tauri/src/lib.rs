@@ -299,7 +299,7 @@ fn run_background_event_loop(
                     });
                 });
             }
-            recv(event_watcher.receiver) -> events => {
+            recv(event_watcher) -> events => {
                 let events = events.expect("Event stream closed");
                 processed_events += events.len();
 
@@ -327,7 +327,10 @@ fn run_background_event_loop(
                 let handle_result = cache.handle_fs_events(events);
                 if let Err(HandleFSEError::Rescan) = handle_result {
                     info!("!!!!!!!!!! Rescan triggered !!!!!!!!");
-                    event_watcher = EventWatcher::noop();
+                    #[allow(unused_assignments)]
+                    {
+                        event_watcher = EventWatcher::noop();
+                    }
                     cache.rescan();
                     event_watcher = EventWatcher::spawn(watch_root.to_string(), cache.last_event_id(), fse_latency_secs).1;
                     update_app_state(app_handle, AppLifecycleState::Initializing);

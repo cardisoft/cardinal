@@ -46,7 +46,8 @@ fn main() -> Result<()> {
     let (search_result_tx, search_result_rx) = unbounded::<Result<Vec<SearchResultNode>>>();
 
     std::thread::spawn(move || {
-        let (dev, mut event_watcher) = EventWatcher::spawn("/".to_string(), cache.last_event_id(), 0.1);
+        let (dev, mut event_watcher) =
+            EventWatcher::spawn("/".to_string(), cache.last_event_id(), 0.1);
         println!("Processing changes of dev:{dev} during preparation.");
         loop {
             crossbeam_channel::select! {
@@ -62,7 +63,7 @@ fn main() -> Result<()> {
                         .send(files)
                         .expect("search_result_tx is closed");
                 }
-                recv(event_watcher.receiver) -> events => {
+                recv(event_watcher) -> events => {
                     let events = events.expect("event_stream is closed");
                     if let Err(HandleFSEError::Rescan) = cache.handle_fs_events(events) {
                         println!("!!!!!!!!!! Rescan triggered !!!!!!!!");
