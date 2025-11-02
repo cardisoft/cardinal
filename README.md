@@ -2,7 +2,7 @@
 
 <p style="display: flex; align-items: center;">
   <img src="cardinal/mac-icon_1024x1024.png" alt="Cardinal Icon" width="100" height="100" style="margin-right: 20px;">
-  <span style="font-size: 1.5em;">Cardinal is a fast file searching app for macOS.</span>
+  <span style="font-size: 1.5em; line-height: 100px;">Cardinal is a fast file searching app for macOS.</span>
 </p>
 
 <p align="center">
