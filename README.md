@@ -1,5 +1,5 @@
 <div>
-  <img width="100" height="100" align="left" src="cardinal/mac-icon_1024x1024.png" alt="Cardinal Icon"/>
+  <img width="200" height="200" align="left" src="cardinal/mac-icon_1024x1024.png" alt="Cardinal Icon"/>
   <br>
   <h1>Cardinal</h1>
   <p>Cardinal is a fast file searching app for macOS. It helps you locate files quickly and efficiently, enhancing your productivity.</p>
