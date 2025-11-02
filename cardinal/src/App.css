@@ -1,4 +1,3 @@
-/* 使用系统原生滚动条，无需自定义横向滚动条 */
 /* === Base & Theme Tokens === */
 
 :root {
@@ -24,7 +23,7 @@
   --row-odd: #f7f8fa;
   --row-hover: rgb(220, 220, 220);
   --search-toggle-hover-bg: rgba(0, 0, 0, 0.06);
-  /* 去除自定义滚动条颜色变量 */
+  /* Remove custom scrollbar color overrides. */
 
   color: var(--color-text);
   background-color: var(--color-bg);
@@ -37,12 +36,12 @@
   -webkit-text-size-adjust: 100%;
 
   /* Layout tokens */
-  --row-height: 24px; /* 与虚拟列表 rowHeight 同步 */
-  --col-min-width: 30px; /* 列宽最小值 */
-  --col-max-width: 10000px; /* 列宽最大值 */
+  --row-height: 24px; /* Keep in sync with the virtual list rowHeight. */
+  --col-min-width: 30px; /* Minimum column width. */
+  --col-max-width: 10000px; /* Maximum column width. */
   --container-padding: 10px;
-  --virtual-scrollbar-width: 14px; /* 虚拟滚动条宽度，与 JS SCROLLBAR_WIDTH 保持一致 */
-  --virtual-scrollbar-thumb-min: 24px; /* JS/CSS 统一的 thumb 最小高度（可覆盖） */
+  --virtual-scrollbar-width: 14px; /* Virtual scrollbar width, consistent with JS SCROLLBAR_WIDTH. */
+  --virtual-scrollbar-thumb-min: 24px; /* Shared JS/CSS scrollbar-thumb minimum height (overrideable). */
   /* Horizontal padding for header & data cells */
   --cell-hpad: 0.4rem;
 }
@@ -52,15 +51,15 @@
   margin: 0;
   padding: 0;
   border: 0;
-  /* 禁止文本选择 */
+  /* Disable text selection. */
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
-  /* 禁止文本光标（交互元素单独覆盖） */
+  /* Disable the text cursor; interactive elements override this. */
   cursor: default;
   overscroll-behavior: none;
-  /* 禁用 Safari WebView 的橡皮筋滚动效果 */
+  /* Prevent Safari WebView rubber-band scrolling. */
   -webkit-overflow-scrolling: touch;
 }
 
@@ -75,7 +74,7 @@ body {
   width: 100%;
 }
 
-/* 允许内部容器滚动 */
+/* Allow inner containers to scroll. */
 
 /* === Layout: App Container === */
 #root,
@@ -226,12 +225,12 @@ button {
   font-family: inherit;
   color: var(--color-text);
   background-color: var(--color-elevated-bg);
-  /* 统一输入框和按钮背景色 */
+  /* Align input and button background colors. */
   transition: border-color 0.25s;
   box-shadow: 0 2px 2px rgba(0, 0, 0, 0.05);
-  /* 减淡阴影 */
+  /* Lighten the shadow. */
   outline: none;
-  /* 允许输入框中的文本选择 */
+  /* Allow text selection inside the input. */
   -webkit-user-select: text;
   -moz-user-select: text;
   -ms-user-select: text;
@@ -239,7 +238,7 @@ button {
 }
 
 input:not([type='checkbox']) {
-  /* 输入框恢复文本光标 */
+  /* Restore the text cursor inside the input. */
   cursor: text;
 }
 
@@ -260,24 +259,24 @@ button:active {
 .results-container {
   text-align: left;
   width: 100%;
-  /* 高度由 grid 第二行自动撑开 */
+  /* Height is dictated by the second grid row. */
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 0; /* 允许内部内容正确收缩，防止撑开 grid 行 */
-  /* 允许内部绝对定位竖直滚动条 */
+  min-height: 0; /* Allow content to shrink without stretching the grid row. */
+  /* Allow absolutely positioned vertical scrollbars inside. */
   --columns-total: calc(
     var(--w-filename) + var(--w-path) + var(--w-size) + var(--w-modified) + var(--w-created)
   );
 }
 
 .scroll-area {
-  overflow: hidden; /* 外层容器不显示自己的滚动条，但允许子元素滚动 */
+  overflow: hidden; /* Hide the outer scrollbar while letting children scroll. */
   height: 100%;
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0; /* 防止子元素撑破 */
+  min-height: 0; /* Prevent children from stretching the container. */
   padding: 0 0 0 var(--container-padding);
 }
 
@@ -380,7 +379,7 @@ button:active {
 /* === Header Row === */
 .header-row-container {
   overflow: hidden;
-  /* 完全禁用表头的滚动，只接收来自 Grid 的滚动位置 */
+  /* Disable header scrolling; rely on the grid-provided scroll position. */
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
 }
@@ -397,12 +396,12 @@ button:active {
   padding: 6px 0;
   border-bottom: 1px solid var(--color-border);
   font-size: 12px;
-  /* 表头宽度包含滚动条宽度，用于与内容区域（含虚拟滚动条）对齐 */
+  /* Include scrollbar width so the header lines up with the content region. */
   width: calc(var(--columns-total) + var(--virtual-scrollbar-width));
 }
 
 .header-row.columns {
-  /* 表头比内容行多一列，用于填充滚动条位置 */
+  /* Header has one extra column to fill the scrollbar gap. */
   grid-template-columns:
     var(--w-filename) var(--w-path) var(--w-size) var(--w-modified) var(--w-created)
     var(--virtual-scrollbar-width);
@@ -423,7 +422,7 @@ button:active {
 }
 
 .header-scrollbar-spacer {
-  /* 空白填充单元格，用于对齐虚拟滚动条位置 */
+  /* Spacer cell used to align the virtual scrollbar area. */
   width: var(--virtual-scrollbar-width);
   min-width: var(--virtual-scrollbar-width);
 }
@@ -466,8 +465,8 @@ button:active {
 .virtual-list {
   height: 100%;
   flex: 1;
-  overflow: hidden; /* 外层隐藏溢出 */
-  position: relative; /* 允许内部绝对定位 */
+  overflow: hidden; /* Hide overflow on the outer wrapper. */
+  position: relative; /* Allow absolutely positioned children. */
   width: 100%;
 }
 
@@ -547,11 +546,11 @@ button:active {
 /* Rows (rendered inside virtual list) */
 /* === Rows & Cells === */
 .row {
-  /* 去掉水平内边距以避免总宽度 (列总宽度 + padding) 造成轻微溢出 */
-  padding: 5px 0; /* 原为 5px 10px */
+  /* Remove horizontal padding to avoid width overflow (columns + padding). */
+  padding: 5px 0; /* Previously 5px 10px. */
   box-sizing: border-box;
-  white-space: nowrap; /* 防止文本换行 */
-  overflow: visible; /* 允许父容器水平滚动时显示列内容 */
+  white-space: nowrap; /* Prevent text wrapping. */
+  overflow: visible; /* Keep column content visible during horizontal scroll. */
   background-color: var(--row-even);
   border-radius: 6px;
 }
@@ -705,7 +704,7 @@ button:active {
     background-color: #343a40;
   }
 
-  /* 暗色模式下的虚拟滚动条 (Safari 风格) */
+  /* Virtual scrollbar styling for dark mode (Safari aesthetic). */
   .virtual-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.35);
     box-shadow:
@@ -1019,20 +1018,20 @@ button:active {
   overflow: hidden;
 }
 
-/* 虚拟滚动条样式 - Safari 原生风格 (始终可见) */
+/* Virtual scrollbar styling — Safari-native look (always visible). */
 .virtual-scrollbar {
   width: var(--virtual-scrollbar-width);
   position: relative;
   flex-shrink: 0;
-  padding: 0 3px; /* 形成留白轨道 */
+  padding: 0 3px; /* Create gutter spacing for the track. */
   box-sizing: border-box;
   display: flex;
   user-select: none;
   -webkit-user-select: none;
   contain: layout paint;
   transition: opacity 0.25s ease;
-  opacity: 1; /* 始终可见 */
-  pointer-events: auto; /* 始终响应事件 */
+  opacity: 1; /* Always visible. */
+  pointer-events: auto; /* Always interactive. */
 }
 
 .virtual-scrollbar-track {
@@ -1047,7 +1046,7 @@ button:active {
   left: 0;
   top: 0;
   width: 100%;
-  min-height: 24px; /* 不小于行高，易抓取 */
+  min-height: 24px; /* Match row height so the thumb is easy to grab. */
   background: rgba(0, 0, 0, 0.35);
   background-clip: padding-box;
   border-radius: 7px;
@@ -1071,7 +1070,7 @@ button:active {
   transition: none;
 }
 
-/* 水平滚动视口 */
+/* Horizontal scroll viewport. */
 .virtual-list-viewport {
   position: relative;
   height: 100%;

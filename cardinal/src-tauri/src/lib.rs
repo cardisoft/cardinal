@@ -128,19 +128,19 @@ async fn search(
     state: State<'_, SearchState>,
 ) -> Result<Vec<SlabIndex>, String> {
     let options = options.unwrap_or_default();
-    // 发送搜索请求到后台线程
+    // Send the search request to the background worker.
     state
         .search_tx
         .send(SearchJob { query, options })
         .map_err(|e| format!("Failed to send search request: {:?}", e))?;
 
-    // 等待搜索结果
+    // Wait for the search result.
     let search_result = state
         .result_rx
         .recv()
         .map_err(|e| format!("Failed to receive search result: {:?}", e))?;
 
-    // 处理搜索结果
+    // Propagate any search errors back to the caller.
     search_result.map_err(|e| format!("Failed to process search result: {:?}", e))
 }
 
@@ -303,7 +303,7 @@ fn run_background_event_loop(
                 let events = events.expect("Event stream closed");
                 processed_events += events.len();
 
-                // 发送状态栏更新事件，包含文件扫描数和处理的事件数
+                // Emit a status-bar update with the current scan and event counts.
                 app_handle.emit("status_bar_update", StatusBarUpdate {
                     scanned_files: cache.get_total_files(),
                     processed_events
@@ -467,7 +467,7 @@ pub fn run() -> Result<()> {
         builder = builder.plugin(tauri_plugin_prevent_default::init());
     }
     builder = builder.plugin(tauri_plugin_opener::init());
-    // 运行Tauri应用
+    // Run the Tauri application.
     let app = builder
         .manage(SearchState {
             search_tx,
@@ -507,7 +507,7 @@ pub fn run() -> Result<()> {
             const WATCH_ROOT: &str = "/";
             const FSE_LATENCY_SECS: f64 = 0.1;
             let path = PathBuf::from(WATCH_ROOT);
-            // 初始化搜索缓存
+            // Initialize the search cache.
             let mut cache = match SearchCache::try_read_persistent_cache(
                 &path,
                 &CACHE_PATH,
@@ -518,7 +518,7 @@ pub fn run() -> Result<()> {
                     info!("Loaded existing cache");
                     // If using cache, defer the emit init process to HistoryDone event processing
 
-                    // 发送初始状态栏信息
+                    // Emit the initial status-bar payload.
                     app_handle
                         .emit(
                             "status_bar_update",
@@ -579,7 +579,7 @@ pub fn run() -> Result<()> {
                         return;
                     };
 
-                    // 发送初始状态栏信息
+                    // Emit the initial status-bar payload.
                     app_handle
                         .emit(
                             "status_bar_update",
@@ -596,7 +596,7 @@ pub fn run() -> Result<()> {
                 }
             };
 
-            // 启动事件监听器
+            // Start the filesystem event watcher.
             let event_watcher = EventWatcher::spawn(
                 WATCH_ROOT.to_string(),
                 cache.last_event_id(),
@@ -629,14 +629,14 @@ pub fn run() -> Result<()> {
                 RunEvent::Exit => {
                     update_app_state(app_handle, AppLifecycleState::Closing);
                     APP_QUIT.store(true, Ordering::Relaxed);
-                    // 右键关闭的时候会被调用
-                    // TODO(ldm0): 未来这里可以优化成不时保存一下，然后关闭的时候如果10秒内之前存过就不再存了
+                    // Triggered when the tray context menu requests an exit.
+                    // TODO(ldm0): Periodically save the cache so a close event within ~10s can skip another flush.
 
                     // Write cache to file before app exit
                     flush_cache_to_file_once(&finish_tx);
                 }
                 RunEvent::ExitRequested { api, code, .. } => {
-                    // 点击红色关闭气泡的时候会被调用，这时候窗口先关闭，然后托盘图标再慢慢退
+                    // Triggered by the window close button; the window exits first and the tray follows.
 
                     // Keep the event loop running even if all windows are closed
                     // This allow us to catch tray icon events when there is no window

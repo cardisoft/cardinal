@@ -205,7 +205,8 @@ impl SearchCache {
             path: &Path,
             walk_data: &WalkData,
         ) -> Option<(SlabIndex, ThinSlab<SlabNode>)> {
-            // 先多线程构建树形文件名列表(不能直接创建 slab 因为 slab 无法多线程构建(slab 节点有相互引用，不想加锁))
+            // Build the tree of file names in parallel first (we cannot construct the slab directly
+            // because slab nodes reference each other and we prefer to avoid locking).
             let visit_time = Instant::now();
             let node = walk_it(path, walk_data)?;
             info!(
@@ -214,7 +215,7 @@ impl SearchCache {
                 visit_time.elapsed()
             );
 
-            // 然后创建 slab
+            // Then create the slab.
             let slab_time = Instant::now();
             let mut slab = ThinSlab::new();
             let slab_root = construct_node_slab(None, &node, &mut slab);
@@ -708,36 +709,44 @@ impl SearchCache {
     }
 }
 
-/// 根据一批 FsEvent 计算需要进行递归/单节点扫描的最小路径集合。
+/// Compute the minimal set of paths that must be rescanned for a batch of FsEvents.
 ///
-/// 功能 & 目标:
-/// 1. 过滤掉不需要增量扫描的事件 (例如 `ReScan` / `Nop` 类型: RootChanged, HistoryDone 等)，这些事件在更高层逻辑里会触发完整重建或者仅更新 event id。
-/// 2. 只保留 `ScanType::SingleNode` 与 `ScanType::Folder` 的事件路径。
-/// 3. 对路径做“祖先去重”与“祖先覆盖”：
-///    - 如果即将插入的路径已被某个祖先路径覆盖 (path.starts_with(ancestor))，跳过它；
-///    - 如果新路径是现有若干路径的祖先，则移除所有这些后代，只保留祖先；
-///    - 相同路径只会出现一次 (后续重复事件会被 starts_with 判定为已覆盖)。
-/// 4. 结果是需要最少扫描次数即可覆盖所有事件影响的最小集合 (Minimal Cover)。
+/// Goals:
+/// 1. Filter out events that do not require incremental rescans (e.g. `ReScan` / `Nop` variants
+///    such as RootChanged or HistoryDone). Higher-level logic either rebuilds the cache or simply
+///    updates the event id for those.
+/// 2. Keep only `ScanType::SingleNode` and `ScanType::Folder` paths.
+/// 3. Deduplicate ancestors and descendants:
+///    - Skip a path if it is already covered by an ancestor (`path.starts_with(ancestor)`).
+///    - When inserting an ancestor, remove all of its descendants that were previously added.
+///    - Keep only a single entry for identical paths; later duplicates are considered covered.
+/// 4. Return the minimal cover—the smallest set of paths whose rescans still cover every change.
 ///
-/// 使用场景:
-/// - `SearchCache::handle_fs_events` 中遍历返回的路径，对每个路径执行 `scan_path_recursive`，避免对子孙/重复路径做浪费的多次扫描。
-/// - FSEvents 高频且可能“冒泡”出大量同一子树的文件/目录更改，合并可以显著降低后续 IO / 元数据抓取开销。
+/// Usage:
+/// - `SearchCache::handle_fs_events` iterates over the returned paths and calls
+///   `scan_path_recursive` on each of them to avoid redundant rescans of descendants or duplicates.
+/// - High-frequency FSEvents often bubble many changes from the same subtree; merging them here
+///   significantly reduces IO and metadata fetch work downstream.
 ///
-/// 算法复杂度:
-/// - 复杂度约为 O(n log n + m * depth)：先按深度排序，再线性扫描并检查祖先。
-/// - 若后续需要进一步优化，可继续引入 Trie/前缀树结构。
+/// Complexity:
+/// - Approximately O(n log n + m * depth): sort by depth first, then scan linearly while checking
+///   ancestors.
+/// - If we ever need additional speed we can explore trie/prefix-tree structures.
 ///
-/// Corner Cases & 处理方式:
-/// - 空输入 => 返回空 Vec。
-/// - 重复相同路径多次 => 只保留一次 (后续会被 starts_with 匹配跳过)。
-/// - 先出现子路径, 后出现其祖先 => 祖先覆盖子路径, 仅祖先保留。
-/// - 先出现祖先, 后出现子路径 => 子路径被跳过。
-/// - 兄弟路径互不影响 => 全部保留。
-/// - 路径名字前缀但不是父子关系 (如 /foo/bar 与 /foo/barista) => 二者都保留 (Path::starts_with 以组件匹配，不会把 barista 当作 bar 的子路径)。
-/// - 混合 Folder / SingleNode 事件 => 一起参与最小化；不区分类型只看路径祖先关系。
-/// - 使用 PathBuf 原样比较，不做规范化：不会展开符号链接；调用方需保证一致性。
+/// Corner cases:
+/// - Empty input → returns an empty `Vec`.
+/// - Duplicate identical paths → only one is kept (later duplicates are skipped via `starts_with`).
+/// - Child path seen before its ancestor → the ancestor replaces all children, so only the ancestor remains.
+/// - Ancestor seen before its child → the child is skipped.
+/// - Sibling paths never interfere with each other and are all kept.
+/// - Paths that merely share prefixes (e.g. `/foo/bar` vs `/foo/barista`) are both retained because
+///   `Path::starts_with` compares path components.
+/// - Folder and `SingleNode` events participate together; we only look at the hierarchy.
+/// - `PathBuf` values are compared as-is without normalisation, so symlinks are left untouched—the
+///   caller must provide consistent inputs.
 ///
-/// 效果: 本地测试跳过了 415449 个事件中 173034 个事件的扫描
+/// Result:
+/// - Local benchmarks skipped rescans for 173,034 events out of 415,449.
 fn scan_paths(events: Vec<FsEvent>) -> Vec<PathBuf> {
     let mut candidates: Vec<(PathBuf, usize)> = events
         .into_iter()
@@ -889,7 +898,7 @@ mod tests {
 
     #[test]
     fn test_handle_fs_event_add() {
-        // 创建临时文件夹
+        // Create a temporary directory.
         let temp_dir = TempDir::new("test_events").expect("Failed to create temp directory");
         let temp_path = temp_dir.path();
 
@@ -1316,7 +1325,7 @@ mod tests {
 
         let cache = SearchCache::walk_fs(root_path.to_path_buf());
 
-        // 目录的 metadata 都会是 Some()
+        // Directory nodes should always carry metadata.
         assert!(cache.slab[cache.slab_root].metadata.is_some());
 
         // Check metadata for a file node
@@ -1325,7 +1334,7 @@ mod tests {
             .expect("Search for file1.txt failed");
         assert_eq!(file_nodes.len(), 1, "Expected 1 node for file1.txt");
         let file_node_idx = file_nodes.into_iter().next().unwrap();
-        // 文件的 metadata 都会是 None
+        // File nodes should always have `metadata` set to `None`.
         assert!(
             cache.slab[file_node_idx].metadata.is_none(),
             "Metadata for file node created by walk_fs_new should be None"
@@ -1337,7 +1346,7 @@ mod tests {
             .expect("Search for file1.txt failed");
         assert_eq!(file_nodes.len(), 1);
         let file_node_idx = file_nodes.into_iter().next().unwrap();
-        // 文件的 metadata 都会是 None
+        // File nodes should always have `metadata` set to `None`.
         assert!(
             cache.slab[file_node_idx].metadata.is_none(),
             "Metadata for file node created by walk_fs_new should be None"
@@ -1347,7 +1356,7 @@ mod tests {
         let dir_nodes = cache.search("subdir1").expect("Search for subdir1 failed");
         assert_eq!(dir_nodes.len(), 1, "Expected 1 node for subdir1");
         let dir_node_idx = dir_nodes.into_iter().next().unwrap();
-        // 目录的 metadata 都会是 Some()
+        // Directory nodes should always carry metadata.
         assert!(
             cache.slab[dir_node_idx].metadata.is_some(),
             "Metadata for directory node created by walk_fs_new should be Some"
@@ -1730,7 +1739,7 @@ mod tests {
         assert_eq!(inner_file_meta.size(), 4);
     }
 
-    // --- scan_paths 专项测试 ---
+    // --- scan_paths focused tests ---
     #[test]
     fn test_scan_paths_empty() {
         assert!(scan_paths(vec![]).is_empty());
@@ -1772,7 +1781,7 @@ mod tests {
                 path: p.clone(),
                 id: 2,
                 flag: EventFlag::ItemModified | EventFlag::ItemIsFile,
-            }, // 假设错误标记, 仍然 SingleNode
+            }, // Assume the flag is incorrect; treat it as SingleNode anyway.
             FsEvent {
                 path: p,
                 id: 3,
@@ -1804,7 +1813,7 @@ mod tests {
             },
         ];
         let out = scan_paths(events);
-        // 最终只剩 /t/a
+        // Expect the ancestor /t/a to absorb the whole subtree.
         assert_eq!(out, vec![PathBuf::from("/t/a")]);
     }
 
@@ -1863,7 +1872,7 @@ mod tests {
 
     #[test]
     fn test_scan_paths_prefix_but_not_parent() {
-        // /foo/bar 与 /foo/barista 不是父子关系（组件不同），应同时保留
+        // /foo/bar and /foo/barista share a prefix but are not parent/child; both should stay.
         let events = vec![
             FsEvent {
                 path: PathBuf::from("/foo/bar"),
@@ -1886,7 +1895,7 @@ mod tests {
 
     #[test]
     fn test_scan_paths_mix_folder_and_single_node() {
-        // 创建目录事件 + 文件修改事件, 目录应吸收其子文件
+        // Directory creation plus file modification: the directory should absorb its child.
         let events = vec![
             FsEvent {
                 path: PathBuf::from("/mix/dir/sub/file.txt"),
@@ -1958,7 +1967,7 @@ mod tests {
 
     #[test]
     fn test_scan_paths_large_chain_collapse() {
-        // 模拟较长链条，最后祖先出现
+        // Build a long chain where the ancestor arrives at the end.
         let mut events = Vec::new();
         let depth = ["a", "b", "c", "d", "e", "f"];
         for i in 0..depth.len() {
@@ -1969,7 +1978,7 @@ mod tests {
                 flag: EventFlag::ItemCreated | EventFlag::ItemIsDir,
             });
         }
-        // 插入真正的祖先 /long
+        // Add the real ancestor /long.
         events.push(FsEvent {
             path: PathBuf::from("/long"),
             id: 99,
