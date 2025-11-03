@@ -80,9 +80,10 @@ function App() {
     getMenuItems: getEventsMenuItems,
   } = useContextMenu(autoFitEventColumns);
 
-  const [fullDiskAccessStatus, setFullDiskAccessStatus] = useState<
-    'checking' | 'granted' | 'denied'
-  >('checking');
+  const [fullDiskAccessStatus, setFullDiskAccessStatus] = useState<'granted' | 'denied'>(
+    'granted',
+  );
+  const [isCheckingFullDiskAccess, setIsCheckingFullDiskAccess] = useState(true);
   const hasLoggedPermissionStatusRef = useRef(false);
   const menu = activeTab === 'events' ? eventsMenu : filesMenu;
   const showContextMenu = activeTab === 'events' ? showEventsContextMenu : showFilesContextMenu;
@@ -93,7 +94,7 @@ function App() {
 
   useEffect(() => {
     const checkFullDiskAccess = async () => {
-      setFullDiskAccessStatus('checking');
+      setIsCheckingFullDiskAccess(true);
       try {
         const authorized = await checkFullDiskAccessPermission();
         if (!hasLoggedPermissionStatusRef.current) {
@@ -104,6 +105,8 @@ function App() {
       } catch (error) {
         console.error('Failed to check full disk access permission', error);
         setFullDiskAccessStatus('denied');
+      } finally {
+        setIsCheckingFullDiskAccess(false);
       }
     };
 
@@ -260,11 +263,10 @@ function App() {
     }px`,
   } as CSSProperties;
 
-  const showFullDiskAccessOverlay = fullDiskAccessStatus !== 'granted';
-  const overlayStatusMessage =
-    fullDiskAccessStatus === 'checking'
-      ? 'Checking permission status...'
-      : 'Full Disk Access is disabled.';
+  const showFullDiskAccessOverlay = fullDiskAccessStatus === 'denied';
+  const overlayStatusMessage = isCheckingFullDiskAccess
+    ? 'Checking permission status...'
+    : 'Full Disk Access is disabled.';
 
   return (
     <>
@@ -386,7 +388,7 @@ function App() {
               <button
                 type="button"
                 onClick={requestFullDiskAccessPermission}
-                disabled={fullDiskAccessStatus === 'checking'}
+                disabled={isCheckingFullDiskAccess}
               >
                 Open System Settings
               </button>

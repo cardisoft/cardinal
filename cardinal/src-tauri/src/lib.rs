@@ -17,7 +17,7 @@ use std::{
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tauri::{Emitter, RunEvent, State};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, State};
 use tracing::{error, info, level_filters::LevelFilter};
 use tracing_subscriber::EnvFilter;
 
@@ -493,6 +493,10 @@ pub fn run() -> Result<()> {
         .expect("error while running tauri application");
 
     let app_handle = &app.handle().to_owned();
+    if !has_full_disk_access(&app_handle) {
+        info!("App does not have Full Disk Access, sleeping indefinitely");
+        std::thread::sleep(Duration::from_secs(u64::MAX));
+    }
     emit_app_state(app_handle);
     let icon_update_rx = &icon_update_rx;
     std::thread::scope(move |s| {
@@ -691,3 +695,28 @@ fn flush_cache_to_file_once(finish_tx: &Sender<Sender<Option<SearchCache>>>) {
         }
     });
 }
+
+fn has_full_disk_access<R: Runtime>(app_handle: &AppHandle<R>) -> bool {
+    // Reference: https://github.com/inket/FullDiskAccess/blob/846e04ea2b84fce843f47d7e7f3421189221829c/Sources/FullDiskAccess/FullDiskAccess.swift#L46
+    let check_dirs = vec!["Library/Containers/com.apple.stocks", "Library/Safari"];
+
+    if let Ok(home_dir) = app_handle.path().home_dir() {
+        for check_dir in check_dirs.iter() {
+            if std::fs::read_dir(&home_dir.join(check_dir)).is_ok() {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/*
+fn request_full_disk_access() -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
+        .output()
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+ */
