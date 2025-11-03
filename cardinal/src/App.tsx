@@ -21,6 +21,10 @@ import FSEventsPanel from './components/FSEventsPanel';
 import type { FSEventsPanelHandle } from './components/FSEventsPanel';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
+import {
+  checkFullDiskAccessPermission,
+  requestFullDiskAccessPermission,
+} from 'tauri-plugin-macos-permissions-api';
 
 type ActiveTab = StatusTabKey;
 
@@ -76,12 +80,35 @@ function App() {
     getMenuItems: getEventsMenuItems,
   } = useContextMenu(autoFitEventColumns);
 
+  const [fullDiskAccessStatus, setFullDiskAccessStatus] = useState<
+    'checking' | 'granted' | 'denied'
+  >('checking');
+  const hasLoggedPermissionStatusRef = useRef(false);
   const menu = activeTab === 'events' ? eventsMenu : filesMenu;
   const showContextMenu = activeTab === 'events' ? showEventsContextMenu : showFilesContextMenu;
   const showHeaderContextMenu =
     activeTab === 'events' ? showEventsHeaderContextMenu : showFilesHeaderContextMenu;
   const closeMenu = activeTab === 'events' ? closeEventsMenu : closeFilesMenu;
   const getMenuItems = activeTab === 'events' ? getEventsMenuItems : getFilesMenuItems;
+
+  useEffect(() => {
+    const checkFullDiskAccess = async () => {
+      setFullDiskAccessStatus('checking');
+      try {
+        const authorized = await checkFullDiskAccessPermission();
+        if (!hasLoggedPermissionStatusRef.current) {
+          console.log('Full Disk Access granted:', authorized);
+          hasLoggedPermissionStatusRef.current = true;
+        }
+        setFullDiskAccessStatus(authorized ? 'granted' : 'denied');
+      } catch (error) {
+        console.error('Failed to check full disk access permission', error);
+        setFullDiskAccessStatus('denied');
+      }
+    };
+
+    void checkFullDiskAccess();
+  }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -233,105 +260,141 @@ function App() {
     }px`,
   } as CSSProperties;
 
+  const showFullDiskAccessOverlay = fullDiskAccessStatus !== 'granted';
+  const overlayStatusMessage =
+    fullDiskAccessStatus === 'checking'
+      ? 'Checking permission status...'
+      : 'Full Disk Access is disabled.';
+
   return (
-    <main className="container">
-      <div className="search-container">
-        <div className="search-bar">
-          <input
-            id="search-input"
-            value={searchInputValue}
-            onChange={onQueryChange}
-            placeholder={
-              activeTab === 'files'
-                ? 'Search for files and folders...'
-                : 'Filter events by path or name...'
-            }
-            spellCheck={false}
-            autoCorrect="off"
-            autoComplete="off"
-            autoCapitalize="off"
-          />
-          <div className="search-options">
-            <label className="search-option" title="Toggle case-sensitive matching">
-              <input
-                type="checkbox"
-                checked={caseSensitive}
-                onChange={onToggleCaseSensitive}
-                aria-label="Toggle case-sensitive matching"
-              />
-              <span className="search-option__display" aria-hidden="true">
-                Aa
-              </span>
-              <span className="sr-only">Toggle case-sensitive matching</span>
-            </label>
-            <label className="search-option" title="Enable regular expression search">
-              <input
-                type="checkbox"
-                checked={useRegex}
-                onChange={onToggleRegex}
-                aria-label="Enable regular expression search"
-              />
-              <span className="search-option__display" aria-hidden="true">
-                .*
-              </span>
-              <span className="sr-only">Enable regular expression search</span>
-            </label>
-          </div>
-        </div>
-      </div>
-      <div className="results-container" style={containerStyle}>
-        {activeTab === 'events' ? (
-          <FSEventsPanel
-            ref={eventsPanelRef}
-            events={filteredEvents}
-            onResizeStart={onEventResizeStart}
-            onContextMenu={showContextMenu}
-            onHeaderContextMenu={showHeaderContextMenu}
-            searchQuery={eventFilterQuery}
-            caseInsensitive={!caseSensitive}
-          />
-        ) : (
-          <div className="scroll-area">
-            <ColumnHeader
-              ref={headerRef}
-              onResizeStart={onResizeStart}
-              onContextMenu={showHeaderContextMenu}
+    <>
+      <main className="container" aria-hidden={showFullDiskAccessOverlay}>
+        <div className="search-container">
+          <div className="search-bar">
+            <input
+              id="search-input"
+              value={searchInputValue}
+              onChange={onQueryChange}
+              placeholder={
+                activeTab === 'files'
+                  ? 'Search for files and folders...'
+                  : 'Filter events by path or name...'
+              }
+              spellCheck={false}
+              autoCorrect="off"
+              autoComplete="off"
+              autoCapitalize="off"
             />
-            <div className="flex-fill">
-              {displayState !== 'results' ? (
-                <StateDisplay
-                  state={displayState}
-                  message={searchErrorMessage}
-                  query={currentQuery}
+            <div className="search-options">
+              <label className="search-option" title="Toggle case-sensitive matching">
+                <input
+                  type="checkbox"
+                  checked={caseSensitive}
+                  onChange={onToggleCaseSensitive}
+                  aria-label="Toggle case-sensitive matching"
                 />
-              ) : (
-                <VirtualList
-                  ref={virtualListRef}
-                  results={results}
-                  rowHeight={ROW_HEIGHT}
-                  overscan={OVERSCAN_ROW_COUNT}
-                  renderRow={renderRow}
-                  onScrollSync={handleHorizontalSync}
-                  className="virtual-list"
+                <span className="search-option__display" aria-hidden="true">
+                  Aa
+                </span>
+                <span className="sr-only">Toggle case-sensitive matching</span>
+              </label>
+              <label className="search-option" title="Enable regular expression search">
+                <input
+                  type="checkbox"
+                  checked={useRegex}
+                  onChange={onToggleRegex}
+                  aria-label="Enable regular expression search"
                 />
-              )}
+                <span className="search-option__display" aria-hidden="true">
+                  .*
+                </span>
+                <span className="sr-only">Enable regular expression search</span>
+              </label>
             </div>
           </div>
+        </div>
+        <div className="results-container" style={containerStyle}>
+          {activeTab === 'events' ? (
+            <FSEventsPanel
+              ref={eventsPanelRef}
+              events={filteredEvents}
+              onResizeStart={onEventResizeStart}
+              onContextMenu={showContextMenu}
+              onHeaderContextMenu={showHeaderContextMenu}
+              searchQuery={eventFilterQuery}
+              caseInsensitive={!caseSensitive}
+            />
+          ) : (
+            <div className="scroll-area">
+              <ColumnHeader
+                ref={headerRef}
+                onResizeStart={onResizeStart}
+                onContextMenu={showHeaderContextMenu}
+              />
+              <div className="flex-fill">
+                {displayState !== 'results' ? (
+                  <StateDisplay
+                    state={displayState}
+                    message={searchErrorMessage}
+                    query={currentQuery}
+                  />
+                ) : (
+                  <VirtualList
+                    ref={virtualListRef}
+                    results={results}
+                    rowHeight={ROW_HEIGHT}
+                    overscan={OVERSCAN_ROW_COUNT}
+                    renderRow={renderRow}
+                    onScrollSync={handleHorizontalSync}
+                    className="virtual-list"
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        {menu.visible && (
+          <ContextMenu x={menu.x} y={menu.y} items={getMenuItems()} onClose={closeMenu} />
         )}
-      </div>
-      {menu.visible && (
-        <ContextMenu x={menu.x} y={menu.y} items={getMenuItems()} onClose={closeMenu} />
+        <StatusBar
+          scannedFiles={scannedFiles}
+          processedEvents={processedEvents}
+          lifecycleState={lifecycleState}
+          searchDurationMs={durationMs}
+          resultCount={resultCount}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+        />
+      </main>
+      {showFullDiskAccessOverlay && (
+        <div className="permission-overlay">
+          <div className="permission-card" role="dialog" aria-modal="true">
+            <h1>Full Disk Access Required</h1>
+            <p>
+              Cardinal needs macOS Full Disk Access to index and monitor files across your system.
+              Please enable Full Disk Access for Cardinal in System Settings.
+            </p>
+            <ol>
+              <li>Open System Settings &gt; Privacy &amp; Security &gt; Full Disk Access.</li>
+              <li>Click the lock to make changes and enable Cardinal.</li>
+              <li>When prompted, allow macOS to restart Cardinal.</li>
+            </ol>
+            <p className="permission-status" role="status" aria-live="polite">
+              {overlayStatusMessage}
+            </p>
+            <div className="permission-actions">
+              <button
+                type="button"
+                onClick={requestFullDiskAccessPermission}
+                disabled={fullDiskAccessStatus === 'checking'}
+              >
+                Open System Settings
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-      <StatusBar
-        scannedFiles={scannedFiles}
-        processedEvents={processedEvents}
-        lifecycleState={lifecycleState}
-        searchDurationMs={durationMs}
-        resultCount={resultCount}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-      />
-    </main>
+    </>
   );
 }
 

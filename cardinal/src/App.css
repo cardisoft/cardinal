@@ -718,6 +718,24 @@ button:active {
   .virtual-scrollbar-thumb:active {
     background: rgba(255, 255, 255, 0.75);
   }
+
+  .permission-overlay {
+    background: rgba(7, 9, 14, 0.72);
+  }
+
+  .permission-card {
+    background: var(--color-elevated-bg);
+    color: var(--color-text);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+  }
+
+  .permission-card h1 {
+    color: var(--color-text);
+  }
+
+  .permission-status {
+    color: rgba(226, 232, 240, 0.75);
+  }
 }
 
 /* === Merged: StatusBar.css === */
@@ -994,6 +1012,66 @@ button:active {
 .state-message {
   font-size: 0.875rem; /* 14px */
   color: var(--color-muted);
+}
+
+.permission-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(15, 17, 26, 0.78);
+  backdrop-filter: blur(6px);
+}
+
+.permission-card {
+  width: 100%;
+  max-width: 520px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-radius: 18px;
+  padding: 32px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.25);
+  text-align: left;
+  line-height: 1.5;
+}
+
+.permission-card h1 {
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+  color: var(--color-header);
+}
+
+.permission-card p {
+  margin-bottom: 16px;
+  color: var(--color-text);
+}
+
+.permission-card ol {
+  margin: 0 0 20px 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--color-text);
+}
+
+.permission-status {
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+  color: var(--color-muted);
+}
+
+.permission-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.permission-actions button {
+  min-width: 180px;
 }
 
 /* === Utilities (extracted from inline JSX styles) === */
