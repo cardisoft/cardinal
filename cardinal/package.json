@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
-    "@types/node": "^22.10.1",
+    "@types/node": "^24.10.0",
     "@types/react": "^19.0.3",
     "@types/react-dom": "^19.0.3",
     "@types/react-virtualized": "^9.21.27",
