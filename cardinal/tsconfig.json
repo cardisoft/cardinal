@@ -14,7 +14,8 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "allowImportingTsExtensions": true,
-    "allowJs": true
+    "allowJs": true,
+    "types": ["vitest/globals", "vite/client"]
   },
   "include": ["src"],
   "references": [

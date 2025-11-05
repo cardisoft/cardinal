@@ -8,6 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -29,7 +31,12 @@
     "@types/react": "^19.0.3",
     "@types/react-dom": "^19.0.3",
     "@types/react-virtualized": "^9.21.27",
+    "@testing-library/jest-dom": "^6.4.5",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "jsdom": "^24.1.0",
     "@vitejs/plugin-react": "^5.1.0",
+    "vitest": "^2.1.3",
     "prettier": "^3.6.2",
     "typescript": "^5.7.3",
     "vite": "^7.1.12"
