@@ -58,3 +58,53 @@ jobs:
 
       - name: Run ${{ matrix.name }}
         run: ${{ matrix.command }}
+
+  tauri:
+    name: Tauri ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: fmt
+            command: cargo fmt -- --check
+            install_taplo: false
+          - name: taplo
+            command: taplo fmt --check
+            install_taplo: true
+          - name: clippy
+            command: cargo clippy --all-targets -- -D warnings
+            install_taplo: false
+          - name: check
+            command: cargo check --all-targets
+            install_taplo: false
+          - name: test
+            command: cargo test
+            install_taplo: false
+    defaults:
+      run:
+        working-directory: cardinal/src-tauri
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: clippy, rustfmt
+
+      - name: Cache cargo build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cardinal/src-tauri
+
+      - name: Install Taplo CLI
+        if: ${{ matrix.install_taplo }}
+        uses: taiki-e/install-action@v2
+        with:
+          tool: taplo-cli
+
+      - name: Run ${{ matrix.name }}
+        run: ${{ matrix.command }}
