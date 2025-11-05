@@ -129,7 +129,7 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
     const listRef = useRef<ListImperativeAPI | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const listContainerRef = useRef<HTMLDivElement | null>(null);
-    const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+    const [listSize, setListSize] = useState({ width: 0, height: 0 });
     const isAtBottomRef = useRef(true); // Track whether the viewport is watching the newest events.
     const prevEventsLengthRef = useRef(events.length);
 
@@ -223,26 +223,18 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
 
     useLayoutEffect(() => {
       const node = listContainerRef.current;
-      if (!node || typeof ResizeObserver === 'undefined') {
-        return;
-      }
+      if (!node) return;
 
-      const updateSize = (width: number, height: number) => {
-        setContainerSize((prev) =>
-          prev.width === width && prev.height === height ? prev : { width, height },
-        );
-      };
-
-      const observer = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const { width, height } = entry.contentRect;
-          updateSize(width, height);
-        }
+      const observer = new ResizeObserver(([entry]) => {
+        const { width, height } = entry.contentRect;
+        setListSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
       });
 
       observer.observe(node);
+
+      // Populate initial size synchronously so the list renders on first mount.
       const rect = node.getBoundingClientRect();
-      updateSize(rect.width, rect.height);
+      setListSize({ width: rect.width, height: rect.height });
 
       return () => {
         observer.disconnect();
@@ -283,7 +275,7 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
             </div>
           ) : (
             <div className="events-list-container" ref={listContainerRef}>
-              {containerSize.width > 0 && containerSize.height > 0 && (
+              {listSize.width > 0 && listSize.height > 0 && (
                 <List
                   listRef={attachScrollContainer}
                   rowComponent={EventRow}
@@ -291,8 +283,7 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
                   rowHeight={ROW_HEIGHT}
                   rowProps={rowProps}
                   className="events-list"
-                  style={{ width: containerSize.width, height: containerSize.height }}
-                  defaultHeight={containerSize.height}
+                  style={{ width: listSize.width, height: listSize.height }}
                   overscanCount={10}
                 />
               )}
