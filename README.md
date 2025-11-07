@@ -4,7 +4,7 @@
   <p>A fast file searching tool for macOS.</p>
   <p>
     <a href="#using-cardinal">Using Cardinal</a> ·
-    <a href="#running-cardinal">Running Cardinal</a>
+    <a href="#running-cardinal">Building Cardinal</a>
   </p>
   <img src="doc/UI.gif" alt="Cardinal UI preview" width="720">
 </div>
@@ -12,6 +12,10 @@
 ---
 
 ## Using Cardinal
+
+### Download
+
+Grab the latest packaged builds from [GitHub Releases](https://github.com/ldm0/cardinal/releases/).
 
 ### i18n support
 
@@ -33,7 +37,7 @@ Happy searching!
 
 ---
 
-## Running Cardinal
+## Building Cardinal
 
 ### Requirements
 
