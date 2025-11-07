@@ -69,6 +69,8 @@ export function useContextMenu(autoFitColumns: (() => void) | null = null): UseC
   const getMenuItems = useCallback((): ContextMenuItem[] => {
     const path = menu.data;
     if (menu.type === 'file' && path) {
+      const segments = path.split(/[\\/]/).filter(Boolean);
+      const filename = segments.length > 0 ? segments[segments.length - 1] : path;
       return [
         {
           label: t('contextMenu.openInFinder'),
@@ -77,6 +79,10 @@ export function useContextMenu(autoFitColumns: (() => void) | null = null): UseC
         {
           label: t('contextMenu.copyPath'),
           action: () => navigator.clipboard.writeText(path),
+        },
+        {
+          label: t('contextMenu.copyFilename'),
+          action: () => navigator.clipboard.writeText(filename),
         },
       ];
     }

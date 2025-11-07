@@ -36,6 +36,7 @@
   "contextMenu": {
     "openInFinder": "在 Finder 中打开",
     "copyPath": "复制路径",
+    "copyFilename": "复制文件名",
     "resetColumnWidths": "重置列宽"
   },
   "statusBar": {

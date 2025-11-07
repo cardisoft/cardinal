@@ -36,6 +36,7 @@
   "contextMenu": {
     "openInFinder": "Open in Finder",
     "copyPath": "Copy Path",
+    "copyFilename": "Copy Filename",
     "resetColumnWidths": "Reset Column Widths"
   },
   "statusBar": {
