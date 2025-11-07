@@ -57,6 +57,7 @@ function App() {
   const eventsPanelRef = useRef<FSEventsPanelHandle | null>(null);
   const headerRef = useRef<HTMLDivElement | null>(null);
   const virtualListRef = useRef<VirtualListHandle | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const isMountedRef = useRef(false);
   const { colWidths, onResizeStart, autoFitColumns } = useColumnResize();
   const { useRegex, caseSensitive } = searchParams;
@@ -118,6 +119,7 @@ function App() {
     isMountedRef.current = true;
     let unlistenStatus: UnlistenFn | undefined;
     let unlistenLifecycle: UnlistenFn | undefined;
+    let unlistenQuickLaunch: UnlistenFn | undefined;
 
     const setupListeners = async (): Promise<void> => {
       unlistenStatus = await listen<StatusBarUpdatePayload>('status_bar_update', (event) => {
@@ -134,6 +136,16 @@ function App() {
         if (!status) return;
         setLifecycleState(status);
       });
+
+      unlistenQuickLaunch = await listen('quick_launch', () => {
+        if (!isMountedRef.current) return;
+        requestAnimationFrame(() => {
+          const input = searchInputRef.current;
+          if (!input) return;
+          input.focus();
+          input.select();
+        });
+      });
     };
 
     void setupListeners();
@@ -142,6 +154,7 @@ function App() {
       isMountedRef.current = false;
       unlistenStatus?.();
       unlistenLifecycle?.();
+      unlistenQuickLaunch?.();
     };
   }, [handleStatusUpdate, setLifecycleState]);
 
@@ -278,6 +291,7 @@ function App() {
           <div className="search-bar">
             <input
               id="search-input"
+              ref={searchInputRef}
               value={searchInputValue}
               onChange={onQueryChange}
               placeholder={

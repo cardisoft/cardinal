@@ -17,8 +17,9 @@ use std::{
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, State};
-use tracing::{error, info, level_filters::LevelFilter};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, State, WebviewWindow, WindowEvent};
+use tauri_plugin_global_shortcut::ShortcutState;
+use tracing::{error, info, level_filters::LevelFilter, warn};
 use tracing_subscriber::EnvFilter;
 
 static CACHE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
@@ -31,6 +32,11 @@ static CACHE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
         .join("cardinal.db")
 });
 static APP_QUIT: AtomicBool = AtomicBool::new(false);
+static EXIT_REQUESTED: AtomicBool = AtomicBool::new(false);
+const QUICK_LAUNCH_SHORTCUT: &str = "CmdOrCtrl+Shift+Space";
+
+#[cfg(desktop)]
+const TRAY_MENU_QUIT_ID: &str = "tray.quit_cardinal";
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,6 +83,70 @@ fn update_app_state(app_handle: &tauri::AppHandle, state: AppLifecycleState) {
     }
     store_app_state(state);
     emit_app_state(app_handle);
+}
+
+fn ensure_main_window_visible<R: Runtime>(app_handle: &AppHandle<R>) -> Option<WebviewWindow<R>> {
+    let window = app_handle.get_webview_window("main")?;
+
+    if let Ok(true) = window.is_minimized() {
+        if let Err(err) = window.unminimize() {
+            error!(?err, "Failed to unminimize window");
+        }
+    }
+
+    if let Ok(false) = window.is_visible() {
+        if let Err(err) = window.show() {
+            error!(?err, "Failed to show window");
+        }
+    }
+
+    if let Err(err) = window.set_focus() {
+        error!(?err, "Failed to focus window");
+    }
+
+    Some(window)
+}
+
+fn hide_main_window<R: Runtime>(app_handle: &AppHandle<R>) -> bool {
+    if let Some(window) = app_handle.get_webview_window("main") {
+        if let Err(err) = window.hide() {
+            error!(?err, "Failed to hide main window");
+            return false;
+        }
+        return true;
+    }
+
+    warn!("Hide requested but main window is unavailable");
+    false
+}
+
+fn toggle_main_window<R: Runtime>(app_handle: &AppHandle<R>) {
+    let Some(window) = app_handle.get_webview_window("main") else {
+        warn!("Toggle requested but main window is unavailable");
+        return;
+    };
+
+    let is_visible = window.is_visible().unwrap_or(true);
+    let is_minimized = window.is_minimized().unwrap_or(false);
+
+    if is_visible && !is_minimized {
+        if hide_main_window(app_handle) {
+            info!("Global shortcut hid the Cardinal window");
+        }
+    } else {
+        trigger_quick_launch(app_handle);
+    }
+}
+
+fn trigger_quick_launch<R: Runtime>(app_handle: &AppHandle<R>) {
+    let Some(window) = ensure_main_window_visible(app_handle) else {
+        error!("Quick launch shortcut triggered but main window is unavailable");
+        return;
+    };
+
+    if let Err(err) = window.emit("quick_launch", ()) {
+        error!(?err, "Failed to emit quick launch event");
+    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Default)]
@@ -509,6 +579,51 @@ fn open_in_finder(path: String) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(desktop)]
+fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::{
+        menu::{MenuBuilder, MenuItemBuilder},
+        tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
+    };
+
+    let handle = app.handle();
+
+    let quit_item = MenuItemBuilder::with_id(TRAY_MENU_QUIT_ID, "Quit Cardinal")
+        .accelerator("CmdOrCtrl+Q")
+        .build(app)?;
+
+    let menu = MenuBuilder::new(app).item(&quit_item).build()?;
+
+    let mut tray_builder = TrayIconBuilder::new()
+        .menu(&menu)
+        .tooltip("Cardinal")
+        .on_menu_event(|app, event| {
+            if event.id.as_ref() == TRAY_MENU_QUIT_ID {
+                EXIT_REQUESTED.store(true, Ordering::Relaxed);
+                app.exit(0);
+            }
+        })
+        .on_tray_icon_event(|tray, tray_event| {
+            if let TrayIconEvent::Click { button, .. } = tray_event {
+                if matches!(button, MouseButton::Left) {
+                    ensure_main_window_visible(tray.app_handle());
+                }
+            }
+        });
+
+    let tray_icon_owned = handle
+        .default_window_icon()
+        .cloned()
+        .map(|icon| icon.to_owned());
+    if let Some(icon) = tray_icon_owned {
+        tray_builder = tray_builder.icon(icon);
+    }
+
+    let tray_icon = tray_builder.build(app)?;
+    let _ = Box::leak(Box::new(tray_icon));
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> Result<()> {
     // Initialize the tracing subscriber to print logs to the command line
@@ -528,6 +643,15 @@ pub fn run() -> Result<()> {
     let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>)>();
     let (rescan_tx, rescan_rx) = unbounded::<()>();
     let (icon_update_tx, icon_update_rx) = unbounded::<IconPayload>();
+    let quick_launch_shortcut_plugin = tauri_plugin_global_shortcut::Builder::new()
+        .with_shortcut(QUICK_LAUNCH_SHORTCUT)
+        .expect("invalid quick launch shortcut definition")
+        .with_handler(|app, _shortcut, event| {
+            if event.state == ShortcutState::Pressed {
+                toggle_main_window(app);
+            }
+        })
+        .build();
     let mut builder = tauri::Builder::default();
     #[cfg(not(feature = "dev"))]
     {
@@ -536,7 +660,25 @@ pub fn run() -> Result<()> {
     builder = builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_macos_permissions::init())
-        .plugin(tauri_plugin_window_state::Builder::new().build());
+        .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(quick_launch_shortcut_plugin)
+        .on_window_event(|window, event| {
+            if window.label() != "main" {
+                return;
+            }
+
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if EXIT_REQUESTED.load(Ordering::Relaxed) {
+                    return;
+                }
+
+                api.prevent_close();
+                let app_handle = window.app_handle();
+                if hide_main_window(app_handle) {
+                    info!("Main window hidden; Cardinal keeps running in the background");
+                }
+            }
+        });
     // Run the Tauri application.
     let app = builder
         .manage(SearchState {
@@ -557,6 +699,9 @@ pub fn run() -> Result<()> {
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
+
+    #[cfg(desktop)]
+    setup_tray(&app).expect("failed to initialize system tray");
 
     let app_handle = &app.handle().to_owned();
     emit_app_state(app_handle);
@@ -717,23 +862,28 @@ pub fn run() -> Result<()> {
                     flush_cache_to_file_once(&finish_tx);
                 }
                 RunEvent::ExitRequested { api, code, .. } => {
-                    // Triggered by the window close button; the window exits first and the tray follows.
+                    let already_requested = EXIT_REQUESTED.swap(true, Ordering::Relaxed);
+                    APP_QUIT.store(true, Ordering::Relaxed);
+                    if !already_requested {
+                        info!(
+                            "Exit requested (code: {:?}); flushing cache before shutdown",
+                            code
+                        );
+                    }
 
-                    // Keep the event loop running even if all windows are closed
-                    // This allow us to catch tray icon events when there is no window
-                    // if we manually requested an exit (code is Some(_)) we will let it go through
+                    flush_cache_to_file_once(&finish_tx);
+
                     if code.is_none() {
-                        APP_QUIT.store(true, Ordering::Relaxed);
-                        info!("Tauri application exited, flushing cache...");
-
-                        // TODO(ldm0): is this necessary?
                         api.prevent_exit();
-
-                        // TODO(ldm0): change the tray icon to "saving"
-
-                        flush_cache_to_file_once(&finish_tx);
-
                         app_handle.exit(0);
+                    }
+                }
+                RunEvent::Reopen {
+                    has_visible_windows,
+                    ..
+                } => {
+                    if !has_visible_windows {
+                        ensure_main_window_visible(app_handle);
                     }
                 }
                 _ => (),
