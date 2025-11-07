@@ -22,7 +22,7 @@ use tracing::{info, level_filters::LevelFilter, warn};
 use tracing_subscriber::EnvFilter;
 use window_controls::{activate_window, hide_window, toggle_window, WindowToggle};
 
-use background::{run_background_event_loop, IconPayload, StatusBarUpdate};
+use background::{emit_status_bar_update, run_background_event_loop, IconPayload};
 use commands::{
     get_app_status, get_nodes_info, open_in_finder, search, trigger_rescan, update_icon_viewport,
     SearchJob, SearchState,
@@ -172,15 +172,11 @@ pub fn run() -> Result<()> {
             ) {
                 Ok(cached) => {
                     info!("Loaded existing cache");
-                    app_handle
-                        .emit(
-                            "status_bar_update",
-                            StatusBarUpdate {
-                                scanned_files: cached.get_total_files(),
-                                processed_events: 0,
-                            },
-                        )
-                        .unwrap();
+                    emit_status_bar_update(
+                        app_handle,
+                        cached.get_total_files(),
+                        0,
+                    );
                     cached
                 }
                 Err(e) => {
@@ -197,15 +193,7 @@ pub fn run() -> Result<()> {
                                 let dirs = walk_data.num_dirs.load(Ordering::Relaxed);
                                 let files = walk_data.num_files.load(Ordering::Relaxed);
                                 let total = dirs + files;
-                                app_handle
-                                    .emit(
-                                        "status_bar_update",
-                                        StatusBarUpdate {
-                                            scanned_files: total,
-                                            processed_events: 0,
-                                        },
-                                    )
-                                    .unwrap();
+                                emit_status_bar_update(app_handle, total, 0);
                                 std::thread::sleep(Duration::from_millis(100));
                             }
                         });
@@ -230,15 +218,7 @@ pub fn run() -> Result<()> {
                         return;
                     };
 
-                    app_handle
-                        .emit(
-                            "status_bar_update",
-                            StatusBarUpdate {
-                                scanned_files: cache.get_total_files(),
-                                processed_events: 0,
-                            },
-                        )
-                        .unwrap();
+                    emit_status_bar_update(app_handle, cache.get_total_files(), 0);
 
                     cache
                 }

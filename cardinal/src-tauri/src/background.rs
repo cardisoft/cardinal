@@ -35,6 +35,18 @@ pub struct IconPayload {
     pub icon: String,
 }
 
+pub fn emit_status_bar_update(app_handle: &AppHandle, scanned_files: usize, processed_events: usize) {
+    app_handle
+        .emit(
+            "status_bar_update",
+            StatusBarUpdate {
+                scanned_files,
+                processed_events,
+            },
+        )
+        .unwrap();
+}
+
 struct EventSnapshot {
     path: PathBuf,
     event_id: u64,
@@ -124,15 +136,7 @@ pub fn run_background_event_loop(
                 request.expect("Rescan channel closed");
                 info!("Manual rescan requested");
                 update_app_state(app_handle, AppLifecycleState::Initializing);
-                app_handle
-                    .emit(
-                        "status_bar_update",
-                        StatusBarUpdate {
-                            scanned_files: 0,
-                            processed_events: 0,
-                        },
-                    )
-                    .unwrap();
+                emit_status_bar_update(app_handle, 0, 0);
 
                 #[allow(unused_assignments)]
                 {
@@ -147,15 +151,7 @@ pub fn run_background_event_loop(
                             let dirs = walk_data.num_dirs.load(std::sync::atomic::Ordering::Relaxed);
                             let files = walk_data.num_files.load(std::sync::atomic::Ordering::Relaxed);
                             let total = dirs + files;
-                            app_handle
-                                .emit(
-                                    "status_bar_update",
-                                    StatusBarUpdate {
-                                        scanned_files: total,
-                                        processed_events: 0,
-                                    },
-                                )
-                                .unwrap();
+                            emit_status_bar_update(app_handle, total, 0);
                             std::thread::sleep(Duration::from_millis(100));
                         }
                     });
@@ -175,10 +171,7 @@ pub fn run_background_event_loop(
                 let events = events.expect("Event stream closed");
                 processed_events += events.len();
 
-                app_handle.emit("status_bar_update", StatusBarUpdate {
-                    scanned_files: cache.get_total_files(),
-                    processed_events
-                }).unwrap();
+                emit_status_bar_update(app_handle, cache.get_total_files(), processed_events);
 
                 let mut snapshots = Vec::with_capacity(events.len());
                 for event in events.iter() {
