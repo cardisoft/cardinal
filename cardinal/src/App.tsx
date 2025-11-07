@@ -238,19 +238,33 @@ function App() {
   }, [activeTab, selectedPath]);
 
   useEffect(() => {
-    const handleSearchFocusShortcut = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey) {
-        const key = event.key.toLowerCase();
-        if (key === 'f') {
-          event.preventDefault();
-          focusSearchInput();
+    const handleGlobalShortcuts = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+
+      if (key === 'f') {
+        event.preventDefault();
+        focusSearchInput();
+        return;
+      }
+
+      if (key === 'r') {
+        if (activeTab !== 'files' || !selectedPath) {
+          return;
         }
+        event.preventDefault();
+        invoke('open_in_finder', { path: selectedPath }).catch((error) => {
+          console.error('Failed to reveal file in Finder', error);
+        });
       }
     };
 
-    window.addEventListener('keydown', handleSearchFocusShortcut);
-    return () => window.removeEventListener('keydown', handleSearchFocusShortcut);
-  }, [focusSearchInput]);
+    window.addEventListener('keydown', handleGlobalShortcuts);
+    return () => window.removeEventListener('keydown', handleGlobalShortcuts);
+  }, [focusSearchInput, activeTab, selectedPath]);
 
   const onQueryChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {

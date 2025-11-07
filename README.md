@@ -33,13 +33,12 @@ Cardinal's search box understands several pattern styles to help you locate file
 
 Both **case-sensitive** and **regular-expression** modes are available via the toggles next to the search input, so you can tighten queries whenever needed.
 
-### Quick Look previews
+### Keyboard shortcuts & previews
 
-Click any result row to select it, then tap the space bar to launch a native Quick Look preview of that file without leaving Cardinal.
-
-### Global hide/show hotkey
-
-Hit `Cmd+Shift+Space` from anywhere to toggle the Cardinal window. The shortcut instantly pops Cardinal to the front for a new search, and pressing it again hides the window while the app keeps running in the background tray.
+- `Space` – Quick Look the currently selected row without leaving Cardinal.
+- `Cmd+R` – reveal the highlighted result in Finder.
+- `Cmd+F` – jump focus back to the search bar.
+- `Cmd+Shift+Space` – toggle the Cardinal window globally via the quick-launch hotkey.
 
 Happy searching!
 
