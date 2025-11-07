@@ -7,8 +7,9 @@ import fr from './resources/fr.json';
 import es from './resources/es.json';
 import de from './resources/de.json';
 import ru from './resources/ru.json';
+import uk from './resources/uk.json';
 
-export type SupportedLanguage = 'en' | 'zh' | 'ja' | 'fr' | 'es' | 'de' | 'ru';
+export type SupportedLanguage = 'en' | 'zh' | 'ja' | 'fr' | 'es' | 'de' | 'ru' | 'uk';
 
 type LanguageOption = {
   code: SupportedLanguage;
@@ -23,6 +24,7 @@ export const LANGUAGE_OPTIONS: LanguageOption[] = [
   { code: 'es', label: 'Español' },
   { code: 'de', label: 'Deutsch' },
   { code: 'ru', label: 'Русский' },
+  { code: 'uk', label: 'Українська' },
 ];
 
 const STORAGE_KEY = 'cardinal.language';
@@ -36,6 +38,7 @@ const resources = {
   es: { translation: es },
   de: { translation: de },
   ru: { translation: ru },
+  uk: { translation: uk },
 } as const;
 
 const detectInitialLanguage = (): SupportedLanguage => {
