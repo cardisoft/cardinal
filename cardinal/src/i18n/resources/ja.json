@@ -46,6 +46,7 @@
     },
     "lifecycle": {
       "Initializing": "初期化中",
+      "Updating": "更新中",
       "Ready": "準備完了"
     },
     "aria": {
@@ -54,7 +55,7 @@
       "rescan": "ファイルシステムの再スキャンを実行"
     },
     "rescan": {
-      "disabledHint": "Cardinal の初期化が完了すると再スキャンが利用可能になります。",
+      "disabledHint": "Cardinal の準備が整うと再スキャンを利用できます。",
       "enabledHint": "ファイルシステム全体の再スキャンを実行します。"
     },
     "searchLabel": "検索:",

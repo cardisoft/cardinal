@@ -46,6 +46,7 @@
     },
     "lifecycle": {
       "Initializing": "正在初始化",
+      "Updating": "正在更新",
       "Ready": "就绪"
     },
     "aria": {
@@ -54,7 +55,7 @@
       "rescan": "触发文件系统重新扫描"
     },
     "rescan": {
-      "disabledHint": "Cardinal 完成初始化后即可重新扫描。",
+      "disabledHint": "Cardinal 准备就绪后即可重新扫描。",
       "enabledHint": "触发一次完整的文件系统重新扫描。"
     },
     "searchLabel": "搜索：",

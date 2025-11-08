@@ -228,8 +228,8 @@ pub fn run() -> Result<()> {
                 FSE_LATENCY_SECS,
             )
             .1;
-            if !matches!(load_app_state(), AppLifecycleState::Ready) {
-                update_app_state(app_handle, AppLifecycleState::Initializing);
+            if load_app_state() != AppLifecycleState::Ready {
+                update_app_state(app_handle, AppLifecycleState::Updating);
             }
             info!("Started background processing thread");
             run_background_event_loop(
@@ -296,7 +296,7 @@ pub fn run() -> Result<()> {
 
 fn flush_cache_to_file_once(finish_tx: &Sender<Sender<Option<SearchCache>>>) {
     static FLUSH_ONCE: Once = Once::new();
-    if load_app_state() == AppLifecycleState::Initializing {
+    if load_app_state() != AppLifecycleState::Ready {
         info!("App not fully initialized, skipping cache flush");
         return;
     }

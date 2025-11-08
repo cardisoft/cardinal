@@ -46,6 +46,7 @@
     },
     "lifecycle": {
       "Initializing": "Initializing",
+      "Updating": "Updating",
       "Ready": "Ready"
     },
     "aria": {
@@ -54,7 +55,7 @@
       "rescan": "Trigger filesystem rescan"
     },
     "rescan": {
-      "disabledHint": "Rescan becomes available once Cardinal finishes initializing.",
+      "disabledHint": "Rescan becomes available once Cardinal is ready.",
       "enabledHint": "Trigger a full filesystem rescan."
     },
     "searchLabel": "Search:",

@@ -46,6 +46,7 @@
     },
     "lifecycle": {
       "Initializing": "Initialisierung",
+      "Updating": "Aktualisierung",
       "Ready": "Bereit"
     },
     "aria": {
@@ -54,7 +55,7 @@
       "rescan": "Dateisystem erneut scannen"
     },
     "rescan": {
-      "disabledHint": "Der erneute Scan ist verfügbar, sobald Cardinal die Initialisierung abgeschlossen hat.",
+      "disabledHint": "Der erneute Scan ist verfügbar, sobald Cardinal bereit ist.",
       "enabledHint": "Einen vollständigen Scan des Dateisystems starten."
     },
     "searchLabel": "Suche:",

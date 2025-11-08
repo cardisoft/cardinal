@@ -6,13 +6,16 @@ use tracing::error;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppLifecycleState {
     Initializing = 0,
-    Ready = 1,
+    Updating = 1,
+    Ready = 2,
 }
 
 impl AppLifecycleState {
     pub fn from_u8(value: u8) -> Self {
         match value {
-            1 => Self::Ready,
+            0 => Self::Initializing,
+            1 => Self::Updating,
+            2 => Self::Ready,
             _ => Self::Initializing,
         }
     }
@@ -20,6 +23,7 @@ impl AppLifecycleState {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Initializing => "Initializing",
+            Self::Updating => "Updating",
             Self::Ready => "Ready",
         }
     }

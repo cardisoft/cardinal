@@ -93,7 +93,7 @@ pub fn run_background_event_loop(
         icon_update_tx,
     } = channels;
     let mut processed_events = 0usize;
-    let mut history_ready = matches!(load_app_state(), AppLifecycleState::Ready);
+    let mut history_ready = load_app_state() == AppLifecycleState::Ready;
     loop {
         crossbeam_channel::select! {
             recv(finish_rx) -> tx => {
@@ -180,6 +180,7 @@ pub fn run_background_event_loop(
                 );
                 event_watcher = watcher;
                 history_ready = false;
+                update_app_state(app_handle, AppLifecycleState::Updating);
             }
             recv(event_watcher) -> events => {
                 let events = events.expect("Event stream closed");
@@ -209,10 +210,12 @@ pub fn run_background_event_loop(
                     {
                         event_watcher = EventWatcher::noop();
                     }
-                    cache.rescan();
-                    event_watcher = EventWatcher::spawn(watch_root.to_string(), cache.last_event_id(), fse_latency_secs).1;
                     update_app_state(app_handle, AppLifecycleState::Initializing);
                     history_ready = false;
+
+                    cache.rescan();
+                    event_watcher = EventWatcher::spawn(watch_root.to_string(), cache.last_event_id(), fse_latency_secs).1;
+                    update_app_state(app_handle, AppLifecycleState::Updating);
                 }
 
                 if history_ready && !snapshots.is_empty() {

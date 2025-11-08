@@ -22,4 +22,4 @@ export type RecentEventPayload = {
   timestamp: number;
 };
 
-export type AppLifecycleStatus = 'Initializing' | 'Ready';
+export type AppLifecycleStatus = 'Initializing' | 'Updating' | 'Ready';

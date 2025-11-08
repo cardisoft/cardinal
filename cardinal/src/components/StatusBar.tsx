@@ -22,6 +22,7 @@ const TABS: StatusTabKey[] = ['files', 'events'];
 
 const LIFECYCLE_META: Record<AppLifecycleStatus, { icon: string; tone: string }> = {
   Initializing: { icon: '○', tone: 'initializing' },
+  Updating: { icon: '◑', tone: 'updating' },
   Ready: { icon: '●', tone: 'ready' },
 };
 
