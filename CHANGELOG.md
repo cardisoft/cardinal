@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.5 — 2025-11-09
+- search-cache: widen `NameAndParent` filename length tracking from `u8` to `u32` to handle very long paths without truncation or panic.
+
 ## 0.1.4 — 2025-11-09
 - Fix i18n support for tray menu.
 - Rescans now clickable while updating cache.
