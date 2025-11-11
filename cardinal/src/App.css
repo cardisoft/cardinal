@@ -24,6 +24,8 @@
   --row-hover: rgb(220, 220, 220);
   --row-selected-bg: rgb(0, 100, 225);
   --row-selected-hover-bg: rgb(0, 100, 225);
+  --row-selected-text: #ffffff;
+  --row-selected-muted-text: rgba(255, 255, 255, 0.85);
   --search-toggle-hover-bg: rgba(0, 0, 0, 0.06);
   /* Remove custom scrollbar color overrides. */
 
@@ -51,6 +53,8 @@
 :root[data-window-focused='false'] {
   --row-selected-bg: rgb(220, 220, 220);
   --row-selected-hover-bg: rgb(220, 220, 220);
+  --row-selected-text: var(--color-text);
+  --row-selected-muted-text: var(--color-muted);
 }
 
 * {
@@ -588,10 +592,17 @@ button:active {
 
 .row-selected {
   background-color: var(--row-selected-bg);
+  color: var(--row-selected-text);
 }
 
 .row-selected:hover {
   background-color: var(--row-selected-hover-bg);
+}
+
+.row-selected .mtime-text,
+.row-selected .ctime-text,
+.row-selected .size-text {
+  color: var(--row-selected-muted-text);
 }
 
 .path-text {
