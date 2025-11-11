@@ -22,12 +22,9 @@ import type { FSEventsPanelHandle } from './components/FSEventsPanel';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
-import {
-  checkFullDiskAccessPermission,
-  requestFullDiskAccessPermission,
-} from 'tauri-plugin-macos-permissions-api';
 import { useTranslation } from 'react-i18next';
 import type { SlabIndex } from './types/slab';
+import { useFullDiskAccessPermission } from './hooks/useFullDiskAccessPermission';
 
 type ActiveTab = StatusTabKey;
 
@@ -134,9 +131,11 @@ function App() {
     getMenuItems: getEventsMenuItems,
   } = useContextMenu(autoFitEventColumns);
 
-  const [fullDiskAccessStatus, setFullDiskAccessStatus] = useState<'granted' | 'denied'>('granted');
-  const [isCheckingFullDiskAccess, setIsCheckingFullDiskAccess] = useState(true);
-  const hasLoggedPermissionStatusRef = useRef(false);
+  const {
+    status: fullDiskAccessStatus,
+    isChecking: isCheckingFullDiskAccess,
+    requestPermission: requestFullDiskAccessPermission,
+  } = useFullDiskAccessPermission();
   const menu = activeTab === 'events' ? eventsMenu : filesMenu;
   const showContextMenu = activeTab === 'events' ? showEventsContextMenu : showFilesContextMenu;
   const showHeaderContextMenu =
@@ -145,27 +144,6 @@ function App() {
   const getMenuItems = activeTab === 'events' ? getEventsMenuItems : getFilesMenuItems;
   const selectedIndex = selectedRow?.index ?? null;
   const selectedPath = selectedRow?.path ?? null;
-
-  useEffect(() => {
-    const checkFullDiskAccess = async () => {
-      setIsCheckingFullDiskAccess(true);
-      try {
-        const authorized = await checkFullDiskAccessPermission();
-        if (!hasLoggedPermissionStatusRef.current) {
-          console.log('Full Disk Access granted:', authorized);
-          hasLoggedPermissionStatusRef.current = true;
-        }
-        setFullDiskAccessStatus(authorized ? 'granted' : 'denied');
-      } catch (error) {
-        console.error('Failed to check full disk access permission', error);
-        setFullDiskAccessStatus('denied');
-      } finally {
-        setIsCheckingFullDiskAccess(false);
-      }
-    };
-
-    void checkFullDiskAccess();
-  }, []);
 
   useEffect(() => {
     if (isCheckingFullDiskAccess) {
