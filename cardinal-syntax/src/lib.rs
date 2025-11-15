@@ -129,18 +129,22 @@ pub enum Expr {
 /// translate them into structured lookups or validation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
-    /// A literal token (e.g., `report`, `*.mp3`, `"summer holiday"`). Quoted
-    /// phrases return just the inner string, so callers don't need to keep
-    /// track of whether whitespace was preserved via quotes.
+    /// A bare word or wildcard token (e.g., `report`, `*.mp3`).
     ///
     /// ```
     /// use cardinal_syntax::{parse_query, Expr, Term};
     /// let Expr::Term(Term::Word(word)) = parse_query("*.mp3").unwrap().expr else { panic!() };
     /// assert_eq!(word, "*.mp3");
-    /// let Expr::Term(Term::Word(word)) = parse_query("\"summer holiday\"").unwrap().expr else { panic!() };
-    /// assert_eq!(word, "summer holiday");
     /// ```
     Word(String),
+    /// Quoted phrase such as `"summer holiday"`.
+    ///
+    /// ```
+    /// use cardinal_syntax::{parse_query, Expr, Term};
+    /// let Expr::Term(Term::Phrase(phrase)) = parse_query("\"summer holiday\"").unwrap().expr else { panic!() };
+    /// assert_eq!(phrase, "summer holiday");
+    /// ```
+    Phrase(String),
     /// `name:argument` style filters (`size:>1GB`, `folder:` ...).
     ///
     /// ```
@@ -505,19 +509,22 @@ pub struct FilterArgument {
 /// Common syntactic patterns supported by Everything filters.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArgumentKind {
-    /// Plain argument with no additional structure. Quoted values also land in
-    /// this bucket so callers don't need to track whether whitespace was
-    /// preserved with double quotes.
+    /// Plain argument with no additional structure.
     ///
     /// ```
     /// use cardinal_syntax::{parse_query, Expr, Term, ArgumentKind};
     /// let Expr::Term(Term::Filter(filter)) = parse_query("folder:Projects").unwrap().expr else { panic!() };
     /// assert!(matches!(filter.argument.unwrap().kind, ArgumentKind::Bare));
-    ///
-    /// let Expr::Term(Term::Filter(filter)) = parse_query("parent:\"/Users/demo\"").unwrap().expr else { panic!() };
-    /// assert!(matches!(filter.argument.unwrap().kind, ArgumentKind::Bare));
     /// ```
     Bare,
+    /// Double quoted value (Everything keeps the text verbatim).
+    ///
+    /// ```
+    /// use cardinal_syntax::{parse_query, Expr, Term, ArgumentKind};
+    /// let Expr::Term(Term::Filter(filter)) = parse_query("parent:\"/Users/demo\"").unwrap().expr else { panic!() };
+    /// assert!(matches!(filter.argument.unwrap().kind, ArgumentKind::Phrase));
+    /// ```
+    Phrase,
     /// Semicolon-delimited list such as `ext:jpg;png`.
     ///
     /// ```
@@ -803,7 +810,7 @@ impl<'a> Parser<'a> {
             '>' | ')' => Err(self.error("unexpected closing delimiter")),
             '"' => {
                 let text = self.parse_phrase_string()?;
-                Ok(Expr::Term(Term::Word(text)))
+                Ok(Expr::Term(Term::Phrase(text)))
             }
             _ => {
                 let term = self.parse_word_like()?;
@@ -896,10 +903,8 @@ impl<'a> Parser<'a> {
 
         if self.peek_char() == Some('"') {
             let text = self.parse_phrase_string()?;
-            return Ok(Some(FilterArgument {
-                raw: text,
-                kind: ArgumentKind::Bare,
-            }));
+            let kind = ArgumentKind::Phrase;
+            return Ok(Some(FilterArgument { raw: text, kind }));
         }
 
         let start = self.pos;
@@ -932,7 +937,7 @@ impl<'a> Parser<'a> {
             return Ok(None);
         }
 
-        let argument_kind = classify_argument(kind, &buffer);
+        let argument_kind = classify_argument(kind, &buffer, false);
         Ok(Some(FilterArgument {
             raw: buffer,
             kind: argument_kind,
@@ -1071,7 +1076,11 @@ fn is_valid_filter_name(name: &str) -> bool {
 
 /// Lightweight heuristic classification so downstream code can handle the most
 /// common filter syntaxes without writing custom parsers.
-fn classify_argument(kind: &FilterKind, raw: &str) -> ArgumentKind {
+fn classify_argument(kind: &FilterKind, raw: &str, quoted: bool) -> ArgumentKind {
+    if quoted {
+        return ArgumentKind::Phrase;
+    }
+
     if let Some(list) = try_parse_list(raw) {
         return ArgumentKind::List(list);
     }
@@ -1243,7 +1252,10 @@ mod tests {
             query.expr,
             Expr::And(vec![
                 word("foo"),
-                Expr::Or(vec![word("bar"), word("baz qux")]),
+                Expr::Or(vec![
+                    word("bar"),
+                    Expr::Term(Term::Phrase("baz qux".into()))
+                ]),
                 Expr::Not(Box::new(word("temp"))),
             ])
         );

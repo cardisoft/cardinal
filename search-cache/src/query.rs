@@ -1,5 +1,6 @@
 use crate::{
-    build_segment_matchers, cache::NAME_POOL, SearchCache, SearchOptions, SegmentKind, SegmentMatcher, SlabIndex
+    SearchCache, SearchOptions, SegmentKind, SegmentMatcher, SlabIndex, build_segment_matchers,
+    cache::NAME_POOL,
 };
 use anyhow::{Result, anyhow, bail};
 use cardinal_syntax::{ArgumentKind, Expr, Filter, FilterArgument, FilterKind, Term};
@@ -126,7 +127,7 @@ impl SearchCache {
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
         match term {
-            Term::Word(text) => self.evaluate_word(text, options, token),
+            Term::Word(text) | Term::Phrase(text) => self.evaluate_word(text, options, token),
             Term::Regex(pattern) => self.evaluate_regex(pattern, options, token),
             Term::Filter(filter) => self.evaluate_filter(filter, options, token),
         }
