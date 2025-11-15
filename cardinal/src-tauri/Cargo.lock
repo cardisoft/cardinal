@@ -419,6 +419,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "cardinal-syntax"
+version = "0.1.0"
+
+[[package]]
 name = "cargo-platform"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3445,6 +3449,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cardinal-sdk",
+ "cardinal-syntax",
  "crossbeam-channel",
  "enumn",
  "fswalk",

@@ -1,3 +1,4 @@
+use fswalk::NodeFileType;
 use serde::{
     Deserialize, Serialize,
     de::{self, SeqAccess, Visitor},
@@ -209,6 +210,14 @@ impl SlabNodeMetadataCompact {
 
     pub fn is_unaccessible(&self) -> bool {
         matches!(self.state(), crate::State::Unaccessible)
+    }
+
+    pub fn file_type_hint(&self) -> NodeFileType {
+        self.state_type_and_size.r#type()
+    }
+
+    pub fn size_hint(&self) -> Option<u64> {
+        (self.state() == crate::State::Some).then(|| self.state_type_and_size.size())
     }
 }
 

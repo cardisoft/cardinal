@@ -1,17 +1,16 @@
 use crate::{
-    FileNodes, NameIndex, SearchOptions, SearchResultNode, SegmentKind, SegmentMatcher, SlabIndex,
-    SlabNode, SlabNodeMetadataCompact, State, ThinSlab, build_segment_matchers,
+    FileNodes, NameIndex, SearchOptions, SearchResultNode, SlabIndex, SlabNode,
+    SlabNodeMetadataCompact, State, ThinSlab,
     persistent::{PersistentStorage, read_cache_from_file, write_cache_to_file},
 };
 use anyhow::{Context, Result, anyhow, bail};
 use cardinal_sdk::{EventFlag, FsEvent, ScanType, current_event_id};
+use cardinal_syntax::parse_query;
 use fswalk::{Node, NodeMetadata, WalkData, walk_it};
 use hashbrown::HashSet;
 use namepool::NamePool;
-use query_segmentation::query_segmentation;
 use search_cancel::CancellationToken;
 use std::{
-    collections::BTreeSet,
     ffi::OsStr,
     io::ErrorKind,
     path::{Path, PathBuf},
@@ -23,9 +22,9 @@ use tracing::{debug, info};
 use typed_num::Num;
 
 pub struct SearchCache {
-    file_nodes: FileNodes,
+    pub(crate) file_nodes: FileNodes,
     last_event_id: u64,
-    name_index: NameIndex,
+    pub(crate) name_index: NameIndex,
     ignore_paths: Option<Vec<PathBuf>>,
     cancel: Option<&'static AtomicBool>,
 }
@@ -187,72 +186,14 @@ impl SearchCache {
         options: SearchOptions,
         cancellation_token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
-        let segments = query_segmentation(line);
-        if segments.is_empty() {
+        if line.trim().is_empty() {
             bail!("Unprocessable query: {line:?}");
         }
-        let matchers = build_segment_matchers(&segments, options)
-            .map_err(|err| anyhow!("Invalid regex pattern: {err}"))?;
+        let parsed = parse_query(line).map_err(|err| anyhow!("Failed to parse query: {}", err))?;
         let search_time = Instant::now();
-        let mut node_set: Option<Vec<SlabIndex>> = None;
-        for matcher in &matchers {
-            if let Some(nodes) = &node_set {
-                let mut new_node_set = Vec::with_capacity(nodes.len());
-                for (i, &node) in nodes.iter().enumerate() {
-                    if i % 0x10000 == 0 && cancellation_token.is_cancelled() {
-                        return Ok(None);
-                    }
-                    let mut child_matches = self.file_nodes[node]
-                        .children
-                        .iter()
-                        .filter_map(|&child| {
-                            let name = self.file_nodes[child].name_and_parent.as_str();
-                            if matcher.matches(name) {
-                                Some((name, child))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<_>>();
-                    child_matches.sort_unstable_by_key(|(name, _)| *name);
-                    new_node_set.extend(child_matches.into_iter().map(|(_, index)| index));
-                }
-                node_set = Some(new_node_set);
-            } else {
-                // Use BTreeSet here to:
-                // 1. Deduplicate filenames
-                // 2. Keep filename of the search results in order
-                let names: Option<BTreeSet<_>> = match matcher {
-                    SegmentMatcher::Plain { kind, needle } => match kind {
-                        SegmentKind::Substr => NAME_POOL.search_substr(needle, cancellation_token),
-                        SegmentKind::Prefix => NAME_POOL.search_prefix(needle, cancellation_token),
-                        SegmentKind::Exact => NAME_POOL.search_exact(needle, cancellation_token),
-                        SegmentKind::Suffix => NAME_POOL.search_suffix(needle, cancellation_token),
-                    },
-                    SegmentMatcher::Regex { regex } => {
-                        NAME_POOL.search_regex(regex, cancellation_token)
-                    }
-                };
-                let Some(names) = names else {
-                    return Ok(None);
-                };
-                let mut nodes = Vec::with_capacity(names.len());
-                for (i, name) in names.iter().enumerate() {
-                    if i % 0x10000 == 0 && cancellation_token.is_cancelled() {
-                        return Ok(None);
-                    }
-                    // namepool doesn't shrink, so it can contains non-existng names. Therefore, we don't error out on None branch here.
-                    if let Some(x) = self.name_index.get(name) {
-                        nodes.extend(x.iter());
-                    }
-                }
-                node_set = Some(nodes);
-            }
-        }
-        let search_time = search_time.elapsed();
-        info!("Search time: {:?}", search_time);
-        // Safety: node_set can't be None since segments is not empty.
-        Ok(Some(node_set.unwrap()))
+        let result = self.evaluate_expr(&parsed.expr, options, cancellation_token);
+        info!("Search time: {:?}", search_time.elapsed());
+        result
     }
 
     /// Get the path of the node in the slab.
@@ -1630,7 +1571,7 @@ mod tests {
     fn test_query_files_empty_query_string() {
         let temp_dir = TempDir::new("test_query_files_empty_q").unwrap();
         let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
-        // query_segmentation("") returns empty vec, search() then bails.
+        // search_with_options() rejects empty queries; callers should use search_empty instead.
         let result = cache.query_files("".to_string(), CancellationToken::noop());
         assert!(
             result.is_err(),
@@ -1700,6 +1641,120 @@ mod tests {
             "Path was: {:?}",
             results_multi_segment_dir[0].path
         );
+    }
+
+    #[test]
+    fn test_boolean_queries() {
+        let temp_dir = TempDir::new("test_boolean_queries").unwrap();
+        let root = temp_dir.path();
+        fs::File::create(root.join("foo.txt")).unwrap();
+        fs::File::create(root.join("bar.txt")).unwrap();
+        fs::File::create(root.join("foobar.txt")).unwrap();
+
+        let mut cache = SearchCache::walk_fs(root.to_path_buf());
+
+        let results_and = query(&mut cache, "foo bar");
+        assert_eq!(results_and.len(), 1);
+        assert!(
+            results_and[0].path.ends_with("foobar.txt"),
+            "AND query should keep files matching both terms"
+        );
+
+        let mut names_or: Vec<_> = query(&mut cache, "foo|bar")
+            .into_iter()
+            .filter_map(|node| {
+                node.path
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+            })
+            .collect();
+        names_or.sort();
+        assert!(
+            names_or.contains(&"foo.txt".to_string())
+                && names_or.contains(&"bar.txt".to_string())
+                && names_or.contains(&"foobar.txt".to_string()),
+            "OR query should include any matching term. Found: {:?}",
+            names_or
+        );
+
+        let excluded = query(&mut cache, "!foo");
+        assert!(
+            excluded.iter().all(|node| !node.path.ends_with("foo.txt")),
+            "NOT query should exclude foo.txt"
+        );
+        assert!(
+            excluded.iter().any(|node| node.path.ends_with("bar.txt")),
+            "NOT query should keep unrelated files"
+        );
+    }
+
+    #[test]
+    fn test_type_filters() {
+        let temp_dir = TempDir::new("test_type_filters").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir(root.join("alpha_dir")).unwrap();
+        fs::File::create(root.join("alpha_dir/file_a.txt")).unwrap();
+        fs::File::create(root.join("beta.txt")).unwrap();
+
+        let mut cache = SearchCache::walk_fs(root.to_path_buf());
+
+        let files = query(&mut cache, "file:beta");
+        assert_eq!(files.len(), 1);
+        assert!(files[0].path.ends_with("beta.txt"));
+
+        let folders = query(&mut cache, "folder:alpha");
+        assert_eq!(folders.len(), 1);
+        assert!(folders[0].path.ends_with("alpha_dir"));
+    }
+
+    #[test]
+    fn test_extension_and_path_filters() {
+        let temp_dir = TempDir::new("test_extension_filters").unwrap();
+        let root = temp_dir.path();
+        let nested = root.join("nested");
+        fs::create_dir(&nested).unwrap();
+        fs::File::create(root.join("top.txt")).unwrap();
+        fs::File::create(root.join("top.md")).unwrap();
+        fs::File::create(nested.join("child.txt")).unwrap();
+
+        let mut cache = SearchCache::walk_fs(root.to_path_buf());
+
+        let txt_results = query(&mut cache, "ext:txt");
+        let mut txt_paths: Vec<_> = txt_results
+            .into_iter()
+            .filter_map(|node| {
+                node.path
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+            })
+            .collect();
+        txt_paths.sort();
+        assert_eq!(
+            txt_paths,
+            vec!["child.txt".to_string(), "top.txt".to_string()]
+        );
+
+        let parent_query = format!(r#"parent:"{}""#, root.to_string_lossy());
+        let direct_children = query(&mut cache, parent_query);
+        let mut child_names: Vec<_> = direct_children
+            .into_iter()
+            .filter_map(|node| {
+                node.path
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+            })
+            .collect();
+        child_names.sort();
+        assert!(
+            child_names.contains(&"top.txt".to_string())
+                && child_names.contains(&"top.md".to_string()),
+            "parent: filter should return direct children"
+        );
+
+        let infolder_query = format!(r#"infolder:"{}""#, nested.to_string_lossy());
+        let infolder_results = query(&mut cache, infolder_query);
+        assert_eq!(infolder_results.len(), 1);
+        assert!(infolder_results[0].path.ends_with("nested/child.txt"));
     }
 
     #[test]

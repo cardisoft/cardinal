@@ -1052,6 +1052,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cardinal-sdk",
+ "cardinal-syntax",
  "crossbeam-channel",
  "enumn",
  "fswalk",

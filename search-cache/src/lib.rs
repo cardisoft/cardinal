@@ -4,6 +4,7 @@ mod file_nodes;
 mod metadata_cache;
 mod name_index;
 mod persistent;
+mod query;
 mod segment;
 mod slab;
 mod slab_node;
