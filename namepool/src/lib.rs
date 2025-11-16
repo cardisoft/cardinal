@@ -2,10 +2,8 @@
 use core::str;
 use parking_lot::Mutex;
 use regex::Regex;
-use search_cancel::CancellationToken;
+use search_cancel::{CANCEL_CHECK_INTERVAL, CancellationToken};
 use std::collections::BTreeSet;
-
-const CANCEL_CHECK_INTERVAL: usize = 0x10000;
 
 pub struct NamePool {
     inner: Mutex<BTreeSet<Box<str>>>,

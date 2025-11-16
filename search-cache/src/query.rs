@@ -8,10 +8,8 @@ use fswalk::NodeFileType;
 use hashbrown::HashSet;
 use query_segmentation::query_segmentation;
 use regex::RegexBuilder;
-use search_cancel::CancellationToken;
+use search_cancel::{CANCEL_CHECK_INTERVAL, CancellationToken};
 use std::{collections::BTreeSet, path::PathBuf};
-
-const CANCEL_CHECK_INTERVAL: usize = 0x10000;
 
 impl SearchCache {
     pub(crate) fn evaluate_expr(
