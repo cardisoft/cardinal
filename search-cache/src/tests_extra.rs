@@ -329,7 +329,7 @@ mod extra {
         let tmp = TempDir::new("all_subnodes_cancel").unwrap();
         // Create many files to test cancellation
         for i in 0..100 {
-            fs::write(tmp.path().join(format!("file_{}.txt", i)), b"x").unwrap();
+            fs::write(tmp.path().join(format!("file_{i}.txt")), b"x").unwrap();
         }
 
         let cache = SearchCache::walk_fs(tmp.path().to_path_buf());
