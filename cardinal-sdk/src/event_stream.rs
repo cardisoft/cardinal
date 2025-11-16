@@ -166,18 +166,18 @@ impl EventWatcher {
     ) -> (dev_t, EventWatcher) {
         let (_cancellation_token, cancellation_token_rx) = bounded::<()>(1);
         let (sender, receiver) = unbounded();
-        let dev = 0;
+        let stream = EventStream::new(
+            &[&path],
+            since_event_id,
+            latency,
+            Box::new(move |events| {
+                let _ = sender.send(events);
+            }),
+        );
+        let dev = stream.dev();
         std::thread::Builder::new()
             .name("cardinal-sdk-event-watcher".to_string())
             .spawn(move || {
-                let stream = EventStream::new(
-                    &[&path],
-                    since_event_id,
-                    latency,
-                    Box::new(move |events| {
-                        let _ = sender.send(events);
-                    }),
-                );
                 let _stream_and_queue = stream.spawn().expect("failed to spawn event stream");
                 let _ = cancellation_token_rx.recv();
             })
