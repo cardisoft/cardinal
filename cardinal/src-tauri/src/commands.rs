@@ -16,22 +16,12 @@ use tracing::info;
 #[serde(rename_all = "camelCase")]
 pub struct SearchOptionsPayload {
     #[serde(default)]
-    pub use_regex: bool,
-    #[serde(default)]
     pub case_insensitive: bool,
 }
 
 impl From<SearchOptionsPayload> for SearchOptions {
-    fn from(
-        SearchOptionsPayload {
-            use_regex,
-            case_insensitive,
-        }: SearchOptionsPayload,
-    ) -> Self {
-        SearchOptions {
-            use_regex,
-            case_insensitive,
-        }
+    fn from(SearchOptionsPayload { case_insensitive }: SearchOptionsPayload) -> Self {
+        SearchOptions { case_insensitive }
     }
 }
 

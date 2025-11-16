@@ -5,8 +5,7 @@
       "events": "Filtrar eventos por ruta o nombre..."
     },
     "options": {
-      "caseSensitive": "Activar coincidencia sensible a mayúsculas",
-      "regex": "Habilitar búsqueda con expresiones regulares"
+      "caseSensitive": "Activar coincidencia sensible a mayúsculas"
     }
   },
   "stateDisplay": {

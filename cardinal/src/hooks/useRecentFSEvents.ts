@@ -25,10 +25,9 @@ const toComparable = (value: string, caseSensitive: boolean): string =>
 
 type RecentEventsOptions = {
   caseSensitive: boolean;
-  useRegex: boolean;
 };
 
-export function useRecentFSEvents({ caseSensitive, useRegex }: RecentEventsOptions) {
+export function useRecentFSEvents({ caseSensitive }: RecentEventsOptions) {
   const [recentEvents, setRecentEvents] = useState<RecentEventPayload[]>([]);
   const [eventFilterQuery, setEventFilterQuery] = useState('');
   const isMountedRef = useRef(false);
@@ -77,31 +76,16 @@ export function useRecentFSEvents({ caseSensitive, useRegex }: RecentEventsOptio
       return recentEvents;
     }
 
-    if (useRegex) {
-      try {
-        const flags = caseSensitive ? '' : 'i';
-        const regex = new RegExp(query, flags);
-        // Regex search hits either the full path or just the leaf name.
-        return recentEvents.filter((event) => {
-          const path = event.path || '';
-          const name = path.split('/').pop() || '';
-          return regex.test(path) || regex.test(name);
-        });
-      } catch {
-        return recentEvents;
-      }
-    }
-
     const searchQuery = toComparable(query, caseSensitive);
     return recentEvents.filter((event) => {
       const path = event.path || '';
       const name = path.split('/').pop() || '';
       const testPath = toComparable(path, caseSensitive);
       const testName = toComparable(name, caseSensitive);
-      // Perform basic substring matching when regex is disabled.
+      // Perform basic substring matching across path and filename.
       return testPath.includes(searchQuery) || testName.includes(searchQuery);
     });
-  }, [recentEvents, eventFilterQuery, caseSensitive, useRegex]);
+  }, [recentEvents, eventFilterQuery, caseSensitive]);
 
   return {
     recentEvents,

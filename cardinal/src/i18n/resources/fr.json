@@ -5,8 +5,7 @@
       "events": "Filtrer les événements par chemin ou nom..."
     },
     "options": {
-      "caseSensitive": "Activer la correspondance sensible à la casse",
-      "regex": "Activer la recherche par expression régulière"
+      "caseSensitive": "Activer la correspondance sensible à la casse"
     }
   },
   "stateDisplay": {

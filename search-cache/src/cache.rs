@@ -907,32 +907,22 @@ mod tests {
     }
 
     #[test]
-    fn test_search_with_regex_option() {
-        let temp_dir = TempDir::new("test_search_regex_option").unwrap();
+    fn test_search_with_regex_query() {
+        let temp_dir = TempDir::new("test_search_regex_query").unwrap();
         let dir = temp_dir.path();
 
         fs::File::create(dir.join("foo123.txt")).unwrap();
         fs::File::create(dir.join("bar.txt")).unwrap();
 
         let mut cache = SearchCache::walk_fs(dir.to_path_buf());
-        let opts = SearchOptions {
-            use_regex: true,
-            case_insensitive: false,
-        };
-        let indices =
-            guard_indices(cache.search_with_options("foo\\d+", opts, CancellationToken::noop()));
+        let indices = cache.search("regex:foo\\d+").unwrap();
         assert_eq!(indices.len(), 1);
         let nodes = cache.expand_file_nodes(&indices);
         assert_eq!(nodes.len(), 1);
         assert!(nodes[0].path.ends_with("foo123.txt"));
 
         // ensure other names are not matched
-        let opts = SearchOptions {
-            use_regex: true,
-            case_insensitive: false,
-        };
-        let miss =
-            guard_indices(cache.search_with_options("bar\\d+", opts, CancellationToken::noop()));
+        let miss = cache.search("regex:bar\\d+").unwrap();
         assert!(miss.is_empty());
     }
 
@@ -946,7 +936,6 @@ mod tests {
 
         let mut cache = SearchCache::walk_fs(dir.to_path_buf());
         let opts = SearchOptions {
-            use_regex: false,
             case_insensitive: true,
         };
         let indices =
@@ -957,7 +946,6 @@ mod tests {
         assert!(nodes[0].path.ends_with("Alpha.TXT"));
 
         let opts = SearchOptions {
-            use_regex: false,
             case_insensitive: true,
         };
         let miss =
@@ -989,7 +977,6 @@ mod tests {
         let result = cache.search_with_options(
             "file_a",
             SearchOptions {
-                use_regex: false,
                 case_insensitive: false,
             },
             token,

@@ -3,7 +3,6 @@ use regex::{Regex, RegexBuilder};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SearchOptions {
-    pub use_regex: bool,
     pub case_insensitive: bool,
 }
 
@@ -44,12 +43,8 @@ pub(crate) fn build_segment_matchers(
         .map(|segment| {
             let kind = segment_kind(segment);
             let value = segment_value(segment);
-            if options.use_regex || options.case_insensitive {
-                let base = if options.use_regex {
-                    value.to_owned()
-                } else {
-                    regex::escape(value)
-                };
+            if options.case_insensitive {
+                let base = regex::escape(value);
                 let pattern = match kind {
                     SegmentKind::Substr => base,
                     SegmentKind::Prefix => format!("^(?:{base})"),

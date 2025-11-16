@@ -5,8 +5,7 @@
       "events": "按路径或名称筛选事件…"
     },
     "options": {
-      "caseSensitive": "切换区分大小写匹配",
-      "regex": "启用正则表达式搜索"
+      "caseSensitive": "切换区分大小写匹配"
     }
   },
   "stateDisplay": {

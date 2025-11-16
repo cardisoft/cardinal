@@ -5,8 +5,7 @@
       "events": "Ereignisse nach Pfad oder Name filtern..."
     },
     "options": {
-      "caseSensitive": "Groß-/Kleinschreibung beachten",
-      "regex": "Suche mit regulären Ausdrücken aktivieren"
+      "caseSensitive": "Groß-/Kleinschreibung beachten"
     }
   },
   "stateDisplay": {

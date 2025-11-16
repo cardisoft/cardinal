@@ -23,7 +23,6 @@ type SearchState = {
 
 type SearchParams = {
   query: string;
-  useRegex: boolean;
   caseSensitive: boolean;
 };
 
@@ -64,7 +63,6 @@ const initialSearchState: SearchState = {
 
 const initialSearchParams: SearchParams = {
   query: '',
-  useRegex: false,
   caseSensitive: false,
 };
 
@@ -197,7 +195,7 @@ export function useFileSearch(): UseFileSearchResult {
     const requestVersion = searchVersionRef.current + 1;
     searchVersionRef.current = requestVersion;
 
-    const { query, useRegex, caseSensitive } = nextSearch;
+    const { query, caseSensitive } = nextSearch;
     const startTs = performance.now();
     const isInitial = !hasInitialSearchRunRef.current;
     const trimmedQuery = query.trim();
@@ -216,7 +214,6 @@ export function useFileSearch(): UseFileSearchResult {
       const rawResults = await invoke<number[]>('search', {
         query,
         options: {
-          useRegex,
           caseInsensitive: !caseSensitive,
         },
         version: requestVersion,
@@ -298,7 +295,7 @@ export function useFileSearch(): UseFileSearchResult {
     }
 
     void handleSearch();
-  }, [handleSearch, searchParams.caseSensitive, searchParams.useRegex]);
+  }, [handleSearch, searchParams.caseSensitive]);
 
   const requestRescan = useCallback(async () => {
     try {

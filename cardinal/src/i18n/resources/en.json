@@ -5,8 +5,7 @@
       "events": "Filter events by path or name..."
     },
     "options": {
-      "caseSensitive": "Toggle case-sensitive matching",
-      "regex": "Enable regular expression search"
+      "caseSensitive": "Toggle case-sensitive matching"
     }
   },
   "stateDisplay": {

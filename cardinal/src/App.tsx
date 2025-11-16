@@ -71,11 +71,10 @@ function App() {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const isMountedRef = useRef(false);
   const { colWidths, onResizeStart, autoFitColumns } = useColumnResize();
-  const { useRegex, caseSensitive } = searchParams;
+  const { caseSensitive } = searchParams;
   const { eventColWidths, onEventResizeStart, autoFitEventColumns } = useEventColumnWidths();
   const { filteredEvents, eventFilterQuery, setEventFilterQuery } = useRecentFSEvents({
     caseSensitive,
-    useRegex,
   });
   const { t } = useTranslation();
 
@@ -447,14 +446,6 @@ function App() {
     [activeTab, queueSearch, setEventFilterQuery],
   );
 
-  const onToggleRegex = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const nextValue = event.target.checked;
-      updateSearchParams({ useRegex: nextValue });
-    },
-    [updateSearchParams],
-  );
-
   const onToggleCaseSensitive = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const nextValue = event.target.checked;
@@ -568,7 +559,6 @@ function App() {
     ? t('app.fullDiskAccess.status.checking')
     : t('app.fullDiskAccess.status.disabled');
   const caseSensitiveLabel = t('search.options.caseSensitive');
-  const regexLabel = t('search.options.regex');
   const searchPlaceholder =
     activeTab === 'files' ? t('search.placeholder.files') : t('search.placeholder.events');
   const permissionSteps = [
@@ -587,11 +577,8 @@ function App() {
           placeholder={searchPlaceholder}
           onChange={onQueryChange}
           caseSensitive={caseSensitive}
-          useRegex={useRegex}
           onToggleCaseSensitive={onToggleCaseSensitive}
-          onToggleRegex={onToggleRegex}
           caseSensitiveLabel={caseSensitiveLabel}
-          regexLabel={regexLabel}
         />
         <div className="results-container" style={containerStyle}>
           {activeTab === 'events' ? (

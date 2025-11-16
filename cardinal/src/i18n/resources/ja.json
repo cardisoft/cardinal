@@ -5,8 +5,7 @@
       "events": "パスまたは名前でイベントを絞り込む..."
     },
     "options": {
-      "caseSensitive": "大文字と小文字を区別する",
-      "regex": "正規表現検索を有効にする"
+      "caseSensitive": "大文字と小文字を区別する"
     }
   },
   "stateDisplay": {
