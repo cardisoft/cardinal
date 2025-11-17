@@ -1,5 +1,5 @@
 import { defaultWindowIcon } from '@tauri-apps/api/app';
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { Menu } from '@tauri-apps/api/menu';
 import { TrayIcon, type TrayIconEvent, type TrayIconOptions } from '@tauri-apps/api/tray';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
@@ -13,10 +13,6 @@ let trayIcon: TrayIcon | null = null;
 let unsubscribeLanguageChange: (() => void) | null = null;
 
 export function initializeTray(): Promise<void> {
-  if (!isTauri()) {
-    return Promise.resolve();
-  }
-
   if (!trayInitPromise) {
     trayInitPromise = createTray().catch((error) => {
       console.error('Failed to initialize Cardinal tray', error);

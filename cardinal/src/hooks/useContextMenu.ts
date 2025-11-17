@@ -1,107 +1,107 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { ContextMenuItem } from '../components/ContextMenu';
+import { Menu } from '@tauri-apps/api/menu';
+import type { MenuItemOptions } from '@tauri-apps/api/menu';
 import { useTranslation } from 'react-i18next';
 
-type MenuType = 'file' | 'header' | null;
-
-type ContextMenuState = {
-  visible: boolean;
-  x: number;
-  y: number;
-  type: MenuType;
-  data: string | null;
-};
-
 type UseContextMenuResult = {
-  menu: ContextMenuState;
   showContextMenu: (event: ReactMouseEvent<HTMLElement>, path: string) => void;
   showHeaderContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
-  closeMenu: () => void;
-  getMenuItems: () => ContextMenuItem[];
 };
 
 export function useContextMenu(autoFitColumns: (() => void) | null = null): UseContextMenuResult {
   const { t } = useTranslation();
-  const [menu, setMenu] = useState<ContextMenuState>({
-    visible: false,
-    x: 0,
-    y: 0,
-    type: null,
-    data: null,
-  });
 
-  // Centralised helper for toggling the active menu overlay.
-  const showMenu = useCallback(
-    (event: ReactMouseEvent<HTMLElement>, type: MenuType, data: string | null = null) => {
-      event.preventDefault();
-      event.stopPropagation();
-      setMenu({
-        visible: true,
-        x: event.clientX,
-        y: event.clientY,
-        type,
-        data,
-      });
+  const buildFileMenuItems = useCallback(
+    (path: string): MenuItemOptions[] => {
+      if (!path) {
+        return [];
+      }
+
+      const segments = path.split(/[\\/]/).filter(Boolean);
+      const filename = segments.length > 0 ? segments[segments.length - 1] : path;
+
+      return [
+        {
+          id: 'context_menu.open_in_finder',
+          text: t('contextMenu.openInFinder'),
+          action: () => {
+            void invoke('open_in_finder', { path });
+          },
+        },
+        {
+          id: 'context_menu.copy_path',
+          text: t('contextMenu.copyPath'),
+          action: () => {
+            if (navigator?.clipboard?.writeText) {
+              void navigator.clipboard.writeText(path);
+            }
+          },
+        },
+        {
+          id: 'context_menu.copy_filename',
+          text: t('contextMenu.copyFilename'),
+          action: () => {
+            if (navigator?.clipboard?.writeText) {
+              void navigator.clipboard.writeText(filename);
+            }
+          },
+        },
+      ];
     },
-    [],
+    [t],
   );
+
+  const buildHeaderMenuItems = useCallback((): MenuItemOptions[] => {
+    if (!autoFitColumns) {
+      return [];
+    }
+
+    return [
+      {
+        id: 'context_menu.reset_column_widths',
+        text: t('contextMenu.resetColumnWidths'),
+        action: () => {
+          autoFitColumns();
+        },
+      },
+    ];
+  }, [autoFitColumns, t]);
+
+  const showMenu = useCallback(async (items: MenuItemOptions[]) => {
+    if (!items.length) {
+      return;
+    }
+
+    try {
+      const menu = await Menu.new({ items });
+      await menu.popup();
+    } catch (error) {
+      console.error('Failed to show context menu', error);
+    }
+  }, []);
 
   const showContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLElement>, path: string) => {
-      showMenu(event, 'file', path);
+      event.preventDefault();
+      event.stopPropagation();
+      void showMenu(buildFileMenuItems(path));
     },
-    [showMenu],
+    [buildFileMenuItems, showMenu],
   );
 
   const showHeaderContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLElement>) => {
-      showMenu(event, 'header');
+      event.preventDefault();
+      event.stopPropagation();
+      void showMenu(buildHeaderMenuItems());
     },
-    [showMenu],
+    [buildHeaderMenuItems, showMenu],
   );
 
-  const closeMenu = useCallback(() => {
-    setMenu((prev) => ({ ...prev, visible: false }));
-  }, []);
-
-  const getMenuItems = useCallback((): ContextMenuItem[] => {
-    const path = menu.data;
-    if (menu.type === 'file' && path) {
-      const segments = path.split(/[\\/]/).filter(Boolean);
-      const filename = segments.length > 0 ? segments[segments.length - 1] : path;
-      return [
-        {
-          label: t('contextMenu.openInFinder'),
-          action: () => invoke('open_in_finder', { path }),
-        },
-        {
-          label: t('contextMenu.copyPath'),
-          action: () => navigator.clipboard.writeText(path),
-        },
-        {
-          label: t('contextMenu.copyFilename'),
-          action: () => navigator.clipboard.writeText(filename),
-        },
-      ];
-    }
-    if (menu.type === 'header' && autoFitColumns) {
-      return [
-        {
-          label: t('contextMenu.resetColumnWidths'),
-          action: autoFitColumns,
-        },
-      ];
-    }
-    return [];
-  }, [menu, autoFitColumns, t]);
-
   return {
-    menu,
     showContextMenu,
     showHeaderContextMenu,
-    closeMenu,
-    getMenuItems,
   };
 }

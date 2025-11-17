@@ -1,7 +1,6 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import './App.css';
-import { ContextMenu } from './components/ContextMenu';
 import { FileRow } from './components/FileRow';
 import { SearchBar } from './components/SearchBar';
 import { FilesTabContent } from './components/FilesTabContent';
@@ -116,19 +115,13 @@ function App() {
   );
 
   const {
-    menu: filesMenu,
     showContextMenu: showFilesContextMenu,
     showHeaderContextMenu: showFilesHeaderContextMenu,
-    closeMenu: closeFilesMenu,
-    getMenuItems: getFilesMenuItems,
   } = useContextMenu(autoFitColumns);
 
   const {
-    menu: eventsMenu,
     showContextMenu: showEventsContextMenu,
     showHeaderContextMenu: showEventsHeaderContextMenu,
-    closeMenu: closeEventsMenu,
-    getMenuItems: getEventsMenuItems,
   } = useContextMenu(autoFitEventColumns);
 
   const {
@@ -136,12 +129,6 @@ function App() {
     isChecking: isCheckingFullDiskAccess,
     requestPermission: requestFullDiskAccessPermission,
   } = useFullDiskAccessPermission();
-  const menu = activeTab === 'events' ? eventsMenu : filesMenu;
-  const showContextMenu = activeTab === 'events' ? showEventsContextMenu : showFilesContextMenu;
-  const showHeaderContextMenu =
-    activeTab === 'events' ? showEventsHeaderContextMenu : showFilesHeaderContextMenu;
-  const closeMenu = activeTab === 'events' ? closeEventsMenu : closeFilesMenu;
-  const getMenuItems = activeTab === 'events' ? getEventsMenuItems : getFilesMenuItems;
   const selectedIndex = selectedRow?.index ?? null;
   const selectedPath = selectedRow?.path ?? null;
 
@@ -480,9 +467,9 @@ function App() {
   const handleRowContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => {
       handleRowSelect(path, rowIndex);
-      showContextMenu(event, path);
+      showFilesContextMenu(event, path);
     },
-    [handleRowSelect, showContextMenu],
+    [handleRowSelect, showFilesContextMenu],
   );
 
   const renderRow = useCallback(
@@ -587,8 +574,8 @@ function App() {
               ref={eventsPanelRef}
               events={filteredEvents}
               onResizeStart={onEventResizeStart}
-              onContextMenu={showContextMenu}
-              onHeaderContextMenu={showHeaderContextMenu}
+              onContextMenu={showEventsContextMenu}
+              onHeaderContextMenu={showEventsHeaderContextMenu}
               searchQuery={eventFilterQuery}
               caseInsensitive={!caseSensitive}
             />
@@ -596,7 +583,7 @@ function App() {
             <FilesTabContent
               headerRef={headerRef}
               onResizeStart={onResizeStart}
-              onHeaderContextMenu={showHeaderContextMenu}
+              onHeaderContextMenu={showFilesHeaderContextMenu}
               displayState={displayState}
               searchErrorMessage={searchErrorMessage}
               currentQuery={currentQuery}
@@ -609,9 +596,6 @@ function App() {
             />
           )}
         </div>
-        {menu.visible && (
-          <ContextMenu x={menu.x} y={menu.y} items={getMenuItems()} onClose={closeMenu} />
-        )}
         <StatusBar
           scannedFiles={scannedFiles}
           processedEvents={processedEvents}
