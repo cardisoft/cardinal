@@ -39,6 +39,38 @@ fn test_audio_macro_with_argument_behaves_like_and() {
 }
 
 #[test]
+fn test_type_filter_respects_parent_base() {
+    let tmp = TempDir::new("type_filter_base").unwrap();
+    fs::create_dir(tmp.path().join("media")).unwrap();
+    fs::write(tmp.path().join("media/keep.jpg"), b"x").unwrap();
+    fs::write(tmp.path().join("skip.jpg"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+
+    let keep_idx = cache.search("keep.jpg").unwrap()[0];
+    let skip_idx = cache.search("skip.jpg").unwrap()[0];
+    assert!(cache.file_nodes[skip_idx].metadata.is_none());
+
+    let results = cache
+        .search(&format!(
+            "parent:{} type:picture",
+            tmp.path().join("media").display()
+        ))
+        .unwrap();
+    assert_eq!(results.len(), 1);
+    let path = cache.node_path(*results.first().unwrap()).unwrap();
+    assert!(path.ends_with(PathBuf::from("keep.jpg")));
+
+    assert!(
+        cache.file_nodes[skip_idx].metadata.is_none(),
+        "type filter should not touch nodes outside the parent base"
+    );
+    assert!(
+        cache.file_nodes[keep_idx].metadata.is_none(),
+        "type filter should not touch nodes inside the parent base"
+    );
+}
+
+#[test]
 fn test_type_picture_comprehensive() {
     let tmp = TempDir::new("type_picture_comp").unwrap();
     // Common image formats

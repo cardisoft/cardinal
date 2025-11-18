@@ -45,6 +45,13 @@ impl SearchCache {
                     };
                     current = Some(x);
                 }
+                Expr::Term(Term::Filter(filter)) => {
+                    let base = current.take();
+                    let Some(nodes) = self.evaluate_filter(filter, base, options, token)? else {
+                        return Ok(None);
+                    };
+                    current = Some(nodes);
+                }
                 _ => {
                     let Some(nodes) = self.evaluate_expr(part, options, token)? else {
                         return Ok(None);
@@ -118,7 +125,7 @@ impl SearchCache {
             Term::Word(text) => self.evaluate_word(text, options, token),
             Term::Phrase(text) => self.evaluate_phrase(text, options, token),
             Term::Regex(pattern) => self.evaluate_regex(pattern, options, token),
-            Term::Filter(filter) => self.evaluate_filter(filter, options, token),
+            Term::Filter(filter) => self.evaluate_filter(filter, None, options, token),
         }
     }
 
@@ -229,18 +236,21 @@ impl SearchCache {
     fn evaluate_filter(
         &mut self,
         filter: &Filter,
+        base: Option<Vec<SlabIndex>>,
         options: SearchOptions,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
         match filter.kind {
             FilterKind::File => self.evaluate_type_filter(
                 NodeFileType::File,
+                base,
                 filter.argument.as_ref(),
                 options,
                 token,
             ),
             FilterKind::Folder => self.evaluate_type_filter(
                 NodeFileType::Dir,
+                base,
                 filter.argument.as_ref(),
                 options,
                 token,
@@ -250,61 +260,61 @@ impl SearchCache {
                     .argument
                     .as_ref()
                     .ok_or_else(|| anyhow!("ext: requires at least one extension"))?;
-                self.evaluate_extension_filter(argument, token)
+                self.evaluate_extension_filter(argument, base, token)
             }
             FilterKind::Parent => {
                 let argument = filter
                     .argument
                     .as_ref()
                     .ok_or_else(|| anyhow!("parent: requires a folder path"))?;
-                self.evaluate_parent_filter(argument, token)
+                self.evaluate_parent_filter(argument, base, token)
             }
             FilterKind::InFolder => {
                 let argument = filter
                     .argument
                     .as_ref()
                     .ok_or_else(|| anyhow!("infolder: requires a folder path"))?;
-                self.evaluate_infolder_filter(argument, token)
+                self.evaluate_infolder_filter(argument, base, token)
             }
             FilterKind::Type => {
                 let argument = filter
                     .argument
                     .as_ref()
                     .ok_or_else(|| anyhow!("type: requires a category"))?;
-                self.evaluate_named_type_filter(&argument.raw, options, token)
+                self.evaluate_named_type_filter(&argument.raw, base, options, token)
             }
             FilterKind::Audio => {
-                self.evaluate_type_macro("audio", filter.argument.as_ref(), options, token)
+                self.evaluate_type_macro("audio", base, filter.argument.as_ref(), options, token)
             }
             FilterKind::Video => {
-                self.evaluate_type_macro("video", filter.argument.as_ref(), options, token)
+                self.evaluate_type_macro("video", base, filter.argument.as_ref(), options, token)
             }
             FilterKind::Doc => {
-                self.evaluate_type_macro("doc", filter.argument.as_ref(), options, token)
+                self.evaluate_type_macro("doc", base, filter.argument.as_ref(), options, token)
             }
             FilterKind::Exe => {
-                self.evaluate_type_macro("exe", filter.argument.as_ref(), options, token)
+                self.evaluate_type_macro("exe", base, filter.argument.as_ref(), options, token)
             }
             FilterKind::Size => {
                 let argument = filter
                     .argument
                     .as_ref()
                     .ok_or_else(|| anyhow!("size: requires a value"))?;
-                self.evaluate_size_filter(argument, token)
+                self.evaluate_size_filter(argument, base, token)
             }
             FilterKind::DateModified => {
                 let argument = filter
                     .argument
                     .as_ref()
                     .ok_or_else(|| anyhow!("dm: requires a date or range"))?;
-                self.evaluate_date_filter(DateField::Modified, argument, token)
+                self.evaluate_date_filter(DateField::Modified, argument, base, token)
             }
             FilterKind::DateCreated => {
                 let argument = filter
                     .argument
                     .as_ref()
                     .ok_or_else(|| anyhow!("dc: requires a date or range"))?;
-                self.evaluate_date_filter(DateField::Created, argument, token)
+                self.evaluate_date_filter(DateField::Created, argument, base, token)
             }
             _ => bail!("Filter {:?} is not supported yet", filter.kind),
         }
@@ -313,18 +323,34 @@ impl SearchCache {
     fn evaluate_type_filter(
         &self,
         file_type: NodeFileType,
+        base: Option<Vec<SlabIndex>>,
         argument: Option<&FilterArgument>,
         options: SearchOptions,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
-        let base = if let Some(arg) = argument {
-            self.evaluate_phrase(&arg.raw, options, token)?
-        } else {
-            self.search_empty(token)
+        let (mut nodes, argument_applied) = match (base, argument) {
+            (Some(nodes), _) => (nodes, false),
+            (None, Some(arg)) => match self.evaluate_phrase(&arg.raw, options, token)? {
+                Some(nodes) => (nodes, true),
+                None => return Ok(None),
+            },
+            (None, None) => match self.search_empty(token) {
+                Some(nodes) => (nodes, false),
+                None => return Ok(None),
+            },
         };
-        let Some(nodes) = base else {
-            return Ok(None);
-        };
+
+        if !argument_applied {
+            if let Some(arg) = argument {
+                let Some(matches) = self.evaluate_phrase(&arg.raw, options, token)? else {
+                    return Ok(None);
+                };
+                if intersect_in_place(&mut nodes, &matches, token).is_none() {
+                    return Ok(None);
+                }
+            }
+        }
+
         Ok(filter_nodes(nodes, token, |index| {
             self.file_nodes[index].metadata.file_type_hint() == file_type
         }))
@@ -333,13 +359,14 @@ impl SearchCache {
     fn evaluate_extension_filter(
         &self,
         argument: &FilterArgument,
+        base: Option<Vec<SlabIndex>>,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
         let extensions = normalize_extensions(argument);
         if extensions.is_empty() {
             bail!("ext: requires non-empty extensions");
         }
-        let Some(nodes) = self.search_empty(token) else {
+        let Some(nodes) = self.nodes_from_base(base, token) else {
             return Ok(None);
         };
         Ok(filter_nodes(nodes, token, |index| {
@@ -356,21 +383,7 @@ impl SearchCache {
     fn evaluate_parent_filter(
         &self,
         argument: &FilterArgument,
-        _token: CancellationToken,
-    ) -> Result<Option<Vec<SlabIndex>>> {
-        let target = self.resolve_query_path(&argument.raw)?;
-        let Some(target) = self.node_index_for_raw_path(&target) else {
-            bail!(
-                "Parent filter {:?} is not found in file system",
-                argument.raw
-            );
-        };
-        Ok(Some(self.file_nodes[target].children.to_vec()))
-    }
-
-    fn evaluate_infolder_filter(
-        &self,
-        argument: &FilterArgument,
+        base: Option<Vec<SlabIndex>>,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
         let target = self.resolve_query_path(&argument.raw)?;
@@ -380,12 +393,47 @@ impl SearchCache {
                 argument.raw
             );
         };
-        Ok(self.all_subnodes(target, token))
+        let children = self.file_nodes[target].children.to_vec();
+        if let Some(mut nodes) = base {
+            if intersect_in_place(&mut nodes, &children, token).is_none() {
+                return Ok(None);
+            }
+            Ok(Some(nodes))
+        } else {
+            Ok(Some(children))
+        }
+    }
+
+    fn evaluate_infolder_filter(
+        &self,
+        argument: &FilterArgument,
+        base: Option<Vec<SlabIndex>>,
+        token: CancellationToken,
+    ) -> Result<Option<Vec<SlabIndex>>> {
+        let target = self.resolve_query_path(&argument.raw)?;
+        let Some(target) = self.node_index_for_raw_path(&target) else {
+            bail!(
+                "Parent filter {:?} is not found in file system",
+                argument.raw
+            );
+        };
+        let Some(children) = self.all_subnodes(target, token) else {
+            return Ok(None);
+        };
+        if let Some(mut nodes) = base {
+            if intersect_in_place(&mut nodes, &children, token).is_none() {
+                return Ok(None);
+            }
+            Ok(Some(nodes))
+        } else {
+            Ok(Some(children))
+        }
     }
 
     fn evaluate_named_type_filter(
         &self,
         raw: &str,
+        base: Option<Vec<SlabIndex>>,
         options: SearchOptions,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
@@ -397,22 +445,24 @@ impl SearchCache {
         let Some(target) = lookup_type_group(&normalized) else {
             bail!("Unknown type category: {name}");
         };
-        self.apply_type_group(target, options, token)
+        self.apply_type_group(target, base, options, token)
     }
 
     fn evaluate_type_macro(
         &self,
         name: &'static str,
+        base: Option<Vec<SlabIndex>>,
         argument: Option<&FilterArgument>,
         options: SearchOptions,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
-        let base = self.apply_type_group(
+        let group_nodes = self.apply_type_group(
             lookup_type_group(name).expect("built-in macro should map to a known type group"),
+            base,
             options,
             token,
         )?;
-        let Some(mut nodes) = base else {
+        let Some(mut nodes) = group_nodes else {
             return Ok(None);
         };
         let Some(argument) = argument else {
@@ -430,26 +480,28 @@ impl SearchCache {
     fn apply_type_group(
         &self,
         target: TypeFilterTarget,
+        base: Option<Vec<SlabIndex>>,
         options: SearchOptions,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
         match target {
             TypeFilterTarget::NodeType(file_type) => {
-                self.evaluate_type_filter(file_type, None, options, token)
+                self.evaluate_type_filter(file_type, base, None, options, token)
             }
-            TypeFilterTarget::Extensions(list) => self.filter_static_extensions(list, token),
+            TypeFilterTarget::Extensions(list) => self.filter_static_extensions(list, base, token),
         }
     }
 
     fn filter_static_extensions(
         &self,
         extensions: &'static [&'static str],
+        base: Option<Vec<SlabIndex>>,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
         if extensions.is_empty() {
             return Ok(Some(Vec::new()));
         }
-        let Some(nodes) = self.search_empty(token) else {
+        let Some(nodes) = self.nodes_from_base(base, token) else {
             return Ok(None);
         };
         Ok(filter_nodes(nodes, token, |index| {
@@ -468,10 +520,11 @@ impl SearchCache {
     fn evaluate_size_filter(
         &mut self,
         argument: &FilterArgument,
+        base: Option<Vec<SlabIndex>>,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
         let predicate = SizePredicate::parse(argument)?;
-        let Some(nodes) = self.search_empty(token) else {
+        let Some(nodes) = self.nodes_from_base(base, token) else {
             return Ok(None);
         };
         Ok(filter_nodes(nodes, token, |index| {
@@ -490,11 +543,12 @@ impl SearchCache {
         &mut self,
         field: DateField,
         argument: &FilterArgument,
+        base: Option<Vec<SlabIndex>>,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
         let context = DateContext::capture();
         let predicate = DatePredicate::parse(argument, &context)?;
-        let Some(nodes) = self.search_empty(token) else {
+        let Some(nodes) = self.nodes_from_base(base, token) else {
             return Ok(None);
         };
         Ok(filter_nodes(nodes, token, |index| {
@@ -503,6 +557,17 @@ impl SearchCache {
             };
             predicate.matches(timestamp)
         }))
+    }
+
+    fn nodes_from_base(
+        &self,
+        base: Option<Vec<SlabIndex>>,
+        token: CancellationToken,
+    ) -> Option<Vec<SlabIndex>> {
+        match base {
+            Some(nodes) => Some(nodes),
+            None => self.search_empty(token),
+        }
     }
 
     fn resolve_query_path(&self, raw: &str) -> Result<PathBuf> {

@@ -45,3 +45,31 @@ fn test_date_filters_cover_keywords_and_ranges() {
     let dc_hyphen = cache.search("dc:1/8/2014-31/8/2014").unwrap();
     assert_file_hits(&cache, &dc_hyphen, &["very_old.txt"]);
 }
+
+#[test]
+fn date_filter_reuses_existing_and_base() {
+    let tmp = TempDir::new("date_filter_base").unwrap();
+    fs::write(tmp.path().join("keep.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("skip.bin"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+
+    let keep_idx = cache.search("keep.txt").unwrap()[0];
+    let skip_idx = cache.search("skip.bin").unwrap()[0];
+
+    set_file_times(
+        &mut cache,
+        keep_idx,
+        ts_for_date(2024, 1, 1),
+        ts_for_date(2024, 1, 1),
+    );
+
+    assert!(cache.file_nodes[skip_idx].metadata.is_none());
+
+    let hits = cache.search("ext:txt dm:2024-01-01").unwrap();
+    assert_file_hits(&cache, &hits, &["keep.txt"]);
+
+    assert!(
+        cache.file_nodes[skip_idx].metadata.is_none(),
+        "date filter should not touch nodes excluded by earlier ext: filters",
+    );
+}

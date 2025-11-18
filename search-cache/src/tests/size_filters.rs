@@ -39,6 +39,69 @@ fn test_size_filter_persists_metadata_on_nodes() {
 }
 
 #[test]
+fn test_size_filter_respects_parent_base() {
+    let tmp = TempDir::new("size_filter_scoped").unwrap();
+    fs::create_dir(tmp.path().join("folder")).unwrap();
+    fs::write(tmp.path().join("folder/keep.bin"), vec![0u8; 4096]).unwrap();
+    fs::write(tmp.path().join("skip.bin"), vec![0u8; 8192]).unwrap();
+
+    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let folder = tmp.path().join("folder");
+    let keep_idx = cache.search("keep.bin").unwrap()[0];
+    let skip_idx = cache.search("skip.bin").unwrap()[0];
+    assert!(cache.file_nodes[skip_idx].metadata.is_none());
+
+    let results = cache
+        .search(&format!("parent:{} size:>1kb", folder.display()))
+        .unwrap();
+    assert_eq!(results.len(), 1);
+    let path = cache.node_path(*results.first().unwrap()).unwrap();
+    assert!(path.ends_with(PathBuf::from("keep.bin")));
+
+    assert!(
+        cache.file_nodes[skip_idx].metadata.is_none(),
+        "size filter should not evaluate nodes outside the parent base"
+    );
+    assert!(
+        cache.file_nodes[keep_idx].metadata.is_some(),
+        "size filter should still populate metadata for matching nodes"
+    );
+}
+
+#[test]
+fn test_size_filter_respects_infolder_base() {
+    let tmp = TempDir::new("size_filter_infoder_base").unwrap();
+    fs::create_dir(tmp.path().join("media")).unwrap();
+    fs::create_dir(tmp.path().join("media/nested")).unwrap();
+    fs::write(tmp.path().join("media/nested/keep.bin"), vec![0u8; 4096]).unwrap();
+    fs::write(tmp.path().join("skip.bin"), vec![0u8; 8192]).unwrap();
+
+    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let keep_idx = cache.search("keep.bin").unwrap()[0];
+    let skip_idx = cache.search("skip.bin").unwrap()[0];
+    assert!(cache.file_nodes[skip_idx].metadata.is_none());
+
+    let results = cache
+        .search(&format!(
+            "infolder:{} size:>1kb",
+            tmp.path().join("media").display()
+        ))
+        .unwrap();
+    assert_eq!(results.len(), 1);
+    let path = cache.node_path(*results.first().unwrap()).unwrap();
+    assert!(path.ends_with(PathBuf::from("keep.bin")));
+
+    assert!(
+        cache.file_nodes[skip_idx].metadata.is_none(),
+        "size filter should not evaluate nodes outside the infolder base"
+    );
+    assert!(
+        cache.file_nodes[keep_idx].metadata.is_some(),
+        "size filter should still populate metadata for matching nodes"
+    );
+}
+
+#[test]
 fn test_size_comparison_operators() {
     let tmp = TempDir::new("size_comparison").unwrap();
     fs::write(tmp.path().join("tiny.bin"), vec![0u8; 500]).unwrap();
