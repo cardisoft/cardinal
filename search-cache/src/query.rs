@@ -12,7 +12,7 @@ use jiff::{Timestamp, civil::Date, tz::TimeZone};
 use query_segmentation::query_segmentation;
 use regex::RegexBuilder;
 use search_cancel::{CANCEL_CHECK_INTERVAL, CancellationToken};
-use std::{collections::BTreeSet, path::PathBuf};
+use std::{collections::BTreeSet, path::Path};
 
 impl SearchCache {
     pub(crate) fn evaluate_expr(
@@ -276,6 +276,13 @@ impl SearchCache {
                     .ok_or_else(|| anyhow!("infolder: requires a folder path"))?;
                 self.evaluate_infolder_filter(argument, base, token)
             }
+            FilterKind::NoSubfolders => {
+                let argument = filter
+                    .argument
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("nosubfolders: requires a folder path"))?;
+                self.evaluate_nosubfolders_filter(argument, base, token)
+            }
             FilterKind::Type => {
                 let argument = filter
                     .argument
@@ -386,8 +393,7 @@ impl SearchCache {
         base: Option<Vec<SlabIndex>>,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
-        let target = self.resolve_query_path(&argument.raw)?;
-        let Some(target) = self.node_index_for_raw_path(&target) else {
+        let Some(target) = self.node_index_for_raw_path(Path::new(&argument.raw)) else {
             bail!(
                 "Parent filter {:?} is not found in file system",
                 argument.raw
@@ -410,8 +416,7 @@ impl SearchCache {
         base: Option<Vec<SlabIndex>>,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
-        let target = self.resolve_query_path(&argument.raw)?;
-        let Some(target) = self.node_index_for_raw_path(&target) else {
+        let Some(target) = self.node_index_for_raw_path(Path::new(&argument.raw)) else {
             bail!(
                 "Parent filter {:?} is not found in file system",
                 argument.raw
@@ -427,6 +432,43 @@ impl SearchCache {
             Ok(Some(nodes))
         } else {
             Ok(Some(children))
+        }
+    }
+
+    fn evaluate_nosubfolders_filter(
+        &self,
+        argument: &FilterArgument,
+        base: Option<Vec<SlabIndex>>,
+        token: CancellationToken,
+    ) -> Result<Option<Vec<SlabIndex>>> {
+        let Some(target) = self.node_index_for_raw_path(Path::new(&argument.raw)) else {
+            bail!(
+                "nosubfolders filter {:?} is not found in file system",
+                argument.raw
+            );
+        };
+        if self.file_nodes[target].metadata.file_type_hint() != NodeFileType::Dir {
+            bail!("nosubfolders path {:?} is not a folder", argument.raw);
+        }
+
+        let nodes = if let Some(nodes) = base
+            && nodes.len() <= self.file_nodes[target].children.len()
+        {
+            nodes
+        } else {
+            self.file_nodes[target].children.to_vec()
+        };
+
+        Ok(filter_nodes(nodes, token, |index| {
+            self.keep_node_for_nosubfolders(index, target)
+        }))
+    }
+
+    fn keep_node_for_nosubfolders(&self, index: SlabIndex, root: SlabIndex) -> bool {
+        index == root || {
+            let node = &self.file_nodes[index];
+            node.name_and_parent.parent() == Some(root)
+                && node.metadata.file_type_hint() != NodeFileType::Dir
         }
     }
 
@@ -568,18 +610,6 @@ impl SearchCache {
             Some(nodes) => Some(nodes),
             None => self.search_empty(token),
         }
-    }
-
-    fn resolve_query_path(&self, raw: &str) -> Result<PathBuf> {
-        let raw = PathBuf::from(raw);
-        if !raw.starts_with(self.file_nodes.path()) {
-            bail!(
-                "Query path {:?} is outside of the indexed root {:?}",
-                raw,
-                self.file_nodes.path()
-            );
-        }
-        Ok(raw)
     }
 
     fn node_size_bytes(&mut self, index: SlabIndex) -> Option<u64> {

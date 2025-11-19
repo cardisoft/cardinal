@@ -40,6 +40,7 @@ NOT > OR > AND, so group expressions (e.g., `good (*.mp3|*.wav)`) any time you w
 | `ext:`              | Accept a semicolon-separated extension list: `ext:jpg;png;gif`.                            |
 | `parent:`           | Show only direct children of a directory: `parent:/Users/demo/Documents`.                  |
 | `infolder:`         | Walk a directory recursively: `infolder:/Users/demo/Projects report`.                      |
+| `nosubfolders:`     | Return only the files directly under a folder (no subfolders): `nosubfolders:/Users/demo/Projects`. |
 | `type:`             | Category filters such as `type:picture`, `type:video`, `type:doc`, `type:archive`, etc.    |
 | `audio:` / `video:` / `doc:` / `exe:` | Shorthand macros equivalent to `type:audio`, `type:video`, etc.          |
 | `size:`             | Filter by file size with comparisons (`size:>1GB`), ranges (`size:1mb..10mb`), or keywords (`size:tiny`). |

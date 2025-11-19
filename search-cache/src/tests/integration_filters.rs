@@ -254,3 +254,50 @@ fn test_final_integration_comprehensive() {
     let results = cache.search("vacation type:picture size:>100kb").unwrap();
     assert_eq!(results.len(), 1);
 }
+
+#[test]
+fn test_nosubfolders_keeps_only_direct_files() {
+    let tmp = TempDir::new("nosubfolders_direct_files").unwrap();
+    let projects = tmp.path().join("Projects");
+    fs::create_dir(&projects).unwrap();
+    fs::write(projects.join("root.txt"), b"root").unwrap();
+    fs::create_dir(projects.join("Nested")).unwrap();
+    fs::write(projects.join("Nested/deep.txt"), b"deep").unwrap();
+
+    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let results = cache
+        .search(&format!("nosubfolders:{}", projects.display()))
+        .unwrap();
+
+    let paths: Vec<_> = results
+        .iter()
+        .filter_map(|idx| cache.node_path(*idx))
+        .collect();
+    assert_eq!(paths.len(), 1);
+    assert!(paths.iter().any(|path| path.ends_with("root.txt")));
+    assert!(paths.iter().all(|path| !path.ends_with("Nested")));
+    assert!(paths.iter().all(|path| !path.ends_with("deep.txt")));
+}
+
+#[test]
+fn test_nosubfolders_only_filters_target_tree() {
+    let tmp = TempDir::new("nosubfolders_intersection").unwrap();
+    let projects = tmp.path().join("Projects");
+    fs::create_dir(&projects).unwrap();
+    fs::write(projects.join("report.txt"), b"root report").unwrap();
+    fs::create_dir(projects.join("Nested")).unwrap();
+    fs::write(projects.join("Nested/report.txt"), b"deep report").unwrap();
+    fs::write(tmp.path().join("report.txt"), b"global report").unwrap();
+
+    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let query = format!("report nosubfolders:{}", projects.display());
+    let paths: Vec<_> = cache
+        .search(&query)
+        .unwrap()
+        .into_iter()
+        .filter_map(|idx| cache.node_path(idx))
+        .collect();
+
+    assert_eq!(paths.len(), 1);
+    assert_eq!(paths[0], projects.join("report.txt"));
+}
