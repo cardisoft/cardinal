@@ -31,6 +31,7 @@ Cardinal now speaks an Everything-compatible syntax layer on top of the classic 
 - `infolder:/Users demo!.psd` – restrict the search root to `/Users`, then search for files whose names contain `demo` but exclude `.psd`.
 - `"Application Support"` – quote exact phrases.
 - `brary/Applicat` – use `/` as a path separator for sub-path searching, matching directories like `Library/Application Support`.
+- `/report` · `draft/` · `/report/` – wrap tokens with leading and/or trailing slashes to force **prefix**, **suffix**, or **exact** name matches when you need whole-word control beyond Everything syntax.
 
 For the supported operator catalog—including boolean grouping, folder scoping, extension filters, regex usage, and more examples—see [`doc/search-syntax.md`](doc/search-syntax.md).
 
