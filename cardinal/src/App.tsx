@@ -310,7 +310,7 @@ function App() {
 
   useEffect(() => {
     const handleGlobalShortcuts = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
+      if (!(event.metaKey)) {
         return;
       }
 
