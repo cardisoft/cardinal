@@ -81,6 +81,14 @@
       "openSettings": "システム設定を開く"
     }
   },
+  "menu": {
+    "about": "{{appName}} について",
+    "preferences": "環境設定",
+    "hide": "非表示",
+    "quit": "{{appName}} を終了",
+    "help": "ヘルプ",
+    "getUpdates": "アップデートを入手"
+  },
   "language": {
     "label": "言語",
     "separator": "：",

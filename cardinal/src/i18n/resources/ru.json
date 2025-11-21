@@ -81,6 +81,14 @@
       "openSettings": "Открыть Системные настройки"
     }
   },
+  "menu": {
+    "about": "О программе {{appName}}",
+    "preferences": "Настройки",
+    "hide": "Скрыть",
+    "quit": "Выйти из {{appName}}",
+    "help": "Справка",
+    "getUpdates": "Получить обновления"
+  },
   "language": {
     "label": "Язык",
     "separator": ":",

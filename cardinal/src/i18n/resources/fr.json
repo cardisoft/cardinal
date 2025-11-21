@@ -81,6 +81,14 @@
       "openSettings": "Ouvrir Réglages système"
     }
   },
+  "menu": {
+    "about": "À propos de {{appName}}",
+    "preferences": "Préférences",
+    "hide": "Masquer",
+    "quit": "Quitter {{appName}}",
+    "help": "Aide",
+    "getUpdates": "Obtenir les mises à jour"
+  },
   "language": {
     "label": "Langue",
     "separator": ":",

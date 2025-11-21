@@ -81,6 +81,14 @@
       "openSettings": "Відкрити Системні параметри"
     }
   },
+  "menu": {
+    "about": "Про {{appName}}",
+    "preferences": "Налаштування",
+    "hide": "Приховати",
+    "quit": "Вийти з {{appName}}",
+    "help": "Довідка",
+    "getUpdates": "Отримати оновлення"
+  },
   "language": {
     "label": "Мова",
     "separator": ":",

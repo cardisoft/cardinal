@@ -80,6 +80,14 @@
       "openSettings": "打开系统设置"
     }
   },
+  "menu": {
+    "about": "关于 {{appName}}",
+    "preferences": "偏好设置",
+    "hide": "隐藏",
+    "quit": "退出 {{appName}}",
+    "help": "帮助",
+    "getUpdates": "获取更新"
+  },
   "language": {
     "label": "语言",
     "separator": "：",

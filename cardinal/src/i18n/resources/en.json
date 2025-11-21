@@ -81,6 +81,14 @@
       "openSettings": "Open System Settings"
     }
   },
+  "menu": {
+    "about": "About {{appName}}",
+    "preferences": "Preferences",
+    "hide": "Hide",
+    "quit": "Quit {{appName}}",
+    "help": "Help",
+    "getUpdates": "Get Updates"
+  },
   "language": {
     "label": "Language",
     "separator": ":",
