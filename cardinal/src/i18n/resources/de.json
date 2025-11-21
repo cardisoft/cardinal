@@ -88,6 +88,8 @@
     "hide": "Ausblenden",
     "quit": "{{appName}} beenden",
     "edit": "Bearbeiten",
+    "view": "Ansicht",
+    "window": "Fenster",
     "help": "Hilfe",
     "getUpdates": "Updates abrufen"
   },

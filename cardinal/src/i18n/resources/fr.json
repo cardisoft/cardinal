@@ -88,6 +88,8 @@
     "hide": "Masquer",
     "quit": "Quitter {{appName}}",
     "edit": "Édition",
+    "view": "Affichage",
+    "window": "Fenêtre",
     "help": "Aide",
     "getUpdates": "Obtenir les mises à jour"
   },

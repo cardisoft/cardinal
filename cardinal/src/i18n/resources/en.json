@@ -88,6 +88,8 @@
     "hide": "Hide",
     "quit": "Quit {{appName}}",
     "edit": "Edit",
+    "view": "View",
+    "window": "Window",
     "help": "Help",
     "getUpdates": "Get Updates"
   },

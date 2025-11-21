@@ -69,6 +69,23 @@ async function buildAppMenu(): Promise<void> {
     ],
   });
 
+  const viewSubmenu = await Submenu.new({
+    id: 'menu.view',
+    text: i18n.t('menu.view'),
+    items: [await PredefinedMenuItem.new({ item: 'Fullscreen' })],
+  });
+
+  const windowSubmenu = await Submenu.new({
+    id: 'menu.window',
+    text: i18n.t('menu.window'),
+    items: [
+      await PredefinedMenuItem.new({ item: 'Minimize' }),
+      await PredefinedMenuItem.new({ item: 'Maximize' }),
+      await PredefinedMenuItem.new({ item: 'Separator' }),
+      await PredefinedMenuItem.new({ item: 'CloseWindow' }),
+    ],
+  });
+
   const getUpdatesItem = await MenuItem.new({
     id: 'menu.help_updates',
     text: i18n.t('menu.getUpdates'),
@@ -83,7 +100,7 @@ async function buildAppMenu(): Promise<void> {
   await helpSubmenu.setAsHelpMenuForNSApp().catch(() => {});
 
   const menu = await Menu.new({
-    items: [appSubmenu, editSubmenu, helpSubmenu],
+    items: [appSubmenu, editSubmenu, viewSubmenu, windowSubmenu, helpSubmenu],
   });
   await menu.setAsAppMenu();
 }

@@ -88,6 +88,8 @@
     "hide": "非表示",
     "quit": "{{appName}} を終了",
     "edit": "編集",
+    "view": "表示",
+    "window": "ウインドウ",
     "help": "ヘルプ",
     "getUpdates": "アップデートを入手"
   },
