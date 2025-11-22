@@ -18,6 +18,7 @@ pub struct NameAndParent {
 }
 
 unsafe impl Send for NameAndParent {}
+unsafe impl Sync for NameAndParent {}
 
 impl Serialize for NameAndParent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
