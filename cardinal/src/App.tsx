@@ -29,6 +29,13 @@ import { OPEN_PREFERENCES_EVENT } from './constants/appEvents';
 
 type ActiveTab = StatusTabKey;
 
+const isEditableTarget = (target: EventTarget | null): boolean => {
+  const element = target as HTMLElement | null;
+  if (!element) return false;
+  const tagName = element.tagName;
+  return tagName === 'INPUT' || tagName === 'TEXTAREA' || element.isContentEditable;
+};
+
 function App() {
   const {
     state,
@@ -243,11 +250,8 @@ function App() {
       }
 
       const target = event.target as HTMLElement | null;
-      if (target) {
-        const tagName = target.tagName;
-        if (tagName === 'INPUT' || tagName === 'TEXTAREA' || target.isContentEditable) {
-          return;
-        }
+      if (isEditableTarget(target)) {
+        return;
       }
 
       if (!selectedPath) {
@@ -278,12 +282,8 @@ function App() {
         return;
       }
 
-      const target = event.target as HTMLElement | null;
-      if (target) {
-        const tagName = target.tagName;
-        if (tagName === 'INPUT' || tagName === 'TEXTAREA' || target.isContentEditable) {
-          return;
-        }
+      if (isEditableTarget(event.target)) {
+        return;
       }
 
       if (!results.length) {
@@ -499,16 +499,13 @@ function App() {
     [handleRowContextMenu, handleRowSelect, selectedIndex, caseSensitive, highlightTerms],
   );
 
-  const getDisplayState = (): 'loading' | 'error' | 'empty' | 'results' => {
-    // Derive the UI state from search lifecycle, preserving existing semantics
+  const displayState: 'loading' | 'error' | 'empty' | 'results' = (() => {
     if (!initialFetchCompleted) return 'loading';
     if (showLoadingUI) return 'loading';
     if (searchError) return 'error';
     if (results.length === 0) return 'empty';
     return 'results';
-  };
-
-  const displayState = getDisplayState();
+  })();
   const searchErrorMessage =
     typeof searchError === 'string' ? searchError : (searchError?.message ?? null);
 
@@ -547,9 +544,7 @@ function App() {
     '--w-event-name': `${eventColWidths.name}px`,
     '--w-event-path': `${eventColWidths.path}px`,
     '--w-event-time': `${eventColWidths.time}px`,
-    '--columns-events-total': `${
-      eventColWidths.name + eventColWidths.path + eventColWidths.time
-    }px`,
+    '--columns-events-total': `${eventColWidths.name + eventColWidths.path + eventColWidths.time}px`,
   } as CSSProperties;
 
   const showFullDiskAccessOverlay = fullDiskAccessStatus === 'denied';
