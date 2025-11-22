@@ -33,6 +33,7 @@
     }
   },
   "contextMenu": {
+    "quickLook": "QuickLook",
     "openInFinder": "Open in Finder",
     "copyPath": "Copy Path",
     "copyFilename": "Copy Filename",

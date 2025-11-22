@@ -33,6 +33,7 @@
     }
   },
   "contextMenu": {
+    "quickLook": "Быстрый просмотр",
     "openInFinder": "Открыть в Finder",
     "copyPath": "Копировать путь",
     "copyFilename": "Копировать имя файла",

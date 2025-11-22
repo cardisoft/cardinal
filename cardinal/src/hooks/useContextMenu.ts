@@ -50,6 +50,14 @@ export function useContextMenu(autoFitColumns: (() => void) | null = null): UseC
             }
           },
         },
+        {
+          id: 'context_menu.quicklook',
+          text: t('contextMenu.quickLook'),
+          accelerator: 'Space',
+          action: () => {
+            void invoke('preview_with_quicklook', { path });
+          },
+        },
       ];
     },
     [t],

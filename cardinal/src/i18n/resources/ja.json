@@ -33,6 +33,7 @@
     }
   },
   "contextMenu": {
+    "quickLook": "クイックルック",
     "openInFinder": "Finder で開く",
     "copyPath": "パスをコピー",
     "copyFilename": "ファイル名をコピー",
