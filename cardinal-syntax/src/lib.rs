@@ -1023,7 +1023,7 @@ impl<'a> Parser<'a> {
             return Ok(None);
         }
 
-        if self.peek_char().map_or(false, |ch| ch.is_whitespace()) {
+        if self.peek_char().is_some_and(|ch| ch.is_whitespace()) {
             return Ok(None);
         }
 
