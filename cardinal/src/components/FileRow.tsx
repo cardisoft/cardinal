@@ -1,8 +1,9 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback, DragEvent } from 'react';
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import { MiddleEllipsisHighlight } from './MiddleEllipsisHighlight';
 import { formatKB, formatTimestamp } from '../utils/format';
 import type { SearchResultItem } from '../types/search';
+import { startNativeFileDrag } from '../utils/drag';
 
 type FileRowProps = {
   item?: SearchResultItem;
@@ -59,11 +60,31 @@ export const FileRow = memo(function FileRow({
     }
   };
 
+  const handleMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
+    // Select on mouse down for responsiveness.
+    if (path && onSelect && e.button === 0) {
+      onSelect(path, rowIndex);
+    }
+  };
+
   const handleClick = () => {
+    // onSelect is also here to support accessibility and other click triggers.
     if (path && onSelect) {
       onSelect(path, rowIndex);
     }
   };
+
+  const handleDragStart = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      if (!path) {
+        return;
+      }
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData('text/plain', path);
+      void startNativeFileDrag({ paths: [path], icon: item.icon });
+    },
+    [item.icon, path],
+  );
 
   const rowClassName = [
     'row',
@@ -79,7 +100,10 @@ export const FileRow = memo(function FileRow({
       style={style}
       className={rowClassName}
       onContextMenu={handleContextMenu}
+      onMouseDown={handleMouseDown}
       onClick={handleClick}
+      draggable={true}
+      onDragStart={handleDragStart}
       aria-selected={isSelected}
       title={path}
     >
