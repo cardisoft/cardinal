@@ -67,7 +67,7 @@ export const FileRow = memo(function FileRow({
   };
 
   const handleMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (path && onSelect && e.button === 0) {
+    if (!isSelected && path && onSelect && e.button === 0) {
       onSelect(path, rowIndex, {
         isShift: e.shiftKey,
         isMeta: e.metaKey,
