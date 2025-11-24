@@ -9,9 +9,14 @@ type FileRowProps = {
   item?: SearchResultItem;
   rowIndex: number;
   style?: CSSProperties;
-  onContextMenu?: (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => void;
-  onSelect?: (path: string, rowIndex: number) => void;
+  onContextMenu?: (event: ReactMouseEvent<HTMLDivElement>, path: string) => void;
+  onSelect?: (
+    path: string,
+    rowIndex: number,
+    options: { isShift: boolean; isMeta: boolean; isCtrl: boolean },
+  ) => void;
   isSelected?: boolean;
+  selectedPaths?: Set<string>;
   caseInsensitive?: boolean;
   highlightTerms?: readonly string[];
 };
@@ -23,6 +28,7 @@ export const FileRow = memo(function FileRow({
   onContextMenu,
   onSelect,
   isSelected = false,
+  selectedPaths = new Set(),
   caseInsensitive,
   highlightTerms,
 }: FileRowProps): React.JSX.Element | null {
@@ -56,21 +62,17 @@ export const FileRow = memo(function FileRow({
   const handleContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (path && onContextMenu) {
-      onContextMenu(e, path, rowIndex);
+      onContextMenu(e, path);
     }
   };
 
   const handleMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
-    // Select on mouse down for responsiveness.
     if (path && onSelect && e.button === 0) {
-      onSelect(path, rowIndex);
-    }
-  };
-
-  const handleClick = () => {
-    // onSelect is also here to support accessibility and other click triggers.
-    if (path && onSelect) {
-      onSelect(path, rowIndex);
+      onSelect(path, rowIndex, {
+        isShift: e.shiftKey,
+        isMeta: e.metaKey,
+        isCtrl: e.ctrlKey,
+      });
     }
   };
 
@@ -79,11 +81,15 @@ export const FileRow = memo(function FileRow({
       if (!path) {
         return;
       }
+
+      const isDraggingSelected = selectedPaths.has(path);
+      const pathsToDrag = isDraggingSelected ? Array.from(selectedPaths) : [path];
+
       e.dataTransfer.effectAllowed = 'copy';
-      e.dataTransfer.setData('text/plain', path);
-      void startNativeFileDrag({ paths: [path], icon: item.icon });
+      e.dataTransfer.setData('text/plain', pathsToDrag.join('\n'));
+      void startNativeFileDrag({ paths: pathsToDrag, icon: item.icon });
     },
-    [item.icon, path],
+    [item.icon, path, selectedPaths],
   );
 
   const rowClassName = [
@@ -101,7 +107,6 @@ export const FileRow = memo(function FileRow({
       className={rowClassName}
       onContextMenu={handleContextMenu}
       onMouseDown={handleMouseDown}
-      onClick={handleClick}
       draggable={true}
       onDragStart={handleDragStart}
       aria-selected={isSelected}

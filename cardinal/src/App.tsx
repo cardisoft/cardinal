@@ -23,9 +23,9 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
-import type { SlabIndex } from './types/slab';
 import { useFullDiskAccessPermission } from './hooks/useFullDiskAccessPermission';
 import { OPEN_PREFERENCES_EVENT } from './constants/appEvents';
+import { getAllPathsInRange } from './utils/selection';
 
 type ActiveTab = StatusTabKey;
 
@@ -62,12 +62,10 @@ function App() {
     lifecycleState,
   } = state;
   const [activeTab, setActiveTab] = useState<ActiveTab>('files');
-  type SelectedRow = {
-    index: number;
-    slab: SlabIndex | null;
-    path: string | null;
-  };
-  const [selectedRow, setSelectedRow] = useState<SelectedRow | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState(new Set<string>());
+  const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
+  const [shiftAnchorIndex, setShiftAnchorIndex] = useState<number | null>(null);
+
   const [isWindowFocused, setIsWindowFocused] = useState<boolean>(() => {
     if (typeof document === 'undefined') {
       return true;
@@ -87,40 +85,46 @@ function App() {
   });
   const { t } = useTranslation();
 
-  const selectRow = useCallback(
-    (rowIndex: number, pathOverride?: string | null) => {
-      if (rowIndex < 0 || rowIndex >= results.length) {
-        return;
+  const handleRowSelect = useCallback(
+    (
+      path: string,
+      rowIndex: number,
+      options: { isShift: boolean; isMeta: boolean; isCtrl: boolean },
+    ) => {
+      const { isShift, isMeta, isCtrl } = options;
+      const isCmdOrCtrl = isMeta || isCtrl;
+
+      if (isShift && shiftAnchorIndex !== null) {
+        // Shift-click for range selection (closed interval).
+        // This replaces the current selection with the new range.
+        const rangePaths = getAllPathsInRange({
+          results,
+          virtualList: virtualListRef.current,
+          startIndex: shiftAnchorIndex,
+          endIndex: rowIndex,
+        });
+        setSelectedPaths(new Set(rangePaths));
+      } else if (isCmdOrCtrl) {
+        // Cmd/Ctrl-click to toggle selection.
+        setSelectedPaths((prevPaths) => {
+          const newPaths = new Set(prevPaths);
+          if (newPaths.has(path)) {
+            newPaths.delete(path);
+          } else {
+            newPaths.add(path);
+          }
+          return newPaths;
+        });
+        setShiftAnchorIndex(rowIndex); // Set anchor on cmd-click.
+      } else {
+        // Simple click to select a single row.
+        setSelectedPaths(new Set([path]));
+        setShiftAnchorIndex(rowIndex); // Set anchor on simple click.
       }
 
-      const resolvedPath =
-        pathOverride ?? virtualListRef.current?.getItem?.(rowIndex)?.path ?? null;
-      const nextSlab = results[rowIndex] ?? null;
-
-      setSelectedRow((prev) => {
-        if (
-          prev &&
-          prev.index === rowIndex &&
-          prev.slab === nextSlab &&
-          prev.path === resolvedPath
-        ) {
-          return prev;
-        }
-        return {
-          index: rowIndex,
-          slab: nextSlab,
-          path: resolvedPath,
-        };
-      });
+      setActiveRowIndex(rowIndex);
     },
-    [results],
-  );
-
-  const handleRowSelect = useCallback(
-    (path: string, rowIndex: number) => {
-      selectRow(rowIndex, path);
-    },
-    [selectRow],
+    [shiftAnchorIndex, results],
   );
 
   const {
@@ -139,8 +143,11 @@ function App() {
     requestPermission: requestFullDiskAccessPermission,
   } = useFullDiskAccessPermission();
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
-  const selectedIndex = selectedRow?.index ?? null;
-  const selectedPath = selectedRow?.path ?? null;
+
+  const activePath =
+    activeRowIndex !== null
+      ? (virtualListRef.current?.getItem?.(activeRowIndex)?.path ?? null)
+      : null;
 
   useEffect(() => {
     if (isCheckingFullDiskAccess) {
@@ -234,7 +241,9 @@ function App() {
 
   useEffect(() => {
     if (activeTab !== 'files') {
-      setSelectedRow(null);
+      setSelectedPaths(new Set());
+      setActiveRowIndex(null);
+      setShiftAnchorIndex(null);
     }
   }, [activeTab]);
 
@@ -254,19 +263,19 @@ function App() {
         return;
       }
 
-      if (!selectedPath) {
+      if (!activePath) {
         return;
       }
 
       event.preventDefault();
-      invoke('preview_with_quicklook', { path: selectedPath }).catch((error) => {
+      invoke('preview_with_quicklook', { path: activePath }).catch((error) => {
         console.error('Failed to preview file with Quick Look', error);
       });
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, selectedPath]);
+  }, [activePath, activeTab]);
 
   useEffect(() => {
     if (activeTab !== 'files') {
@@ -294,19 +303,26 @@ function App() {
 
       const delta = event.key === 'ArrowDown' ? 1 : -1;
       const fallbackIndex = delta > 0 ? -1 : results.length;
-      const baseIndex = selectedIndex ?? fallbackIndex;
+      const baseIndex = activeRowIndex ?? fallbackIndex;
       const nextIndex = Math.min(Math.max(baseIndex + delta, 0), results.length - 1);
 
-      if (nextIndex === selectedIndex) {
+      if (nextIndex === activeRowIndex) {
         return;
       }
 
-      selectRow(nextIndex);
+      const nextPath = virtualListRef.current?.getItem?.(nextIndex)?.path;
+      if (nextPath) {
+        handleRowSelect(nextPath, nextIndex, {
+          isShift: false,
+          isMeta: false,
+          isCtrl: false,
+        });
+      }
     };
 
     window.addEventListener('keydown', handleArrowNavigation);
     return () => window.removeEventListener('keydown', handleArrowNavigation);
-  }, [activeTab, results, selectRow, selectedIndex]);
+  }, [activeRowIndex, activeTab, handleRowSelect, results.length]);
 
   useEffect(() => {
     const handleGlobalShortcuts = (event: KeyboardEvent) => {
@@ -323,23 +339,23 @@ function App() {
       }
 
       if (key === 'r') {
-        if (activeTab !== 'files' || !selectedPath) {
+        if (activeTab !== 'files' || !activePath) {
           return;
         }
         event.preventDefault();
-        invoke('open_in_finder', { path: selectedPath }).catch((error) => {
+        invoke('open_in_finder', { path: activePath }).catch((error) => {
           console.error('Failed to reveal file in Finder', error);
         });
         return;
       }
 
       if (key === 'c') {
-        if (activeTab !== 'files' || !selectedPath) {
+        if (activeTab !== 'files' || !activePath) {
           return;
         }
         event.preventDefault();
         if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-          navigator.clipboard.writeText(selectedPath).catch((error) => {
+          navigator.clipboard.writeText(activePath).catch((error) => {
             console.error('Failed to copy file path', error);
           });
         }
@@ -348,10 +364,10 @@ function App() {
 
     window.addEventListener('keydown', handleGlobalShortcuts);
     return () => window.removeEventListener('keydown', handleGlobalShortcuts);
-  }, [focusSearchInput, activeTab, selectedPath]);
+  }, [focusSearchInput, activeTab, activePath]);
 
   useEffect(() => {
-    if (selectedIndex == null) {
+    if (activeRowIndex == null) {
       return;
     }
 
@@ -360,75 +376,22 @@ function App() {
       return;
     }
 
-    list.scrollToRow?.(selectedIndex, 'nearest');
-
-    let cancelled = false;
-    const ensureResult = list.ensureRangeLoaded?.(selectedIndex, selectedIndex);
-    const ensurePromise = ensureResult instanceof Promise ? ensureResult : Promise.resolve();
-
-    void ensurePromise.then(() => {
-      if (cancelled) {
-        return;
-      }
-
-      const item = list.getItem?.(selectedIndex);
-      if (!item?.path) {
-        return;
-      }
-
-      setSelectedRow((prev) => {
-        if (!prev || prev.index !== selectedIndex || prev.path === item.path) {
-          return prev;
-        }
-        return { ...prev, path: item.path };
-      });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedIndex]);
+    list.scrollToRow?.(activeRowIndex, 'nearest');
+  }, [activeRowIndex]);
 
   useEffect(() => {
     if (!results.length) {
-      setSelectedRow(null);
+      setSelectedPaths(new Set());
+      setActiveRowIndex(null);
+      setShiftAnchorIndex(null);
       return;
     }
 
-    setSelectedRow((prev) => {
-      if (!prev) {
-        return prev;
-      }
-
-      const { slab, index, path } = prev;
-      let nextIndex = -1;
-
-      if (slab != null) {
-        nextIndex = results.findIndex((candidate) => candidate === slab);
-      }
-
-      if (nextIndex === -1) {
-        nextIndex = Math.min(index, results.length - 1);
-      }
-
-      if (nextIndex < 0) {
-        return null;
-      }
-
-      const nextSlab = results[nextIndex] ?? null;
-      if (nextIndex === index && nextSlab === slab) {
-        return prev;
-      }
-
-      const list = virtualListRef.current;
-      const resolvedPath = list?.getItem?.(nextIndex)?.path ?? null;
-
-      return {
-        index: nextIndex,
-        slab: nextSlab,
-        path: resolvedPath ?? (nextIndex === index ? path : null),
-      };
-    });
+    // Naive implementation: just clear selection.
+    // A more robust solution might try to preserve selection based on paths.
+    setSelectedPaths(new Set());
+    setActiveRowIndex(null);
+    setShiftAnchorIndex(null);
   }, [results]);
 
   const onQueryChange = useCallback(
@@ -475,28 +438,37 @@ function App() {
   }, []);
 
   const handleRowContextMenu = useCallback(
-    (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => {
-      handleRowSelect(path, rowIndex);
+    (event: ReactMouseEvent<HTMLDivElement>, path: string) => {
+      // If right-clicking a non-selected file, clear existing selection and select it.
+      if (!selectedPaths.has(path)) {
+        setSelectedPaths(new Set([path]));
+      }
       showFilesContextMenu(event, path);
     },
-    [handleRowSelect, showFilesContextMenu],
+    [selectedPaths, showFilesContextMenu],
   );
 
   const renderRow = useCallback(
-    (rowIndex: number, item: SearchResultItem | undefined, rowStyle: CSSProperties) => (
-      <FileRow
-        key={rowIndex}
-        item={item}
-        rowIndex={rowIndex}
-        style={{ ...rowStyle, width: 'var(--columns-total)' }} // Enforce column width CSS vars for virtualization rows
-        onContextMenu={(event, path) => handleRowContextMenu(event, path, rowIndex)}
-        onSelect={(path) => handleRowSelect(path, rowIndex)}
-        isSelected={selectedIndex === rowIndex}
-        caseInsensitive={!caseSensitive}
-        highlightTerms={highlightTerms}
-      />
-    ),
-    [handleRowContextMenu, handleRowSelect, selectedIndex, caseSensitive, highlightTerms],
+    (rowIndex: number, item: SearchResultItem | undefined, rowStyle: CSSProperties) => {
+      const path = item?.path;
+      const isSelected = !!path && selectedPaths.has(path);
+
+      return (
+        <FileRow
+          key={item?.path ?? rowIndex}
+          item={item}
+          rowIndex={rowIndex}
+          style={{ ...rowStyle, width: 'var(--columns-total)' }} // Enforce column width CSS vars for virtualization rows
+          onContextMenu={(event, contextPath) => handleRowContextMenu(event, contextPath)}
+          onSelect={handleRowSelect}
+          isSelected={isSelected}
+          selectedPaths={selectedPaths}
+          caseInsensitive={!caseSensitive}
+          highlightTerms={highlightTerms}
+        />
+      );
+    },
+    [handleRowContextMenu, handleRowSelect, selectedPaths, caseSensitive, highlightTerms],
   );
 
   const displayState: 'loading' | 'error' | 'empty' | 'results' = (() => {
