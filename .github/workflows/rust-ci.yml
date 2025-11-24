@@ -23,19 +23,12 @@ jobs:
         include:
           - name: fmt
             command: cargo fmt --all -- --check
-            install_taplo: false
-          - name: taplo
-            command: taplo fmt --check
-            install_taplo: true
           - name: clippy
             command: cargo clippy --workspace --all-targets -- -D warnings
-            install_taplo: false
           - name: check
             command: cargo check --workspace --all-targets
-            install_taplo: false
           - name: test
             command: cargo test --workspace
-            install_taplo: false
 
     steps:
       - name: Checkout repository
@@ -50,12 +43,6 @@ jobs:
       - name: Cache cargo build artifacts
         uses: Swatinem/rust-cache@v2
 
-      - name: Install Taplo CLI
-        if: ${{ matrix.install_taplo }}
-        uses: taiki-e/install-action@v2
-        with:
-          tool: taplo-cli
-
       - name: Run ${{ matrix.name }}
         run: ${{ matrix.command }}
 
@@ -68,19 +55,12 @@ jobs:
         include:
           - name: fmt
             command: cargo fmt -- --check
-            install_taplo: false
-          - name: taplo
-            command: taplo fmt --check
-            install_taplo: true
           - name: clippy
             command: cargo clippy --all-targets -- -D warnings
-            install_taplo: false
           - name: check
             command: cargo check --all-targets
-            install_taplo: false
           - name: test
             command: cargo test
-            install_taplo: false
     defaults:
       run:
         working-directory: cardinal/src-tauri
@@ -99,12 +79,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: cardinal/src-tauri
-
-      - name: Install Taplo CLI
-        if: ${{ matrix.install_taplo }}
-        uses: taiki-e/install-action@v2
-        with:
-          tool: taplo-cli
 
       - name: Run ${{ matrix.name }}
         run: ${{ matrix.command }}
