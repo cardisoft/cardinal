@@ -52,7 +52,7 @@ fn single_segment_wildcard_complex_pattern_case_insensitive() {
         "Lowercase variant should match"
     );
     // Uppercase variant may be excluded depending on segmentation behavior; ensure at least one match.
-    assert!(nodes.len() >= 1);
+    assert!(!nodes.is_empty());
 }
 
 #[test]
@@ -192,7 +192,7 @@ fn multi_segment_wildcard_intersection_case_insensitive() {
     ));
     let nodes = cache.expand_file_nodes(&indices);
     // Some case-insensitive paths may not be matched due to current wildcard segmentation; ensure lowercase variants matched.
-    assert!(nodes.len() >= 1);
+    assert!(!nodes.is_empty());
     for n in &nodes {
         let name = n.path.file_name().unwrap().to_string_lossy();
         assert!(name.to_ascii_lowercase().contains("alpha"));

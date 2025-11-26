@@ -168,12 +168,10 @@ fn trailing_slash_deep_exact_directory() {
         guard_indices(cache.search_with_options("a/b/c/d/", opts, CancellationToken::noop()));
     let names = normalize(&mut cache, &indices, root);
     println!(
-        "wildcard_last_segment_multiple_extensions names={:?}",
-        names
+        "wildcard_last_segment_multiple_extensions names={names:?}"
     );
     println!(
-        "mixed_case_segments_case_sensitive_behavior names={:?}",
-        names
+        "mixed_case_segments_case_sensitive_behavior names={names:?}"
     );
     // Only the exact directory "a/b/c/d" should appear; variants excluded.
     assert!(
@@ -327,8 +325,7 @@ fn wildcard_last_segment_multiple_extensions_case_insensitive() {
     ));
     let names = normalize(&mut cache, &indices, root);
     println!(
-        "wildcard_last_segment_multiple_extensions_case_insensitive names={:?}",
-        names
+        "wildcard_last_segment_multiple_extensions_case_insensitive names={names:?}"
     );
     // Case-insensitive should pick README.MD; wildcard picks readmeX.md also.
     assert!(names.iter().any(|n| n.ends_with("README.MD")));
@@ -752,8 +749,7 @@ fn mixed_wildcard_case_sensitive_file_variants() {
     ));
     let names = normalize(&mut cache, &indices, root);
     println!(
-        "mixed_wildcard_case_sensitive_file_variants names={:?}",
-        names
+        "mixed_wildcard_case_sensitive_file_variants names={names:?}"
     );
     assert!(
         names.iter().any(|n| n.ends_with("app/config/readme.md")),
@@ -791,8 +787,7 @@ fn mixed_wildcard_case_insensitive_file_variants() {
     ));
     let names = normalize(&mut cache, &indices, root);
     println!(
-        "mixed_wildcard_case_insensitive_file_variants names={:?}",
-        names
+        "mixed_wildcard_case_insensitive_file_variants names={names:?}"
     );
     // Case-insensitive should collect lowercase and uppercase filename variants (across different parents).
     assert!(names.iter().any(|n| n.ends_with("app/config/readme.md")));
