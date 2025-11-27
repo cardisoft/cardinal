@@ -66,7 +66,6 @@ function App() {
   const [selectedPaths, setSelectedPaths] = useState(new Set<string>());
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
   const [shiftAnchorIndex, setShiftAnchorIndex] = useState<number | null>(null);
-  const [isQuickLookActive, setIsQuickLookActive] = useState<boolean>(false);
 
   const [isWindowFocused, setIsWindowFocused] = useState<boolean>(() => {
     if (typeof document === 'undefined') {
@@ -132,7 +131,7 @@ function App() {
   const {
     showContextMenu: showFilesContextMenu,
     showHeaderContextMenu: showFilesHeaderContextMenu,
-  } = useContextMenu(autoFitColumns, () => setIsQuickLookActive(true));
+  } = useContextMenu(autoFitColumns, selectedPaths);
 
   const {
     showContextMenu: showEventsContextMenu,
@@ -250,45 +249,57 @@ function App() {
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab !== 'files') return;
+    if (activeTab === 'files') {
+      return;
+    }
+
+    // Close Quick Look when leaving the files tab
+    invoke('close_quicklook').catch((error) => {
+      console.error('Failed to close Quick Look', error);
+    });
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'files') {
+      return;
+    }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isEditableTarget(event.target as HTMLElement)) return;
-
-      if (event.code === 'Space' || event.key === ' ') {
-        event.preventDefault();
-
-        if (!activePath) return;
-
-        invoke<boolean>('toggle_quicklook', { path: activePath })
-          .then(setIsQuickLookActive)
-          .catch((error) => {
-            console.error('Failed to preview file with Quick Look', error);
-          });
+      const isSpaceKey = event.code === 'Space' || event.key === ' ';
+      if (!isSpaceKey || event.repeat) {
+        return;
       }
 
-      if (event.code === 'Escape') {
-        if (isQuickLookActive && activePath) {
-          invoke<boolean>('toggle_quicklook', { path: activePath })
-            .then(() => setIsQuickLookActive(false))
-            .catch((error) => {
-              console.error('Failed to close Quick Look', error);
-            });
-        }
+      const target = event.target as HTMLElement | null;
+      if (isEditableTarget(target)) {
+        return;
       }
+
+      const previewPaths = selectedPaths.size ? Array.from(selectedPaths) : [];
+      if (!previewPaths.length) {
+        return;
+      }
+
+      event.preventDefault();
+      invoke('open_quicklook', { paths: previewPaths }).catch((error) => {
+        console.error('Failed to preview file with Quick Look', error);
+      });
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, activePath, isQuickLookActive]);
+  }, [activeTab, selectedPaths]);
 
   useEffect(() => {
-    if (isQuickLookActive && activePath) {
-      invoke('update_quicklook', { path: activePath }).catch((error) => {
-        console.error('Failed to update Quick Look', error);
-      });
+    if (!selectedPaths.size) {
+      return;
     }
-  }, [activePath, isQuickLookActive]);
+
+    const previewPaths = Array.from(selectedPaths);
+    invoke('update_quicklook', { paths: previewPaths }).catch((error) => {
+      console.error('Failed to update Quick Look', error);
+    });
+  }, [selectedPaths]);
 
   useEffect(() => {
     if (activeTab !== 'files') {

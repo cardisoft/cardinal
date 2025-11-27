@@ -26,8 +26,6 @@
   --row-selected-hover-bg: rgb(0, 100, 225);
   --row-selected-text: #ffffff;
   --row-selected-muted-text: rgba(255, 255, 255, 0.85);
-  --row-selected-ql-bg: rgb(0, 100, 225);
-  --row-selected-ql-muted-text: rgba(255, 255, 255, 0.85);
   --search-toggle-hover-bg: rgba(0, 0, 0, 0.06);
   /* Remove custom scrollbar color overrides. */
 
@@ -1472,22 +1470,4 @@ button:active {
   flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
-}
-
-/* Quicklook active row styles */
-.quicklook-active .row-selected {
-  background-color: var(--row-selected-ql-bg) !important;
-  color: #ffffff !important;
-}
-
-.quicklook-active .row-selected .mtime-text,
-.quicklook-active .row-selected .ctime-text,
-.quicklook-active .row-selected .size-text,
-.quicklook-active .row-selected .path-text,
-.quicklook-active .row-selected .filename-text {
-  color: var(--row-selected-ql-muted-text) !important;
-}
-
-.quicklook-active .row:not(.row-selected):hover {
-  background-color: transparent !important;
 }

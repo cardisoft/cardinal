@@ -1,227 +1,222 @@
-#[cfg(target_os = "macos")]
-pub use macos_impl::*;
+use crate::window_controls::trigger_quick_launch;
+use camino::Utf8Path;
+use objc2::{
+    DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained,
+    runtime::ProtocolObject,
+};
+use objc2_app_kit::NSWindowDelegate;
+use objc2_foundation::{NSInteger, NSNotification, NSObject, NSObjectProtocol, NSString, NSURL};
+use objc2_quick_look_ui::{
+    QLPreviewItem, QLPreviewPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegate,
+};
+use std::cell::RefCell;
+use tauri::{AppHandle, Manager};
 
-#[cfg(target_os = "macos")]
-mod macos_impl {
-    use block2::RcBlock;
-    use objc2::{
-        AnyThread, DefinedClass, MainThreadMarker, define_class, msg_send,
-        rc::Retained,
-        runtime::{AnyObject, ProtocolObject},
+thread_local! {
+    static PREVIEW_CONTROLLER: RefCell<Option<Retained<PreviewController>>> = const { RefCell::new(None) };
+}
+
+fn clear_preview_controller() {
+    PREVIEW_CONTROLLER.with(|cell| {
+        cell.borrow_mut().take();
+    });
+}
+
+struct PreviewItemState {
+    url: Retained<NSURL>,
+    title: Option<Retained<NSString>>,
+}
+
+define_class!(
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "CardinalPreviewItem"]
+    #[ivars = PreviewItemState]
+    struct PreviewItemImpl;
+
+    unsafe impl NSObjectProtocol for PreviewItemImpl {}
+    unsafe impl QLPreviewItem for PreviewItemImpl {
+        #[allow(non_snake_case)]
+        #[unsafe(method_id(previewItemURL))]
+        unsafe fn previewItemURL(&self) -> Option<Retained<NSURL>> {
+            Some(self.ivars().url.clone())
+        }
+
+        #[allow(non_snake_case)]
+        #[unsafe(method_id(previewItemTitle))]
+        unsafe fn previewItemTitle(&self) -> Option<Retained<NSString>> {
+            self.ivars().title.clone()
+        }
+    }
+);
+
+impl PreviewItemImpl {
+    fn new(
+        mtm: MainThreadMarker,
+        url: Retained<NSURL>,
+        title: Option<Retained<NSString>>,
+    ) -> Retained<Self> {
+        let obj = PreviewItemImpl::alloc(mtm).set_ivars(PreviewItemState { url, title });
+        unsafe { msg_send![super(obj), init] }
+    }
+}
+
+#[derive(Default)]
+struct PreviewControllerState {
+    items: RefCell<Vec<Retained<ProtocolObject<dyn QLPreviewItem>>>>,
+}
+
+define_class!(
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "CardinalPreviewController"]
+    #[ivars = PreviewControllerState]
+    struct PreviewController;
+
+    unsafe impl NSObjectProtocol for PreviewController {}
+    unsafe impl NSWindowDelegate for PreviewController {
+        #[allow(non_snake_case)]
+        #[unsafe(method(windowWillClose:))]
+        unsafe fn windowWillClose(&self, _notification: &NSNotification) {
+            clear_preview_controller();
+        }
+    }
+    unsafe impl QLPreviewPanelDataSource for PreviewController {
+        #[allow(non_snake_case)]
+        #[unsafe(method(numberOfPreviewItemsInPreviewPanel:))]
+        fn numberOfPreviewItemsInPreviewPanel(&self, _panel: Option<&QLPreviewPanel>) -> NSInteger {
+            self.ivars().items.borrow().len() as NSInteger
+        }
+
+        #[allow(non_snake_case)]
+        #[unsafe(method_id(previewPanel:previewItemAtIndex:))]
+        fn previewPanel_previewItemAtIndex(
+            &self,
+            _panel: Option<&QLPreviewPanel>,
+            index: NSInteger,
+        ) -> Option<Retained<ProtocolObject<dyn QLPreviewItem>>> {
+            if index < 0 {
+                None
+            } else {
+                let index = index as usize;
+                self.ivars().items.borrow().get(index).cloned()
+            }
+        }
+    }
+
+    unsafe impl QLPreviewPanelDelegate for PreviewController {}
+);
+
+impl PreviewController {
+    fn new(mtm: MainThreadMarker) -> Retained<Self> {
+        let obj = PreviewController::alloc(mtm).set_ivars(PreviewControllerState::default());
+        unsafe { msg_send![super(obj), init] }
+    }
+}
+
+fn preview_controller(mtm: MainThreadMarker) -> Retained<PreviewController> {
+    PREVIEW_CONTROLLER.with(|cell| {
+        if let Some(controller) = cell.borrow().as_ref() {
+            return controller.clone();
+        }
+
+        let controller = PreviewController::new(mtm);
+        cell.borrow_mut().replace(controller.clone());
+        controller
+    })
+}
+
+fn build_preview_item(
+    mtm: MainThreadMarker,
+    path: &str,
+) -> Retained<ProtocolObject<dyn QLPreviewItem>> {
+    let url = NSURL::fileURLWithPath(&NSString::from_str(path));
+    let title = Utf8Path::new(path)
+        .file_name()
+        .filter(|name| !name.is_empty())
+        .map(NSString::from_str);
+
+    let item = PreviewItemImpl::new(mtm, url, title);
+    ProtocolObject::from_retained(item)
+}
+
+fn build_preview_items(
+    mtm: MainThreadMarker,
+    paths: Vec<String>,
+) -> Vec<Retained<ProtocolObject<dyn QLPreviewItem>>> {
+    paths
+        .into_iter()
+        .map(|path| build_preview_item(mtm, &path))
+        .collect()
+}
+
+fn set_preview_items(mtm: MainThreadMarker, paths: Vec<String>) {
+    let controller = preview_controller(mtm);
+    let items = build_preview_items(mtm, paths);
+    *controller.ivars().items.borrow_mut() = items;
+}
+
+fn setup_panel(mtm: MainThreadMarker, panel: &Retained<QLPreviewPanel>) {
+    let controller = preview_controller(mtm);
+    let data_source = ProtocolObject::from_ref(&*controller);
+    let delegate: &ProtocolObject<dyn QLPreviewPanelDelegate> =
+        ProtocolObject::from_ref(&*controller);
+    let has_items = !controller.ivars().items.borrow().is_empty();
+
+    unsafe {
+        panel.setDataSource(Some(data_source));
+        panel.setDelegate(Some(delegate.as_ref()));
+        panel.updateController();
+        panel.reloadData();
+        if has_items {
+            panel.setCurrentPreviewItemIndex(0);
+            panel.refreshCurrentPreviewItem();
+        }
+    }
+}
+
+fn shared_panel() -> Option<(MainThreadMarker, Retained<QLPreviewPanel>)> {
+    let mtm = MainThreadMarker::new()?;
+    let panel = unsafe { QLPreviewPanel::sharedPreviewPanel(mtm)? };
+    Some((mtm, panel))
+}
+
+pub fn open_preview_panel(paths: Vec<String>) {
+    let Some((mtm, panel)) = shared_panel() else {
+        return;
     };
-    use objc2_app_kit::{NSEvent, NSEventMask, NSEventType, NSWindow};
-    use objc2_foundation::{NSInteger, NSObject, NSObjectProtocol, NSString, NSURL};
-    use objc2_quick_look_ui::{QLPreviewPanel, QLPreviewPanelDataSource};
-    use std::{
-        ffi::c_void,
-        ptr::{self, NonNull},
-        sync::{Mutex, OnceLock},
+
+    set_preview_items(mtm, paths);
+    setup_panel(mtm, &panel);
+    panel.makeKeyAndOrderFront(None);
+}
+
+pub fn update_preview_panel(paths: Vec<String>) {
+    let Some((mtm, panel)) = shared_panel() else {
+        return;
     };
 
-    // Thread-safe wrapper
-    // SAFETY: This wrapper is only used for Retained<AnyObject> from the event monitor.
-    // According to Apple documentation,
-    // NSEvent monitor objects are thread-safe and can be safely shared across threads.
-    // Therefore, it is safe to implement Send and Sync for this specific usage.
-    struct SendSyncWrapper<T>(T);
-    unsafe impl<T> Send for SendSyncWrapper<T> {}
-    unsafe impl<T> Sync for SendSyncWrapper<T> {}
-
-    enum PanelAction {
-        Update,
-        Toggle,
-        Open,
+    if !panel.isVisible() {
+        clear_preview_controller();
+        return;
     }
 
-    #[derive(Default)]
-    struct State {
-        url: Mutex<Option<Retained<NSURL>>>,
-    }
+    set_preview_items(mtm, paths);
+    setup_panel(mtm, &panel);
+}
 
-    define_class!(
-        #[unsafe(super(NSObject))]
-        #[name = "SimpleQLDataSource"]
-        #[ivars = State]
-        struct DataSource;
+pub fn close_preview_panel(app_handle: AppHandle) {
+    let Some((_, panel)) = shared_panel() else {
+        clear_preview_controller();
+        return;
+    };
 
-        unsafe impl NSObjectProtocol for DataSource {}
-        unsafe impl QLPreviewPanelDataSource for DataSource {}
-
-        impl DataSource {
-            #[unsafe(method(numberOfPreviewItemsInPreviewPanel:))]
-            fn count(&self, _panel: &QLPreviewPanel) -> NSInteger {
-                self.ivars().url.lock().unwrap().is_some() as NSInteger
-            }
-
-            #[unsafe(method_id(previewPanel:previewItemAtIndex:))]
-            fn item(&self, _panel: &QLPreviewPanel, _idx: NSInteger) -> Option<Retained<NSURL>> {
-                self.ivars().url.lock().unwrap().clone()
-            }
-        }
-    );
-
-    static DELEGATE: OnceLock<Retained<DataSource>> = OnceLock::new();
-    static EVENT_MONITOR: Mutex<Option<SendSyncWrapper<Retained<AnyObject>>>> = Mutex::new(None);
-    static INTERCEPT_MODE: Mutex<bool> = Mutex::new(true);
-
-    fn get_or_create_delegate() -> Retained<DataSource> {
-        DELEGATE
-            .get_or_init(|| {
-                let obj = DataSource::alloc().set_ivars(State::default());
-                unsafe { msg_send![super(obj), init] }
-            })
-            .clone()
-    }
-
-    fn set_delegate_url(path: &str) -> Retained<DataSource> {
-        let delegate: Retained<DataSource> = get_or_create_delegate();
-        let url: Retained<NSURL> = NSURL::fileURLWithPath(&NSString::from_str(path));
-        *delegate.ivars().url.lock().unwrap() = Some(url);
-        delegate
-    }
-
-    fn get_panel(mtm: MainThreadMarker) -> Option<Retained<QLPreviewPanel>> {
-        unsafe { QLPreviewPanel::sharedPreviewPanel(mtm) }
-    }
-
-    fn setup_panel(delegate: &Retained<DataSource>, panel: &Retained<QLPreviewPanel>) {
-        let ds_protocol: &ProtocolObject<dyn QLPreviewPanelDataSource> =
-            ProtocolObject::<dyn QLPreviewPanelDataSource>::from_ref(&**delegate);
-        unsafe {
-            panel.setDataSource(Some(ds_protocol));
-            panel.reloadData();
+    if panel.isVisible() {
+        panel.close();
+        if let Some(window) = app_handle.get_webview_window("main") {
+            trigger_quick_launch(&window);
         }
     }
 
-    fn handle_preview_panel(path: &str, main_window: *mut c_void, action: PanelAction) -> bool {
-        let Some(mtm): Option<MainThreadMarker> = MainThreadMarker::new() else {
-            return false;
-        };
-
-        unsafe {
-            _ensure_event_monitor(main_window);
-        }
-        _enable_interception();
-
-        let Some(panel): Option<Retained<QLPreviewPanel>> = get_panel(mtm) else {
-            return false;
-        };
-
-        match action {
-            PanelAction::Update => {
-                if panel.isVisible() {
-                    let delegate: Retained<DataSource> = set_delegate_url(path);
-                    setup_panel(&delegate, &panel);
-                }
-                false
-            }
-            PanelAction::Toggle => unsafe {
-                if panel.isVisible() {
-                    panel.close();
-                    if !main_window.is_null() {
-                        let mw: &NSWindow = &*(main_window as *const NSWindow);
-                        mw.makeKeyWindow();
-                    }
-                    false
-                } else {
-                    let delegate: Retained<DataSource> = set_delegate_url(path);
-                    setup_panel(&delegate, &panel);
-                    panel.makeKeyAndOrderFront(None);
-                    true
-                }
-            },
-            PanelAction::Open => {
-                let delegate: Retained<DataSource> = set_delegate_url(path);
-                setup_panel(&delegate, &panel);
-                panel.makeKeyAndOrderFront(None);
-                true
-            }
-        }
-    }
-
-    fn _enable_interception() {
-        if let Ok(mut guard) = INTERCEPT_MODE.lock() {
-            *guard = true;
-        }
-    }
-
-    unsafe fn _ensure_event_monitor(main_window: *mut c_void) {
-        let mut monitor_guard: std::sync::MutexGuard<
-            '_,
-            Option<SendSyncWrapper<Retained<AnyObject>>>,
-        > = match EVENT_MONITOR.lock().ok() {
-            Some(guard) => guard,
-            None => return,
-        };
-
-        if monitor_guard.is_none() || main_window.is_null() {
-            return;
-        }
-
-        let main_window_addr: usize = main_window as usize;
-
-        let handler = RcBlock::new(move |event: NonNull<NSEvent>| -> *mut NSEvent {
-            let mtm: MainThreadMarker = unsafe { MainThreadMarker::new_unchecked() };
-            unsafe {
-                let event_ref: &NSEvent = event.as_ref();
-                let event_type: NSEventType = event_ref.r#type();
-
-                // Handle left mouse down - disable interception if clicking on panel
-                if event_type == NSEventType::LeftMouseDown {
-                    if let (Some(win), Some(panel)) = (
-                        event_ref.window(mtm),
-                        QLPreviewPanel::sharedPreviewPanel(mtm),
-                    ) {
-                        if Retained::as_ptr(&win) as *const AnyObject
-                            == Retained::as_ptr(&panel) as *const AnyObject
-                        {
-                            if let Ok(mut guard) = INTERCEPT_MODE.lock() {
-                                *guard = false;
-                            }
-                        }
-                    }
-                    return event.as_ptr();
-                }
-
-                // Handle key down - forward specific keys to main window
-                if event_type == NSEventType::KeyDown {
-                    if let Some(panel) = QLPreviewPanel::sharedPreviewPanel(mtm) {
-                        let is_key: bool = msg_send![&panel, isKeyWindow];
-                        if panel.isVisible() && is_key {
-                            let should_intercept: bool =
-                                INTERCEPT_MODE.lock().ok().map(|b| *b).unwrap_or(true);
-                            if should_intercept {
-                                let key_code: u16 = event_ref.keyCode();
-                                // 126=Up, 125=Down, 49=Space
-                                if [126, 125, 49].contains(&key_code) {
-                                    (*(main_window_addr as *const NSWindow)).keyDown(event_ref);
-                                    return ptr::null_mut();
-                                }
-                            }
-                        }
-                    }
-                }
-                event.as_ptr()
-            }
-        });
-
-        let mask: NSEventMask = NSEventMask::KeyDown.union(NSEventMask::LeftMouseDown);
-        if let Some(monitor) =
-            unsafe { NSEvent::addLocalMonitorForEventsMatchingMask_handler(mask, &handler) }
-        {
-            *monitor_guard = Some(SendSyncWrapper(monitor));
-        }
-    }
-
-    pub fn update(path: &str, main_window: *mut c_void) -> bool {
-        handle_preview_panel(path, main_window, PanelAction::Update)
-    }
-
-    pub fn toggle(path: &str, main_window: *mut c_void) -> bool {
-        handle_preview_panel(path, main_window, PanelAction::Toggle)
-    }
-
-    pub fn open(path: &str, main_window: *mut c_void) -> bool {
-        handle_preview_panel(path, main_window, PanelAction::Open)
-    }
+    clear_preview_controller();
 }

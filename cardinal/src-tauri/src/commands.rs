@@ -1,6 +1,7 @@
 use crate::{
     LOGIC_START,
     lifecycle::{EXIT_REQUESTED, load_app_state},
+    quicklook::{close_preview_panel, open_preview_panel, update_preview_panel},
     window_controls::{WindowToggle, activate_window, hide_window, toggle_window},
 };
 use anyhow::Result;
@@ -10,7 +11,7 @@ use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, Sl
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
 use std::{process::Command, sync::atomic::Ordering};
-use tauri::{AppHandle, Manager, State, WebviewWindow};
+use tauri::{AppHandle, Manager, State};
 use tracing::{info, warn};
 
 #[derive(Debug, Clone, Copy, Deserialize, Default)]
@@ -97,38 +98,36 @@ impl NodeInfoMetadata {
     }
 }
 
-macro_rules! quicklook_command {
-    ($name:ident, $quicklook_fn:path) => {
-        #[tauri::command]
-        pub fn $name(window: WebviewWindow, path: String) -> Result<bool, String> {
-            #[cfg(target_os = "macos")]
-            {
-                let ns_window_handle = window
-                    .ns_window()
-                    .map_err(|e| format!("Failed to get window handle: {e}"))?;
-
-                let window_ptr_addr: usize = ns_window_handle as usize;
-                let (tx, rx) = std::sync::mpsc::channel();
-
-                let _ = window.app_handle().run_on_main_thread(move || {
-                    let result = $quicklook_fn(&path, window_ptr_addr as *mut std::ffi::c_void);
-                    let _ = tx.send(result);
-                });
-
-                rx.recv()
-                    .map_err(|_| "Failed to receive quicklook result".into())
-            }
-            #[cfg(not(target_os = "macos"))]
-            {
-                Err("QuickLook is only available on macOS".into())
-            }
-        }
-    };
+#[tauri::command]
+pub fn close_quicklook(app_handle: AppHandle) -> Result<(), String> {
+    let app_handle_cloned = app_handle.clone();
+    app_handle
+        .run_on_main_thread(move || {
+            close_preview_panel(app_handle_cloned);
+        })
+        .map_err(|e| format!("Failed to dispatch quicklook action: {e:?}"))?;
+    Ok(())
 }
 
-quicklook_command!(toggle_quicklook, crate::quicklook::toggle);
-quicklook_command!(update_quicklook, crate::quicklook::update);
-quicklook_command!(open_quicklook, crate::quicklook::open);
+#[tauri::command]
+pub fn update_quicklook(app_handle: AppHandle, paths: Vec<String>) -> Result<(), String> {
+    app_handle
+        .run_on_main_thread(move || {
+            update_preview_panel(paths);
+        })
+        .map_err(|e| format!("Failed to dispatch quicklook action: {e:?}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_quicklook(app_handle: AppHandle, paths: Vec<String>) -> Result<(), String> {
+    app_handle
+        .run_on_main_thread(move || {
+            open_preview_panel(paths);
+        })
+        .map_err(|e| format!("Failed to dispatch quicklook action: {e:?}"))?;
+    Ok(())
+}
 
 #[tauri::command]
 pub async fn search(
