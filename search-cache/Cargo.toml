@@ -12,7 +12,6 @@ query-segmentation = { path = "../query-segmentation" }
 search-cancel = { path = "../search-cancel" }
 zstd = { version = "0.13", features = ["zstdmt"] }
 serde = { version = "1", features = ["derive"] }
-slab = { version = "0.4", features = ["serde"] }
 anyhow = "1.0.97"
 memchr = "2.7"
 crossbeam-channel = "0.5.15"
@@ -28,6 +27,7 @@ hashbrown = { version = "0.16.0", features = ["serde"] }
 regex = "1"
 jiff = "0.2"
 rayon = "1.9"
+slab-mmap = { path = "../slab-mmap" }
 
 [dev-dependencies]
 tempdir = "0.3"
