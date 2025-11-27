@@ -101,27 +101,20 @@ macro_rules! quicklook_command {
     ($name:ident, $quicklook_fn:path) => {
         #[tauri::command]
         pub fn $name(window: WebviewWindow, path: String) -> Result<bool, String> {
-            #[cfg(target_os = "macos")]
-            {
-                let ns_window_handle = window
-                    .ns_window()
-                    .map_err(|e| format!("Failed to get window handle: {e}"))?;
+            let ns_window_handle = window
+                .ns_window()
+                .map_err(|e| format!("Failed to get window handle: {e}"))?;
 
-                let window_ptr_addr: usize = ns_window_handle as usize;
-                let (tx, rx) = std::sync::mpsc::channel();
+            let window_ptr_addr: usize = ns_window_handle as usize;
+            let (tx, rx) = std::sync::mpsc::channel();
 
-                let _ = window.app_handle().run_on_main_thread(move || {
-                    let result = $quicklook_fn(&path, window_ptr_addr as *mut std::ffi::c_void);
-                    let _ = tx.send(result);
-                });
+            let _ = window.app_handle().run_on_main_thread(move || {
+                let result = $quicklook_fn(&path, window_ptr_addr as *mut std::ffi::c_void);
+                let _ = tx.send(result);
+            });
 
-                rx.recv()
-                    .map_err(|_| "Failed to receive quicklook result".into())
-            }
-            #[cfg(not(target_os = "macos"))]
-            {
-                Err("QuickLook is only available on macOS".into())
-            }
+            rx.recv()
+                .map_err(|_| "Failed to receive quicklook result".into())
         }
     };
 }
