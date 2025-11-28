@@ -10,5 +10,6 @@ members = [
   "query-segmentation",
   "cardinal-syntax",
   "search-cancel",
+  "slab-mmap",
 ]
 exclude = ["cardinal"]

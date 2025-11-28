@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use slab_mmap::{Slab, SlabIter};
+use std::io;
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 #[repr(transparent)]
@@ -53,7 +55,7 @@ impl SlabIndex {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 #[repr(transparent)]
-pub struct ThinSlab<T>(slab::Slab<T>);
+pub struct ThinSlab<T>(Slab<T>);
 
 impl<T> Default for ThinSlab<T> {
     fn default() -> Self {
@@ -62,12 +64,31 @@ impl<T> Default for ThinSlab<T> {
 }
 
 impl<T> ThinSlab<T> {
+    /// Construct a ThinSlab, panicking if the mmap initialization fails.
     pub fn new() -> Self {
-        Self(slab::Slab::new())
+        Self::try_new().expect("ThinSlab::new failed to initialize memory-mapped slab")
     }
 
+    /// Construct a ThinSlab while propagating I/O failures to the caller.
+    pub fn try_new() -> io::Result<Self> {
+        Slab::new().map(Self)
+    }
+
+    /// Inserts a value into the slab.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the underlying memory-mapped slab needs to grow and the operation fails due to an I/O error (e.g., disk full, permission denied, etc.).
+    /// If you need to handle such errors gracefully, use [`try_insert`](Self::try_insert) instead.
     pub fn insert(&mut self, value: T) -> SlabIndex {
-        SlabIndex::new(self.0.insert(value))
+        self.try_insert(value)
+            .expect("ThinSlab::insert failed to grow backing slab")
+    }
+
+    /// Insert a value while allowing callers to handle any I/O failures emitted
+    /// by the backing slab.
+    pub fn try_insert(&mut self, value: T) -> io::Result<SlabIndex> {
+        self.0.insert(value).map(SlabIndex::new)
     }
 
     pub fn get(&self, index: SlabIndex) -> Option<&T> {
@@ -109,7 +130,7 @@ impl<T> std::ops::IndexMut<SlabIndex> for ThinSlab<T> {
     }
 }
 
-pub struct ThinSlabIter<'a, T>(slab::Iter<'a, T>);
+pub struct ThinSlabIter<'a, T>(SlabIter<'a, T>);
 
 impl<'a, T> Iterator for ThinSlabIter<'a, T> {
     type Item = (SlabIndex, &'a T);
@@ -118,5 +139,30 @@ impl<'a, T> Iterator for ThinSlabIter<'a, T> {
         self.0
             .next()
             .map(|(index, value)| (SlabIndex::new(index), value))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn thin_slab_try_new_is_empty() {
+        let slab = ThinSlab::<i32>::try_new().expect("ThinSlab::try_new should succeed");
+        assert!(slab.is_empty());
+        assert_eq!(slab.len(), 0);
+    }
+
+    #[test]
+    fn thin_slab_try_insert_round_trips() {
+        let mut slab = ThinSlab::<i32>::try_new().expect("ThinSlab::try_new should succeed");
+        let idx_try = slab
+            .try_insert(7)
+            .expect("ThinSlab::try_insert should succeed for in-memory data");
+        assert_eq!(slab.get(idx_try), Some(&7));
+
+        let idx_insert = slab.insert(99);
+        assert_eq!(slab[idx_insert], 99);
+        assert_ne!(idx_try, idx_insert);
     }
 }

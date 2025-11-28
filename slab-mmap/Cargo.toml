@@ -1,0 +1,15 @@
+[package]
+name = "slab-mmap"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+memmap2 = "0.9"
+tempfile = "3.16"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde-value = "0.7"
+slab = { version = "0.4", features = ["serde"] }
+postcard = { version = "1", features = ["use-std"] }
+serde_json = "1"
