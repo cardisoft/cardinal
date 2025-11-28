@@ -47,6 +47,7 @@ search-cache.path = "../../search-cache"
 fswalk.path = "../../fswalk"
 fs-icon.path = "../../fs-icon"
 search-cancel.path = "../../search-cancel"
+camino = "1.2.1"
 
 [features]
 default = []

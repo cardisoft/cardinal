@@ -12,7 +12,7 @@ type UseContextMenuResult = {
 
 export function useContextMenu(
   autoFitColumns: (() => void) | null = null,
-  onQuickLook?: () => void,
+  getPreviewPaths?: () => string[],
 ): UseContextMenuResult {
   const { t } = useTranslation();
 
@@ -58,16 +58,15 @@ export function useContextMenu(
           text: t('contextMenu.quickLook'),
           accelerator: 'Space',
           action: () => {
-            void invoke('open_quicklook', { path });
-
-            if (onQuickLook) {
-              onQuickLook();
+            const previewPaths: string[] | undefined = getPreviewPaths?.();
+            if (previewPaths?.length) {
+              void invoke('open_quicklook', { paths: previewPaths });
             }
           },
         },
       ];
     },
-    [t, onQuickLook],
+    [getPreviewPaths, t],
   );
 
   const buildHeaderMenuItems = useCallback((): MenuItemOptions[] => {

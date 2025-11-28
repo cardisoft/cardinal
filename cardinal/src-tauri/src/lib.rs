@@ -10,9 +10,9 @@ use background::{
 };
 use cardinal_sdk::EventWatcher;
 use commands::{
-    SearchJob, SearchState, activate_main_window, get_app_status, get_nodes_info, hide_main_window,
-    open_in_finder, open_path, open_quicklook, request_app_exit, search, start_logic,
-    toggle_main_window, toggle_quicklook, trigger_rescan, update_icon_viewport, update_quicklook,
+    SearchJob, SearchState, activate_main_window, close_quicklook, get_app_status, get_nodes_info,
+    hide_main_window, open_in_finder, open_path, open_quicklook, request_app_exit, search,
+    start_logic, toggle_main_window, trigger_rescan, update_icon_viewport, update_quicklook,
 };
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, bounded, unbounded};
 use lifecycle::{
@@ -120,7 +120,7 @@ pub fn run() -> Result<()> {
             open_in_finder,
             open_path,
             open_quicklook,
-            toggle_quicklook,
+            close_quicklook,
             update_quicklook,
             request_app_exit,
             start_logic,
