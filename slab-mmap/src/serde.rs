@@ -63,3 +63,43 @@ where
         deserializer.deserialize_map(SlabVisitor(PhantomData))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::de::{
+        Visitor,
+        value::{Error as ValueError, MapDeserializer},
+    };
+
+    struct ExpectingDisplay<'a>(&'a SlabVisitor<u32>);
+
+    impl fmt::Display for ExpectingDisplay<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            Visitor::expecting(self.0, f)
+        }
+    }
+
+    #[test]
+    fn visitor_reports_map_expectation() {
+        let visitor = SlabVisitor::<u32>(PhantomData);
+        let rendered = format!("{}", ExpectingDisplay(&visitor));
+        assert_eq!(rendered, "a map");
+    }
+
+    #[test]
+    fn visitor_reconstructs_slab_from_map_entries() {
+        let visitor = SlabVisitor::<u32>(PhantomData);
+        let entries = vec![(0usize, 10u32), (3usize, 30u32), (7usize, 70u32)];
+        let map = MapDeserializer::<_, ValueError>::new(entries.clone().into_iter());
+
+        let slab = visitor
+            .visit_map(map)
+            .expect("visit_map should rebuild slab from entries");
+
+        assert_eq!(slab.len(), entries.len());
+        for (index, value) in entries {
+            assert_eq!(slab.get(index), Some(&value));
+        }
+    }
+}
