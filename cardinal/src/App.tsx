@@ -131,7 +131,7 @@ function App() {
   const {
     showContextMenu: showFilesContextMenu,
     showHeaderContextMenu: showFilesHeaderContextMenu,
-  } = useContextMenu(autoFitColumns);
+  } = useContextMenu(autoFitColumns, selectedPaths);
 
   const {
     showContextMenu: showEventsContextMenu,
@@ -249,6 +249,17 @@ function App() {
   }, [activeTab]);
 
   useEffect(() => {
+    if (activeTab === 'files') {
+      return;
+    }
+
+    // Close Quick Look when leaving the files tab
+    invoke('close_quicklook').catch((error) => {
+      console.error('Failed to close Quick Look', error);
+    });
+  }, [activeTab]);
+
+  useEffect(() => {
     if (activeTab !== 'files') {
       return;
     }
@@ -264,19 +275,31 @@ function App() {
         return;
       }
 
-      if (!activePath) {
+      const previewPaths = selectedPaths.size ? Array.from(selectedPaths) : [];
+      if (!previewPaths.length) {
         return;
       }
 
       event.preventDefault();
-      invoke('preview_with_quicklook', { path: activePath }).catch((error) => {
+      invoke('open_quicklook', { paths: previewPaths }).catch((error) => {
         console.error('Failed to preview file with Quick Look', error);
       });
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activePath, activeTab]);
+  }, [activeTab, selectedPaths]);
+
+  useEffect(() => {
+    if (!selectedPaths.size) {
+      return;
+    }
+
+    const previewPaths = Array.from(selectedPaths);
+    invoke('update_quicklook', { paths: previewPaths }).catch((error) => {
+      console.error('Failed to update Quick Look', error);
+    });
+  }, [selectedPaths]);
 
   useEffect(() => {
     if (activeTab !== 'files') {

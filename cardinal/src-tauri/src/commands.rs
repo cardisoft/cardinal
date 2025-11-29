@@ -1,6 +1,7 @@
 use crate::{
     LOGIC_START,
     lifecycle::{EXIT_REQUESTED, load_app_state},
+    quicklook::{close_preview_panel, open_preview_panel, update_preview_panel},
     window_controls::{WindowToggle, activate_window, hide_window, toggle_window},
 };
 use anyhow::Result;
@@ -95,6 +96,37 @@ impl NodeInfoMetadata {
             mtime: metadata.mtime().map(|x| x.get()).unwrap_or_default(),
         }
     }
+}
+
+#[tauri::command]
+pub fn close_quicklook(app_handle: AppHandle) -> Result<(), String> {
+    let app_handle_cloned = app_handle.clone();
+    app_handle
+        .run_on_main_thread(move || {
+            close_preview_panel(app_handle_cloned);
+        })
+        .map_err(|e| format!("Failed to dispatch quicklook action: {e:?}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn update_quicklook(app_handle: AppHandle, paths: Vec<String>) -> Result<(), String> {
+    app_handle
+        .run_on_main_thread(move || {
+            update_preview_panel(paths);
+        })
+        .map_err(|e| format!("Failed to dispatch quicklook action: {e:?}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_quicklook(app_handle: AppHandle, paths: Vec<String>) -> Result<(), String> {
+    app_handle
+        .run_on_main_thread(move || {
+            open_preview_panel(paths);
+        })
+        .map_err(|e| format!("Failed to dispatch quicklook action: {e:?}"))?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -219,16 +251,6 @@ pub fn open_path(path: String) -> Result<(), String> {
         .arg(&path)
         .spawn()
         .map_err(|e| format!("Failed to open path: {e}"))?;
-    Ok(())
-}
-
-#[tauri::command]
-pub fn preview_with_quicklook(path: String) -> Result<(), String> {
-    Command::new("qlmanage")
-        .arg("-p")
-        .arg(&path)
-        .spawn()
-        .map_err(|e| format!("Failed to launch Quick Look preview: {e}"))?;
     Ok(())
 }
 

@@ -553,6 +553,7 @@ button:active {
   :root:not([data-theme]) .empty-icon {
     color: var(--color-resizer);
   }
+
   :root:not([data-theme]) .empty-title {
     color: var(--color-text);
   }
@@ -750,10 +751,12 @@ button:active {
       0 0 0 1px rgba(0, 0, 0, 0.4),
       0 1px 2px rgba(0, 0, 0, 0.5);
   }
+
   :root:not([data-theme]) .virtual-scrollbar-track:hover .virtual-scrollbar-thumb,
   :root:not([data-theme]) .virtual-scrollbar-track.is-dragging .virtual-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.55);
   }
+
   :root:not([data-theme]) .virtual-scrollbar-thumb:active {
     background: rgba(255, 255, 255, 0.75);
   }
@@ -818,10 +821,12 @@ button:active {
     0 0 0 1px rgba(0, 0, 0, 0.4),
     0 1px 2px rgba(0, 0, 0, 0.5);
 }
+
 [data-theme='dark'] .virtual-scrollbar-track:hover .virtual-scrollbar-thumb,
 [data-theme='dark'] .virtual-scrollbar-track.is-dragging .virtual-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.55);
 }
+
 [data-theme='dark'] .virtual-scrollbar-thumb:active {
   background: rgba(255, 255, 255, 0.75);
 }
@@ -1037,6 +1042,7 @@ button:active {
     font-size: 12px;
     line-height: 1;
   }
+
   :root:not([data-theme]) .status-tab {
     color: rgba(226, 232, 240, 0.72);
   }
@@ -1093,6 +1099,7 @@ button:active {
   font-size: 12px;
   line-height: 1;
 }
+
 [data-theme='dark'] .status-tab {
   color: rgba(226, 232, 240, 0.72);
 }
@@ -1178,9 +1185,11 @@ button:active {
 .readiness-indicator.ready {
   color: #4caf50;
 }
+
 .readiness-indicator.initializing {
   color: #ff9800;
 }
+
 .readiness-indicator.updating {
   color: #2196f3;
 }
@@ -1190,6 +1199,7 @@ button:active {
   font-weight: 500;
   white-space: nowrap;
 }
+
 .status-value {
   color: var(--color-text);
   font-weight: 600;
@@ -1202,6 +1212,7 @@ button:active {
   text-align: left;
   min-width: 36px;
 }
+
 .status-right .status-value {
   text-align: right;
   min-width: 80px;
