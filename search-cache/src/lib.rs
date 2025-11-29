@@ -6,6 +6,7 @@ mod metadata_cache;
 mod name_index;
 mod persistent;
 mod query;
+mod query_preprocessor;
 mod segment;
 mod slab;
 mod slab_node;

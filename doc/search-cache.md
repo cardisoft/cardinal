@@ -88,6 +88,7 @@ FSEvents -> handle_fs_events -> {remove | create_node_chain | scan_path_recursiv
 ```
 UI query string
    ↓ parse (cardinal-syntax::parse_query)
+   ↓ normalize paths (search-cache::expand_query_home_dirs)
    ↓ optimize (cardinal-syntax::optimize_query)
    ↓ highlight terms (highlight::derive_highlight_terms)
    ↓ evaluate_expr (SearchCache)
