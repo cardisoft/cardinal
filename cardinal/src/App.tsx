@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import './App.css';
 import { FileRow } from './components/FileRow';
@@ -26,7 +26,6 @@ import type { UnlistenFn } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
 import { useFullDiskAccessPermission } from './hooks/useFullDiskAccessPermission';
 import { OPEN_PREFERENCES_EVENT } from './constants/appEvents';
-import { getAllPathsInRange } from './utils/selection';
 import type { DisplayState } from './components/StateDisplay';
 
 type ActiveTab = StatusTabKey;
@@ -100,11 +99,12 @@ function App() {
     lifecycleState,
   } = state;
   const [activeTab, setActiveTab] = useState<ActiveTab>('files');
-  const [selectedPaths, setSelectedPaths] = useState(new Set<string>());
+  // Track selection by virtual-list row index to keep state lightweight even when paths change.
+  const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
   const [shiftAnchorIndex, setShiftAnchorIndex] = useState<number | null>(null);
-  const selectedPathsRef = useRef(selectedPaths);
-
+  // Quick Look key events can arrive while React state is mid-update; keep an imperative ref in sync.
+  const selectedIndicesRef = useRef(selectedIndices);
   const [isWindowFocused, setIsWindowFocused] = useState<boolean>(() => {
     return document.hasFocus();
   });
@@ -121,9 +121,24 @@ function App() {
   });
   const { t } = useTranslation();
 
+  const selectedPaths = useMemo(() => {
+    const list = virtualListRef.current;
+    if (!list) {
+      return [];
+    }
+    const paths: string[] = [];
+    selectedIndices.forEach((index) => {
+      const item = list.getItem?.(index);
+      if (item?.path) {
+        paths.push(item.path);
+      }
+    });
+    return paths;
+  }, [selectedIndices, results]);
+
   const handleRowSelect = useCallback(
     (
-      path: string,
+      _path: string,
       rowIndex: number,
       options: { isShift: boolean; isMeta: boolean; isCtrl: boolean },
     ) => {
@@ -131,36 +146,30 @@ function App() {
       const isCmdOrCtrl = isMeta || isCtrl;
 
       if (isShift && shiftAnchorIndex !== null) {
-        // Shift-click for range selection (closed interval).
-        // This replaces the current selection with the new range.
-        const rangePaths = getAllPathsInRange({
-          results,
-          virtualList: virtualListRef.current,
-          startIndex: shiftAnchorIndex,
-          endIndex: rowIndex,
-        });
-        setSelectedPaths(new Set(rangePaths));
+        const start = Math.min(shiftAnchorIndex, rowIndex);
+        const end = Math.max(shiftAnchorIndex, rowIndex);
+        const range: number[] = [];
+        for (let i = start; i <= end; i += 1) {
+          range.push(i);
+        }
+        setSelectedIndices(range);
       } else if (isCmdOrCtrl) {
         // Cmd/Ctrl-click to toggle selection.
-        setSelectedPaths((prevPaths) => {
-          const newPaths = new Set(prevPaths);
-          if (newPaths.has(path)) {
-            newPaths.delete(path);
-          } else {
-            newPaths.add(path);
+        setSelectedIndices((prevIndices) => {
+          if (prevIndices.includes(rowIndex)) {
+            return prevIndices.filter((index) => index !== rowIndex);
           }
-          return newPaths;
+          return [...prevIndices, rowIndex];
         });
-        setShiftAnchorIndex(rowIndex); // Set anchor on cmd-click.
+        setShiftAnchorIndex(rowIndex);
       } else {
-        // Simple click to select a single row.
-        setSelectedPaths(new Set([path]));
-        setShiftAnchorIndex(rowIndex); // Set anchor on simple click.
+        setSelectedIndices([rowIndex]);
+        setShiftAnchorIndex(rowIndex);
       }
 
       setActiveRowIndex(rowIndex);
     },
-    [shiftAnchorIndex, results],
+    [shiftAnchorIndex],
   );
 
   const getQuickLookItems = useCallback(async (): Promise<QuickLookItemPayload[]> => {
@@ -168,7 +177,7 @@ function App() {
       return [];
     }
 
-    const paths = Array.from(selectedPaths);
+    const paths = selectedPaths;
     if (!paths.length) {
       return [];
     }
@@ -406,8 +415,8 @@ function App() {
   }, [focusSearchInput]);
 
   useEffect(() => {
-    selectedPathsRef.current = selectedPaths;
-  }, [selectedPaths]);
+    selectedIndicesRef.current = selectedIndices;
+  }, [selectedIndices]);
 
   useEffect(() => {
     const handleOpenPreferences = () => setIsPreferencesOpen(true);
@@ -439,7 +448,7 @@ function App() {
 
   useEffect(() => {
     if (activeTab !== 'files') {
-      setSelectedPaths(new Set());
+      setSelectedIndices([]);
       setActiveRowIndex(null);
       setShiftAnchorIndex(null);
     }
@@ -472,7 +481,7 @@ function App() {
         return;
       }
 
-      if (!selectedPaths.size) {
+      if (!selectedIndices.length) {
         return;
       }
 
@@ -482,15 +491,15 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, toggleQuickLookPanel, selectedPaths]);
+  }, [activeTab, toggleQuickLookPanel, selectedIndices]);
 
   useEffect(() => {
-    if (activeTab !== 'files' || !selectedPaths.size) {
+    if (activeTab !== 'files' || !selectedIndices.length) {
       return;
     }
 
     updateQuickLookPanel();
-  }, [activeTab, selectedPaths, updateQuickLookPanel]);
+  }, [activeTab, selectedIndices, updateQuickLookPanel]);
 
   useEffect(() => {
     if (activeTab !== 'files') {
@@ -572,7 +581,7 @@ function App() {
           }
 
           const payload = event.payload;
-          if (!payload || !selectedPathsRef.current.size) {
+          if (!payload || !selectedIndicesRef.current.length) {
             return;
           }
 
@@ -616,15 +625,15 @@ function App() {
 
   useEffect(() => {
     if (!results.length) {
-      setSelectedPaths(new Set());
+      setSelectedIndices([]);
       setActiveRowIndex(null);
       setShiftAnchorIndex(null);
       return;
     }
 
     // Naive implementation: just clear selection.
-    // A more robust solution might try to preserve selection based on paths.
-    setSelectedPaths(new Set());
+    // A more robust solution might try to preserve selection based on indices.
+    setSelectedIndices([]);
     setActiveRowIndex(null);
     setShiftAnchorIndex(null);
   }, [results]);
@@ -673,14 +682,17 @@ function App() {
   }, []);
 
   const handleRowContextMenu = useCallback(
-    (event: ReactMouseEvent<HTMLDivElement>, path: string) => {
-      // If right-clicking a non-selected file, clear existing selection and select it.
-      if (!selectedPaths.has(path)) {
-        setSelectedPaths(new Set([path]));
+    (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => {
+      if (!selectedIndices.includes(rowIndex)) {
+        setSelectedIndices([rowIndex]);
+        setActiveRowIndex(rowIndex);
+        setShiftAnchorIndex(rowIndex);
       }
-      showFilesContextMenu(event, path);
+      if (path) {
+        showFilesContextMenu(event, path);
+      }
     },
-    [selectedPaths, showFilesContextMenu],
+    [selectedIndices, showFilesContextMenu],
   );
 
   const handleRowOpen = useCallback((path: string) => {
@@ -695,7 +707,7 @@ function App() {
   const renderRow = useCallback(
     (rowIndex: number, item: SearchResultItem | undefined, rowStyle: CSSProperties) => {
       const path = item?.path;
-      const isSelected = !!path && selectedPaths.has(path);
+      const isSelected = selectedIndices.includes(rowIndex);
 
       return (
         <FileRow
@@ -703,11 +715,11 @@ function App() {
           item={item}
           rowIndex={rowIndex}
           style={{ ...rowStyle, width: 'var(--columns-total)' }} // Enforce column width CSS vars for virtualization rows
-          onContextMenu={(event, contextPath) => handleRowContextMenu(event, contextPath)}
+          onContextMenu={(event, contextPath) => handleRowContextMenu(event, contextPath, rowIndex)}
           onSelect={handleRowSelect}
           onOpen={handleRowOpen}
           isSelected={isSelected}
-          selectedPaths={selectedPaths}
+          selectedPathsForDrag={selectedPaths}
           caseInsensitive={!caseSensitive}
           highlightTerms={highlightTerms}
         />
@@ -717,6 +729,7 @@ function App() {
       handleRowContextMenu,
       handleRowSelect,
       handleRowOpen,
+      selectedIndices,
       selectedPaths,
       caseSensitive,
       highlightTerms,
