@@ -137,11 +137,7 @@ function App() {
   }, [selectedIndices, results]);
 
   const handleRowSelect = useCallback(
-    (
-      _path: string,
-      rowIndex: number,
-      options: { isShift: boolean; isMeta: boolean; isCtrl: boolean },
-    ) => {
+    (rowIndex: number, options: { isShift: boolean; isMeta: boolean; isCtrl: boolean }) => {
       const { isShift, isMeta, isCtrl } = options;
       const isCmdOrCtrl = isMeta || isCtrl;
 
@@ -320,7 +316,7 @@ function App() {
 
       const nextPath = virtualListRef.current?.getItem?.(nextIndex)?.path;
       if (nextPath) {
-        handleRowSelect(nextPath, nextIndex, {
+        handleRowSelect(nextIndex, {
           isShift: false,
           isMeta: false,
           isCtrl: false,

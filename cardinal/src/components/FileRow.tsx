@@ -12,7 +12,6 @@ type FileRowProps = {
   onContextMenu?: (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => void;
   onOpen?: (path: string) => void;
   onSelect?: (
-    path: string,
     rowIndex: number,
     options: { isShift: boolean; isMeta: boolean; isCtrl: boolean },
   ) => void;
@@ -69,8 +68,8 @@ export const FileRow = memo(function FileRow({
   };
 
   const handleMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!isSelected && path && onSelect && e.button === 0) {
-      onSelect(path, rowIndex, {
+    if (!isSelected && onSelect && e.button === 0) {
+      onSelect(rowIndex, {
         isShift: e.shiftKey,
         isMeta: e.metaKey,
         isCtrl: e.ctrlKey,
