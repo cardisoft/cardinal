@@ -125,7 +125,7 @@ pub fn run() -> Result<()> {
 
     let db_path = DB_PATH
         .get_or_try_init(|| app.path().app_config_dir().map(|p| p.join("cardinal.db")))
-        .expect("Failed to initialize cache path");
+        .expect("Failed to initialize database path");
 
     let app_handle = &app.handle().to_owned();
     let channels = BackgroundLoopChannels {
