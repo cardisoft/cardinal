@@ -21,9 +21,9 @@ use lifecycle::{
 use once_cell::sync::OnceCell;
 use search_cache::{SearchCache, SearchOutcome, SearchResultNode, SlabIndex, WalkData};
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
-        LazyLock, Once,
+        Once,
         atomic::{AtomicBool, Ordering},
     },
     time::Duration,
@@ -33,15 +33,7 @@ use tracing::{info, level_filters::LevelFilter, warn};
 use tracing_subscriber::EnvFilter;
 use window_controls::{activate_window, hide_window};
 
-static CACHE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
-    directories::ProjectDirs::from("", "", "Cardinal")
-        .expect(
-            "Failed to get ProjectDirs: no valid home directory \
-                path could be retrieved from the operating system",
-        )
-        .config_dir()
-        .join("cardinal.db")
-});
+static DB_PATH: OnceCell<PathBuf> = OnceCell::new();
 pub(crate) static LOGIC_START: OnceCell<Sender<()>> = OnceCell::new();
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -131,6 +123,10 @@ pub fn run() -> Result<()> {
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
+    let db_path = DB_PATH
+        .get_or_try_init(|| app.path().app_config_dir().map(|p| p.join("cardinal.db")))
+        .expect("Failed to initialize database path");
+
     let app_handle = &app.handle().to_owned();
     let channels = BackgroundLoopChannels {
         finish_rx,
@@ -163,13 +159,13 @@ pub fn run() -> Result<()> {
                 return;
             }
 
-            run_logic_thread(app_handle, channels);
+            run_logic_thread(app_handle, db_path, channels);
         });
 
         app.run(move |app_handle, event| match event {
             RunEvent::Exit => {
                 APP_QUIT.store(true, Ordering::Relaxed);
-                flush_cache_to_file_once(&finish_tx);
+                flush_cache_to_file_once(&finish_tx, db_path);
             }
             RunEvent::ExitRequested { api, code, .. } => {
                 let already_requested = EXIT_REQUESTED.swap(true, Ordering::Relaxed);
@@ -181,7 +177,7 @@ pub fn run() -> Result<()> {
                     );
                 }
 
-                flush_cache_to_file_once(&finish_tx);
+                flush_cache_to_file_once(&finish_tx, db_path);
 
                 if code.is_none() {
                     api.prevent_exit();
@@ -207,7 +203,11 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-fn run_logic_thread(app_handle: &tauri::AppHandle, channels: BackgroundLoopChannels) {
+fn run_logic_thread(
+    app_handle: &tauri::AppHandle,
+    db_path: &Path,
+    channels: BackgroundLoopChannels,
+) {
     const WATCH_ROOT: &str = "/";
     const FSE_LATENCY_SECS: f64 = 0.1;
     let path = PathBuf::from(WATCH_ROOT);
@@ -215,7 +215,7 @@ fn run_logic_thread(app_handle: &tauri::AppHandle, channels: BackgroundLoopChann
 
     let mut cache = match SearchCache::try_read_persistent_cache(
         &path,
-        &CACHE_PATH,
+        db_path,
         Some(ignore_paths.clone()),
         Some(&APP_QUIT),
     ) {
@@ -288,7 +288,7 @@ fn run_logic_thread(app_handle: &tauri::AppHandle, channels: BackgroundLoopChann
     info!("Background thread exited");
 }
 
-fn flush_cache_to_file_once(finish_tx: &Sender<Sender<Option<SearchCache>>>) {
+fn flush_cache_to_file_once(finish_tx: &Sender<Sender<Option<SearchCache>>>, db_path: &PathBuf) {
     static FLUSH_ONCE: Once = Once::new();
     if load_app_state() != AppLifecycleState::Ready {
         info!("App not fully initialized, skipping cache flush");
@@ -302,13 +302,13 @@ fn flush_cache_to_file_once(finish_tx: &Sender<Sender<Option<SearchCache>>>) {
             .unwrap();
         if let Some(cache) = cache_rx.recv().context("cache_tx is closed").unwrap() {
             cache
-                .flush_to_file(&CACHE_PATH)
+                .flush_to_file(db_path)
                 .context("Failed to write cache to file")
                 .unwrap();
 
-            info!("Cache flushed successfully to {:?}", &*CACHE_PATH);
+            info!("Cache flushed successfully to {:?}", db_path);
         } else {
-            info!("Canncelled during data construction, no cache to flush");
+            info!("Cancelled during data construction, no cache to flush");
         }
     });
 }

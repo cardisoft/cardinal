@@ -36,7 +36,6 @@ objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSWindow", "NSP
 objc2-quick-look-ui = "0.3"
 parking_lot = "0.12"
 tauri-plugin-prevent-default = "4"
-directories = "6.0.0"
 tauri-plugin-macos-permissions = "2.3.0"
 tauri-plugin-window-state = "2"
 once_cell = { version = "1.20", features = ["parking_lot"] }
