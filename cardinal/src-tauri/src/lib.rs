@@ -308,7 +308,7 @@ fn flush_cache_to_file_once(finish_tx: &Sender<Sender<Option<SearchCache>>>, db_
 
             info!("Cache flushed successfully to {:?}", db_path);
         } else {
-            info!("Canncelled during data construction, no cache to flush");
+            info!("Cancelled during data construction, no cache to flush");
         }
     });
 }
