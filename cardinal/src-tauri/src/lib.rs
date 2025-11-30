@@ -21,7 +21,7 @@ use lifecycle::{
 use once_cell::sync::OnceCell;
 use search_cache::{SearchCache, SearchOutcome, SearchResultNode, SlabIndex, WalkData};
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         Once,
         atomic::{AtomicBool, Ordering},
@@ -205,7 +205,7 @@ pub fn run() -> Result<()> {
 
 fn run_logic_thread(
     app_handle: &tauri::AppHandle,
-    db_path: &PathBuf,
+    db_path: &Path,
     channels: BackgroundLoopChannels,
 ) {
     const WATCH_ROOT: &str = "/";
