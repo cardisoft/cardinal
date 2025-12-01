@@ -391,12 +391,6 @@ function App() {
     requestPermission: requestFullDiskAccessPermission,
   } = useFullDiskAccessPermission();
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
-  const handleSortThresholdChange = useCallback(
-    (value: number) => {
-      setSortThreshold(value);
-    },
-    [setSortThreshold],
-  );
 
   const activePath =
     activeRowIndex !== null
@@ -946,7 +940,7 @@ function App() {
         open={isPreferencesOpen}
         onClose={() => setIsPreferencesOpen(false)}
         sortThreshold={sortThreshold}
-        onSortThresholdChange={handleSortThresholdChange}
+        onSortThresholdChange={setSortThreshold}
       />
       {showFullDiskAccessOverlay && (
         <PermissionOverlay
