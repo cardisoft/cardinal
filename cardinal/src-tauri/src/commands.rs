@@ -346,11 +346,7 @@ fn compare_entries(a: &SortEntry, b: &SortEntry, sort: &SortStatePayload) -> Std
         }
     };
 
-    let ordering = match ordering {
-        StdOrdering::Equal => a.original_index.cmp(&b.original_index),
-        StdOrdering::Less => StdOrdering::Less,
-        StdOrdering::Greater => StdOrdering::Greater,
-    };
+    let ordering = ordering.then_with(|| a.original_index.cmp(&b.original_index));
 
     match sort.direction {
         SortDirectionPayload::Asc => ordering,
