@@ -15,6 +15,7 @@ import { useContextMenu } from './hooks/useContextMenu';
 import { useFileSearch } from './hooks/useFileSearch';
 import { useEventColumnWidths } from './hooks/useEventColumnWidths';
 import { useRecentFSEvents } from './hooks/useRecentFSEvents';
+import { useRemoteSort } from './hooks/useRemoteSort';
 import { ROW_HEIGHT, OVERSCAN_ROW_COUNT } from './constants';
 import type { VirtualListHandle } from './components/VirtualList';
 import FSEventsPanel from './components/FSEventsPanel';
@@ -27,8 +28,7 @@ import { useTranslation } from 'react-i18next';
 import { useFullDiskAccessPermission } from './hooks/useFullDiskAccessPermission';
 import { OPEN_PREFERENCES_EVENT } from './constants/appEvents';
 import type { DisplayState } from './components/StateDisplay';
-import { toSlabIndexArray, type SlabIndex } from './types/slab';
-import type { SortKey, SortState } from './types/sort';
+import type { SlabIndex } from './types/slab';
 
 type ActiveTab = StatusTabKey;
 
@@ -74,43 +74,6 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 
 const QUICK_LOOK_KEYCODE_DOWN = 125;
 const QUICK_LOOK_KEYCODE_UP = 126;
-
-const SORT_THRESHOLD_STORAGE_KEY = 'cardinal.sortThreshold';
-const DEFAULT_SORTABLE_RESULT_THRESHOLD = 20000;
-
-const clampSortThreshold = (value: number): number => {
-  if (!Number.isFinite(value)) {
-    return DEFAULT_SORTABLE_RESULT_THRESHOLD;
-  }
-  const rounded = Math.round(value);
-  return Math.max(1, rounded);
-};
-
-const readStoredSortThreshold = (): number => {
-  if (typeof window === 'undefined') {
-    return DEFAULT_SORTABLE_RESULT_THRESHOLD;
-  }
-  const stored = window.localStorage.getItem(SORT_THRESHOLD_STORAGE_KEY);
-  if (stored == null) {
-    return DEFAULT_SORTABLE_RESULT_THRESHOLD;
-  }
-  const parsed = Number.parseInt(stored, 10);
-  if (Number.isNaN(parsed)) {
-    return DEFAULT_SORTABLE_RESULT_THRESHOLD;
-  }
-  return clampSortThreshold(parsed);
-};
-
-const persistSortThreshold = (value: number): void => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  try {
-    window.localStorage.setItem(SORT_THRESHOLD_STORAGE_KEY, String(value));
-  } catch {
-    // Ignore storage failures (e.g., Safari private mode).
-  }
-};
 
 type SelectionSync = {
   indices: number[];
@@ -171,11 +134,6 @@ function App() {
     searchError,
     lifecycleState,
   } = state;
-  const [sortState, setSortState] = useState<SortState>(null);
-  const [sortedResults, setSortedResults] = useState<SlabIndex[]>([]);
-  const [sortThreshold, setSortThreshold] = useState<number>(() => readStoredSortThreshold());
-  const sortRequestRef = useRef(0);
-  const [isSorting, setIsSorting] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('files');
   // Track selection by virtual-list row index to keep state lightweight even when paths change.
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
@@ -199,17 +157,18 @@ function App() {
     caseSensitive,
   });
   const { t, i18n } = useTranslation();
-  const totalResults = results.length;
-  const canSort = totalResults > 0 && totalResults <= sortThreshold;
-  const shouldUseSortedResults = Boolean(sortState && canSort);
-  const displayedResults = shouldUseSortedResults ? sortedResults : results;
+  const {
+    sortState,
+    displayedResults,
+    sortThreshold,
+    setSortThreshold,
+    canSort,
+    isSorting,
+    sortDisabledTooltip,
+    sortButtonsDisabled,
+    handleSortToggle,
+  } = useRemoteSort(results, i18n.language, (limit) => t('sorting.disabled', { limit }));
   const displayedResultsLength = displayedResults.length;
-  const sortLimitText = useMemo(
-    () => new Intl.NumberFormat(i18n.language).format(sortThreshold),
-    [i18n.language, sortThreshold],
-  );
-  const sortDisabledTooltip = canSort ? null : t('sorting.disabled', { limit: sortLimitText });
-  const sortButtonsDisabled = !canSort || isSorting;
 
   const selectedPaths = useMemo(() => {
     const list = virtualListRef.current;
@@ -257,29 +216,6 @@ function App() {
     },
     [shiftAnchorIndex],
   );
-
-  const handleSortToggle = useCallback(
-    (nextKey: SortKey) => {
-      if (!canSort) {
-        return;
-      }
-      setSortState((prev) => {
-        if (!prev || prev.key !== nextKey) {
-          return { key: nextKey, direction: 'asc' };
-        }
-        if (prev.direction === 'asc') {
-          return { key: nextKey, direction: 'desc' };
-        }
-        return null;
-      });
-    },
-    [canSort],
-  );
-  useEffect(() => {
-    if (!canSort && sortState) {
-      setSortState(null);
-    }
-  }, [canSort, sortState]);
 
   const getQuickLookItems = useCallback(async (): Promise<QuickLookItemPayload[]> => {
     if (activeTab !== 'files') {
@@ -455,11 +391,12 @@ function App() {
     requestPermission: requestFullDiskAccessPermission,
   } = useFullDiskAccessPermission();
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
-  const handleSortThresholdChange = useCallback((value: number) => {
-    const normalized = clampSortThreshold(value);
-    setSortThreshold(normalized);
-    persistSortThreshold(normalized);
-  }, []);
+  const handleSortThresholdChange = useCallback(
+    (value: number) => {
+      setSortThreshold(value);
+    },
+    [setSortThreshold],
+  );
 
   const activePath =
     activeRowIndex !== null
@@ -527,40 +464,6 @@ function App() {
   useEffect(() => {
     focusSearchInput();
   }, [focusSearchInput]);
-
-  useEffect(() => {
-    const requestId = sortRequestRef.current + 1;
-    sortRequestRef.current = requestId;
-
-    if (!sortState || !canSort || results.length === 0) {
-      setIsSorting(false);
-      setSortedResults(results);
-      return;
-    }
-
-    setIsSorting(true);
-
-    void (async () => {
-      try {
-        const ordered = await invoke<number[]>('get_sorted_view', {
-          results,
-          sort: sortState,
-        });
-        if (sortRequestRef.current === requestId) {
-          setSortedResults(toSlabIndexArray(Array.isArray(ordered) ? ordered : []));
-        }
-      } catch (error) {
-        console.error('Failed to sort results', error);
-        if (sortRequestRef.current === requestId) {
-          setSortedResults(results);
-        }
-      } finally {
-        if (sortRequestRef.current === requestId) {
-          setIsSorting(false);
-        }
-      }
-    })();
-  }, [results, sortState, canSort]);
 
   useEffect(() => {
     selectedIndicesRef.current = selectedIndices;
