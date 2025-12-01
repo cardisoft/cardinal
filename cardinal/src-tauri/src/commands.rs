@@ -8,11 +8,15 @@ use crate::{
 };
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
-use crossbeam_channel::{Receiver, Sender};
-use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, SlabNodeMetadata};
+use crossbeam_channel::{Receiver, Sender, bounded};
+use parking_lot::Mutex;
+use search_cache::{
+    SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, SlabNodeMetadata,
+    SlabNodeMetadataCompact,
+};
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
-use std::{process::Command, sync::atomic::Ordering};
+use std::{cmp::Ordering as StdOrdering, process::Command, sync::atomic::Ordering};
 use tauri::{AppHandle, Manager, State};
 use tracing::{info, warn};
 
@@ -36,24 +40,56 @@ pub struct SearchJob {
     pub cancellation_token: CancellationToken,
 }
 
+#[derive(Debug, Clone)]
+pub struct NodeInfoRequest {
+    pub slab_indices: Vec<SlabIndex>,
+    pub response_tx: Sender<Vec<SearchResultNode>>,
+}
+
+#[derive(Default)]
+struct SortedViewCache {
+    slab_indices: Vec<SlabIndex>,
+    nodes: Vec<SearchResultNode>,
+}
+
+fn normalize_path(path: &std::path::Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+fn metadata_numeric(meta: &SlabNodeMetadataCompact, key: SortKeyPayload) -> i64 {
+    let Some(meta_ref) = meta.as_ref() else {
+        return i64::MIN;
+    };
+    match key {
+        SortKeyPayload::Size => meta_ref.size() as i64,
+        SortKeyPayload::Mtime => meta_ref
+            .mtime()
+            .map(|value| value.get() as i64)
+            .unwrap_or(i64::MIN),
+        SortKeyPayload::Ctime => meta_ref
+            .ctime()
+            .map(|value| value.get() as i64)
+            .unwrap_or(i64::MIN),
+        SortKeyPayload::FullPath | SortKeyPayload::Filename => 0,
+    }
+}
+
 pub struct SearchState {
     search_tx: Sender<SearchJob>,
     result_rx: Receiver<Result<SearchOutcome>>,
 
-    node_info_tx: Sender<Vec<SlabIndex>>,
-    node_info_results_rx: Receiver<Vec<SearchResultNode>>,
+    node_info_tx: Sender<NodeInfoRequest>,
 
     icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
     rescan_tx: Sender<()>,
+    sorted_view_cache: Mutex<Option<SortedViewCache>>,
 }
 
 impl SearchState {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         search_tx: Sender<SearchJob>,
         result_rx: Receiver<Result<SearchOutcome>>,
-        node_info_tx: Sender<Vec<SlabIndex>>,
-        node_info_results_rx: Receiver<Vec<SearchResultNode>>,
+        node_info_tx: Sender<NodeInfoRequest>,
         icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
         rescan_tx: Sender<()>,
     ) -> Self {
@@ -61,10 +97,53 @@ impl SearchState {
             search_tx,
             result_rx,
             node_info_tx,
-            node_info_results_rx,
             icon_viewport_tx,
             rescan_tx,
+            sorted_view_cache: Mutex::new(None),
         }
+    }
+
+    fn request_nodes(&self, slab_indices: Vec<SlabIndex>) -> Result<Vec<SearchResultNode>, String> {
+        if slab_indices.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let (response_tx, response_rx) = bounded::<Vec<SearchResultNode>>(1);
+        self.node_info_tx
+            .send(NodeInfoRequest {
+                slab_indices,
+                response_tx,
+            })
+            .map_err(|e| format!("Failed to send node info request: {e:?}"))?;
+
+        response_rx
+            .recv()
+            .map_err(|e| format!("Failed to receive node info results: {e:?}"))
+    }
+
+    fn fetch_sorted_nodes(
+        &self,
+        slab_indices: &[SlabIndex],
+    ) -> Result<Vec<SearchResultNode>, String> {
+        if slab_indices.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut cache_guard = self.sorted_view_cache.lock();
+        if let Some(cached) = cache_guard
+            .as_ref()
+            .filter(|cache| cache.slab_indices == slab_indices)
+            .map(|cache| cache.nodes.clone())
+        {
+            return Ok(cached);
+        }
+
+        let nodes = self.request_nodes(slab_indices.to_vec())?;
+        *cache_guard = Some(SortedViewCache {
+            slab_indices: slab_indices.to_vec(),
+            nodes: nodes.clone(),
+        });
+        Ok(nodes)
     }
 }
 
@@ -182,32 +261,30 @@ pub async fn search(
 #[tauri::command]
 pub async fn get_nodes_info(
     results: Vec<SlabIndex>,
+    include_icons: Option<bool>,
     state: State<'_, SearchState>,
 ) -> Result<Vec<NodeInfo>, String> {
     if results.is_empty() {
         return Ok(Vec::new());
     }
 
-    state
-        .node_info_tx
-        .send(results.clone())
-        .map_err(|e| format!("Failed to send node info request: {e:?}"))?;
-
-    let nodes = state
-        .node_info_results_rx
-        .recv()
-        .map_err(|e| format!("Failed to receive node info results: {e:?}"))?;
+    let include_icons = include_icons.unwrap_or(true);
+    let nodes = state.request_nodes(results)?;
 
     let node_infos = nodes
         .into_iter()
         .map(|SearchResultNode { path, metadata }| {
             let path = path.to_string_lossy().into_owned();
-            let icon = fs_icon::icon_of_path_ns(&path).map(|data| {
-                format!(
-                    "data:image/png;base64,{}",
-                    general_purpose::STANDARD.encode(data)
-                )
-            });
+            let icon = if include_icons {
+                fs_icon::icon_of_path_ns(&path).map(|data| {
+                    format!(
+                        "data:image/png;base64,{}",
+                        general_purpose::STANDARD.encode(data)
+                    )
+                })
+            } else {
+                None
+            };
             NodeInfo {
                 path,
                 icon,
@@ -217,6 +294,98 @@ pub async fn get_nodes_info(
         .collect();
 
     Ok(node_infos)
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SortKeyPayload {
+    Filename,
+    FullPath,
+    Size,
+    Mtime,
+    Ctime,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SortDirectionPayload {
+    Asc,
+    Desc,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SortStatePayload {
+    pub key: SortKeyPayload,
+    pub direction: SortDirectionPayload,
+}
+
+#[derive(Debug)]
+struct SortEntry {
+    original_index: usize,
+    slab_index: SlabIndex,
+    node: SearchResultNode,
+    path_key: String,
+    name_key: String,
+}
+
+fn normalize_filename(node: &SearchResultNode) -> String {
+    node.path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|x| x.to_string())
+        .unwrap_or_else(|| node.path.to_string_lossy().into_owned())
+}
+
+fn compare_entries(a: &SortEntry, b: &SortEntry, sort: &SortStatePayload) -> StdOrdering {
+    let ordering = match sort.key {
+        SortKeyPayload::FullPath => a.path_key.cmp(&b.path_key),
+        SortKeyPayload::Filename => a.name_key.cmp(&b.name_key),
+        SortKeyPayload::Size | SortKeyPayload::Mtime | SortKeyPayload::Ctime => {
+            metadata_numeric(&a.node.metadata, sort.key)
+                .cmp(&metadata_numeric(&b.node.metadata, sort.key))
+        }
+    };
+
+    let ordering = match ordering {
+        StdOrdering::Equal => a.original_index.cmp(&b.original_index),
+        StdOrdering::Less => StdOrdering::Less,
+        StdOrdering::Greater => StdOrdering::Greater,
+    };
+
+    match sort.direction {
+        SortDirectionPayload::Asc => ordering,
+        SortDirectionPayload::Desc => ordering.reverse(),
+    }
+}
+
+#[tauri::command]
+pub async fn get_sorted_view(
+    results: Vec<SlabIndex>,
+    sort: Option<SortStatePayload>,
+    state: State<'_, SearchState>,
+) -> Result<Vec<SlabIndex>, String> {
+    if results.is_empty() || sort.is_none() {
+        return Ok(results);
+    }
+
+    let sort_state = sort.expect("checked above");
+    let nodes = state.fetch_sorted_nodes(&results)?;
+    let mut entries: Vec<SortEntry> = results
+        .into_iter()
+        .zip(nodes.into_iter())
+        .enumerate()
+        .map(|(idx, (slab_index, node))| SortEntry {
+            original_index: idx,
+            path_key: normalize_path(&node.path),
+            name_key: normalize_filename(&node),
+            slab_index,
+            node,
+        })
+        .collect();
+
+    entries.sort_by(|a, b| compare_entries(a, b, &sort_state));
+
+    Ok(entries.into_iter().map(|entry| entry.slab_index).collect())
 }
 
 #[tauri::command]

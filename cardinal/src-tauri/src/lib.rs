@@ -10,16 +10,17 @@ use background::{
 };
 use cardinal_sdk::EventWatcher;
 use commands::{
-    SearchJob, SearchState, activate_main_window, close_quicklook, get_app_status, get_nodes_info,
-    hide_main_window, open_in_finder, open_path, request_app_exit, search, start_logic,
-    toggle_main_window, toggle_quicklook, trigger_rescan, update_icon_viewport, update_quicklook,
+    NodeInfoRequest, SearchJob, SearchState, activate_main_window, close_quicklook, get_app_status,
+    get_nodes_info, get_sorted_view, hide_main_window, open_in_finder, open_path, request_app_exit,
+    search, start_logic, toggle_main_window, toggle_quicklook, trigger_rescan,
+    update_icon_viewport, update_quicklook,
 };
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, bounded, unbounded};
 use lifecycle::{
     APP_QUIT, AppLifecycleState, EXIT_REQUESTED, emit_app_state, load_app_state, update_app_state,
 };
 use once_cell::sync::OnceCell;
-use search_cache::{SearchCache, SearchOutcome, SearchResultNode, SlabIndex, WalkData};
+use search_cache::{SearchCache, SearchOutcome, SlabIndex, WalkData};
 use std::{
     path::{Path, PathBuf},
     sync::{
@@ -48,8 +49,7 @@ pub fn run() -> Result<()> {
     let (finish_tx, finish_rx) = bounded::<Sender<Option<SearchCache>>>(1);
     let (search_tx, search_rx) = unbounded::<SearchJob>();
     let (result_tx, result_rx) = unbounded::<Result<SearchOutcome>>();
-    let (node_info_tx, node_info_rx) = unbounded::<Vec<SlabIndex>>();
-    let (node_info_results_tx, node_info_results_rx) = unbounded::<Vec<SearchResultNode>>();
+    let (node_info_tx, node_info_rx) = unbounded::<NodeInfoRequest>();
     let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>)>();
     let (rescan_tx, rescan_rx) = unbounded::<()>();
     let (icon_update_tx, icon_update_rx) = unbounded::<IconPayload>();
@@ -99,13 +99,13 @@ pub fn run() -> Result<()> {
             search_tx,
             result_rx,
             node_info_tx,
-            node_info_results_rx,
             icon_viewport_tx.clone(),
             rescan_tx.clone(),
         ))
         .invoke_handler(tauri::generate_handler![
             search,
             get_nodes_info,
+            get_sorted_view,
             update_icon_viewport,
             get_app_status,
             trigger_rescan,
@@ -133,7 +133,6 @@ pub fn run() -> Result<()> {
         search_rx,
         result_tx,
         node_info_rx,
-        node_info_results_tx,
         icon_viewport_rx,
         rescan_rx,
         icon_update_tx,

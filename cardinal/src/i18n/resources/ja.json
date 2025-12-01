@@ -21,6 +21,9 @@
     "modified": "更新日時",
     "created": "作成日時"
   },
+  "sorting": {
+    "disabled": "結果が {{limit}} 件を超えているため並べ替えできません。"
+  },
   "events": {
     "columns": {
       "time": "時刻",

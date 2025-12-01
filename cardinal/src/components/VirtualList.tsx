@@ -112,7 +112,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   // Ensure the data cache stays warm for the active window
   useEffect(() => {
     if (end >= start) ensureRangeLoaded(start, end);
-  }, [start, end, ensureRangeLoaded]);
+  }, [start, end, ensureRangeLoaded, resultsList]);
 
   // Track container height changes so virtualization recalculates the viewport
   useLayoutEffect(() => {

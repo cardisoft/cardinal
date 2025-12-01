@@ -11,8 +11,7 @@ UI -> Tauri commands -> background thread
 
 [search_tx]            search requests (query + options + cancel token)
 [result_rx]            search outcomes (Vec<SlabIndex> + highlights)
-[node_info_tx]         slab indices needing path/metadata/icon (NSWorkspace)
-[node_info_results_rx] hydrated node info
+[node_info_tx]         slab indices needing path/metadata/icon (oneshot response channel)
 [icon_viewport_tx]     visible slab indices for QuickLook icon prefetch
 [icon_update_tx]       pushes base64 PNG icons back to UI (event: icon_update)
 [rescan_tx]            manual rescan requests
@@ -27,7 +26,7 @@ Entry: `run_background_event_loop` in `cardinal/src-tauri/src/background.rs`.
 loop select! {
   finish_rx        => persist cache and return
   search_rx        => cache.search_with_options -> result_tx
-  node_info_rx     => cache.expand_file_nodes   -> node_info_results_tx
+  node_info_rx     => cache.expand_file_nodes   -> respond via NodeInfoRequest.response_tx
   icon_viewport_rx => spawn QuickLook jobs; send IconPayload via icon_update_tx
   rescan_rx        => perform_rescan(...)
   event_watcher    => handle_fs_events; maybe trigger rescan; forward new events to UI

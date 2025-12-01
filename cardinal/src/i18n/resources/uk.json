@@ -21,6 +21,9 @@
     "modified": "Змінено",
     "created": "Створено"
   },
+  "sorting": {
+    "disabled": "Понад {{limit}} результатів. Сортування недоступне."
+  },
   "events": {
     "columns": {
       "time": "Час",

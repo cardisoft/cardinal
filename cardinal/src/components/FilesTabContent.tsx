@@ -8,6 +8,7 @@ import type { ColumnKey } from '../constants';
 import type { VirtualListHandle } from './VirtualList';
 import type { SearchResultItem } from '../types/search';
 import type { SlabIndex } from '../types/slab';
+import type { SortKey, SortState } from '../types/sort';
 
 type FilesTabContentProps = {
   headerRef: React.RefObject<HTMLDivElement | null>;
@@ -26,6 +27,11 @@ type FilesTabContentProps = {
     rowStyle: CSSProperties,
   ) => ReactNode;
   onScrollSync: (scrollLeft: number) => void;
+  sortState?: SortState;
+  onSortToggle?: (sortKey: SortKey) => void;
+  sortDisabled?: boolean;
+  sortIndicatorMode?: 'triangle' | 'circle';
+  sortDisabledTooltip?: string | null;
 };
 
 export function FilesTabContent({
@@ -41,6 +47,11 @@ export function FilesTabContent({
   overscan,
   renderRow,
   onScrollSync,
+  sortState,
+  onSortToggle,
+  sortDisabled = false,
+  sortIndicatorMode = 'triangle',
+  sortDisabledTooltip,
 }: FilesTabContentProps): React.JSX.Element {
   return (
     <div className="scroll-area">
@@ -48,6 +59,11 @@ export function FilesTabContent({
         ref={headerRef}
         onResizeStart={onResizeStart}
         onContextMenu={onHeaderContextMenu}
+        sortState={sortState}
+        onSortToggle={onSortToggle}
+        sortDisabled={sortDisabled}
+        sortIndicatorMode={sortIndicatorMode}
+        sortDisabledTooltip={sortDisabledTooltip}
       />
       <div className="flex-fill">
         {displayState !== 'results' ? (

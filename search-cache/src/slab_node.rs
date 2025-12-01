@@ -219,7 +219,7 @@ impl SlabNodeMetadataCompact {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SearchResultNode {
     pub path: std::path::PathBuf,
     pub metadata: SlabNodeMetadataCompact,

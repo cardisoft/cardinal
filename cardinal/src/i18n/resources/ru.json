@@ -21,6 +21,9 @@
     "modified": "Изменено",
     "created": "Создано"
   },
+  "sorting": {
+    "disabled": "Больше {{limit}} результатов. Сортировка недоступна."
+  },
   "events": {
     "columns": {
       "time": "Время",

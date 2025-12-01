@@ -27,6 +27,8 @@ import { useTranslation } from 'react-i18next';
 import { useFullDiskAccessPermission } from './hooks/useFullDiskAccessPermission';
 import { OPEN_PREFERENCES_EVENT } from './constants/appEvents';
 import type { DisplayState } from './components/StateDisplay';
+import { toSlabIndexArray, type SlabIndex } from './types/slab';
+import type { SortKey, SortState } from './types/sort';
 
 type ActiveTab = StatusTabKey;
 
@@ -73,6 +75,8 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 const QUICK_LOOK_KEYCODE_DOWN = 125;
 const QUICK_LOOK_KEYCODE_UP = 126;
 
+const SORTABLE_RESULT_THRESHOLD = 20000;
+
 function App() {
   const {
     state,
@@ -98,6 +102,10 @@ function App() {
     searchError,
     lifecycleState,
   } = state;
+  const [sortState, setSortState] = useState<SortState>(null);
+  const [sortedResults, setSortedResults] = useState<SlabIndex[]>(results);
+  const sortRequestRef = useRef(0);
+  const [isSorting, setIsSorting] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('files');
   // Track selection by virtual-list row index to keep state lightweight even when paths change.
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
@@ -105,6 +113,7 @@ function App() {
   const [shiftAnchorIndex, setShiftAnchorIndex] = useState<number | null>(null);
   // Quick Look key events can arrive while React state is mid-update; keep an imperative ref in sync.
   const selectedIndicesRef = useRef(selectedIndices);
+  const selectedSlabIndicesRef = useRef<SlabIndex[]>([]);
   const [isWindowFocused, setIsWindowFocused] = useState<boolean>(() => {
     return document.hasFocus();
   });
@@ -119,7 +128,18 @@ function App() {
   const { filteredEvents, eventFilterQuery, setEventFilterQuery } = useRecentFSEvents({
     caseSensitive,
   });
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const totalResults = results.length;
+  const canSort = totalResults > 0 && totalResults <= SORTABLE_RESULT_THRESHOLD;
+  const shouldUseSortedResults = Boolean(sortState && canSort);
+  const displayedResults = shouldUseSortedResults ? sortedResults : results;
+  const displayedResultsLength = displayedResults.length;
+  const sortLimitText = useMemo(
+    () => new Intl.NumberFormat(i18n.language).format(SORTABLE_RESULT_THRESHOLD),
+    [i18n.language],
+  );
+  const sortDisabledTooltip = canSort ? null : t('sorting.disabled', { limit: sortLimitText });
+  const sortButtonsDisabled = !canSort || isSorting;
 
   const selectedPaths = useMemo(() => {
     const list = virtualListRef.current;
@@ -134,7 +154,7 @@ function App() {
       }
     });
     return paths;
-  }, [selectedIndices, results]);
+  }, [selectedIndices, displayedResults]);
 
   const handleRowSelect = useCallback(
     (rowIndex: number, options: { isShift: boolean; isMeta: boolean; isCtrl: boolean }) => {
@@ -166,6 +186,64 @@ function App() {
       setActiveRowIndex(rowIndex);
     },
     [shiftAnchorIndex],
+  );
+
+  const handleSortToggle = useCallback(
+    (nextKey: SortKey) => {
+      if (!canSort) {
+        return;
+      }
+      setSortState((prev) => {
+        if (!prev || prev.key !== nextKey) {
+          return { key: nextKey, direction: 'asc' };
+        }
+        if (prev.direction === 'asc') {
+          return { key: nextKey, direction: 'desc' };
+        }
+        return null;
+      });
+    },
+    [canSort],
+  );
+  useEffect(() => {
+    if (!canSort && sortState) {
+      setSortState(null);
+    }
+  }, [canSort, sortState]);
+
+  const runRemoteSort = useCallback(
+    async (activeSort: SortState, sourceResults: SlabIndex[]) => {
+      const requestId = sortRequestRef.current + 1;
+      sortRequestRef.current = requestId;
+
+      if (!activeSort || !canSort || sourceResults.length === 0) {
+        setSortedResults(sourceResults);
+        return;
+      }
+
+      setIsSorting(true);
+
+      try {
+        const ordered = await invoke<number[]>('get_sorted_view', {
+          results: sourceResults,
+          sort: activeSort,
+        });
+        console.log('Sorted results received', ordered);
+        if (sortRequestRef.current === requestId) {
+          setSortedResults(toSlabIndexArray(Array.isArray(ordered) ? ordered : []));
+        }
+      } catch (error) {
+        console.error('Failed to sort results', error);
+        if (sortRequestRef.current === requestId) {
+          setSortedResults(sourceResults);
+        }
+      } finally {
+        if (sortRequestRef.current === requestId) {
+          setIsSorting(false);
+        }
+      }
+    },
+    [canSort],
   );
 
   const getQuickLookItems = useCallback(async (): Promise<QuickLookItemPayload[]> => {
@@ -302,13 +380,13 @@ function App() {
 
   const moveSelection = useCallback(
     (delta: 1 | -1) => {
-      if (activeTab !== 'files' || !results.length) {
+      if (activeTab !== 'files' || displayedResultsLength === 0) {
         return;
       }
 
-      const fallbackIndex = delta > 0 ? -1 : results.length;
+      const fallbackIndex = delta > 0 ? -1 : displayedResultsLength;
       const baseIndex = activeRowIndex ?? fallbackIndex;
-      const nextIndex = Math.min(Math.max(baseIndex + delta, 0), results.length - 1);
+      const nextIndex = Math.min(Math.max(baseIndex + delta, 0), displayedResultsLength - 1);
 
       if (nextIndex === activeRowIndex) {
         return;
@@ -323,7 +401,7 @@ function App() {
         });
       }
     },
-    [activeRowIndex, activeTab, handleRowSelect, results.length],
+    [activeRowIndex, activeTab, displayedResultsLength, handleRowSelect],
   );
 
   const {
@@ -411,8 +489,54 @@ function App() {
   }, [focusSearchInput]);
 
   useEffect(() => {
+    sortRequestRef.current += 1;
+    if (!sortState || !canSort) {
+      setSortedResults(results);
+      return;
+    }
+    void runRemoteSort(sortState, results);
+  }, [results, sortState, canSort, runRemoteSort]);
+
+  useEffect(() => {
     selectedIndicesRef.current = selectedIndices;
   }, [selectedIndices]);
+
+  useEffect(() => {
+    const slabs: SlabIndex[] = [];
+    selectedIndices.forEach((index) => {
+      const slabIndex = displayedResults[index];
+      if (slabIndex != null) {
+        slabs.push(slabIndex);
+      }
+    });
+    selectedSlabIndicesRef.current = slabs;
+  }, [displayedResults, selectedIndices]);
+
+  useEffect(() => {
+    if (selectedSlabIndicesRef.current.length === 0) {
+      return;
+    }
+
+    const slabSet = new Set(selectedSlabIndicesRef.current);
+    const remapped: number[] = [];
+    displayedResults.forEach((value, idx) => {
+      if (slabSet.has(value)) {
+        remapped.push(idx);
+      }
+    });
+
+    if (remapped.length === 0) {
+      setSelectedIndices([]);
+      setActiveRowIndex(null);
+      setShiftAnchorIndex(null);
+      return;
+    }
+
+    setSelectedIndices(remapped);
+    const lastIndex = remapped[remapped.length - 1];
+    setActiveRowIndex(lastIndex);
+    setShiftAnchorIndex(lastIndex);
+  }, [displayedResults]);
 
   useEffect(() => {
     const handleOpenPreferences = () => setIsPreferencesOpen(true);
@@ -825,11 +949,16 @@ function App() {
               searchErrorMessage={searchErrorMessage}
               currentQuery={currentQuery}
               virtualListRef={virtualListRef}
-              results={results}
+              results={displayedResults}
               rowHeight={ROW_HEIGHT}
               overscan={OVERSCAN_ROW_COUNT}
               renderRow={renderRow}
               onScrollSync={handleHorizontalSync}
+              sortState={sortState}
+              onSortToggle={handleSortToggle}
+              sortDisabled={sortButtonsDisabled}
+              sortIndicatorMode="triangle"
+              sortDisabledTooltip={sortDisabledTooltip}
             />
           )}
         </div>

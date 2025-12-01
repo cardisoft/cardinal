@@ -21,6 +21,9 @@
     "modified": "Geändert",
     "created": "Erstellt"
   },
+  "sorting": {
+    "disabled": "Mehr als {{limit}} Ergebnisse. Sortieren ist nicht möglich."
+  },
   "events": {
     "columns": {
       "time": "Zeit",

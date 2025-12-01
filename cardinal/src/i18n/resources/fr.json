@@ -21,6 +21,9 @@
     "modified": "Modifié",
     "created": "Créé"
   },
+  "sorting": {
+    "disabled": "Plus de {{limit}} résultats. Le tri est indisponible."
+  },
   "events": {
     "columns": {
       "time": "Heure",

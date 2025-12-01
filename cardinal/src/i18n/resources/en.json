@@ -21,6 +21,9 @@
     "modified": "Modified",
     "created": "Created"
   },
+  "sorting": {
+    "disabled": "More than {{limit}} results. Sorting is unavailable."
+  },
   "events": {
     "columns": {
       "time": "Time",
