@@ -138,7 +138,7 @@ function App() {
     lifecycleState,
   } = state;
   const [sortState, setSortState] = useState<SortState>(null);
-  const [sortedResults, setSortedResults] = useState<SlabIndex[]>(results);
+  const [sortedResults, setSortedResults] = useState<SlabIndex[]>([]);
   const [sortThreshold, setSortThreshold] = useState<number>(() => readStoredSortThreshold());
   const sortRequestRef = useRef(0);
   const [isSorting, setIsSorting] = useState(false);

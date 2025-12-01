@@ -328,7 +328,7 @@ struct SortEntry {
     name_key: String,
 }
 
-fn normalize_filename(node: &SearchResultNode) -> String {
+fn extract_filename(node: &SearchResultNode) -> String {
     node.path
         .file_name()
         .and_then(|name| name.to_str())
@@ -373,7 +373,7 @@ pub async fn get_sorted_view(
         .map(|(idx, (slab_index, node))| SortEntry {
             original_index: idx,
             path_key: normalize_path(&node.path),
-            name_key: normalize_filename(&node),
+            name_key: extract_filename(&node),
             slab_index,
             node,
         })
