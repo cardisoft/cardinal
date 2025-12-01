@@ -534,8 +534,10 @@ function App() {
       setSortedResults(results);
       return;
     }
-    void runRemoteSort(sortState, results);
-  }, [results, sortState, canSort, runRemoteSort]);
+    void (async () => {
+      await runRemoteSort(sortState, results);
+    })();
+  }, [results, sortState, canSort]);
 
   useEffect(() => {
     selectedIndicesRef.current = selectedIndices;
