@@ -281,40 +281,6 @@ function App() {
     }
   }, [canSort, sortState]);
 
-  const runRemoteSort = useCallback(
-    async (activeSort: SortState, sourceResults: SlabIndex[]) => {
-      const requestId = sortRequestRef.current + 1;
-      sortRequestRef.current = requestId;
-
-      if (!activeSort || !canSort || sourceResults.length === 0) {
-        setSortedResults(sourceResults);
-        return;
-      }
-
-      setIsSorting(true);
-
-      try {
-        const ordered = await invoke<number[]>('get_sorted_view', {
-          results: sourceResults,
-          sort: activeSort,
-        });
-        if (sortRequestRef.current === requestId) {
-          setSortedResults(toSlabIndexArray(Array.isArray(ordered) ? ordered : []));
-        }
-      } catch (error) {
-        console.error('Failed to sort results', error);
-        if (sortRequestRef.current === requestId) {
-          setSortedResults(sourceResults);
-        }
-      } finally {
-        if (sortRequestRef.current === requestId) {
-          setIsSorting(false);
-        }
-      }
-    },
-    [canSort],
-  );
-
   const getQuickLookItems = useCallback(async (): Promise<QuickLookItemPayload[]> => {
     if (activeTab !== 'files') {
       return [];
@@ -563,13 +529,36 @@ function App() {
   }, [focusSearchInput]);
 
   useEffect(() => {
-    sortRequestRef.current += 1;
-    if (!sortState || !canSort) {
+    const requestId = sortRequestRef.current + 1;
+    sortRequestRef.current = requestId;
+
+    if (!sortState || !canSort || results.length === 0) {
+      setIsSorting(false);
       setSortedResults(results);
       return;
     }
+
+    setIsSorting(true);
+
     void (async () => {
-      await runRemoteSort(sortState, results);
+      try {
+        const ordered = await invoke<number[]>('get_sorted_view', {
+          results,
+          sort: sortState,
+        });
+        if (sortRequestRef.current === requestId) {
+          setSortedResults(toSlabIndexArray(Array.isArray(ordered) ? ordered : []));
+        }
+      } catch (error) {
+        console.error('Failed to sort results', error);
+        if (sortRequestRef.current === requestId) {
+          setSortedResults(results);
+        }
+      } finally {
+        if (sortRequestRef.current === requestId) {
+          setIsSorting(false);
+        }
+      }
     })();
   }, [results, sortState, canSort]);
 
