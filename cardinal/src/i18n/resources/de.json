@@ -105,6 +105,9 @@
     "themeHint": "Wähle Hell, Dunkel oder Systemstandard.",
     "language": "Sprache",
     "languageHint": "Wechsle die Oberflächensprache sofort.",
+    "sortingLimit": {
+      "label": "Sortierlimit"
+    },
     "close": "Schließen"
   },
   "language": {

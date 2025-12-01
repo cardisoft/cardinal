@@ -105,6 +105,9 @@
     "themeHint": "Choose light, dark, or follow the system.",
     "language": "Language",
     "languageHint": "Switch the interface language instantly.",
+    "sortingLimit": {
+      "label": "Sorting limit"
+    },
     "close": "Close"
   },
   "language": {

@@ -75,7 +75,42 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 const QUICK_LOOK_KEYCODE_DOWN = 125;
 const QUICK_LOOK_KEYCODE_UP = 126;
 
-const SORTABLE_RESULT_THRESHOLD = 20000;
+const SORT_THRESHOLD_STORAGE_KEY = 'cardinal.sortThreshold';
+const DEFAULT_SORTABLE_RESULT_THRESHOLD = 20000;
+
+const clampSortThreshold = (value: number): number => {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_SORTABLE_RESULT_THRESHOLD;
+  }
+  const rounded = Math.round(value);
+  return Math.max(1, rounded);
+};
+
+const readStoredSortThreshold = (): number => {
+  if (typeof window === 'undefined') {
+    return DEFAULT_SORTABLE_RESULT_THRESHOLD;
+  }
+  const stored = window.localStorage.getItem(SORT_THRESHOLD_STORAGE_KEY);
+  if (stored == null) {
+    return DEFAULT_SORTABLE_RESULT_THRESHOLD;
+  }
+  const parsed = Number.parseInt(stored, 10);
+  if (Number.isNaN(parsed)) {
+    return DEFAULT_SORTABLE_RESULT_THRESHOLD;
+  }
+  return clampSortThreshold(parsed);
+};
+
+const persistSortThreshold = (value: number): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(SORT_THRESHOLD_STORAGE_KEY, String(value));
+  } catch {
+    // Ignore storage failures (e.g., Safari private mode).
+  }
+};
 
 function App() {
   const {
@@ -104,6 +139,7 @@ function App() {
   } = state;
   const [sortState, setSortState] = useState<SortState>(null);
   const [sortedResults, setSortedResults] = useState<SlabIndex[]>(results);
+  const [sortThreshold, setSortThreshold] = useState<number>(() => readStoredSortThreshold());
   const sortRequestRef = useRef(0);
   const [isSorting, setIsSorting] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('files');
@@ -130,13 +166,13 @@ function App() {
   });
   const { t, i18n } = useTranslation();
   const totalResults = results.length;
-  const canSort = totalResults > 0 && totalResults <= SORTABLE_RESULT_THRESHOLD;
+  const canSort = totalResults > 0 && totalResults <= sortThreshold;
   const shouldUseSortedResults = Boolean(sortState && canSort);
   const displayedResults = shouldUseSortedResults ? sortedResults : results;
   const displayedResultsLength = displayedResults.length;
   const sortLimitText = useMemo(
-    () => new Intl.NumberFormat(i18n.language).format(SORTABLE_RESULT_THRESHOLD),
-    [i18n.language],
+    () => new Intl.NumberFormat(i18n.language).format(sortThreshold),
+    [i18n.language, sortThreshold],
   );
   const sortDisabledTooltip = canSort ? null : t('sorting.disabled', { limit: sortLimitText });
   const sortButtonsDisabled = !canSort || isSorting;
@@ -420,6 +456,11 @@ function App() {
     requestPermission: requestFullDiskAccessPermission,
   } = useFullDiskAccessPermission();
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
+  const handleSortThresholdChange = useCallback((value: number) => {
+    const normalized = clampSortThreshold(value);
+    setSortThreshold(normalized);
+    persistSortThreshold(normalized);
+  }, []);
 
   const activePath =
     activeRowIndex !== null
@@ -973,7 +1014,12 @@ function App() {
           onRequestRescan={requestRescan}
         />
       </main>
-      <PreferencesOverlay open={isPreferencesOpen} onClose={() => setIsPreferencesOpen(false)} />
+      <PreferencesOverlay
+        open={isPreferencesOpen}
+        onClose={() => setIsPreferencesOpen(false)}
+        sortThreshold={sortThreshold}
+        onSortThresholdChange={handleSortThresholdChange}
+      />
       {showFullDiskAccessOverlay && (
         <PermissionOverlay
           title={t('app.fullDiskAccess.title')}

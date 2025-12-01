@@ -105,6 +105,9 @@
     "themeHint": "Elige claro, oscuro o según el sistema.",
     "language": "Idioma",
     "languageHint": "Cambia el idioma de la interfaz al instante.",
+    "sortingLimit": {
+      "label": "Límite de ordenación"
+    },
     "close": "Cerrar"
   },
   "language": {

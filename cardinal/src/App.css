@@ -226,7 +226,7 @@ main,
 }
 
 /* Inputs and buttons (used in search area) */
-input:not([type='checkbox']),
+input:not([type='checkbox']):not(.preferences-number-input),
 button {
   border-radius: 8px;
   border: 1px solid transparent;
@@ -248,7 +248,7 @@ button {
   user-select: text;
 }
 
-input:not([type='checkbox']) {
+input:not([type='checkbox']):not(.preferences-number-input) {
   /* Restore the text cursor inside the input. */
   cursor: text;
 }
@@ -1469,28 +1469,62 @@ button:active {
 .preferences-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 
 .preferences-row {
-  display: flex;
+  height: 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
-  padding: 12px 0;
-  flex-wrap: nowrap;
+  padding: 5px 0;
 }
 
 .preferences-label {
   font-weight: 500;
   font-size: 0.95rem;
   white-space: nowrap;
-  flex-shrink: 0;
+}
+
+.preferences-row__details {
+  min-width: 0;
 }
 
 .preferences-control {
   text-align: right;
-  flex-shrink: 0;
+}
+
+.preferences-number-input {
+  width: 140px;
+  border: 1px solid var(--color-elevated-border, var(--color-border));
+  border-radius: 8px;
+  padding: 6px 10px;
+  text-align: center;
+  font-size: 0.95rem;
+  color: var(--color-text);
+  background: var(--color-elevated-bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+  cursor: text;
+}
+
+.preferences-number-input:focus {
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.35);
+  border-color: var(--color-accent);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+:root[data-theme='dark'] .preferences-number-input {
+  background: var(--color-elevated-bg);
+  border-color: var(--color-elevated-border, var(--color-border));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+:root[data-theme='dark'] .preferences-number-input:focus {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+  border-color: var(--color-accent);
 }
 
 /* === Utilities (extracted from inline JSX styles) === */

@@ -105,6 +105,9 @@
     "themeHint": "Choisissez clair, sombre ou selon le système.",
     "language": "Langue",
     "languageHint": "Changez la langue de l'interface instantanément.",
+    "sortingLimit": {
+      "label": "Limite de tri"
+    },
     "close": "Fermer"
   },
   "language": {
