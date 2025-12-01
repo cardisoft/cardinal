@@ -112,6 +112,40 @@ const persistSortThreshold = (value: number): void => {
   }
 };
 
+type SelectionSync = {
+  indices: number[];
+  activeIndex: number | null;
+  anchorIndex: number | null;
+};
+
+const remapSelection = (
+  selectedSlabs: readonly SlabIndex[],
+  displayed: readonly SlabIndex[],
+): SelectionSync => {
+  if (selectedSlabs.length === 0) {
+    return { indices: [], activeIndex: null, anchorIndex: null };
+  }
+
+  const slabSet = new Set(selectedSlabs);
+  const indices: number[] = [];
+  displayed.forEach((value, idx) => {
+    if (slabSet.has(value)) {
+      indices.push(idx);
+    }
+  });
+
+  if (indices.length === 0) {
+    return { indices: [], activeIndex: null, anchorIndex: null };
+  }
+
+  const lastIndex = indices[indices.length - 1];
+  return {
+    indices,
+    activeIndex: lastIndex,
+    anchorIndex: lastIndex,
+  };
+};
+
 function App() {
   const {
     state,
@@ -555,30 +589,31 @@ function App() {
   }, [displayedResults, selectedIndices]);
 
   useEffect(() => {
-    if (selectedSlabIndicesRef.current.length === 0) {
+    const { indices, activeIndex, anchorIndex } = remapSelection(
+      selectedSlabIndicesRef.current,
+      displayedResults,
+    );
+
+    const selectionChanged =
+      indices.length !== selectedIndices.length ||
+      indices.some((idx, i) => idx !== selectedIndices[i]);
+    const activeChanged = activeRowIndex !== activeIndex;
+    const anchorChanged = shiftAnchorIndex !== anchorIndex;
+
+    if (!selectionChanged && !activeChanged && !anchorChanged) {
       return;
     }
 
-    const slabSet = new Set(selectedSlabIndicesRef.current);
-    const remapped: number[] = [];
-    displayedResults.forEach((value, idx) => {
-      if (slabSet.has(value)) {
-        remapped.push(idx);
-      }
-    });
-
-    if (remapped.length === 0) {
-      setSelectedIndices([]);
-      setActiveRowIndex(null);
-      setShiftAnchorIndex(null);
-      return;
+    if (selectionChanged) {
+      setSelectedIndices(indices);
     }
-
-    setSelectedIndices(remapped);
-    const lastIndex = remapped[remapped.length - 1];
-    setActiveRowIndex(lastIndex);
-    setShiftAnchorIndex(lastIndex);
-  }, [displayedResults]);
+    if (activeChanged) {
+      setActiveRowIndex(activeIndex);
+    }
+    if (anchorChanged) {
+      setShiftAnchorIndex(anchorIndex);
+    }
+  }, [displayedResults, selectedIndices, activeRowIndex, shiftAnchorIndex]);
 
   useEffect(() => {
     const handleOpenPreferences = () => setIsPreferencesOpen(true);
