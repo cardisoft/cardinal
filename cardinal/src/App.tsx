@@ -264,7 +264,6 @@ function App() {
           results: sourceResults,
           sort: activeSort,
         });
-        console.log('Sorted results received', ordered);
         if (sortRequestRef.current === requestId) {
           setSortedResults(toSlabIndexArray(Array.isArray(ordered) ? ordered : []));
         }
