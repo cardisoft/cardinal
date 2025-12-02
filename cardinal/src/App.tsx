@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import './App.css';
 import { FileRow } from './components/FileRow';
@@ -16,6 +16,7 @@ import { useFileSearch } from './hooks/useFileSearch';
 import { useEventColumnWidths } from './hooks/useEventColumnWidths';
 import { useRecentFSEvents } from './hooks/useRecentFSEvents';
 import { useRemoteSort } from './hooks/useRemoteSort';
+import { useSelection } from './hooks/useSelection';
 import { ROW_HEIGHT, OVERSCAN_ROW_COUNT } from './constants';
 import type { VirtualListHandle } from './components/VirtualList';
 import FSEventsPanel from './components/FSEventsPanel';
@@ -28,7 +29,6 @@ import { useTranslation } from 'react-i18next';
 import { useFullDiskAccessPermission } from './hooks/useFullDiskAccessPermission';
 import { OPEN_PREFERENCES_EVENT } from './constants/appEvents';
 import type { DisplayState } from './components/StateDisplay';
-import type { SlabIndex } from './types/slab';
 
 type ActiveTab = StatusTabKey;
 
@@ -75,40 +75,6 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 const QUICK_LOOK_KEYCODE_DOWN = 125;
 const QUICK_LOOK_KEYCODE_UP = 126;
 
-type SelectionSync = {
-  indices: number[];
-  activeIndex: number | null;
-  anchorIndex: number | null;
-};
-
-const remapSelection = (
-  selectedSlabs: readonly SlabIndex[],
-  displayed: readonly SlabIndex[],
-): SelectionSync => {
-  if (selectedSlabs.length === 0) {
-    return { indices: [], activeIndex: null, anchorIndex: null };
-  }
-
-  const slabSet = new Set(selectedSlabs);
-  const indices: number[] = [];
-  displayed.forEach((value, idx) => {
-    if (slabSet.has(value)) {
-      indices.push(idx);
-    }
-  });
-
-  if (indices.length === 0) {
-    return { indices: [], activeIndex: null, anchorIndex: null };
-  }
-
-  const lastIndex = indices[indices.length - 1];
-  return {
-    indices,
-    activeIndex: lastIndex,
-    anchorIndex: lastIndex,
-  };
-};
-
 function App() {
   const {
     state,
@@ -135,13 +101,6 @@ function App() {
     lifecycleState,
   } = state;
   const [activeTab, setActiveTab] = useState<ActiveTab>('files');
-  // Track selection by virtual-list row index to keep state lightweight even when paths change.
-  const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
-  const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
-  const [shiftAnchorIndex, setShiftAnchorIndex] = useState<number | null>(null);
-  // Quick Look key events can arrive while React state is mid-update; keep an imperative ref in sync.
-  const selectedIndicesRef = useRef(selectedIndices);
-  const selectedSlabIndicesRef = useRef<SlabIndex[]>([]);
   const [isWindowFocused, setIsWindowFocused] = useState<boolean>(() => {
     return document.hasFocus();
   });
@@ -168,54 +127,18 @@ function App() {
     sortButtonsDisabled,
     handleSortToggle,
   } = useRemoteSort(results, i18n.language, (limit) => t('sorting.disabled', { limit }));
-  const displayedResultsLength = displayedResults.length;
-
-  const selectedPaths = useMemo(() => {
-    const list = virtualListRef.current;
-    if (!list) {
-      return [];
-    }
-    const paths: string[] = [];
-    selectedIndices.forEach((index) => {
-      const item = list.getItem?.(index);
-      if (item?.path) {
-        paths.push(item.path);
-      }
-    });
-    return paths;
-  }, [selectedIndices, displayedResults]);
-
-  const handleRowSelect = useCallback(
-    (rowIndex: number, options: { isShift: boolean; isMeta: boolean; isCtrl: boolean }) => {
-      const { isShift, isMeta, isCtrl } = options;
-      const isCmdOrCtrl = isMeta || isCtrl;
-
-      if (isShift && shiftAnchorIndex !== null) {
-        const start = Math.min(shiftAnchorIndex, rowIndex);
-        const end = Math.max(shiftAnchorIndex, rowIndex);
-        const range: number[] = [];
-        for (let i = start; i <= end; i += 1) {
-          range.push(i);
-        }
-        setSelectedIndices(range);
-      } else if (isCmdOrCtrl) {
-        // Cmd/Ctrl-click to toggle selection.
-        setSelectedIndices((prevIndices) => {
-          if (prevIndices.includes(rowIndex)) {
-            return prevIndices.filter((index) => index !== rowIndex);
-          }
-          return [...prevIndices, rowIndex];
-        });
-        setShiftAnchorIndex(rowIndex);
-      } else {
-        setSelectedIndices([rowIndex]);
-        setShiftAnchorIndex(rowIndex);
-      }
-
-      setActiveRowIndex(rowIndex);
-    },
-    [shiftAnchorIndex],
-  );
+  // Centralized selection management for the virtualized files list.
+  // Provides memoized helpers for click/keyboard selection and keeps Quick Look hooks fed.
+  const {
+    selectedIndices,
+    selectedIndicesRef,
+    activeRowIndex,
+    selectedPaths,
+    handleRowSelect,
+    selectSingleRow,
+    clearSelection,
+    moveSelection,
+  } = useSelection(displayedResults, virtualListRef);
 
   const getQuickLookItems = useCallback(async (): Promise<QuickLookItemPayload[]> => {
     if (activeTab !== 'files') {
@@ -349,32 +272,6 @@ function App() {
     })();
   }, [getQuickLookItems]);
 
-  const moveSelection = useCallback(
-    (delta: 1 | -1) => {
-      if (activeTab !== 'files' || displayedResultsLength === 0) {
-        return;
-      }
-
-      const fallbackIndex = delta > 0 ? -1 : displayedResultsLength;
-      const baseIndex = activeRowIndex ?? fallbackIndex;
-      const nextIndex = Math.min(Math.max(baseIndex + delta, 0), displayedResultsLength - 1);
-
-      if (nextIndex === activeRowIndex) {
-        return;
-      }
-
-      const nextPath = virtualListRef.current?.getItem?.(nextIndex)?.path;
-      if (nextPath) {
-        handleRowSelect(nextIndex, {
-          isShift: false,
-          isMeta: false,
-          isCtrl: false,
-        });
-      }
-    },
-    [activeRowIndex, activeTab, displayedResultsLength, handleRowSelect],
-  );
-
   const {
     showContextMenu: showFilesContextMenu,
     showHeaderContextMenu: showFilesHeaderContextMenu,
@@ -460,48 +357,6 @@ function App() {
   }, [focusSearchInput]);
 
   useEffect(() => {
-    selectedIndicesRef.current = selectedIndices;
-  }, [selectedIndices]);
-
-  useEffect(() => {
-    const slabs: SlabIndex[] = [];
-    selectedIndices.forEach((index) => {
-      const slabIndex = displayedResults[index];
-      if (slabIndex != null) {
-        slabs.push(slabIndex);
-      }
-    });
-    selectedSlabIndicesRef.current = slabs;
-  }, [displayedResults, selectedIndices]);
-
-  useEffect(() => {
-    const { indices, activeIndex, anchorIndex } = remapSelection(
-      selectedSlabIndicesRef.current,
-      displayedResults,
-    );
-
-    const selectionChanged =
-      indices.length !== selectedIndices.length ||
-      indices.some((idx, i) => idx !== selectedIndices[i]);
-    const activeChanged = activeRowIndex !== activeIndex;
-    const anchorChanged = shiftAnchorIndex !== anchorIndex;
-
-    if (!selectionChanged && !activeChanged && !anchorChanged) {
-      return;
-    }
-
-    if (selectionChanged) {
-      setSelectedIndices(indices);
-    }
-    if (activeChanged) {
-      setActiveRowIndex(activeIndex);
-    }
-    if (anchorChanged) {
-      setShiftAnchorIndex(anchorIndex);
-    }
-  }, [displayedResults, selectedIndices, activeRowIndex, shiftAnchorIndex]);
-
-  useEffect(() => {
     const handleOpenPreferences = () => setIsPreferencesOpen(true);
 
     window.addEventListener(OPEN_PREFERENCES_EVENT, handleOpenPreferences);
@@ -531,11 +386,9 @@ function App() {
 
   useEffect(() => {
     if (activeTab !== 'files') {
-      setSelectedIndices([]);
-      setActiveRowIndex(null);
-      setShiftAnchorIndex(null);
+      clearSelection();
     }
-  }, [activeTab]);
+  }, [activeTab, clearSelection]);
 
   useEffect(() => {
     if (activeTab === 'files') {
@@ -707,19 +560,8 @@ function App() {
   }, [activeRowIndex]);
 
   useEffect(() => {
-    if (!results.length) {
-      setSelectedIndices([]);
-      setActiveRowIndex(null);
-      setShiftAnchorIndex(null);
-      return;
-    }
-
-    // Naive implementation: just clear selection.
-    // A more robust solution might try to preserve selection based on indices.
-    setSelectedIndices([]);
-    setActiveRowIndex(null);
-    setShiftAnchorIndex(null);
-  }, [results]);
+    clearSelection();
+  }, [results, clearSelection]);
 
   const onQueryChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -767,15 +609,13 @@ function App() {
   const handleRowContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => {
       if (!selectedIndices.includes(rowIndex)) {
-        setSelectedIndices([rowIndex]);
-        setActiveRowIndex(rowIndex);
-        setShiftAnchorIndex(rowIndex);
+        selectSingleRow(rowIndex);
       }
       if (path) {
         showFilesContextMenu(event, path);
       }
     },
-    [selectedIndices, showFilesContextMenu],
+    [selectedIndices, selectSingleRow, showFilesContextMenu],
   );
 
   const handleRowOpen = useCallback((path: string) => {
