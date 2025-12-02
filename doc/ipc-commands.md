@@ -28,7 +28,6 @@ This chapter documents the Tauri commands exposed to the frontend.
 
 | Command | Purpose | Used by |
 | --- | --- | --- |
-| `request_app_exit()` | Exit app (sets `EXIT_REQUESTED`) | UI quit action |
 | `hide_main_window()` | Hide window | Escape/menu |
 | `activate_main_window()` | Show + focus | menu |
 | `toggle_main_window()` | Toggle visibility and emit `quick_launch` | global shortcut |
