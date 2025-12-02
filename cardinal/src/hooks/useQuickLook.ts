@@ -85,6 +85,11 @@ export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
       return paths.map((path) => ({ path }));
     }
 
+    // This compensates for a coordinate system mismatch on macOS:
+    // - `geometry.windowOrigin.y` (from Tauri's `innerPosition`) is relative to the *visible* screen area (below the menu bar).
+    // - `geometry.mainScreenHeight` is the *full* screen height.
+    // - `window.screen.availTop` provides the height of the menu bar, allowing us to correctly adjust `logicalYTop`
+    //   to be relative to the absolute top of the screen for `QLPreviewPanel`'s `sourceFrameOnScreenForPreviewItem`.
     const screenTopOffset = window.screen.availTop ?? 0;
 
     const buildItem = (path: string): QuickLookItemPayload => {

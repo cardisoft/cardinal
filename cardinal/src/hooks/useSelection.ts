@@ -198,7 +198,7 @@ export const useSelection = (
       }
     });
     return paths;
-  }, [selectedIndices, virtualListRef, displayedResults]);
+  }, [selectedIndices, virtualListRef]);
 
   return {
     selectedIndices,

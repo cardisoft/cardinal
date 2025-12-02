@@ -124,9 +124,13 @@ function App() {
     moveSelection,
   } = useSelection(displayedResults, virtualListRef);
 
+  const getQuickLookPaths = useCallback(
+    () => (activeTab === 'files' ? selectedPaths : []),
+    [activeTab, selectedPaths],
+  );
   // Quick Look controller keeps preview panel in sync with whichever rows are currently selected.
   const { toggleQuickLook, updateQuickLook, closeQuickLook } = useQuickLook({
-    getPaths: () => (activeTab === 'files' ? selectedPaths : []),
+    getPaths: getQuickLookPaths,
   });
 
   const {
