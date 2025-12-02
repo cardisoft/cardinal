@@ -1,6 +1,6 @@
 use crate::{
     LOGIC_START,
-    lifecycle::{EXIT_REQUESTED, load_app_state},
+    lifecycle::load_app_state,
     quicklook::{
         QuickLookItemInput, close_preview_panel, toggle_preview_panel, update_preview_panel,
     },
@@ -16,7 +16,7 @@ use search_cache::{
 };
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering as StdOrdering, process::Command, sync::atomic::Ordering};
+use std::{cmp::Ordering as StdOrdering, process::Command};
 use tauri::{AppHandle, Manager, State};
 use tracing::{info, warn};
 
@@ -426,13 +426,6 @@ pub fn open_path(path: String) -> Result<(), String> {
         .arg(&path)
         .spawn()
         .map_err(|e| format!("Failed to open path: {e}"))?;
-    Ok(())
-}
-
-#[tauri::command]
-pub fn request_app_exit(app_handle: AppHandle) -> Result<(), String> {
-    EXIT_REQUESTED.store(true, Ordering::Relaxed);
-    app_handle.exit(0);
     Ok(())
 }
 
