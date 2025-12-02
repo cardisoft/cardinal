@@ -1,7 +1,7 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import './App.css';
-import { FileRow } from './components/FileRow';
+import { FileRowRenderer } from './components/FileRowRenderer';
 import { SearchBar } from './components/SearchBar';
 import { FilesTabContent } from './components/FilesTabContent';
 import { PermissionOverlay } from './components/PermissionOverlay';
@@ -482,24 +482,33 @@ function App() {
     });
   }, []);
 
+  const selectedIndexSet = useMemo(() => new Set(selectedIndices), [selectedIndices]);
+
   const renderRow = useCallback(
     (rowIndex: number, item: SearchResultItem | undefined, rowStyle: CSSProperties) => {
-      const path = item?.path;
-      const isSelected = selectedIndices.includes(rowIndex);
+      if (!item) {
+        return (
+          <div
+            key={`placeholder-${rowIndex}`}
+            className="row columns row-loading"
+            style={{ ...rowStyle, width: 'var(--columns-total)' }}
+          />
+        );
+      }
 
       return (
-        <FileRow
-          key={item?.path ?? rowIndex}
-          item={item}
+        <FileRowRenderer
+          key={item.path}
           rowIndex={rowIndex}
-          style={{ ...rowStyle, width: 'var(--columns-total)' }} // Enforce column width CSS vars for virtualization rows
+          item={item}
+          style={rowStyle}
+          isSelected={selectedIndexSet.has(rowIndex)}
+          selectedPaths={selectedPaths}
+          caseInsensitive={!caseSensitive}
+          highlightTerms={highlightTerms}
           onContextMenu={(event, contextPath) => handleRowContextMenu(event, contextPath, rowIndex)}
           onSelect={handleRowSelect}
           onOpen={handleRowOpen}
-          isSelected={isSelected}
-          selectedPathsForDrag={selectedPaths}
-          caseInsensitive={!caseSensitive}
-          highlightTerms={highlightTerms}
         />
       );
     },
@@ -507,10 +516,10 @@ function App() {
       handleRowContextMenu,
       handleRowSelect,
       handleRowOpen,
-      selectedIndices,
-      selectedPaths,
-      caseSensitive,
       highlightTerms,
+      caseSensitive,
+      selectedPaths,
+      selectedIndexSet,
     ],
   );
 
