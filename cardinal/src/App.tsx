@@ -17,6 +17,7 @@ import { useEventColumnWidths } from './hooks/useEventColumnWidths';
 import { useRecentFSEvents } from './hooks/useRecentFSEvents';
 import { useRemoteSort } from './hooks/useRemoteSort';
 import { useSelection } from './hooks/useSelection';
+import { useQuickLook } from './hooks/useQuickLook';
 import { ROW_HEIGHT, OVERSCAN_ROW_COUNT } from './constants';
 import type { VirtualListHandle } from './components/VirtualList';
 import FSEventsPanel from './components/FSEventsPanel';
@@ -32,19 +33,6 @@ import type { DisplayState } from './components/StateDisplay';
 
 type ActiveTab = StatusTabKey;
 
-type QuickLookRect = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
-type QuickLookItemPayload = {
-  path: string;
-  rect?: QuickLookRect;
-  transitionImage?: string;
-};
-
 type QuickLookKeydownPayload = {
   keyCode: number;
   characters?: string | null;
@@ -59,10 +47,6 @@ type QuickLookKeydownPayload = {
 type WindowGeometry = {
   windowOrigin: { x: number; y: number };
   mainScreenHeight: number;
-};
-
-const escapePathForSelector = (value: string): string => {
-  return window.CSS.escape(value);
 };
 
 const isEditableTarget = (target: EventTarget | null): boolean => {
@@ -140,142 +124,15 @@ function App() {
     moveSelection,
   } = useSelection(displayedResults, virtualListRef);
 
-  const getQuickLookItems = useCallback(async (): Promise<QuickLookItemPayload[]> => {
-    if (activeTab !== 'files') {
-      return [];
-    }
-
-    const paths = selectedPaths;
-    if (!paths.length) {
-      return [];
-    }
-
-    let windowGeometry: WindowGeometry | null | undefined;
-
-    const resolveWindowGeometry = async (): Promise<WindowGeometry | null> => {
-      if (windowGeometry !== undefined) {
-        return windowGeometry;
-      }
-
-      if (typeof window === 'undefined') {
-        windowGeometry = null;
-        return windowGeometry;
-      }
-
-      try {
-        const currentWindow = getCurrentWindow();
-        const [position, monitor, scaleFactor] = await Promise.all([
-          currentWindow.innerPosition(),
-          primaryMonitor(),
-          currentWindow.scaleFactor(),
-        ]);
-
-        if (!monitor) {
-          windowGeometry = null;
-          return windowGeometry;
-        }
-
-        const scale = scaleFactor || monitor.scaleFactor || window.devicePixelRatio || 1;
-        windowGeometry = {
-          windowOrigin: {
-            x: position.x / scale,
-            y: position.y / scale,
-          },
-          mainScreenHeight: monitor.size.height / scale,
-        };
-      } catch (error) {
-        console.warn('Failed to resolve window metrics for Quick Look', error);
-        windowGeometry = null;
-      }
-
-      return windowGeometry;
-    };
-
-    const buildItem = async (path: string): Promise<QuickLookItemPayload> => {
-      const selector = `[data-row-path="${escapePathForSelector(path)}"]`;
-      const row = document.querySelector<HTMLElement>(selector);
-      if (!row) {
-        return { path };
-      }
-      const anchor = row.querySelector<HTMLElement>('.file-icon, .file-icon-placeholder');
-      if (!anchor) {
-        return { path };
-      }
-      const iconImage = row.querySelector<HTMLImageElement>('img.file-icon');
-      if (!iconImage) {
-        return { path };
-      }
-      const transitionImage = iconImage.src;
-
-      const rect = anchor.getBoundingClientRect();
-      const geometry = await resolveWindowGeometry();
-      if (!geometry) {
-        return { path };
-      }
-
-      // This compensates for a coordinate system mismatch on macOS:
-      // - `geometry.windowOrigin.y` (from Tauri's `innerPosition`) is relative to the *visible* screen area (below the menu bar).
-      // - `geometry.mainScreenHeight` is the *full* screen height.
-      // - `window.screen.availTop` provides the height of the menu bar, allowing us to correctly adjust `logicalYTop`
-      //   to be relative to the absolute top of the screen for `QLPreviewPanel`'s `sourceFrameOnScreenForPreviewItem`.
-      const screenTopOffset = window.screen.availTop ?? 0;
-
-      const logicalX = geometry.windowOrigin.x + rect.left;
-      const logicalYTop = geometry.windowOrigin.y + screenTopOffset + rect.top;
-      const logicalWidth = rect.width;
-      const logicalHeight = rect.height;
-
-      const x = logicalX;
-      const y = geometry.mainScreenHeight - (logicalYTop + logicalHeight);
-
-      return {
-        path,
-        rect: {
-          x,
-          y,
-          width: logicalWidth,
-          height: logicalHeight,
-        },
-        transitionImage,
-      };
-    };
-
-    const items = await Promise.all(paths.map((path) => buildItem(path)));
-    return items;
-  }, [activeTab, selectedPaths]);
-
-  const toggleQuickLookPanel = useCallback(() => {
-    void (async () => {
-      const items = await getQuickLookItems();
-      if (!items.length) {
-        return;
-      }
-      try {
-        await invoke('toggle_quicklook', { items });
-      } catch (error) {
-        console.error('Failed to preview file with Quick Look', error);
-      }
-    })();
-  }, [getQuickLookItems]);
-
-  const updateQuickLookPanel = useCallback(() => {
-    void (async () => {
-      const items = await getQuickLookItems();
-      if (!items.length) {
-        return;
-      }
-      try {
-        await invoke('update_quicklook', { items });
-      } catch (error) {
-        console.error('Failed to update Quick Look', error);
-      }
-    })();
-  }, [getQuickLookItems]);
+  // Quick Look controller keeps preview panel in sync with whichever rows are currently selected.
+  const { toggleQuickLook, updateQuickLook, closeQuickLook } = useQuickLook({
+    getPaths: () => (activeTab === 'files' ? selectedPaths : []),
+  });
 
   const {
     showContextMenu: showFilesContextMenu,
     showHeaderContextMenu: showFilesHeaderContextMenu,
-  } = useContextMenu(autoFitColumns, toggleQuickLookPanel);
+  } = useContextMenu(autoFitColumns, toggleQuickLook);
 
   const {
     showContextMenu: showEventsContextMenu,
@@ -396,10 +253,8 @@ function App() {
     }
 
     // Close Quick Look when leaving the files tab
-    invoke('close_quicklook').catch((error) => {
-      console.error('Failed to close Quick Look', error);
-    });
-  }, [activeTab]);
+    closeQuickLook();
+  }, [activeTab, closeQuickLook]);
 
   useEffect(() => {
     if (activeTab !== 'files') {
@@ -422,20 +277,20 @@ function App() {
       }
 
       event.preventDefault();
-      toggleQuickLookPanel();
+      toggleQuickLook();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, toggleQuickLookPanel, selectedIndices]);
+  }, [activeTab, toggleQuickLook, selectedIndices]);
 
   useEffect(() => {
     if (activeTab !== 'files' || !selectedIndices.length) {
       return;
     }
 
-    updateQuickLookPanel();
-  }, [activeTab, selectedIndices, updateQuickLookPanel]);
+    updateQuickLook();
+  }, [activeTab, selectedIndices, updateQuickLook]);
 
   useEffect(() => {
     if (activeTab !== 'files') {
