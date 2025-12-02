@@ -140,7 +140,7 @@ export const useSelection = (
         isCtrl: false,
       });
     },
-    [activeRowIndex, displayedResults.length, handleRowSelect, virtualListRef],
+    [activeRowIndex, displayedResults.length, handleRowSelect],
   );
 
   useEffect(() => {
