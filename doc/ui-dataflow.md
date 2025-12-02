@@ -71,7 +71,7 @@ useDataLoader listens to icon_update
 
 ## Window and shortcuts
 ```
-Global shortcut (Cmd+Shift+Space/P)
+Global shortcut (Cmd+Shift+Space)
   -> invoke('toggle_main_window')
   -> backend activates window and emits quick_launch
   -> UI focuses search input upon quick_launch event
