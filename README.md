@@ -15,7 +15,13 @@
 
 ### Download
 
-Grab the latest packaged builds from [GitHub Releases](https://github.com/cardisoft/cardinal/releases/).
+Use homebrew:
+
+```bash
+brew install --cask cardinal-search
+```
+
+You can also grab the latest packaged builds from [GitHub Releases](https://github.com/cardisoft/cardinal/releases/).
 
 ### i18n support
 
