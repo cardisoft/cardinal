@@ -22,10 +22,18 @@
   --row-even: #ffffff;
   --row-odd: #f7f8fa;
   --row-hover: rgb(220, 220, 220);
-  --row-selected-bg: rgb(0, 100, 225);
-  --row-selected-hover-bg: rgb(0, 100, 225);
-  --row-selected-text: #ffffff;
-  --row-selected-muted-text: rgba(255, 255, 255, 0.85);
+  --row-selected-bg-active: rgb(0, 100, 225);
+  --row-selected-hover-bg-active: rgb(0, 100, 225);
+  --row-selected-text-active: #ffffff;
+  --row-selected-muted-text-active: rgba(255, 255, 255, 0.85);
+  --row-selected-bg-inactive: rgb(220, 220, 220);
+  --row-selected-hover-bg-inactive: rgb(220, 220, 220);
+  --row-selected-text-inactive: var(--color-text);
+  --row-selected-muted-text-inactive: var(--color-muted);
+  --row-selected-bg: var(--row-selected-bg-active);
+  --row-selected-hover-bg: var(--row-selected-hover-bg-active);
+  --row-selected-text: var(--row-selected-text-active);
+  --row-selected-muted-text: var(--row-selected-muted-text-active);
   --search-toggle-hover-bg: rgba(0, 0, 0, 0.06);
   /* Remove custom scrollbar color overrides. */
 
@@ -51,10 +59,17 @@
 }
 
 :root[data-window-focused='false'] {
-  --row-selected-bg: rgb(220, 220, 220);
-  --row-selected-hover-bg: rgb(220, 220, 220);
-  --row-selected-text: var(--color-text);
-  --row-selected-muted-text: var(--color-muted);
+  --row-selected-bg: var(--row-selected-bg-inactive);
+  --row-selected-hover-bg: var(--row-selected-hover-bg-inactive);
+  --row-selected-text: var(--row-selected-text-inactive);
+  --row-selected-muted-text: var(--row-selected-muted-text-inactive);
+}
+
+.results-container--search-focused {
+  --row-selected-bg: var(--row-selected-bg-inactive);
+  --row-selected-hover-bg: var(--row-selected-hover-bg-inactive);
+  --row-selected-text: var(--row-selected-text-inactive);
+  --row-selected-muted-text: var(--row-selected-muted-text-inactive);
 }
 
 * {
@@ -830,14 +845,26 @@ button:active {
     --row-even: rgb(32, 32, 32);
     --row-odd: rgb(43, 43, 42);
     --row-hover: rgb(70, 70, 70);
-    --row-selected-bg: rgb(0, 88, 209);
-    --row-selected-hover-bg: rgb(0, 88, 209);
+    --row-selected-bg-active: rgb(0, 88, 209);
+    --row-selected-hover-bg-active: rgb(0, 88, 209);
+    --row-selected-text-active: #ffffff;
+    --row-selected-muted-text-active: rgba(255, 255, 255, 0.85);
+    --row-selected-bg-inactive: rgb(70, 70, 70);
+    --row-selected-hover-bg-inactive: rgb(70, 70, 70);
+    --row-selected-text-inactive: var(--color-text);
+    --row-selected-muted-text-inactive: var(--color-muted);
+    --row-selected-bg: var(--row-selected-bg-active);
+    --row-selected-hover-bg: var(--row-selected-hover-bg-active);
+    --row-selected-text: var(--row-selected-text-active);
+    --row-selected-muted-text: var(--row-selected-muted-text-active);
     --search-toggle-hover-bg: rgba(255, 255, 255, 0.14);
   }
 
   :root:not([data-theme])[data-window-focused='false'] {
-    --row-selected-bg: rgb(70, 70, 70);
-    --row-selected-hover-bg: rgb(70, 70, 70);
+    --row-selected-bg: var(--row-selected-bg-inactive);
+    --row-selected-hover-bg: var(--row-selected-hover-bg-inactive);
+    --row-selected-text: var(--row-selected-text-inactive);
+    --row-selected-muted-text: var(--row-selected-muted-text-inactive);
   }
 
   :root:not([data-theme]) a:hover {
@@ -900,14 +927,26 @@ button:active {
   --row-even: rgb(32, 32, 32);
   --row-odd: rgb(43, 43, 42);
   --row-hover: rgb(70, 70, 70);
-  --row-selected-bg: rgb(0, 88, 209);
-  --row-selected-hover-bg: rgb(0, 88, 209);
+  --row-selected-bg-active: rgb(0, 88, 209);
+  --row-selected-hover-bg-active: rgb(0, 88, 209);
+  --row-selected-text-active: #ffffff;
+  --row-selected-muted-text-active: rgba(255, 255, 255, 0.85);
+  --row-selected-bg-inactive: rgb(70, 70, 70);
+  --row-selected-hover-bg-inactive: rgb(70, 70, 70);
+  --row-selected-text-inactive: var(--color-text);
+  --row-selected-muted-text-inactive: var(--color-muted);
+  --row-selected-bg: var(--row-selected-bg-active);
+  --row-selected-hover-bg: var(--row-selected-hover-bg-active);
+  --row-selected-text: var(--row-selected-text-active);
+  --row-selected-muted-text: var(--row-selected-muted-text-active);
   --search-toggle-hover-bg: rgba(255, 255, 255, 0.14);
 }
 
 :root[data-theme='dark'][data-window-focused='false'] {
-  --row-selected-bg: rgb(70, 70, 70);
-  --row-selected-hover-bg: rgb(70, 70, 70);
+  --row-selected-bg: var(--row-selected-bg-inactive);
+  --row-selected-hover-bg: var(--row-selected-hover-bg-inactive);
+  --row-selected-text: var(--row-selected-text-inactive);
+  --row-selected-muted-text: var(--row-selected-muted-text-inactive);
 }
 
 [data-theme='dark'] a:hover {

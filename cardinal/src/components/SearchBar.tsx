@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, FocusEventHandler } from 'react';
 
 type SearchBarProps = {
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -8,6 +8,8 @@ type SearchBarProps = {
   caseSensitive: boolean;
   onToggleCaseSensitive: (event: ChangeEvent<HTMLInputElement>) => void;
   caseSensitiveLabel: string;
+  onFocus?: FocusEventHandler<HTMLInputElement>;
+  onBlur?: FocusEventHandler<HTMLInputElement>;
 };
 
 export function SearchBar({
@@ -17,6 +19,8 @@ export function SearchBar({
   caseSensitive,
   onToggleCaseSensitive,
   caseSensitiveLabel,
+  onFocus,
+  onBlur,
 }: SearchBarProps): React.JSX.Element {
   return (
     <div className="search-container">
@@ -30,6 +34,8 @@ export function SearchBar({
           autoCorrect="off"
           autoComplete="off"
           autoCapitalize="off"
+          onFocus={onFocus}
+          onBlur={onBlur}
         />
         <div className="search-options">
           <label className="search-option" title={caseSensitiveLabel}>
