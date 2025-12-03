@@ -88,6 +88,7 @@ function App() {
   const [isWindowFocused, setIsWindowFocused] = useState<boolean>(() => {
     return document.hasFocus();
   });
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const eventsPanelRef = useRef<FSEventsPanelHandle | null>(null);
   const headerRef = useRef<HTMLDivElement | null>(null);
   const virtualListRef = useRef<VirtualListHandle | null>(null);
@@ -173,6 +174,14 @@ function App() {
       input.focus();
       input.select();
     });
+  }, []);
+
+  const handleSearchFocus = useCallback(() => {
+    setIsSearchFocused(true);
+  }, []);
+
+  const handleSearchBlur = useCallback(() => {
+    setIsSearchFocused(false);
   }, []);
 
   useEffect(() => {
@@ -588,6 +597,9 @@ function App() {
     t('app.fullDiskAccess.steps.three'),
   ];
   const openSettingsLabel = t('app.fullDiskAccess.openSettings');
+  const resultsContainerClassName = `results-container${
+    isSearchFocused ? ' results-container--search-focused' : ''
+  }`;
 
   return (
     <>
@@ -599,8 +611,10 @@ function App() {
           caseSensitive={caseSensitive}
           onToggleCaseSensitive={onToggleCaseSensitive}
           caseSensitiveLabel={caseSensitiveLabel}
+          onFocus={handleSearchFocus}
+          onBlur={handleSearchBlur}
         />
-        <div className="results-container" style={containerStyle}>
+        <div className={resultsContainerClassName} style={containerStyle}>
           {activeTab === 'events' ? (
             <FSEventsPanel
               ref={eventsPanelRef}
