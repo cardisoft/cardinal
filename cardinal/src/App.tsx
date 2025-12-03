@@ -1,5 +1,10 @@
 import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
-import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
+import type {
+  ChangeEvent,
+  CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+} from 'react';
 import './App.css';
 import { FileRowRenderer } from './components/FileRowRenderer';
 import { SearchBar } from './components/SearchBar';
@@ -18,6 +23,7 @@ import { useRecentFSEvents } from './hooks/useRecentFSEvents';
 import { useRemoteSort } from './hooks/useRemoteSort';
 import { useSelection } from './hooks/useSelection';
 import { useQuickLook } from './hooks/useQuickLook';
+import { useSearchHistory } from './hooks/useSearchHistory';
 import { ROW_HEIGHT, OVERSCAN_ROW_COUNT } from './constants';
 import type { VirtualListHandle } from './components/VirtualList';
 import FSEventsPanel from './components/FSEventsPanel';
@@ -58,6 +64,7 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 
 const QUICK_LOOK_KEYCODE_DOWN = 125;
 const QUICK_LOOK_KEYCODE_UP = 126;
+const MAX_SEARCH_HISTORY_ENTRIES = 50;
 
 function App() {
   const {
@@ -93,6 +100,12 @@ function App() {
   const virtualListRef = useRef<VirtualListHandle | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const isMountedRef = useRef(false);
+  const {
+    handleInputChange: updateHistoryFromInput,
+    navigate: navigateSearchHistory,
+    ensureTailValue: ensureHistoryBuffer,
+    resetCursorToTail,
+  } = useSearchHistory({ maxEntries: MAX_SEARCH_HISTORY_ENTRIES });
   const { colWidths, onResizeStart, autoFitColumns } = useColumnResize();
   const { caseSensitive } = searchParams;
   const { eventColWidths, onEventResizeStart, autoFitEventColumns } = useEventColumnWidths();
@@ -423,16 +436,23 @@ function App() {
   }, [results, clearSelection]);
 
   const onQueryChange = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      const inputValue = e.target.value;
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const inputValue = event.target.value;
 
       if (activeTab === 'events') {
         setEventFilterQuery(inputValue);
-      } else {
-        queueSearch(inputValue);
+        return;
       }
+
+      updateHistoryFromInput(inputValue);
+      queueSearch(inputValue);
     },
-    [activeTab, queueSearch, setEventFilterQuery],
+    [
+      activeTab,
+      queueSearch,
+      setEventFilterQuery,
+      updateHistoryFromInput,
+    ],
   );
 
   const onToggleCaseSensitive = useCallback(
@@ -441,6 +461,38 @@ function App() {
       updateSearchParams({ caseSensitive: nextValue });
     },
     [updateSearchParams],
+  );
+
+  const handleHistoryNavigation = useCallback(
+    (direction: 'older' | 'newer') => {
+      if (activeTab !== 'files') {
+        return;
+      }
+      const nextValue = navigateSearchHistory(direction);
+      if (nextValue === null) {
+        return;
+      }
+      queueSearch(nextValue);
+    },
+    [activeTab, navigateSearchHistory, queueSearch],
+  );
+
+  const onSearchInputKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLInputElement>) => {
+      if (activeTab !== 'files') {
+        return;
+      }
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
+        return;
+      }
+      if (event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) {
+        return;
+      }
+
+      event.preventDefault();
+      handleHistoryNavigation(event.key === 'ArrowUp' ? 'older' : 'newer');
+    },
+    [activeTab, handleHistoryNavigation],
   );
 
   useEffect(() => {
@@ -552,13 +604,15 @@ function App() {
       if (newTab === 'events') {
         // Switch to events: always show newest items and clear transient filters
         setEventFilterQuery('');
+        resetCursorToTail();
       } else {
         // Switch to files: sync with reducer-managed search state and cancel pending timers
+        ensureHistoryBuffer('');
         resetSearchQuery();
         cancelPendingSearches();
       }
     },
-    [cancelPendingSearches, resetSearchQuery, setEventFilterQuery],
+    [cancelPendingSearches, ensureHistoryBuffer, resetCursorToTail, resetSearchQuery, setEventFilterQuery],
   );
 
   const searchInputValue = activeTab === 'events' ? eventFilterQuery : searchParams.query;
@@ -595,7 +649,9 @@ function App() {
         <SearchBar
           inputRef={searchInputRef}
           placeholder={searchPlaceholder}
+          value={searchInputValue}
           onChange={onQueryChange}
+          onKeyDown={onSearchInputKeyDown}
           caseSensitive={caseSensitive}
           onToggleCaseSensitive={onToggleCaseSensitive}
           caseSensitiveLabel={caseSensitiveLabel}
