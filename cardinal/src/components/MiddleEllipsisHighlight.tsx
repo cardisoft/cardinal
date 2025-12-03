@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 
 const CHAR_WIDTH = 8; // Approximate monospace character width in pixels – used for quick truncation math.
 
@@ -161,23 +161,25 @@ export function MiddleEllipsisHighlight({
   }, [highlightedParts, containerWidth]);
 
   // Prefer a ResizeObserver so truncation reacts quickly to layout shifts.
-  const updateWidth = useCallback(() => {
-    const el = containerRef.current;
-    if (el) {
-      const newWidth = el.getBoundingClientRect().width;
-      setContainerWidth(newWidth);
-    }
-  }, []);
-
   useEffect(() => {
-    updateWidth();
-
-    const resizeObserver = new ResizeObserver(updateWidth);
     const el = containerRef.current;
-    if (el) resizeObserver.observe(el);
+    if (!el) {
+      return;
+    }
 
+    const rect = el.getBoundingClientRect();
+    setContainerWidth(rect.width);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const newWidth = entry.contentRect.width;
+      setContainerWidth((prev) => (prev === newWidth ? prev : newWidth));
+    });
+
+    resizeObserver.observe(el);
     return () => resizeObserver.disconnect();
-  }, [updateWidth]);
+  }, []);
 
   return (
     <span
