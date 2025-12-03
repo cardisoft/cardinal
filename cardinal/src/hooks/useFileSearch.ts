@@ -27,6 +27,10 @@ type SearchParams = {
   caseSensitive: boolean;
 };
 
+type QueueSearchOptions = {
+  onSearchCommitted?: (query: string) => void;
+};
+
 type SearchAction =
   | { type: 'STATUS_UPDATE'; payload: { scannedFiles: number; processedEvents: number } }
   | { type: 'SEARCH_REQUEST'; payload: { immediate: boolean } }
@@ -137,7 +141,7 @@ type UseFileSearchResult = {
   state: SearchState;
   searchParams: SearchParams;
   updateSearchParams: (patch: Partial<SearchParams>) => void;
-  queueSearch: (query: string) => void;
+  queueSearch: (query: string, options?: QueueSearchOptions) => void;
   handleSearch: (overrides?: Partial<SearchParams>) => Promise<void>;
   resetSearchQuery: () => void;
   cancelPendingSearches: () => void;
@@ -276,10 +280,11 @@ export function useFileSearch(): UseFileSearchResult {
   }, []);
 
   const queueSearch = useCallback(
-    (query: string) => {
+    (query: string, options?: QueueSearchOptions) => {
       updateSearchParams({ query });
       cancelTimer(debounceTimerRef);
       debounceTimerRef.current = setTimeout(() => {
+        options?.onSearchCommitted?.(query);
         handleSearch({ query });
       }, SEARCH_DEBOUNCE_MS);
     },

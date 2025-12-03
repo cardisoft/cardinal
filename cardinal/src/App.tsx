@@ -444,15 +444,9 @@ function App() {
         return;
       }
 
-      updateHistoryFromInput(inputValue);
-      queueSearch(inputValue);
+      queueSearch(inputValue, { onSearchCommitted: updateHistoryFromInput });
     },
-    [
-      activeTab,
-      queueSearch,
-      setEventFilterQuery,
-      updateHistoryFromInput,
-    ],
+    [activeTab, queueSearch, setEventFilterQuery, updateHistoryFromInput],
   );
 
   const onToggleCaseSensitive = useCallback(
@@ -612,7 +606,13 @@ function App() {
         cancelPendingSearches();
       }
     },
-    [cancelPendingSearches, ensureHistoryBuffer, resetCursorToTail, resetSearchQuery, setEventFilterQuery],
+    [
+      cancelPendingSearches,
+      ensureHistoryBuffer,
+      resetCursorToTail,
+      resetSearchQuery,
+      setEventFilterQuery,
+    ],
   );
 
   const searchInputValue = activeTab === 'events' ? eventFilterQuery : searchParams.query;

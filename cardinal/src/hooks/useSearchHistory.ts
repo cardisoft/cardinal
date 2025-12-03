@@ -16,9 +16,7 @@ type UseSearchHistoryResult = {
 
 const DEFAULT_MAX_HISTORY = 50;
 
-export function useSearchHistory(
-  options: UseSearchHistoryOptions = {},
-): UseSearchHistoryResult {
+export function useSearchHistory(options: UseSearchHistoryOptions = {}): UseSearchHistoryResult {
   const maxEntries = options.maxEntries ?? DEFAULT_MAX_HISTORY;
   const historyRef = useRef<string[]>(['']);
   const cursorRef = useRef(0);
@@ -86,9 +84,7 @@ export function useSearchHistory(
       }
 
       const firstLetterChanged =
-        tailValue.length > 0 &&
-        nextValue.length > 0 &&
-        tailValue[0] !== nextValue[0];
+        tailValue.length > 0 && nextValue.length > 0 && tailValue[0] !== nextValue[0];
       if (firstLetterChanged) {
         pushEntry(nextValue);
         return;
