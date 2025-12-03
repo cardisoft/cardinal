@@ -167,6 +167,9 @@ export function MiddleEllipsisHighlight({
       return;
     }
 
+    const rect = el.getBoundingClientRect();
+    setContainerWidth(rect.width);
+
     const resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
