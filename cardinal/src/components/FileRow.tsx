@@ -68,13 +68,20 @@ export const FileRow = memo(function FileRow({
   };
 
   const handleMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!isSelected && onSelect && e.button === 0) {
-      onSelect(rowIndex, {
-        isShift: e.shiftKey,
-        isMeta: e.metaKey,
-        isCtrl: e.ctrlKey,
-      });
+    if (!onSelect || e.button !== 0) {
+      return;
     }
+
+    const wantsSelectionChange = !isSelected || e.shiftKey || e.metaKey || e.ctrlKey;
+    if (!wantsSelectionChange) {
+      return;
+    }
+
+    onSelect(rowIndex, {
+      isShift: e.shiftKey,
+      isMeta: e.metaKey,
+      isCtrl: e.ctrlKey,
+    });
   };
 
   const handleDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
