@@ -218,9 +218,7 @@ impl SearchCache {
         }?;
         let mut nodes = Vec::with_capacity(names.len());
         for (i, name) in names.iter().enumerate() {
-            if i % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
-                return None;
-            }
+            token.is_cancelled_sparse(i)?;
             if let Some(indices) = self.name_index.get(name) {
                 nodes.extend(indices.iter().copied());
             }
@@ -236,9 +234,7 @@ impl SearchCache {
     ) -> Option<Vec<SlabIndex>> {
         let mut new_node_set = Vec::new();
         for (i, &node) in parents.iter().enumerate() {
-            if i % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
-                return None;
-            }
+            token.is_cancelled_sparse(i)?;
             let mut child_matches = self.file_nodes[node]
                 .children
                 .iter()
@@ -266,14 +262,10 @@ impl SearchCache {
         let mut matches = Vec::new();
         let mut visited = 0usize;
         for &node in parents {
-            if visited % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
-                return None;
-            }
+            token.is_cancelled_sparse(visited)?;
             let descendants = self.all_subnodes(node, token)?;
             for descendant in descendants {
-                if visited % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
-                    return None;
-                }
+                token.is_cancelled_sparse(visited)?;
                 visited += 1;
                 let name = self.file_nodes[descendant].name_and_parent.as_str();
                 if matcher.matches(name) {
@@ -297,14 +289,10 @@ impl SearchCache {
         let mut extra = Vec::new();
         let mut visited = 0usize;
         for &node in &base {
-            if visited % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
-                return None;
-            }
+            token.is_cancelled_sparse(visited)?;
             let descendants = self.all_subnodes(node, token)?;
             for descendant in descendants {
-                if visited % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
-                    return None;
-                }
+                token.is_cancelled_sparse(visited)?;
                 visited += 1;
                 extra.push(descendant);
             }
@@ -736,7 +724,7 @@ impl SearchCache {
             })
             .collect();
 
-        Ok((!token.is_cancelled()).then_some(matched_indices))
+        Ok(token.is_cancelled().map(|()| matched_indices))
     }
 
     /// user need to ensure that needle is lowercased when case_insensitive is set
@@ -747,9 +735,7 @@ impl SearchCache {
         case_insensitive: bool,
         token: CancellationToken,
     ) -> Option<bool> {
-        if token.is_cancelled() {
-            return None;
-        }
+        token.is_cancelled()?;
 
         let Ok(mut file) = File::open(path) else {
             return Some(false);
@@ -762,9 +748,7 @@ impl SearchCache {
                 let lowercase_target = needle.to_ascii_lowercase();
                 let uppercase_target = needle.to_ascii_uppercase();
                 loop {
-                    if token.is_cancelled() {
-                        return None;
-                    }
+                    token.is_cancelled()?;
                     let read = match file.read(&mut buffer) {
                         Ok(0) => break,
                         Ok(count) => count,
@@ -779,9 +763,7 @@ impl SearchCache {
                 }
             } else {
                 loop {
-                    if token.is_cancelled() {
-                        return None;
-                    }
+                    token.is_cancelled()?;
                     let read = match file.read(&mut buffer) {
                         Ok(0) => break,
                         Ok(count) => count,
@@ -806,9 +788,7 @@ impl SearchCache {
         let mut carry_len = 0usize;
 
         loop {
-            if token.is_cancelled() {
-                return None;
-            }
+            token.is_cancelled()?;
 
             let Ok(read) = file.read(&mut buffer[carry_len..]) else {
                 return Some(false);
@@ -1467,11 +1447,12 @@ fn filter_nodes(
     mut predicate: impl FnMut(SlabIndex) -> bool,
 ) -> Option<Vec<SlabIndex>> {
     let mut filtered = Vec::with_capacity(nodes.len());
-    for (i, index) in nodes.into_iter().enumerate() {
+    let mut counter = 0usize;
+    let step = std::cmp::max(1, CANCEL_CHECK_INTERVAL / 4);
+    for index in nodes {
         // While filtering dc: dm:, lstat is slow. Thus we check cancellation more frequently.
-        if i % (CANCEL_CHECK_INTERVAL / 4) == 0 && token.is_cancelled() {
-            return None;
-        }
+        token.is_cancelled_sparse(counter)?;
+        counter = counter.wrapping_add(step);
         if predicate(index) {
             filtered.push(index);
         }
@@ -1490,9 +1471,7 @@ fn intersect_in_place(
     let rhs_set: HashSet<SlabIndex> = rhs.iter().copied().collect();
     let mut filtered = Vec::with_capacity(values.len().min(rhs.len()));
     for (i, index) in values.iter().copied().enumerate() {
-        if i % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
-            return None;
-        }
+        token.is_cancelled_sparse(i)?;
         if rhs_set.contains(&index) {
             filtered.push(index);
         }
@@ -1512,9 +1491,7 @@ fn difference_in_place(
     let rhs_set: HashSet<SlabIndex> = rhs.iter().copied().collect();
     let mut filtered = Vec::with_capacity(values.len());
     for (i, index) in values.iter().copied().enumerate() {
-        if i % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
-            return None;
-        }
+        token.is_cancelled_sparse(i)?;
         if !rhs_set.contains(&index) {
             filtered.push(index);
         }
@@ -1533,9 +1510,7 @@ fn union_in_place(
     }
     let mut seen: HashSet<SlabIndex> = values.iter().copied().collect();
     for (i, index) in rhs.iter().copied().enumerate() {
-        if i % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
-            return None;
-        }
+        token.is_cancelled_sparse(i)?;
         if seen.insert(index) {
             values.push(index);
         }

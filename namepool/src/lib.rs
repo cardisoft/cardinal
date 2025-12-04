@@ -2,7 +2,7 @@
 use core::str;
 use parking_lot::Mutex;
 use regex::Regex;
-use search_cancel::{CANCEL_CHECK_INTERVAL, CancellationToken};
+use search_cancel::CancellationToken;
 use std::collections::BTreeSet;
 
 pub struct NamePool {
@@ -65,9 +65,7 @@ impl NamePool {
     ) -> Option<BTreeSet<&'pool str>> {
         let mut result = BTreeSet::new();
         for (i, x) in self.inner.lock().iter().enumerate() {
-            if i % CANCEL_CHECK_INTERVAL == 0 && cancellation_token.is_cancelled() {
-                return None;
-            }
+            cancellation_token.is_cancelled_sparse(i)?;
             if x.contains(substr) {
                 result.insert(unsafe { str::from_raw_parts(x.as_ptr(), x.len()) });
             }
@@ -82,9 +80,7 @@ impl NamePool {
     ) -> Option<BTreeSet<&'pool str>> {
         let mut result = BTreeSet::new();
         for (i, x) in self.inner.lock().iter().enumerate() {
-            if i % CANCEL_CHECK_INTERVAL == 0 && cancellation_token.is_cancelled() {
-                return None;
-            }
+            cancellation_token.is_cancelled_sparse(i)?;
             if x.ends_with(suffix) {
                 result.insert(unsafe { str::from_raw_parts(x.as_ptr(), x.len()) });
             }
@@ -99,9 +95,7 @@ impl NamePool {
     ) -> Option<BTreeSet<&'pool str>> {
         let mut result = BTreeSet::new();
         for (i, x) in self.inner.lock().iter().enumerate() {
-            if i % CANCEL_CHECK_INTERVAL == 0 && cancellation_token.is_cancelled() {
-                return None;
-            }
+            cancellation_token.is_cancelled_sparse(i)?;
             if x.starts_with(prefix) {
                 result.insert(unsafe { str::from_raw_parts(x.as_ptr(), x.len()) });
             }
@@ -117,9 +111,7 @@ impl NamePool {
     ) -> Option<BTreeSet<&'pool str>> {
         let mut result = BTreeSet::new();
         for (i, x) in self.inner.lock().iter().enumerate() {
-            if i % CANCEL_CHECK_INTERVAL == 0 && cancellation_token.is_cancelled() {
-                return None;
-            }
+            cancellation_token.is_cancelled_sparse(i)?;
             let existing = unsafe { str::from_raw_parts(x.as_ptr(), x.len()) };
             if pattern.is_match(existing) {
                 result.insert(existing);
@@ -137,9 +129,7 @@ impl NamePool {
     ) -> Option<BTreeSet<&'pool str>> {
         let mut result = BTreeSet::new();
         for (i, x) in self.inner.lock().iter().enumerate() {
-            if i % CANCEL_CHECK_INTERVAL == 0 && cancellation_token.is_cancelled() {
-                return None;
-            }
+            cancellation_token.is_cancelled_sparse(i)?;
             if &**x == exact {
                 result.insert(unsafe { str::from_raw_parts(x.as_ptr(), x.len()) });
             }

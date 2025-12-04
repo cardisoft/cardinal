@@ -11,7 +11,7 @@ use cardinal_syntax::{optimize_query, parse_query};
 use fswalk::{Node, NodeMetadata, WalkData, walk_it};
 use hashbrown::HashSet;
 use namepool::NamePool;
-use search_cancel::{CANCEL_CHECK_INTERVAL, CancellationToken};
+use search_cancel::CancellationToken;
 use std::{
     ffi::OsStr,
     io::ErrorKind,
@@ -264,9 +264,7 @@ impl SearchCache {
         cancel: CancellationToken,
     ) -> Option<()> {
         for &child in &self.file_nodes[index].children {
-            if *i % CANCEL_CHECK_INTERVAL == 0 && cancel.is_cancelled() {
-                return None;
-            }
+            cancel.is_cancelled_sparse(*i)?;
             *i += 1;
             out.push(child);
             self.all_subnodes_recursive(child, out, i, cancel)?;

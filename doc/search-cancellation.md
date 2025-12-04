@@ -16,7 +16,11 @@ Key pieces:
   - Returns a token capturing that version.
 - `CancellationToken::is_cancelled()`:
   - Compares the captured version to `ACTIVE_SEARCH_VERSION` with relaxed loads.
-  - Returns `true` when a newer search has been started.
+  - Returns `Some(())` while the token remains active and `None` once a newer search starts, so callers can
+    simply use `token.is_cancelled()?;` to propagate cancellation.
+- `CancellationToken::is_cancelled_sparse(counter)`:
+  - Checks cancellation only every `CANCEL_CHECK_INTERVAL` iterations to amortize the cost, returning
+    `None` when the token has been cancelled at one of those checkpoints.
 
 `CancellationToken::noop()`:
 - Uses a private, static `AtomicU64` that never changes.
@@ -29,9 +33,7 @@ Key pieces:
 Typical pattern inside loops:
 ```rust
 for (i, item) in items.iter().enumerate() {
-    if i % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
-        return None; // or an error signalling cancellation
-    }
+    token.is_cancelled_sparse(i)?;
     // ... work ...
 }
 ```
@@ -47,8 +49,9 @@ Examples:
 - The frontend includes a monotonically increasing `version` in each `search` request.
 - The Tauri backend creates a `CancellationToken::new(version)` for each search and passes it into `SearchCache::search_with_options`.
 - If a new search starts with a higher version:
-  - The prior token becomes cancelled.
-  - Long-running loops periodically see `is_cancelled() == true` and exit, returning `SearchOutcome { nodes: None, .. }` inside the engine.
+- The prior token becomes cancelled.
+- Long-running loops periodically hit an `is_cancelled()` / `is_cancelled_sparse()` checkpoint that yields
+  `None` and exit, returning `SearchOutcome { nodes: None, .. }` inside the engine.
   - The Tauri command handler converts this to an empty `results` list, and the React side also uses its own `searchVersionRef` to discard responses for older versions.
 
 ---

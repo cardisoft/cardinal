@@ -29,8 +29,20 @@ impl CancellationToken {
         }
     }
 
-    pub fn is_cancelled(&self) -> bool {
-        self.version != self.active_version.load(Ordering::Relaxed)
+    pub fn is_cancelled(&self) -> Option<()> {
+        if self.version != self.active_version.load(Ordering::Relaxed) {
+            None
+        } else {
+            Some(())
+        }
+    }
+
+    pub fn is_cancelled_sparse(&self, counter: usize) -> Option<()> {
+        if counter % CANCEL_CHECK_INTERVAL == 0 {
+            self.is_cancelled()
+        } else {
+            Some(())
+        }
     }
 }
 
@@ -41,16 +53,22 @@ mod tests {
     #[test]
     fn noop_token_is_never_cancelled() {
         let token = CancellationToken::noop();
-        assert!(!token.is_cancelled());
+        assert!(
+            token.is_cancelled().is_some(),
+            "noop token should never be cancelled"
+        );
     }
 
     #[test]
     fn cancelled_after_version_change() {
         let token_v1 = CancellationToken::new(1);
-        assert!(!token_v1.is_cancelled(), "initial version should be active");
+        assert!(
+            token_v1.is_cancelled().is_some(),
+            "initial version should be active"
+        );
 
         // Bump the active version, cancelling the older token.
         let _token_v2 = CancellationToken::new(2);
-        assert!(token_v1.is_cancelled());
+        assert!(token_v1.is_cancelled().is_none());
     }
 }

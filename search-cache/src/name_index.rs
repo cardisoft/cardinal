@@ -1,6 +1,6 @@
 use crate::{FileNodes, NAME_POOL, SlabIndex};
 use itertools::Itertools;
-use search_cancel::{CANCEL_CHECK_INTERVAL, CancellationToken};
+use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, time::Instant};
 use thin_vec::ThinVec;
@@ -82,11 +82,10 @@ impl NameIndex {
             .flat_map(|indices| indices.iter().copied())
             .enumerate()
             .map(|(i, index)| {
-                if i % CANCEL_CHECK_INTERVAL == 0 && cancellation_token.is_cancelled() {
-                    Err(())
-                } else {
-                    Ok(index)
-                }
+                cancellation_token
+                    .is_cancelled_sparse(i)
+                    .map(|()| index)
+                    .ok_or(())
             })
             .try_collect()
             .ok()

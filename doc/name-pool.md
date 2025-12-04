@@ -44,7 +44,7 @@ Shared behavior:
 - Results are returned as `Option<BTreeSet<&str>>`.
   - `None` means the operation was cancelled.
   - `Some(set)` contains borrowed references into the pool.
-- Each method iterates the pool and checks `token.is_cancelled()` every `CANCEL_CHECK_INTERVAL` entries.
+- Each method iterates the pool and calls `token.is_cancelled_sparse(i)?;` so cancellation naturally propagates via `?`.
 
 ---
 
