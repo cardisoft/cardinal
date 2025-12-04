@@ -13,7 +13,7 @@ use memchr::arch::all::rabinkarp;
 use query_segmentation::query_segmentation;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use regex::RegexBuilder;
-use search_cancel::{CANCEL_CHECK_INTERVAL, CancellationToken};
+use search_cancel::CancellationToken;
 use std::{collections::BTreeSet, fs::File, io::Read, path::Path};
 
 pub(crate) const CONTENT_BUFFER_BYTES: usize = 64 * 1024;
