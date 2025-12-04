@@ -1,6 +1,6 @@
 use crate::{
-    SearchCache, SearchOptions, SegmentKind, SegmentMatcher, SlabIndex, SlabNodeMetadataCompact,
-    build_segment_matchers, cache::NAME_POOL,
+    SearchCache, SearchOptions, SegmentKind, SegmentMatcher, SegmentMatcherConcrete, SlabIndex,
+    SlabNodeMetadataCompact, build_segment_matchers, cache::NAME_POOL,
 };
 use anyhow::{Result, anyhow, bail};
 use cardinal_syntax::{
@@ -154,67 +154,163 @@ impl SearchCache {
         }
         let matchers = build_segment_matchers(&segments, options)
             .map_err(|err| anyhow!("Invalid regex pattern: {err}"))?;
-        self.execute_matchers(&matchers, token)
+        Ok(self.execute_matchers(&matchers, token))
     }
 
     fn execute_matchers(
         &self,
         matchers: &[SegmentMatcher],
         token: CancellationToken,
-    ) -> Result<Option<Vec<SlabIndex>>> {
-        if matchers.is_empty() {
-            return Ok(Some(Vec::new()));
-        }
+    ) -> Option<Vec<SlabIndex>> {
         let mut node_set: Option<Vec<SlabIndex>> = None;
+        let mut pending_globstar = false;
+        let mut saw_matcher = false;
         for matcher in matchers {
-            if let Some(nodes) = &node_set {
-                let mut new_node_set = Vec::with_capacity(nodes.len());
-                for (i, &node) in nodes.iter().enumerate() {
-                    if i % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
-                        return Ok(None);
-                    }
-                    let mut child_matches = self.file_nodes[node]
-                        .children
-                        .iter()
-                        .filter_map(|&child| {
-                            let name = self.file_nodes[child].name_and_parent.as_str();
-                            if matcher.matches(name) {
-                                Some((name, child))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<_>>();
-                    child_matches.sort_unstable_by_key(|(name, _)| *name);
-                    new_node_set.extend(child_matches.into_iter().map(|(_, index)| index));
+            match matcher {
+                SegmentMatcher::GlobStar => {
+                    pending_globstar = true;
                 }
-                node_set = Some(new_node_set);
-            } else {
-                let names: Option<BTreeSet<_>> = match matcher {
-                    SegmentMatcher::Plain { kind, needle } => match kind {
-                        SegmentKind::Substr => NAME_POOL.search_substr(needle, token),
-                        SegmentKind::Prefix => NAME_POOL.search_prefix(needle, token),
-                        SegmentKind::Suffix => NAME_POOL.search_suffix(needle, token),
-                        SegmentKind::Exact => NAME_POOL.search_exact(needle, token),
-                    },
-                    SegmentMatcher::Regex { regex } => NAME_POOL.search_regex(regex, token),
-                };
-                let Some(names) = names else {
-                    return Ok(None);
-                };
-                let mut nodes = Vec::with_capacity(names.len());
-                for (i, name) in names.iter().enumerate() {
-                    if i % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
-                        return Ok(None);
-                    }
-                    if let Some(indices) = self.name_index.get(name) {
-                        nodes.extend(indices.iter().copied());
-                    }
+                SegmentMatcher::Concrete(concrete) => {
+                    saw_matcher = true;
+                    let new_node_set = if let Some(nodes) = &node_set {
+                        if pending_globstar {
+                            self.match_descendant_segments(nodes, concrete, token)
+                        } else {
+                            self.match_direct_child_segments(nodes, concrete, token)
+                        }
+                    } else {
+                        self.match_initial_segment(concrete, token)
+                    }?;
+                    node_set = Some(new_node_set);
+                    pending_globstar = false;
                 }
-                node_set = Some(nodes);
             }
         }
-        Ok(node_set)
+
+        if pending_globstar {
+            if let Some(nodes) = node_set.take() {
+                Some(self.expand_trailing_globstar(nodes, token)?)
+            } else if saw_matcher {
+                node_set
+            } else {
+                self.search_empty(token)
+            }
+        } else if saw_matcher {
+            node_set
+        } else {
+            self.search_empty(token)
+        }
+    }
+
+    fn match_initial_segment(
+        &self,
+        matcher: &SegmentMatcherConcrete,
+        token: CancellationToken,
+    ) -> Option<Vec<SlabIndex>> {
+        let names: BTreeSet<_> = match matcher {
+            SegmentMatcherConcrete::Plain { kind, needle } => match kind {
+                SegmentKind::Substr => NAME_POOL.search_substr(needle, token),
+                SegmentKind::Prefix => NAME_POOL.search_prefix(needle, token),
+                SegmentKind::Suffix => NAME_POOL.search_suffix(needle, token),
+                SegmentKind::Exact => NAME_POOL.search_exact(needle, token),
+            },
+            SegmentMatcherConcrete::Regex { regex } => NAME_POOL.search_regex(regex, token),
+        }?;
+        let mut nodes = Vec::with_capacity(names.len());
+        for (i, name) in names.iter().enumerate() {
+            if i % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
+                return None;
+            }
+            if let Some(indices) = self.name_index.get(name) {
+                nodes.extend(indices.iter().copied());
+            }
+        }
+        Some(nodes)
+    }
+
+    fn match_direct_child_segments(
+        &self,
+        parents: &[SlabIndex],
+        matcher: &SegmentMatcherConcrete,
+        token: CancellationToken,
+    ) -> Option<Vec<SlabIndex>> {
+        let mut new_node_set = Vec::new();
+        for (i, &node) in parents.iter().enumerate() {
+            if i % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
+                return None;
+            }
+            let mut child_matches = self.file_nodes[node]
+                .children
+                .iter()
+                .filter_map(|&child| {
+                    let name = self.file_nodes[child].name_and_parent.as_str();
+                    if matcher.matches(name) {
+                        Some((name, child))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            child_matches.sort_unstable_by_key(|(name, _)| *name);
+            new_node_set.extend(child_matches.into_iter().map(|(_, index)| index));
+        }
+        Some(new_node_set)
+    }
+
+    fn match_descendant_segments(
+        &self,
+        parents: &[SlabIndex],
+        matcher: &SegmentMatcherConcrete,
+        token: CancellationToken,
+    ) -> Option<Vec<SlabIndex>> {
+        let mut matches = Vec::new();
+        let mut visited = 0usize;
+        for &node in parents {
+            if visited % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
+                return None;
+            }
+            let descendants = self.all_subnodes(node, token)?;
+            for descendant in descendants {
+                if visited % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
+                    return None;
+                }
+                visited += 1;
+                let name = self.file_nodes[descendant].name_and_parent.as_str();
+                if matcher.matches(name) {
+                    matches.push((name, descendant));
+                }
+            }
+        }
+        matches.sort_unstable_by_key(|(name, _)| *name);
+        Some(matches.into_iter().map(|(_, index)| index).collect())
+    }
+
+    fn expand_trailing_globstar(
+        &self,
+        mut nodes: Vec<SlabIndex>,
+        token: CancellationToken,
+    ) -> Option<Vec<SlabIndex>> {
+        if nodes.is_empty() {
+            return Some(nodes);
+        }
+        let base = nodes.clone();
+        let mut extra = Vec::new();
+        let mut visited = 0usize;
+        for &node in &base {
+            if visited % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
+                return None;
+            }
+            let descendants = self.all_subnodes(node, token)?;
+            for descendant in descendants {
+                if visited % CANCEL_CHECK_INTERVAL == 0 && token.is_cancelled() {
+                    return None;
+                }
+                visited += 1;
+                extra.push(descendant);
+            }
+        }
+        nodes.extend(extra);
+        Some(nodes)
     }
 
     fn evaluate_regex(
@@ -228,8 +324,8 @@ impl SearchCache {
         let regex = builder
             .build()
             .map_err(|err| anyhow!("Invalid regex pattern: {err}"))?;
-        let matcher = SegmentMatcher::Regex { regex };
-        self.execute_matchers(std::slice::from_ref(&matcher), token)
+        let matcher = SegmentMatcher::Concrete(SegmentMatcherConcrete::Regex { regex });
+        Ok(self.execute_matchers(std::slice::from_ref(&matcher), token))
     }
 
     fn evaluate_filter(

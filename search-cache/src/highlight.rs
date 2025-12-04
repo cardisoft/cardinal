@@ -1,5 +1,5 @@
 use cardinal_syntax::{ArgumentKind, Expr, FilterArgument, Term};
-use query_segmentation::{Segment, query_segmentation};
+use query_segmentation::{Segment, SegmentConcrete, query_segmentation};
 use std::collections::BTreeSet;
 
 pub fn derive_highlight_terms(expr: &Expr) -> Vec<String> {
@@ -102,12 +102,14 @@ fn literal_chunks(value: &str) -> Vec<String> {
     }
 }
 
+// TODO(ldm0): handle GloblStar
 fn segment_value<'a>(segment: &'a Segment<'a>) -> &'a str {
     match segment {
-        Segment::Substr(value)
-        | Segment::Prefix(value)
-        | Segment::Suffix(value)
-        | Segment::Exact(value) => value,
+        Segment::Concrete(SegmentConcrete::Substr(value))
+        | Segment::Concrete(SegmentConcrete::Prefix(value))
+        | Segment::Concrete(SegmentConcrete::Suffix(value))
+        | Segment::Concrete(SegmentConcrete::Exact(value)) => value,
+        Segment::GlobStar => "**",
     }
 }
 

@@ -375,6 +375,79 @@ fn overlapping_prefix_directories() {
 }
 
 #[test]
+fn globstar_middle_segment_matches_descendants() {
+    let temp_dir = TempDir::new("globstar_middle_segment_matches_descendants").unwrap();
+    let root = temp_dir.path();
+    fs::create_dir_all(root.join("foo"))
+        .and_then(|_| fs::create_dir_all(root.join("foo/nested")))
+        .and_then(|_| fs::create_dir_all(root.join("foo/nested/deeper")))
+        .unwrap();
+    fs::File::create(root.join("foo/bar.txt")).unwrap();
+    fs::File::create(root.join("foo/nested/bar.txt")).unwrap();
+    fs::File::create(root.join("foo/nested/deeper/bar.txt")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let indices = guard_indices(cache.search_with_options(
+        "foo/**/bar.txt",
+        SearchOptions::default(),
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices, root);
+    assert!(names.iter().any(|n| n.ends_with("foo/bar.txt")));
+    assert!(names.iter().any(|n| n.ends_with("foo/nested/bar.txt")));
+    assert!(
+        names
+            .iter()
+            .any(|n| n.ends_with("foo/nested/deeper/bar.txt"))
+    );
+}
+
+#[test]
+fn globstar_trailing_segment_includes_all_descendants() {
+    let temp_dir = TempDir::new("globstar_trailing_segment_includes_all_descendants").unwrap();
+    let root = temp_dir.path();
+    fs::create_dir_all(root.join("foo/sub/layer"))
+        .and_then(|_| fs::File::create(root.join("foo/file.txt")))
+        .and_then(|_| fs::File::create(root.join("foo/sub/layer/deep.txt")))
+        .unwrap();
+
+    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let indices = guard_indices(cache.search_with_options(
+        "foo/**",
+        SearchOptions::default(),
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices, root);
+    assert!(names.iter().any(|n| n == "foo"));
+    assert!(names.iter().any(|n| n.ends_with("foo/sub")));
+    assert!(names.iter().any(|n| n.ends_with("foo/sub/layer")));
+    assert!(names.iter().any(|n| n.ends_with("foo/file.txt")));
+    assert!(names.iter().any(|n| n.ends_with("foo/sub/layer/deep.txt")));
+}
+
+#[test]
+fn standalone_globstar_matches_entire_tree() {
+    let temp_dir = TempDir::new("standalone_globstar_matches_entire_tree").unwrap();
+    let root = temp_dir.path();
+    fs::create_dir_all(root.join("alpha/beta"))
+        .and_then(|_| fs::File::create(root.join("alpha/beta/file_a.txt")))
+        .and_then(|_| fs::create_dir_all(root.join("gamma")))
+        .and_then(|_| fs::File::create(root.join("gamma/file_b.txt")))
+        .unwrap();
+
+    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let indices = guard_indices(cache.search_with_options(
+        "**",
+        SearchOptions::default(),
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices, root);
+    assert!(names.iter().any(|n| n.ends_with("alpha")));
+    assert!(names.iter().any(|n| n.ends_with("alpha/beta/file_a.txt")));
+    assert!(names.iter().any(|n| n.ends_with("gamma/file_b.txt")));
+}
+
+#[test]
 fn wildcard_question_mark_inside_segment() {
     let temp_dir = TempDir::new("wildcard_question_mark_inside_segment").unwrap();
     let root = temp_dir.path();
