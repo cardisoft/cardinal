@@ -1,6 +1,6 @@
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { getCurrentWindow, primaryMonitor } from '@tauri-apps/api/window';
+import { currentMonitor, getCurrentWindow, primaryMonitor } from '@tauri-apps/api/window';
 
 type QuickLookRect = {
   x: number;
@@ -26,52 +26,35 @@ type UseQuickLookConfig = {
 /**
  * Provides Quick Look helpers for the file list. Given a function that returns the currently
  * selected paths, the hook exposes memoized callbacks to toggle/update/close the Quick Look panel.
- * It caches window geometry so repeated lookups don't thrash Tauri APIs, and translates DOM rects
+ * It resolves window geometry when needed and translates DOM rects
  * into screen coordinates suitable for macOS' Quick Look APIs.
  */
 export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
-  const geometryCacheRef = useRef<{
-    windowOrigin: { x: number; y: number };
-    mainScreenHeight: number;
-  } | null>(null);
-
   const resolveWindowGeometry = useCallback(async () => {
-    if (geometryCacheRef.current !== null) {
-      return geometryCacheRef.current;
-    }
-
-    if (typeof window === 'undefined') {
-      geometryCacheRef.current = null;
-      return geometryCacheRef.current;
-    }
-
     try {
       const currentWindow = getCurrentWindow();
-      const [position, monitor, scaleFactor] = await Promise.all([
+      const [position, scaleFactor] = await Promise.all([
         currentWindow.innerPosition(),
-        primaryMonitor(),
         currentWindow.scaleFactor(),
       ]);
+      const monitor = (await currentMonitor()) ?? (await primaryMonitor());
 
       if (!monitor) {
-        geometryCacheRef.current = null;
-        return geometryCacheRef.current;
+        return null;
       }
 
       const scale = scaleFactor || monitor.scaleFactor || window.devicePixelRatio || 1;
-      geometryCacheRef.current = {
+      return {
         windowOrigin: {
           x: position.x / scale,
           y: position.y / scale,
         },
-        mainScreenHeight: monitor.size.height / scale,
+        screenHeight: monitor.size.height / scale,
       };
     } catch (error) {
       console.warn('Failed to resolve window metrics for Quick Look', error);
-      geometryCacheRef.current = null;
+      return null;
     }
-
-    return geometryCacheRef.current;
   }, []);
 
   const getQuickLookItems = useCallback(async (): Promise<QuickLookItemPayload[]> => {
@@ -87,7 +70,7 @@ export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
 
     // This compensates for a coordinate system mismatch on macOS:
     // - `geometry.windowOrigin.y` (from Tauri's `innerPosition`) is relative to the *visible* screen area (below the menu bar).
-    // - `geometry.mainScreenHeight` is the *full* screen height.
+    // - `geometry.screenHeight` is the *full* height of the monitor hosting the window.
     // - `window.screen.availTop` provides the height of the menu bar, allowing us to correctly adjust `logicalYTop`
     //   to be relative to the absolute top of the screen for `QLPreviewPanel`'s `sourceFrameOnScreenForPreviewItem`.
     const screenTopOffset = window.screen.availTop ?? 0;
@@ -95,15 +78,9 @@ export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
     const buildItem = (path: string): QuickLookItemPayload => {
       const selector = `[data-row-path="${escapePathForSelector(path)}"]`;
       const row = document.querySelector<HTMLElement>(selector);
-      if (!row) {
-        return { path };
-      }
-      const anchor = row.querySelector<HTMLElement>('.file-icon, .file-icon-placeholder');
-      if (!anchor) {
-        return { path };
-      }
-      const iconImage = row.querySelector<HTMLImageElement>('img.file-icon');
-      if (!iconImage) {
+      const anchor = row?.querySelector<HTMLElement>('.file-icon, .file-icon-placeholder');
+      const iconImage = row?.querySelector<HTMLImageElement>('img.file-icon');
+      if (!row || !anchor || !iconImage) {
         return { path };
       }
 
@@ -114,7 +91,7 @@ export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
       const logicalHeight = rect.height;
 
       const x = logicalX;
-      const y = geometry.mainScreenHeight - (logicalYTop + logicalHeight);
+      const y = geometry.screenHeight - (logicalYTop + logicalHeight);
 
       return {
         path,
