@@ -1448,11 +1448,10 @@ fn filter_nodes(
 ) -> Option<Vec<SlabIndex>> {
     let mut filtered = Vec::with_capacity(nodes.len());
     let mut counter = 0usize;
-    let step = std::cmp::max(1, CANCEL_CHECK_INTERVAL / 4);
     for index in nodes {
         // While filtering dc: dm:, lstat is slow. Thus we check cancellation more frequently.
         token.is_cancelled_sparse(counter)?;
-        counter = counter.wrapping_add(step);
+        counter = counter.wrapping_add(4);
         if predicate(index) {
             filtered.push(index);
         }
