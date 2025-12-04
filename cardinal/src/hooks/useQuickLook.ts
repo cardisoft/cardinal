@@ -33,23 +33,24 @@ export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
   const resolveWindowGeometry = useCallback(async () => {
     try {
       const currentWindow = getCurrentWindow();
-      const [position, scaleFactor] = await Promise.all([
+      const [position, scaleFactor, monitor] = await Promise.all([
         currentWindow.innerPosition(),
         currentWindow.scaleFactor(),
+        currentMonitor(),
       ]);
-      const monitor = (await currentMonitor()) ?? (await primaryMonitor());
+      const resolvedMonitor = monitor ?? (await primaryMonitor());
 
-      if (!monitor) {
+      if (!resolvedMonitor) {
         return null;
       }
 
-      const scale = scaleFactor || monitor.scaleFactor || window.devicePixelRatio || 1;
+      const scale = scaleFactor || resolvedMonitor.scaleFactor || window.devicePixelRatio || 1;
       return {
         windowOrigin: {
           x: position.x / scale,
           y: position.y / scale,
         },
-        screenHeight: monitor.size.height / scale,
+        screenHeight: resolvedMonitor.size.height / scale,
       };
     } catch (error) {
       console.warn('Failed to resolve window metrics for Quick Look', error);
