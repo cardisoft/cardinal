@@ -38,7 +38,7 @@ fn explicit_range_instead_of_open_range() {
     let hits = cache.search("dm:2024-05-01-2024-05-15").unwrap();
     let mut names: Vec<_> = hits
         .iter()
-        .filter(|i| cache.file_nodes[**i].metadata.file_type_hint() == NodeFileType::File)
+        .filter(|i| cache.file_nodes[**i].file_type_hint() == NodeFileType::File)
         .map(|i| {
             cache
                 .node_path(*i)
@@ -139,7 +139,7 @@ fn boolean_or_between_dm_and_dc() {
     let thisyear_or_lastyear = cache.search("dc:lastyear|dm:thisyear").unwrap();
     let count = thisyear_or_lastyear
         .iter()
-        .filter(|i| cache.file_nodes[**i].metadata.file_type_hint() == NodeFileType::File)
+        .filter(|i| cache.file_nodes[**i].file_type_hint() == NodeFileType::File)
         .count();
     assert_eq!(count, 2, "OR across dc/dm should include both files");
 }
@@ -155,7 +155,7 @@ fn boolean_and_intersection() {
     let hits = cache.search("dm:pastweek dm:thisyear").unwrap();
     let count = hits
         .iter()
-        .filter(|i| cache.file_nodes[**i].metadata.file_type_hint() == NodeFileType::File)
+        .filter(|i| cache.file_nodes[**i].file_type_hint() == NodeFileType::File)
         .count();
     assert_eq!(count, 1, "intersection should retain only the file node");
 }

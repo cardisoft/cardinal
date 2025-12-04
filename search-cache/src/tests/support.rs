@@ -23,7 +23,7 @@ pub(super) fn set_file_times(
 pub(super) fn assert_file_hits(cache: &SearchCache, indices: &[SlabIndex], expected: &[&str]) {
     let mut names: Vec<String> = indices
         .iter()
-        .filter(|idx| cache.file_nodes[**idx].metadata.file_type_hint() == NodeFileType::File)
+        .filter(|idx| cache.file_nodes[**idx].file_type_hint() == NodeFileType::File)
         .filter_map(|idx| cache.node_path(*idx))
         .filter_map(|path| {
             path.file_name()
@@ -63,7 +63,7 @@ pub(super) fn node_name(cache: &SearchCache, index: SlabIndex) -> String {
 pub(super) fn list_file_names(cache: &SearchCache, indices: &[SlabIndex]) -> Vec<String> {
     let mut out: Vec<String> = indices
         .iter()
-        .filter(|i| cache.file_nodes[**i].metadata.file_type_hint() == NodeFileType::File)
+        .filter(|i| cache.file_nodes[**i].file_type_hint() == NodeFileType::File)
         .map(|i| node_name(cache, *i))
         .collect();
     out.sort();

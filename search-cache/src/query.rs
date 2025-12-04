@@ -243,7 +243,7 @@ impl SearchCache {
                 .children
                 .iter()
                 .filter_map(|&child| {
-                    let name = self.file_nodes[child].name_and_parent.as_str();
+                    let name = self.file_nodes[child].name();
                     if matcher.matches(name) {
                         Some((name, child))
                     } else {
@@ -275,7 +275,7 @@ impl SearchCache {
                     return None;
                 }
                 visited += 1;
-                let name = self.file_nodes[descendant].name_and_parent.as_str();
+                let name = self.file_nodes[descendant].name();
                 if matcher.matches(name) {
                     matches.push((name, descendant));
                 }
@@ -461,7 +461,7 @@ impl SearchCache {
         }
 
         Ok(filter_nodes(nodes, token, |index| {
-            self.file_nodes[index].metadata.file_type_hint() == file_type
+            self.file_nodes[index].file_type_hint() == file_type
         }))
     }
 
@@ -480,10 +480,10 @@ impl SearchCache {
         };
         Ok(filter_nodes(nodes, token, |index| {
             let node = &self.file_nodes[index];
-            if node.metadata.file_type_hint() != NodeFileType::File {
+            if node.file_type_hint() != NodeFileType::File {
                 return false;
             }
-            extension_of(node.name_and_parent.as_str())
+            extension_of(node.name())
                 .map(|ext| extensions.contains(ext.as_str()))
                 .unwrap_or(false)
         }))
@@ -549,7 +549,7 @@ impl SearchCache {
                 argument.raw
             );
         };
-        if self.file_nodes[target].metadata.file_type_hint() != NodeFileType::Dir {
+        if self.file_nodes[target].file_type_hint() != NodeFileType::Dir {
             bail!("nosubfolders path {:?} is not a folder", argument.raw);
         }
 
@@ -569,8 +569,7 @@ impl SearchCache {
     fn keep_node_for_nosubfolders(&self, index: SlabIndex, root: SlabIndex) -> bool {
         index == root || {
             let node = &self.file_nodes[index];
-            node.name_and_parent.parent() == Some(root)
-                && node.metadata.file_type_hint() != NodeFileType::Dir
+            node.parent() == Some(root) && node.file_type_hint() != NodeFileType::Dir
         }
     }
 
@@ -650,10 +649,10 @@ impl SearchCache {
         };
         Ok(filter_nodes(nodes, token, |index| {
             let node = &self.file_nodes[index];
-            if node.metadata.file_type_hint() != NodeFileType::File {
+            if node.file_type_hint() != NodeFileType::File {
                 return false;
             }
-            if let Some(ext) = extension_of(node.name_and_parent.as_str()) {
+            if let Some(ext) = extension_of(node.name()) {
                 extensions.iter().any(|needle| *needle == ext)
             } else {
                 false
@@ -673,7 +672,7 @@ impl SearchCache {
         };
         Ok(filter_nodes(nodes, token, |index| {
             let node = &self.file_nodes[index];
-            if node.metadata.file_type_hint() != NodeFileType::File {
+            if node.file_type_hint() != NodeFileType::File {
                 return false;
             }
             let Some(size) = self.node_size_bytes(index) else {
@@ -727,7 +726,7 @@ impl SearchCache {
 
         let matched_indices = nodes
             .into_iter()
-            .filter(|index| self.file_nodes[*index].metadata.file_type_hint() == NodeFileType::File)
+            .filter(|index| self.file_nodes[*index].file_type_hint() == NodeFileType::File)
             .filter_map(|index| self.node_path(index).map(|path| (index, path)))
             .par_bridge()
             .filter_map(|(index, path)| {

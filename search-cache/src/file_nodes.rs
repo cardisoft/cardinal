@@ -24,8 +24,8 @@ impl FileNodes {
     pub fn node_path(&self, index: SlabIndex) -> Option<PathBuf> {
         let mut current = index;
         let mut segments = vec![];
-        while let Some(parent) = self.slab.get(current)?.name_and_parent.parent() {
-            segments.push(self.slab.get(current)?.name_and_parent.as_str());
+        while let Some(parent) = self.slab.get(current)?.parent() {
+            segments.push(self.slab.get(current)?.name());
             current = parent;
         }
         Some(

@@ -98,12 +98,28 @@ impl NameAndParent {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SlabNode {
-    pub name_and_parent: NameAndParent,
+    name_and_parent: NameAndParent,
     pub children: ThinVec<SlabIndex>,
     pub metadata: SlabNodeMetadataCompact,
 }
 
 impl SlabNode {
+    pub fn name(&self) -> &'static str {
+        self.name_and_parent.as_str()
+    }
+
+    pub fn parent(&self) -> Option<SlabIndex> {
+        self.name_and_parent.parent()
+    }
+
+    pub fn file_type_hint(&self) -> NodeFileType {
+        self.metadata.file_type_hint()
+    }
+
+    pub fn state(&self) -> State {
+        self.metadata.state()
+    }
+
     pub fn add_children(&mut self, children: SlabIndex) {
         if !self.children.contains(&children) {
             self.children.push(children);
