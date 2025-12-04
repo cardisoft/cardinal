@@ -23,6 +23,17 @@ pub enum SegmentConcrete<'s> {
     Exact(&'s str),
 }
 
+impl SegmentConcrete<'_> {
+    pub fn as_value(&self) -> &str {
+        match self {
+            SegmentConcrete::Substr(s)
+            | SegmentConcrete::Prefix(s)
+            | SegmentConcrete::Suffix(s)
+            | SegmentConcrete::Exact(s) => s,
+        }
+    }
+}
+
 /// Process path-query string into segments.
 pub fn query_segmentation(query: &str) -> Vec<Segment<'_>> {
     #[derive(Clone, Copy)]
