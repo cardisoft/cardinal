@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import { FileRow } from '../FileRow';
 
 const baseItem = {
@@ -15,10 +15,6 @@ const renderRow = (props?: Partial<React.ComponentProps<typeof FileRow>>) => {
 };
 
 describe('FileRow selection interactions', () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it('does not send redundant selection updates for a plain click on an already-selected row', () => {
     const onSelect = vi.fn();
     const { getByTitle } = renderRow({ onSelect });
