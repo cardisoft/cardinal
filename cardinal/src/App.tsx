@@ -36,6 +36,7 @@ import { useTranslation } from 'react-i18next';
 import { useFullDiskAccessPermission } from './hooks/useFullDiskAccessPermission';
 import { OPEN_PREFERENCES_EVENT } from './constants/appEvents';
 import type { DisplayState } from './components/StateDisplay';
+import { openResultPath } from './utils/openResultPath';
 
 type ActiveTab = StatusTabKey;
 
@@ -370,6 +371,15 @@ function App() {
         return;
       }
 
+      if (key === 'o') {
+        if (activeTab !== 'files' || !activePath) {
+          return;
+        }
+        event.preventDefault();
+        openResultPath(activePath);
+        return;
+      }
+
       if (key === 'c') {
         if (activeTab !== 'files' || !activePath) {
           return;
@@ -533,12 +543,7 @@ function App() {
   );
 
   const handleRowOpen = useCallback((path: string) => {
-    if (!path) {
-      return;
-    }
-    invoke('open_path', { path }).catch((error) => {
-      console.error('Failed to open file', error);
-    });
+    openResultPath(path);
   }, []);
 
   const selectedIndexSet = useMemo(() => new Set(selectedIndices), [selectedIndices]);

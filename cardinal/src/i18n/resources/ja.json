@@ -36,6 +36,7 @@
     }
   },
   "contextMenu": {
+    "openItem": "開く",
     "quickLook": "クイックルック",
     "openInFinder": "Finder で開く",
     "copyPath": "パスをコピー",

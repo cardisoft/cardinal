@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Menu } from '@tauri-apps/api/menu';
 import type { MenuItemOptions } from '@tauri-apps/api/menu';
 import { useTranslation } from 'react-i18next';
+import { openResultPath } from '../utils/openResultPath';
 
 type UseContextMenuResult = {
   showContextMenu: (event: ReactMouseEvent<HTMLElement>, path: string) => void;
@@ -26,6 +27,14 @@ export function useContextMenu(
       const filename = segments.length > 0 ? segments[segments.length - 1] : path;
 
       const items: MenuItemOptions[] = [
+        {
+          id: 'context_menu.open_item',
+          text: t('contextMenu.openItem'),
+          accelerator: 'Cmd+O',
+          action: () => {
+            openResultPath(path);
+          },
+        },
         {
           id: 'context_menu.open_in_finder',
           text: t('contextMenu.openInFinder'),

@@ -36,6 +36,7 @@
     }
   },
   "contextMenu": {
+    "openItem": "Открыть",
     "quickLook": "Быстрый просмотр",
     "openInFinder": "Открыть в Finder",
     "copyPath": "Копировать путь",

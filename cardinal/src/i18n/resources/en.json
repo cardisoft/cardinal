@@ -36,6 +36,7 @@
     }
   },
   "contextMenu": {
+    "openItem": "Open",
     "quickLook": "QuickLook",
     "openInFinder": "Open in Finder",
     "copyPath": "Copy Path",

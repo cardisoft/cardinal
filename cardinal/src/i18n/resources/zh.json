@@ -36,6 +36,7 @@
     }
   },
   "contextMenu": {
+    "openItem": "打开",
     "quickLook": "快速查看",
     "openInFinder": "在 Finder 中打开",
     "copyPath": "复制路径",
