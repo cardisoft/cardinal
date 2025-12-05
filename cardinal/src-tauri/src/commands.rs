@@ -392,7 +392,9 @@ pub fn get_app_status() -> String {
 
 #[tauri::command]
 pub fn trigger_rescan(state: State<'_, SearchState>) {
-    let _ = state.rescan_tx.send(());
+    if let Err(e) = state.rescan_tx.send(()) {
+        error!("Failed to request rescan: {e:?}");
+    }
 }
 
 #[tauri::command]
