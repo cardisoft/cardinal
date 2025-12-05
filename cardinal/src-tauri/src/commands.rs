@@ -267,7 +267,9 @@ pub fn get_nodes_info(
     let include_icons = include_icons.unwrap_or(true);
     let nodes = state.request_nodes(results);
 
-    let node_infos = nodes
+    
+
+    nodes
         .into_iter()
         .map(|SearchResultNode { path, metadata }| {
             let path = path.to_string_lossy().into_owned();
@@ -287,9 +289,7 @@ pub fn get_nodes_info(
                 metadata: metadata.as_ref().map(NodeInfoMetadata::from_metadata),
             }
         })
-        .collect();
-
-    node_infos
+        .collect()
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -364,7 +364,7 @@ pub fn get_sorted_view(
     let nodes = state.fetch_sorted_nodes(&results);
     let mut entries: Vec<SortEntry> = results
         .into_iter()
-        .zip(nodes.into_iter())
+        .zip(nodes)
         .enumerate()
         .map(|(idx, (slab_index, node))| SortEntry {
             original_index: idx,
