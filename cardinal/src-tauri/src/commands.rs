@@ -267,8 +267,6 @@ pub fn get_nodes_info(
     let include_icons = include_icons.unwrap_or(true);
     let nodes = state.request_nodes(results);
 
-    
-
     nodes
         .into_iter()
         .map(|SearchResultNode { path, metadata }| {
