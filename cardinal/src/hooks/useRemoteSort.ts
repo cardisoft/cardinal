@@ -114,23 +114,13 @@ export const useRemoteSort = (
     setIsSorting(true);
 
     void (async () => {
-      try {
-        const ordered = await invoke<number[]>('get_sorted_view', {
-          results,
-          sort: sortState,
-        });
-        if (sortRequestRef.current === requestId) {
-          setSortedResults(toSlabIndexArray(Array.isArray(ordered) ? ordered : []));
-        }
-      } catch (error) {
-        console.error('Failed to sort results', error);
-        if (sortRequestRef.current === requestId) {
-          setSortedResults(results);
-        }
-      } finally {
-        if (sortRequestRef.current === requestId) {
-          setIsSorting(false);
-        }
+      const ordered = await invoke<number[]>('get_sorted_view', {
+        results,
+        sort: sortState,
+      });
+      if (sortRequestRef.current === requestId) {
+        setSortedResults(toSlabIndexArray(Array.isArray(ordered) ? ordered : []));
+        setIsSorting(false);
       }
     })();
   }, [results, sortState, canSort]);

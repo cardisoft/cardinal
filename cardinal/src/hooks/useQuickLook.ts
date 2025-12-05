@@ -117,11 +117,7 @@ export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
     if (!items.length) {
       return;
     }
-    try {
-      await invoke('toggle_quicklook', { items });
-    } catch (error) {
-      console.error('Failed to preview file with Quick Look', error);
-    }
+    await invoke('toggle_quicklook', { items });
   }, [getQuickLookItems]);
 
   const updateQuickLook = useCallback(async () => {
@@ -129,17 +125,11 @@ export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
     if (!items.length) {
       return;
     }
-    try {
-      await invoke('update_quicklook', { items });
-    } catch (error) {
-      console.error('Failed to update Quick Look', error);
-    }
+    await invoke('update_quicklook', { items });
   }, [getQuickLookItems]);
 
   const closeQuickLook = useCallback(() => {
-    invoke('close_quicklook').catch((error) => {
-      console.error('Failed to close Quick Look', error);
-    });
+    void invoke('close_quicklook');
   }, []);
 
   return {

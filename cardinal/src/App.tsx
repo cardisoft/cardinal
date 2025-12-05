@@ -365,9 +365,7 @@ function App() {
           return;
         }
         event.preventDefault();
-        invoke('open_in_finder', { path: activePath }).catch((error) => {
-          console.error('Failed to reveal file in Finder', error);
-        });
+        void invoke('open_in_finder', { path: activePath });
         return;
       }
 

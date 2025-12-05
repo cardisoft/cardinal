@@ -135,56 +135,51 @@ export function useDataLoader(results: SlabIndex[]) {
     }
     if (needLoading.length === 0) return;
     const versionAtRequest = versionRef.current;
-    try {
-      const slice = needLoading.map((i) => list[i]);
-      const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', { results: slice });
-      if (versionRef.current !== versionAtRequest) {
-        needLoading.forEach((i) => loadingRef.current.delete(i));
-        return;
-      }
-      setCache((prev) => {
-        if (versionRef.current !== versionAtRequest) return prev;
-        let nextCache: DataLoaderCache | null = null;
+    const slice = needLoading.map((i) => list[i]);
+    const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', { results: slice });
+    if (versionRef.current !== versionAtRequest) {
+      needLoading.forEach((i) => loadingRef.current.delete(i));
+      return;
+    }
+    setCache((prev) => {
+      if (versionRef.current !== versionAtRequest) return prev;
+      let nextCache: DataLoaderCache | null = null;
 
-        needLoading.forEach((originalIndex, idx) => {
-          const fetchedItem = fetched[idx];
-          loadingRef.current.delete(originalIndex);
-          if (!fetchedItem) {
-            return;
-          }
-
-          const normalizedItem = fromNodeInfo(fetchedItem);
-          const existing = prev.get(originalIndex);
-          const hasOverride = iconOverridesRef.current.has(originalIndex);
-          const override = hasOverride ? iconOverridesRef.current.get(originalIndex) : undefined;
-
-          const preferredIcon = hasOverride
-            ? normalizeIcon(override)
-            : (existing?.icon ?? normalizedItem.icon);
-
-          const mergedItem =
-            preferredIcon === normalizedItem.icon
-              ? normalizedItem
-              : { ...normalizedItem, icon: preferredIcon };
-
-          if (nextCache === null) {
-            nextCache = new Map(prev);
-          }
-
-          nextCache.set(originalIndex, mergedItem);
-        });
-
-        if (nextCache === null) {
-          return prev;
+      needLoading.forEach((originalIndex, idx) => {
+        const fetchedItem = fetched[idx];
+        loadingRef.current.delete(originalIndex);
+        if (!fetchedItem) {
+          return;
         }
 
-        cacheRef.current = nextCache;
-        return nextCache;
+        const normalizedItem = fromNodeInfo(fetchedItem);
+        const existing = prev.get(originalIndex);
+        const hasOverride = iconOverridesRef.current.has(originalIndex);
+        const override = hasOverride ? iconOverridesRef.current.get(originalIndex) : undefined;
+
+        const preferredIcon = hasOverride
+          ? normalizeIcon(override)
+          : (existing?.icon ?? normalizedItem.icon);
+
+        const mergedItem =
+          preferredIcon === normalizedItem.icon
+            ? normalizedItem
+            : { ...normalizedItem, icon: preferredIcon };
+
+        if (nextCache === null) {
+          nextCache = new Map(prev);
+        }
+
+        nextCache.set(originalIndex, mergedItem);
       });
-    } catch (err) {
-      needLoading.forEach((i) => loadingRef.current.delete(i));
-      console.error('Failed loading rows', err);
-    }
+
+      if (nextCache === null) {
+        return prev;
+      }
+
+      cacheRef.current = nextCache;
+      return nextCache;
+    });
   }, []);
 
   return { cache, ensureRangeLoaded };
