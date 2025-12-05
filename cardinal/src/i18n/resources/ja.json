@@ -38,7 +38,7 @@
   "contextMenu": {
     "openItem": "開く",
     "quickLook": "クイックルック",
-    "openInFinder": "Finder で開く",
+    "revealInFinder": "Finder で表示",
     "copyPath": "パスをコピー",
     "copyFilename": "ファイル名をコピー",
     "resetColumnWidths": "列幅をリセット"

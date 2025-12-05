@@ -37,7 +37,7 @@ export function useContextMenu(
         },
         {
           id: 'context_menu.open_in_finder',
-          text: t('contextMenu.openInFinder'),
+          text: t('contextMenu.revealInFinder'),
           accelerator: 'Cmd+R',
           action: () => {
             void invoke('open_in_finder', { path });

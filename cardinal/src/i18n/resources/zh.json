@@ -38,7 +38,7 @@
   "contextMenu": {
     "openItem": "打开",
     "quickLook": "快速查看",
-    "openInFinder": "在 Finder 中打开",
+    "revealInFinder": "在 Finder 中显示",
     "copyPath": "复制路径",
     "copyFilename": "复制文件名",
     "resetColumnWidths": "重置列宽"

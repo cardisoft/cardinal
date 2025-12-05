@@ -38,7 +38,7 @@
   "contextMenu": {
     "openItem": "Abrir",
     "quickLook": "Vista rápida",
-    "openInFinder": "Abrir en Finder",
+    "revealInFinder": "Mostrar en Finder",
     "copyPath": "Copiar ruta",
     "copyFilename": "Copiar nombre de archivo",
     "resetColumnWidths": "Restablecer ancho de columnas"
