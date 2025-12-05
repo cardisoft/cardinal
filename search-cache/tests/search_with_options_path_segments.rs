@@ -448,6 +448,273 @@ fn standalone_globstar_matches_entire_tree() {
 }
 
 #[test]
+fn globstar_matches_nested_hidden_directory_rs_files() {
+    let temp_dir = TempDir::new("globstar_matches_nested_hidden_directory_rs_files").unwrap();
+    let root = temp_dir.path();
+    fs::create_dir_all(root.join("dir/.cargo/index")).unwrap();
+    fs::File::create(root.join("dir/.cargo/index/emm.rs")).unwrap();
+    fs::File::create(root.join("dir/.cargo/index/skip.txt")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let indices = guard_indices(cache.search_with_options(
+        ".cargo/**/*.rs",
+        SearchOptions::default(),
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices, root);
+    assert!(
+        names
+            .iter()
+            .any(|name| name.ends_with(".cargo/index/emm.rs")),
+        "globstar pattern should match nested .rs file"
+    );
+    assert!(
+        !names
+            .iter()
+            .any(|name| name.ends_with(".cargo/index/skip.txt")),
+        ".rs pattern should exclude non-Rust files"
+    );
+}
+
+#[test]
+fn multiple_globstars_collapse_to_expected_scope() {
+    let temp_dir = TempDir::new("multiple_globstars_collapse_to_expected_scope").unwrap();
+    let root = temp_dir.path();
+    fs::create_dir_all(root.join("aa/src/module")).unwrap();
+    fs::create_dir_all(root.join("aa/module")).unwrap();
+    fs::create_dir_all(root.join("bb/aa")).unwrap();
+    fs::File::create(root.join("aa/src/module/lib.c")).unwrap();
+    fs::File::create(root.join("aa/module/lib.c")).unwrap();
+    fs::File::create(root.join("aa/module/lib.txt")).unwrap();
+    fs::File::create(root.join("bb/aa/lib.c")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let indices = guard_indices(cache.search_with_options(
+        "aa/**/**/*.c",
+        SearchOptions::default(),
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices, root);
+    assert!(names.iter().any(|n| n.ends_with("aa/module/lib.c")));
+    assert!(
+        names.iter().any(|n| n.ends_with("aa/src/module/lib.c")),
+        "deep nested file should be included"
+    );
+    assert!(
+        !names.iter().any(|n| n.ends_with("aa/module/lib.txt")),
+        "non .c extension excluded"
+    );
+    assert!(
+        names.iter().any(|n| n.ends_with("bb/aa/lib.c")),
+        "suffix segment should match directories ending with aa regardless of parent"
+    );
+}
+
+#[test]
+fn redundant_globstars_match_entire_tree() {
+    let temp_dir = TempDir::new("redundant_globstars_match_entire_tree").unwrap();
+    let root = temp_dir.path();
+    fs::create_dir_all(root.join("x/y/z")).unwrap();
+    fs::create_dir_all(root.join("docs")).unwrap();
+    fs::File::create(root.join("x/y/z/file.rs")).unwrap();
+    fs::File::create(root.join("docs/readme.md")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let indices = guard_indices(cache.search_with_options(
+        "**/**/**",
+        SearchOptions::default(),
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices, root);
+    assert!(
+        names.iter().any(|n| n.ends_with("x/y/z/file.rs")),
+        "deep descendant visible"
+    );
+    assert!(
+        names.iter().any(|n| n.ends_with("docs/readme.md")),
+        "sibling branch visible"
+    );
+}
+
+#[test]
+fn globstar_with_question_mark_preserves_length_constraints() {
+    let temp_dir =
+        TempDir::new("globstar_with_question_mark_preserves_length_constraints").unwrap();
+    let root = temp_dir.path();
+    fs::create_dir_all(root.join("pkg-alpha")).unwrap();
+    fs::create_dir_all(root.join("pkg-beta")).unwrap();
+    fs::File::create(root.join("pkg-alpha/lib01.rs")).unwrap();
+    fs::File::create(root.join("pkg-alpha/lib1.rs")).unwrap();
+    fs::File::create(root.join("pkg-beta/libAA.rs")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let indices = guard_indices(cache.search_with_options(
+        "**/lib??.rs",
+        SearchOptions::default(),
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices, root);
+    assert!(
+        names.iter().any(|n| n.ends_with("pkg-alpha/lib01.rs"))
+            && names.iter().any(|n| n.ends_with("pkg-beta/libAA.rs")),
+        "two-character suffix should match"
+    );
+    assert!(
+        !names.iter().any(|n| n.ends_with("pkg-alpha/lib1.rs")),
+        "single-char suffix should not match ?"
+    );
+}
+
+#[test]
+fn globstar_case_sensitive_vs_insensitive_variants() {
+    let temp_dir = TempDir::new("globstar_case_sensitive_vs_insensitive_variants").unwrap();
+    let root = temp_dir.path();
+    fs::create_dir_all(root.join("AA/Deep")).unwrap();
+    fs::create_dir_all(root.join("aa/Deep")).unwrap();
+    fs::File::create(root.join("AA/Deep/FILE.TXT")).unwrap();
+    fs::File::create(root.join("aa/Deep/file.txt")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let sensitive = guard_indices(cache.search_with_options(
+        "aa/**/file.txt",
+        SearchOptions::default(),
+        CancellationToken::noop(),
+    ));
+    let sensitive_names = normalize(&mut cache, &sensitive, root);
+    assert!(
+        sensitive_names.is_empty(),
+        "case-sensitive search with mismatched casing should yield no results"
+    );
+
+    let opts = SearchOptions {
+        case_insensitive: true,
+    };
+    let insensitive =
+        guard_indices(cache.search_with_options("aa/**/file.txt", opts, CancellationToken::noop()));
+    let insensitive_names = normalize(&mut cache, &insensitive, root);
+    assert!(
+        insensitive_names
+            .iter()
+            .any(|n| n.ends_with("AA/Deep/FILE.TXT")),
+        "case-insensitive search should include differently cased target"
+    );
+}
+
+#[test]
+fn globstar_case_sensitive_exact_match() {
+    let temp_dir = TempDir::new("globstar_case_sensitive_exact_match").unwrap();
+    let root = temp_dir.path();
+    fs::create_dir_all(root.join("AA/Deep")).unwrap();
+    fs::create_dir_all(root.join("aa/Deep")).unwrap();
+    fs::File::create(root.join("AA/Deep/FILE.TXT")).unwrap();
+    fs::File::create(root.join("aa/Deep/file.txt")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let indices = guard_indices(cache.search_with_options(
+        "AA/**/FILE.TXT",
+        SearchOptions::default(),
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices, root);
+    assert!(
+        names.iter().any(|n| n.ends_with("AA/Deep/FILE.TXT")),
+        "exact case should match when search is case sensitive"
+    );
+    assert!(
+        !names.iter().any(|n| n.ends_with("aa/Deep/file.txt")),
+        "lowercase variant should not appear in case-sensitive query"
+    );
+}
+
+#[test]
+fn leading_globstar_matches_any_suffix() {
+    let temp_dir = TempDir::new("leading_globstar_matches_any_suffix").unwrap();
+    let root = temp_dir.path();
+    fs::create_dir_all(root.join("alpha/beta")).unwrap();
+    fs::create_dir_all(root.join("gamma/delta")).unwrap();
+    fs::File::create(root.join("alpha/beta/report.log")).unwrap();
+    fs::File::create(root.join("gamma/delta/report.log")).unwrap();
+    fs::File::create(root.join("alpha/report.log")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let indices = guard_indices(cache.search_with_options(
+        "**/report.log",
+        SearchOptions::default(),
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices, root);
+    assert!(names.iter().any(|n| n.ends_with("alpha/beta/report.log")));
+    assert!(names.iter().any(|n| n.ends_with("gamma/delta/report.log")));
+    assert!(names.iter().any(|n| n.ends_with("alpha/report.log")));
+}
+
+#[test]
+fn wildcard_segment_followed_by_trailing_globstar() {
+    let temp_dir = TempDir::new("wildcard_segment_followed_by_trailing_globstar").unwrap();
+    let root = temp_dir.path();
+    fs::create_dir_all(root.join("client-app/src")).unwrap();
+    fs::create_dir_all(root.join("client-lib/tests")).unwrap();
+    fs::create_dir_all(root.join("server-app/src")).unwrap();
+    fs::File::create(root.join("client-app/src/main.rs")).unwrap();
+    fs::File::create(root.join("client-lib/tests/test.rs")).unwrap();
+    fs::File::create(root.join("server-app/src/ignore.rs")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let indices = guard_indices(cache.search_with_options(
+        "client*/**",
+        SearchOptions::default(),
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices, root);
+    assert!(names.iter().any(|n| n.ends_with("client-app/src")));
+    assert!(names.iter().any(|n| n.ends_with("client-app/src/main.rs")));
+    assert!(names.iter().any(|n| n.ends_with("client-lib/tests")));
+    assert!(
+        names
+            .iter()
+            .any(|n| n.ends_with("client-lib/tests/test.rs"))
+    );
+    assert!(
+        !names
+            .iter()
+            .any(|n| n.ends_with("server-app/src/ignore.rs")),
+        "non-matching prefix should be excluded"
+    );
+}
+
+#[test]
+fn globstar_question_mark_segment_and_trailing_globstar() {
+    let temp_dir = TempDir::new("globstar_question_mark_segment_and_trailing_globstar").unwrap();
+    let root = temp_dir.path();
+    fs::create_dir_all(root.join("pkg-a/lib1/src")).unwrap();
+    fs::create_dir_all(root.join("pkg-b/libA/src")).unwrap();
+    fs::create_dir_all(root.join("pkg-c/libAB/src")).unwrap();
+    fs::File::create(root.join("pkg-a/lib1/src/main.rs")).unwrap();
+    fs::File::create(root.join("pkg-b/libA/src/main.rs")).unwrap();
+    fs::File::create(root.join("pkg-c/libAB/src/main.rs")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let indices = guard_indices(cache.search_with_options(
+        "**/lib?/src/**",
+        SearchOptions::default(),
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices, root);
+    assert!(
+        names.iter().any(|n| n.ends_with("pkg-a/lib1/src/main.rs")),
+        "lib1 matches ?"
+    );
+    assert!(
+        names.iter().any(|n| n.ends_with("pkg-b/libA/src/main.rs")),
+        "libA matches ?"
+    );
+    assert!(
+        !names.iter().any(|n| n.ends_with("pkg-c/libAB/src/main.rs")),
+        "two-character suffix should be excluded by single ?"
+    );
+}
+
+#[test]
 fn wildcard_question_mark_inside_segment() {
     let temp_dir = TempDir::new("wildcard_question_mark_inside_segment").unwrap();
     let root = temp_dir.path();
