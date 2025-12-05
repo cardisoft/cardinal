@@ -46,6 +46,7 @@ export type RemoteSortControls = {
   setSortState: (next: SortState) => void;
   sortedResults: SlabIndex[];
   displayedResults: SlabIndex[];
+  displayedResultsVersion: number;
   sortThreshold: number;
   setSortThreshold: (value: number) => void;
   canSort: boolean;
@@ -58,6 +59,7 @@ export type RemoteSortControls = {
 
 export const useRemoteSort = (
   results: SlabIndex[],
+  resultsVersion: number,
   locale: string,
   formatDisabledTooltip: (limit: string) => string | null,
 ): RemoteSortControls => {
@@ -66,6 +68,8 @@ export const useRemoteSort = (
   const [sortThreshold, setSortThresholdState] = useState<number>(() => readStoredSortThreshold());
   const [isSorting, setIsSorting] = useState(false);
   const sortRequestRef = useRef(0);
+  const displayedVersionRef = useRef(0);
+  const [displayedResultsVersion, setDisplayedResultsVersion] = useState(0);
 
   const canSort = results.length > 0 && results.length <= sortThreshold;
   const shouldUseSortedResults = Boolean(sortState && canSort);
@@ -101,6 +105,11 @@ export const useRemoteSort = (
     }
   }, [canSort, sortState]);
 
+  const bumpDisplayedResultsVersion = useCallback(() => {
+    displayedVersionRef.current += 1;
+    setDisplayedResultsVersion(displayedVersionRef.current);
+  }, []);
+
   useEffect(() => {
     const requestId = sortRequestRef.current + 1;
     sortRequestRef.current = requestId;
@@ -121,6 +130,7 @@ export const useRemoteSort = (
         });
         if (sortRequestRef.current === requestId) {
           setSortedResults(toSlabIndexArray(Array.isArray(ordered) ? ordered : []));
+          bumpDisplayedResultsVersion();
         }
       } finally {
         if (sortRequestRef.current === requestId) {
@@ -128,7 +138,15 @@ export const useRemoteSort = (
         }
       }
     })();
-  }, [results, sortState, canSort]);
+  }, [results, sortState, canSort, bumpDisplayedResultsVersion]);
+
+  useEffect(() => {
+    bumpDisplayedResultsVersion();
+  }, [resultsVersion, bumpDisplayedResultsVersion]);
+
+  useEffect(() => {
+    bumpDisplayedResultsVersion();
+  }, [shouldUseSortedResults, bumpDisplayedResultsVersion]);
 
   const sortLimitLabel = useMemo(
     () => new Intl.NumberFormat(locale).format(sortThreshold),
@@ -142,6 +160,7 @@ export const useRemoteSort = (
     setSortState,
     sortedResults,
     displayedResults,
+    displayedResultsVersion,
     sortThreshold,
     setSortThreshold,
     canSort,

@@ -30,13 +30,14 @@ export type SelectionController = {
  */
 export const useSelection = (
   displayedResults: SlabIndex[],
+  resultsVersion: number,
   virtualListRef: RefObject<VirtualListHandle | null>,
 ): SelectionController => {
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
   const [shiftAnchorIndex, setShiftAnchorIndex] = useState<number | null>(null);
   const selectedIndicesRef = useRef<number[]>([]);
-  const displayedResultsRef = useRef(displayedResults);
+  const resultsVersionRef = useRef(resultsVersion);
 
   const handleRowSelect = useCallback(
     (rowIndex: number, options: RowSelectOptions) => {
@@ -66,14 +67,14 @@ export const useSelection = (
 
       setActiveRowIndex(rowIndex);
     },
-    [displayedResults, shiftAnchorIndex],
+    [shiftAnchorIndex],
   );
 
   const selectSingleRow = useCallback((rowIndex: number) => {
     setSelectedIndices([rowIndex]);
     setActiveRowIndex(rowIndex);
     setShiftAnchorIndex(rowIndex);
-  }, [displayedResults]);
+  }, []);
 
   const clearSelection = useCallback(() => {
     setSelectedIndices([]);
@@ -114,24 +115,19 @@ export const useSelection = (
   }, [selectedIndices]);
 
   useEffect(() => {
-    const prev = displayedResultsRef.current;
-    if (prev === displayedResults) {
+    if (resultsVersionRef.current === resultsVersion) {
       return;
     }
-    displayedResultsRef.current = displayedResults;
+    resultsVersionRef.current = resultsVersion;
 
-    if (
-      selectedIndicesRef.current.length === 0 &&
-      activeRowIndex === null &&
-      shiftAnchorIndex === null
-    ) {
+    if (selectedIndices.length === 0 && activeRowIndex === null && shiftAnchorIndex === null) {
       return;
     }
 
     setSelectedIndices([]);
     setActiveRowIndex(null);
     setShiftAnchorIndex(null);
-  }, [displayedResults, activeRowIndex, shiftAnchorIndex]);
+  }, [resultsVersion, selectedIndices, activeRowIndex, shiftAnchorIndex]);
 
   const selectedPaths = useMemo(() => {
     const list = virtualListRef.current;

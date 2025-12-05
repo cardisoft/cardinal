@@ -10,6 +10,7 @@ type SearchError = string | Error | null;
 
 type SearchState = {
   results: SlabIndex[];
+  resultsVersion: number;
   scannedFiles: number;
   processedEvents: number;
   currentQuery: string;
@@ -56,6 +57,7 @@ type SearchAction =
 
 const initialSearchState: SearchState = {
   results: [],
+  resultsVersion: 0,
   scannedFiles: 0,
   processedEvents: 0,
   currentQuery: '',
@@ -104,6 +106,7 @@ function reducer(state: SearchState, action: SearchAction): SearchState {
       return {
         ...state,
         results: action.payload.results,
+        resultsVersion: state.resultsVersion + 1,
         currentQuery: action.payload.query,
         highlightTerms: action.payload.highlightTerms,
         showLoadingUI: false,

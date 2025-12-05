@@ -23,12 +23,14 @@ type SelectOptions = {
   isCtrl?: boolean;
 };
 
-const renderSelection = (initial: number[]) => {
+const renderSelection = (initial: number[], initialVersion = 0) => {
   const virtualListRef = createVirtualListRef();
+  let currentResults = toSlabIndexArray(initial);
+  let version = initialVersion;
   const hook = renderHook(
-    ({ results }: { results: ReturnType<typeof toSlabIndexArray> }) =>
-      useSelection(results, virtualListRef),
-    { initialProps: { results: toSlabIndexArray(initial) } },
+    ({ results, version: activeVersion }: { results: ReturnType<typeof toSlabIndexArray>; version: number }) =>
+      useSelection(results, activeVersion, virtualListRef),
+    { initialProps: { results: currentResults, version } },
   );
 
   const selectRow = (rowIndex: number, options: SelectOptions = {}) => {
@@ -42,13 +44,24 @@ const renderSelection = (initial: number[]) => {
     });
   };
 
-  const rerenderResults = (next: number[]) => {
+  const rerenderResults = (next: number[], options?: { bumpVersion?: boolean }) => {
+    currentResults = toSlabIndexArray(next);
     act(() => {
-      hook.rerender({ results: toSlabIndexArray(next) });
+      if (options?.bumpVersion !== false) {
+        version += 1;
+      }
+      hook.rerender({ results: currentResults, version });
     });
   };
 
-  return { ...hook, selectRow, rerenderResults };
+  const bumpVersion = () => {
+    act(() => {
+      version += 1;
+      hook.rerender({ results: currentResults, version });
+    });
+  };
+
+  return { ...hook, selectRow, rerenderResults, bumpVersion };
 };
 
 describe('useSelection', () => {
@@ -71,6 +84,19 @@ describe('useSelection', () => {
     expect(result.current.shiftAnchorIndex).toBe(3);
 
     rerenderResults([9, 3, 0, 1, 2, 4, 5]);
+
+    expect(result.current.selectedIndices).toEqual([]);
+    expect(result.current.activeRowIndex).toBeNull();
+    expect(result.current.shiftAnchorIndex).toBeNull();
+  });
+
+  it('resets when only the version increments', () => {
+    const { result, selectRow, bumpVersion } = renderSelection([0, 1, 2, 3, 4]);
+
+    selectRow(1);
+    expect(result.current.selectedIndices).toEqual([1]);
+
+    bumpVersion();
 
     expect(result.current.selectedIndices).toEqual([]);
     expect(result.current.activeRowIndex).toBeNull();

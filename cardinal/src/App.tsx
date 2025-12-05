@@ -81,6 +81,7 @@ function App() {
   } = useFileSearch();
   const {
     results,
+    resultsVersion,
     scannedFiles,
     processedEvents,
     currentQuery,
@@ -118,6 +119,7 @@ function App() {
   const {
     sortState,
     displayedResults,
+    displayedResultsVersion,
     sortThreshold,
     setSortThreshold,
     canSort,
@@ -125,7 +127,7 @@ function App() {
     sortDisabledTooltip,
     sortButtonsDisabled,
     handleSortToggle,
-  } = useRemoteSort(results, i18n.language, (limit) => t('sorting.disabled', { limit }));
+  } = useRemoteSort(results, resultsVersion, i18n.language, (limit) => t('sorting.disabled', { limit }));
   // Centralized selection management for the virtualized files list.
   // Provides memoized helpers for click/keyboard selection and keeps Quick Look hooks fed.
   const {
@@ -137,7 +139,7 @@ function App() {
     selectSingleRow,
     clearSelection,
     moveSelection,
-  } = useSelection(displayedResults, virtualListRef);
+  } = useSelection(displayedResults, displayedResultsVersion, virtualListRef);
 
   const getQuickLookPaths = useCallback(
     () => (activeTab === 'files' ? selectedPaths : []),
