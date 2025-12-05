@@ -382,7 +382,9 @@ pub fn get_sorted_view(
 
 #[tauri::command]
 pub fn update_icon_viewport(id: u64, viewport: Vec<SlabIndex>, state: State<'_, SearchState>) {
-    let _ = state.icon_viewport_tx.send((id, viewport));
+    if let Err(e) = state.icon_viewport_tx.send((id, viewport)) {
+        error!("Failed to send icon viewport update: {e:?}");
+    }
 }
 
 #[tauri::command]
