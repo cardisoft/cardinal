@@ -33,24 +33,27 @@ export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
   const resolveWindowGeometry = useCallback(async () => {
     try {
       const currentWindow = getCurrentWindow();
-      const [position, scaleFactor, monitor] = await Promise.all([
+      const [position, scaleFactor, monitor, mainMonitor] = await Promise.all([
         currentWindow.innerPosition(),
         currentWindow.scaleFactor(),
         currentMonitor(),
+        primaryMonitor(),
       ]);
-      const resolvedMonitor = monitor ?? (await primaryMonitor());
 
-      if (!resolvedMonitor) {
+      if (!monitor || !mainMonitor) {
         return null;
       }
 
-      const scale = scaleFactor || resolvedMonitor.scaleFactor || window.devicePixelRatio || 1;
+      // Bug in tauri-apps/tao: https://github.com/tauri-apps/tao/pull/1159
+      position.y = position.y - mainMonitor.size.height + monitor.size.height;
+
+      const scale = scaleFactor || monitor.scaleFactor || window.devicePixelRatio || 1;
       return {
         windowOrigin: {
           x: position.x / scale,
           y: position.y / scale,
         },
-        screenHeight: resolvedMonitor.size.height / scale,
+        screenHeight: monitor.size.height / scale,
       };
     } catch (error) {
       console.warn('Failed to resolve window metrics for Quick Look', error);
