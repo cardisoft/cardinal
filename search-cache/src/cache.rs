@@ -226,7 +226,7 @@ impl SearchCache {
                 .children
                 .iter()
                 .find_map(|&child| {
-                    let name = self.file_nodes[child].name_and_parent.as_str();
+                    let name = self.file_nodes[child].name();
                     if OsStr::new(name) == segment {
                         Some(child)
                     } else {
@@ -273,10 +273,9 @@ impl SearchCache {
     }
 
     fn push_node(&mut self, node: SlabNode) -> SlabIndex {
-        let node_name = node.name_and_parent;
+        let name = node.name();
         let index = self.file_nodes.insert(node);
-        self.name_index
-            .add_index(node_name.as_str(), index, &self.file_nodes);
+        self.name_index.add_index(name, index, &self.file_nodes);
         index
     }
 
@@ -287,7 +286,7 @@ impl SearchCache {
             if let Some(&index) = self.file_nodes[current]
                 .children
                 .iter()
-                .find(|&&x| self.file_nodes[x].name_and_parent.as_str() == name)
+                .find(|&&x| self.file_nodes[x].name() == name)
             {
                 current = index;
             } else {
@@ -307,7 +306,7 @@ impl SearchCache {
             current = if let Some(&index) = self.file_nodes[current]
                 .children
                 .iter()
-                .find(|&&x| self.file_nodes[x].name_and_parent.as_str() == name)
+                .find(|&&x| self.file_nodes[x].name() == name)
             {
                 index
             } else {
@@ -350,9 +349,11 @@ impl SearchCache {
         // Ensure node of the path parent is existed
         let parent = self.create_node_chain(parent);
         // Remove node(if exists) and do a full rescan
-        if let Some(&old_node) = self.file_nodes[parent].children.iter().find(|&&x| {
-            path.file_name() == Some(OsStr::new(self.file_nodes[x].name_and_parent.as_str()))
-        }) {
+        if let Some(&old_node) = self.file_nodes[parent]
+            .children
+            .iter()
+            .find(|&&x| path.file_name() == Some(OsStr::new(self.file_nodes[x].name())))
+        {
             self.remove_node(old_node);
         }
         // For incremental data, we need metadata
@@ -417,15 +418,13 @@ impl SearchCache {
     fn remove_node(&mut self, index: SlabIndex) {
         fn remove_single_node(cache: &mut SearchCache, index: SlabIndex) {
             if let Some(node) = cache.file_nodes.try_remove(index) {
-                let removed = cache
-                    .name_index
-                    .remove_index(node.name_and_parent.as_str(), index);
+                let removed = cache.name_index.remove_index(node.name(), index);
                 assert!(removed, "inconsistent name index and node");
             }
         }
 
         // Remove parent reference, make whole subtree unreachable.
-        if let Some(parent) = self.file_nodes[index].name_and_parent.parent() {
+        if let Some(parent) = self.file_nodes[index].parent() {
             self.file_nodes[parent].children.retain(|&x| x != index);
         }
         let mut stack = vec![index];
@@ -514,7 +513,7 @@ impl SearchCache {
                     .file_nodes
                     .get_mut(node_index)
                     .map(|node| {
-                        match (node.metadata.state(), &path) {
+                        match (node.state(), &path) {
                             (State::None, Some(path)) if FETCH_META => {
                                 // try fetching metadata if it's not cached and cache them
                                 let metadata = match std::fs::symlink_metadata(path) {
