@@ -179,7 +179,7 @@ impl NodeInfoMetadata {
 }
 
 #[tauri::command]
-pub fn close_quicklook(app_handle: AppHandle) {
+pub async fn close_quicklook(app_handle: AppHandle) {
     let app_handle_cloned = app_handle.clone();
     if let Err(e) = app_handle.run_on_main_thread(move || {
         close_preview_panel(app_handle_cloned);
@@ -189,7 +189,7 @@ pub fn close_quicklook(app_handle: AppHandle) {
 }
 
 #[tauri::command]
-pub fn update_quicklook(app_handle: AppHandle, items: Vec<QuickLookItemInput>) {
+pub async fn update_quicklook(app_handle: AppHandle, items: Vec<QuickLookItemInput>) {
     let app_handle_cloned = app_handle.clone();
     if let Err(e) = app_handle.run_on_main_thread(move || {
         update_preview_panel(app_handle_cloned, items);
@@ -199,7 +199,7 @@ pub fn update_quicklook(app_handle: AppHandle, items: Vec<QuickLookItemInput>) {
 }
 
 #[tauri::command]
-pub fn toggle_quicklook(app_handle: AppHandle, items: Vec<QuickLookItemInput>) {
+pub async fn toggle_quicklook(app_handle: AppHandle, items: Vec<QuickLookItemInput>) {
     let app_handle_cloned = app_handle.clone();
     if let Err(e) = app_handle.run_on_main_thread(move || {
         toggle_preview_panel(app_handle_cloned, items);
@@ -209,12 +209,12 @@ pub fn toggle_quicklook(app_handle: AppHandle, items: Vec<QuickLookItemInput>) {
 }
 
 #[tauri::command]
-pub fn search(
+pub async fn search(
     query: String,
     options: Option<SearchOptionsPayload>,
     version: u64,
     state: State<'_, SearchState>,
-) -> SearchResponse {
+) -> Result<SearchResponse, String> {
     let options = options.unwrap_or_default();
     let cancellation_token = CancellationToken::new(version);
     if let Err(e) = state.search_tx.send(SearchJob {
@@ -223,38 +223,33 @@ pub fn search(
         cancellation_token,
     }) {
         error!("Failed to send search request: {e:?}");
-        return SearchResponse::default();
+        return Ok(SearchResponse::default());
     }
 
-    let results = match state.result_rx.recv() {
-        Ok(res) => match res {
-            Ok(outcome) => outcome,
-            Err(e) => {
-                error!("Search {version} failed: {e:?}");
-                return SearchResponse::default();
-            }
-        },
+    match state.result_rx.recv() {
+        Ok(res) => res,
         Err(e) => {
             error!("Failed to receive search result: {e:?}");
-            return SearchResponse::default();
+            return Ok(SearchResponse::default());
         }
-    };
-
-    let SearchOutcome { nodes, highlights } = results;
-    let results = match nodes {
-        Some(list) => list,
-        None => {
-            info!("Search {version} was cancelled");
-            Vec::new()
-        }
-    };
-    SearchResponse {
-        results,
-        highlights,
     }
+    .map(|SearchOutcome { nodes, highlights }| {
+        let results = match nodes {
+            Some(list) => list,
+            None => {
+                info!("Search {version} was cancelled");
+                Vec::new()
+            }
+        };
+        SearchResponse {
+            results,
+            highlights,
+        }
+    })
+    .map_err(|e| format!("Failed to process search result: {e:?}"))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_nodes_info(
     results: Vec<SlabIndex>,
     include_icons: Option<bool>,
@@ -348,7 +343,7 @@ fn compare_entries(a: &SortEntry, b: &SortEntry, sort: &SortStatePayload) -> Std
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_sorted_view(
     results: Vec<SlabIndex>,
     sort: Option<SortStatePayload>,
@@ -378,7 +373,7 @@ pub fn get_sorted_view(
     entries.into_iter().map(|entry| entry.slab_index).collect()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn update_icon_viewport(id: u64, viewport: Vec<SlabIndex>, state: State<'_, SearchState>) {
     if let Err(e) = state.icon_viewport_tx.send((id, viewport)) {
         error!("Failed to send icon viewport update: {e:?}");
@@ -386,11 +381,11 @@ pub fn update_icon_viewport(id: u64, viewport: Vec<SlabIndex>, state: State<'_, 
 }
 
 #[tauri::command]
-pub fn get_app_status() -> String {
+pub async fn get_app_status() -> String {
     load_app_state().as_str().to_string()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn trigger_rescan(state: State<'_, SearchState>) {
     if let Err(e) = state.rescan_tx.send(()) {
         error!("Failed to request rescan: {e:?}");
@@ -398,28 +393,28 @@ pub fn trigger_rescan(state: State<'_, SearchState>) {
 }
 
 #[tauri::command]
-pub fn open_in_finder(path: String) {
+pub async fn open_in_finder(path: String) {
     if let Err(e) = Command::new("open").arg("-R").arg(&path).spawn() {
         error!("Failed to reveal path in Finder: {e}");
     }
 }
 
 #[tauri::command]
-pub fn open_path(path: String) {
+pub async fn open_path(path: String) {
     if let Err(e) = Command::new("open").arg(&path).spawn() {
         error!("Failed to open path: {e}");
     }
 }
 
 #[tauri::command]
-pub fn start_logic() {
+pub async fn start_logic() {
     if let Some(sender) = LOGIC_START.get() {
         let _ = sender.send(());
     }
 }
 
 #[tauri::command]
-pub fn hide_main_window(app: AppHandle) {
+pub async fn hide_main_window(app: AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         if hide_window(&window) {
             info!("Main window hidden via command");
@@ -428,7 +423,7 @@ pub fn hide_main_window(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn activate_main_window(app: AppHandle) {
+pub async fn activate_main_window(app: AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         activate_window(&window);
         info!("Main window activated via command");
@@ -438,7 +433,7 @@ pub fn activate_main_window(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn toggle_main_window(app: AppHandle) {
+pub async fn toggle_main_window(app: AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         if matches!(toggle_window(&window), WindowToggle::Hidden) {
             info!("Main window hidden via command");

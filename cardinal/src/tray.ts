@@ -38,9 +38,5 @@ function handleTrayAction(event: TrayIconEvent): void {
 }
 
 async function activateMainWindow(): Promise<void> {
-  try {
-    await invoke('activate_main_window');
-  } catch (error) {
-    console.error('Failed to activate Cardinal window from tray', error);
-  }
+  await invoke('activate_main_window');
 }

@@ -21,9 +21,7 @@ export function useIconViewport({ results, start, end }: UseIconViewportProps) {
     if (!viewport) return;
     pendingRef.current = null;
     requestIdRef.current += 1;
-    invoke('update_icon_viewport', { id: requestIdRef.current, viewport }).catch((error) => {
-      console.error('Failed to update icon viewport', error);
-    });
+    void invoke('update_icon_viewport', { id: requestIdRef.current, viewport });
   }, []);
 
   const scheduleIconViewport = useCallback(

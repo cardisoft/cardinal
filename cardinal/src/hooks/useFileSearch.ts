@@ -312,11 +312,7 @@ export function useFileSearch(): UseFileSearchResult {
   }, [handleSearch, searchParams.caseSensitive]);
 
   const requestRescan = useCallback(async () => {
-    try {
-      await invoke('trigger_rescan');
-    } catch (error) {
-      console.error('Failed to request filesystem rescan:', error);
-    }
+    await invoke('trigger_rescan');
   }, []);
 
   return {
