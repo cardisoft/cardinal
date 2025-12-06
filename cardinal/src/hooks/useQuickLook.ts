@@ -77,7 +77,7 @@ export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
     // - `geometry.screenHeight` is the *full* height of the monitor hosting the window.
     // - `window.screen.availTop` provides the height of the menu bar, allowing us to correctly adjust `logicalYTop`
     //   to be relative to the absolute top of the screen for `QLPreviewPanel`'s `sourceFrameOnScreenForPreviewItem`.
-    const screenTopOffset = window.screen.availTop ?? 0;
+    const screenTopOffset = (window.screen as { availTop?: number }).availTop ?? 0;
 
     const buildItem = (path: string): QuickLookItemPayload => {
       const selector = `[data-row-path="${escapePathForSelector(path)}"]`;
