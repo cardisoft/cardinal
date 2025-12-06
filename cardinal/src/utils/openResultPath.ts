@@ -5,7 +5,5 @@ export const openResultPath = (path: string | null | undefined): void => {
     return;
   }
 
-  invoke('open_path', { path }).catch((error) => {
-    console.error('Failed to open file', error);
-  });
+  void invoke('open_path', { path });
 };

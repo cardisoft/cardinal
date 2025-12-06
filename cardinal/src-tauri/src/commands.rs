@@ -18,7 +18,7 @@ use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering as StdOrdering, process::Command};
 use tauri::{AppHandle, Manager, State};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 #[derive(Debug, Clone, Copy, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -103,30 +103,29 @@ impl SearchState {
         }
     }
 
-    fn request_nodes(&self, slab_indices: Vec<SlabIndex>) -> Result<Vec<SearchResultNode>, String> {
+    fn request_nodes(&self, slab_indices: Vec<SlabIndex>) -> Vec<SearchResultNode> {
         if slab_indices.is_empty() {
-            return Ok(Vec::new());
+            return Vec::new();
         }
 
         let (response_tx, response_rx) = bounded::<Vec<SearchResultNode>>(1);
-        self.node_info_tx
-            .send(NodeInfoRequest {
-                slab_indices,
-                response_tx,
-            })
-            .map_err(|e| format!("Failed to send node info request: {e:?}"))?;
+        if let Err(e) = self.node_info_tx.send(NodeInfoRequest {
+            slab_indices,
+            response_tx,
+        }) {
+            error!("Failed to send node info request: {e:?}");
+            return Vec::new();
+        }
 
-        response_rx
-            .recv()
-            .map_err(|e| format!("Failed to receive node info results: {e:?}"))
+        response_rx.recv().unwrap_or_else(|e| {
+            error!("Failed to receive node info results: {e:?}");
+            Vec::new()
+        })
     }
 
-    fn fetch_sorted_nodes(
-        &self,
-        slab_indices: &[SlabIndex],
-    ) -> Result<Vec<SearchResultNode>, String> {
+    fn fetch_sorted_nodes(&self, slab_indices: &[SlabIndex]) -> Vec<SearchResultNode> {
         if slab_indices.is_empty() {
-            return Ok(Vec::new());
+            return Vec::new();
         }
 
         let mut cache_guard = self.sorted_view_cache.lock();
@@ -135,15 +134,15 @@ impl SearchState {
             .filter(|cache| cache.slab_indices == slab_indices)
             .map(|cache| cache.nodes.clone())
         {
-            return Ok(cached);
+            return cached;
         }
 
-        let nodes = self.request_nodes(slab_indices.to_vec())?;
+        let nodes = self.request_nodes(slab_indices.to_vec());
         *cache_guard = Some(SortedViewCache {
             slab_indices: slab_indices.to_vec(),
             nodes: nodes.clone(),
         });
-        Ok(nodes)
+        nodes
     }
 }
 
@@ -154,7 +153,7 @@ pub struct NodeInfo {
     pub icon: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Default)]
 pub struct SearchResponse {
     pub results: Vec<SlabIndex>,
     pub highlights: Vec<String>,
@@ -180,98 +179,95 @@ impl NodeInfoMetadata {
 }
 
 #[tauri::command]
-pub fn close_quicklook(app_handle: AppHandle) -> Result<(), String> {
+pub fn close_quicklook(app_handle: AppHandle) {
     let app_handle_cloned = app_handle.clone();
-    app_handle
-        .run_on_main_thread(move || {
-            close_preview_panel(app_handle_cloned);
-        })
-        .map_err(|e| format!("Failed to dispatch quicklook action: {e:?}"))?;
-    Ok(())
+    if let Err(e) = app_handle.run_on_main_thread(move || {
+        close_preview_panel(app_handle_cloned);
+    }) {
+        error!("Failed to dispatch quicklook action: {e:?}");
+    }
 }
 
 #[tauri::command]
-pub fn update_quicklook(
-    app_handle: AppHandle,
-    items: Vec<QuickLookItemInput>,
-) -> Result<(), String> {
+pub fn update_quicklook(app_handle: AppHandle, items: Vec<QuickLookItemInput>) {
     let app_handle_cloned = app_handle.clone();
-    app_handle
-        .run_on_main_thread(move || {
-            update_preview_panel(app_handle_cloned, items);
-        })
-        .map_err(|e| format!("Failed to dispatch quicklook action: {e:?}"))?;
-    Ok(())
+    if let Err(e) = app_handle.run_on_main_thread(move || {
+        update_preview_panel(app_handle_cloned, items);
+    }) {
+        error!("Failed to dispatch quicklook action: {e:?}");
+    }
 }
 
 #[tauri::command]
-pub fn toggle_quicklook(
-    app_handle: AppHandle,
-    items: Vec<QuickLookItemInput>,
-) -> Result<(), String> {
+pub fn toggle_quicklook(app_handle: AppHandle, items: Vec<QuickLookItemInput>) {
     let app_handle_cloned = app_handle.clone();
-    app_handle
-        .run_on_main_thread(move || {
-            toggle_preview_panel(app_handle_cloned, items);
-        })
-        .map_err(|e| format!("Failed to dispatch quicklook action: {e:?}"))?;
-    Ok(())
+    if let Err(e) = app_handle.run_on_main_thread(move || {
+        toggle_preview_panel(app_handle_cloned, items);
+    }) {
+        error!("Failed to dispatch quicklook action: {e:?}");
+    }
 }
 
 #[tauri::command]
-pub async fn search(
+pub fn search(
     query: String,
     options: Option<SearchOptionsPayload>,
     version: u64,
     state: State<'_, SearchState>,
-) -> Result<SearchResponse, String> {
+) -> SearchResponse {
     let options = options.unwrap_or_default();
     let cancellation_token = CancellationToken::new(version);
-    state
-        .search_tx
-        .send(SearchJob {
-            query,
-            options,
-            cancellation_token,
-        })
-        .map_err(|e| format!("Failed to send search request: {e:?}"))?;
+    if let Err(e) = state.search_tx.send(SearchJob {
+        query,
+        options,
+        cancellation_token,
+    }) {
+        error!("Failed to send search request: {e:?}");
+        return SearchResponse::default();
+    }
 
-    let search_result = state
-        .result_rx
-        .recv()
-        .map_err(|e| format!("Failed to receive search result: {e:?}"))?
-        .map(|res| {
-            let SearchOutcome { nodes, highlights } = res;
-            let results = match nodes {
-                Some(list) => list,
-                None => {
-                    info!("Search {version} was cancelled");
-                    Vec::new()
-                }
-            };
-            SearchResponse {
-                results,
-                highlights,
+    let results = match state.result_rx.recv() {
+        Ok(res) => match res {
+            Ok(outcome) => outcome,
+            Err(e) => {
+                error!("Search {version} failed: {e:?}");
+                return SearchResponse::default();
             }
-        });
+        },
+        Err(e) => {
+            error!("Failed to receive search result: {e:?}");
+            return SearchResponse::default();
+        }
+    };
 
-    search_result.map_err(|e| format!("Failed to process search result: {e:?}"))
+    let SearchOutcome { nodes, highlights } = results;
+    let results = match nodes {
+        Some(list) => list,
+        None => {
+            info!("Search {version} was cancelled");
+            Vec::new()
+        }
+    };
+    SearchResponse {
+        results,
+        highlights,
+    }
 }
 
 #[tauri::command]
-pub async fn get_nodes_info(
+pub fn get_nodes_info(
     results: Vec<SlabIndex>,
     include_icons: Option<bool>,
     state: State<'_, SearchState>,
-) -> Result<Vec<NodeInfo>, String> {
+) -> Vec<NodeInfo> {
     if results.is_empty() {
-        return Ok(Vec::new());
+        return Vec::new();
     }
 
     let include_icons = include_icons.unwrap_or(true);
-    let nodes = state.request_nodes(results)?;
+    let nodes = state.request_nodes(results);
 
-    let node_infos = nodes
+    nodes
         .into_iter()
         .map(|SearchResultNode { path, metadata }| {
             let path = path.to_string_lossy().into_owned();
@@ -291,9 +287,7 @@ pub async fn get_nodes_info(
                 metadata: metadata.as_ref().map(NodeInfoMetadata::from_metadata),
             }
         })
-        .collect();
-
-    Ok(node_infos)
+        .collect()
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -355,20 +349,20 @@ fn compare_entries(a: &SortEntry, b: &SortEntry, sort: &SortStatePayload) -> Std
 }
 
 #[tauri::command]
-pub async fn get_sorted_view(
+pub fn get_sorted_view(
     results: Vec<SlabIndex>,
     sort: Option<SortStatePayload>,
     state: State<'_, SearchState>,
-) -> Result<Vec<SlabIndex>, String> {
+) -> Vec<SlabIndex> {
     if results.is_empty() || sort.is_none() {
-        return Ok(results);
+        return results;
     }
 
     let sort_state = sort.expect("checked above");
-    let nodes = state.fetch_sorted_nodes(&results)?;
+    let nodes = state.fetch_sorted_nodes(&results);
     let mut entries: Vec<SortEntry> = results
         .into_iter()
-        .zip(nodes.into_iter())
+        .zip(nodes)
         .enumerate()
         .map(|(idx, (slab_index, node))| SortEntry {
             original_index: idx,
@@ -381,52 +375,40 @@ pub async fn get_sorted_view(
 
     entries.sort_by(|a, b| compare_entries(a, b, &sort_state));
 
-    Ok(entries.into_iter().map(|entry| entry.slab_index).collect())
+    entries.into_iter().map(|entry| entry.slab_index).collect()
 }
 
 #[tauri::command]
-pub async fn update_icon_viewport(
-    id: u64,
-    viewport: Vec<SlabIndex>,
-    state: State<'_, SearchState>,
-) -> Result<(), String> {
-    state
-        .icon_viewport_tx
-        .send((id, viewport))
-        .map_err(|e| format!("Failed to send icon viewport update: {e:?}"))
+pub fn update_icon_viewport(id: u64, viewport: Vec<SlabIndex>, state: State<'_, SearchState>) {
+    if let Err(e) = state.icon_viewport_tx.send((id, viewport)) {
+        error!("Failed to send icon viewport update: {e:?}");
+    }
 }
 
 #[tauri::command]
-pub async fn get_app_status() -> Result<String, String> {
-    Ok(load_app_state().as_str().to_string())
+pub fn get_app_status() -> String {
+    load_app_state().as_str().to_string()
 }
 
 #[tauri::command]
-pub async fn trigger_rescan(state: State<'_, SearchState>) -> Result<(), String> {
-    state
-        .rescan_tx
-        .send(())
-        .map_err(|e| format!("Failed to request rescan: {e:?}"))?;
-    Ok(())
+pub fn trigger_rescan(state: State<'_, SearchState>) {
+    if let Err(e) = state.rescan_tx.send(()) {
+        error!("Failed to request rescan: {e:?}");
+    }
 }
 
 #[tauri::command]
-pub fn open_in_finder(path: String) -> Result<(), String> {
-    Command::new("open")
-        .arg("-R")
-        .arg(&path)
-        .spawn()
-        .map_err(|e| format!("Failed to reveal path in Finder: {e}"))?;
-    Ok(())
+pub fn open_in_finder(path: String) {
+    if let Err(e) = Command::new("open").arg("-R").arg(&path).spawn() {
+        error!("Failed to reveal path in Finder: {e}");
+    }
 }
 
 #[tauri::command]
-pub fn open_path(path: String) -> Result<(), String> {
-    Command::new("open")
-        .arg(&path)
-        .spawn()
-        .map_err(|e| format!("Failed to open path: {e}"))?;
-    Ok(())
+pub fn open_path(path: String) {
+    if let Err(e) = Command::new("open").arg(&path).spawn() {
+        error!("Failed to open path: {e}");
+    }
 }
 
 #[tauri::command]

@@ -122,11 +122,6 @@ export const useRemoteSort = (
         if (sortRequestRef.current === requestId) {
           setSortedResults(toSlabIndexArray(Array.isArray(ordered) ? ordered : []));
         }
-      } catch (error) {
-        console.error('Failed to sort results', error);
-        if (sortRequestRef.current === requestId) {
-          setSortedResults(results);
-        }
       } finally {
         if (sortRequestRef.current === requestId) {
           setIsSorting(false);
