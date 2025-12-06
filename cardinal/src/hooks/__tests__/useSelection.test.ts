@@ -213,4 +213,494 @@ describe('useSelection', () => {
     expect(result.current.selectedIndices).toEqual([3]);
     expect(result.current.shiftAnchorIndex).toBe(3);
   });
+
+  describe('shift selection edge cases', () => {
+    it('creates a range in reverse order (higher anchor to lower target)', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5]);
+
+      selectRow(4);
+      expect(result.current.shiftAnchorIndex).toBe(4);
+
+      selectRow(1, { isShift: true });
+
+      expect(result.current.selectedIndices).toEqual([1, 2, 3, 4]);
+      expect(result.current.shiftAnchorIndex).toBe(4);
+    });
+
+    it('selects a single-item range when shift-clicking the anchor itself', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3]);
+
+      selectRow(2);
+      selectRow(2, { isShift: true });
+
+      expect(result.current.selectedIndices).toEqual([2]);
+      expect(result.current.shiftAnchorIndex).toBe(2);
+    });
+
+    it('extends range to the first item when shift-clicking index 0', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
+
+      selectRow(3);
+      selectRow(0, { isShift: true });
+
+      expect(result.current.selectedIndices).toEqual([0, 1, 2, 3]);
+    });
+
+    it('extends range to the last item when shift-clicking the final index', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
+
+      selectRow(1);
+      selectRow(4, { isShift: true });
+
+      expect(result.current.selectedIndices).toEqual([1, 2, 3, 4]);
+    });
+
+    it('replaces previous shift range when creating a new one from the same anchor', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5]);
+
+      selectRow(2);
+      selectRow(4, { isShift: true });
+      expect(result.current.selectedIndices).toEqual([2, 3, 4]);
+
+      selectRow(0, { isShift: true });
+      expect(result.current.selectedIndices).toEqual([0, 1, 2]);
+      expect(result.current.shiftAnchorIndex).toBe(2);
+    });
+  });
+
+  describe('cmd/ctrl toggle edge cases', () => {
+    it('removes the only selected item when cmd-clicking it', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2]);
+
+      selectRow(1);
+      expect(result.current.selectedIndices).toEqual([1]);
+
+      selectRow(1, { isMeta: true });
+      expect(result.current.selectedIndices).toEqual([]);
+      expect(result.current.shiftAnchorIndex).toBe(1);
+    });
+
+    it('supports adding multiple items with consecutive cmd-clicks', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
+
+      selectRow(0);
+      selectRow(2, { isMeta: true });
+      selectRow(4, { isMeta: true });
+
+      expect(result.current.selectedIndices).toEqual([0, 2, 4]);
+      expect(result.current.shiftAnchorIndex).toBe(4);
+    });
+
+    it('treats ctrl modifier the same as cmd for toggling', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3]);
+
+      selectRow(1);
+      selectRow(3, { isCtrl: true });
+
+      expect(result.current.selectedIndices).toEqual([1, 3]);
+      expect(result.current.shiftAnchorIndex).toBe(3);
+    });
+
+    it('updates anchor to the toggled item even when removing it', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
+
+      selectRow(1);
+      selectRow(2, { isMeta: true });
+      selectRow(3, { isMeta: true });
+      expect(result.current.selectedIndices).toEqual([1, 2, 3]);
+
+      selectRow(2, { isMeta: true });
+      expect(result.current.selectedIndices).toEqual([1, 3]);
+      expect(result.current.shiftAnchorIndex).toBe(2);
+    });
+
+    it('builds a shift range from the last cmd-toggled anchor', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6]);
+
+      selectRow(1);
+      selectRow(3, { isMeta: true });
+      expect(result.current.shiftAnchorIndex).toBe(3);
+
+      selectRow(5, { isShift: true });
+      expect(result.current.selectedIndices).toEqual([3, 4, 5]);
+    });
+  });
+
+  describe('moveSelection edge cases', () => {
+    it('does nothing when moving in an empty list', () => {
+      const { result } = renderSelection([]);
+
+      act(() => {
+        result.current.moveSelection(1);
+      });
+
+      expect(result.current.selectedIndices).toEqual([]);
+      expect(result.current.activeRowIndex).toBeNull();
+    });
+
+    it('starts at index 0 when moving down with no active selection', () => {
+      const { result } = renderSelection([0, 1, 2, 3]);
+
+      act(() => {
+        result.current.moveSelection(1);
+      });
+
+      expect(result.current.selectedIndices).toEqual([0]);
+      expect(result.current.activeRowIndex).toBe(0);
+    });
+
+    it('starts at the last index when moving up with no active selection', () => {
+      const { result } = renderSelection([0, 1, 2, 3, 4]);
+
+      act(() => {
+        result.current.moveSelection(-1);
+      });
+
+      expect(result.current.selectedIndices).toEqual([4]);
+      expect(result.current.activeRowIndex).toBe(4);
+    });
+
+    it('clamps to the first item when moving up from index 0', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3]);
+
+      selectRow(0);
+
+      act(() => {
+        result.current.moveSelection(-1);
+      });
+
+      expect(result.current.selectedIndices).toEqual([0]);
+      expect(result.current.activeRowIndex).toBe(0);
+    });
+
+    it('clamps to the last item when moving down from the end', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
+
+      selectRow(4);
+
+      act(() => {
+        result.current.moveSelection(1);
+      });
+
+      expect(result.current.selectedIndices).toEqual([4]);
+      expect(result.current.activeRowIndex).toBe(4);
+    });
+
+    it('replaces multi-selection with single selection when navigating', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
+
+      selectRow(1);
+      selectRow(3, { isShift: true });
+      expect(result.current.selectedIndices).toEqual([1, 2, 3]);
+
+      act(() => {
+        result.current.moveSelection(1);
+      });
+
+      expect(result.current.selectedIndices).toEqual([4]);
+      expect(result.current.activeRowIndex).toBe(4);
+    });
+
+    it('does nothing when getItem returns undefined', () => {
+      const virtualListRef = createRef<VirtualListHandle>();
+      virtualListRef.current = {
+        scrollToTop: () => {},
+        scrollToRow: () => {},
+        ensureRangeLoaded: () => {},
+        getItem: () => undefined,
+      };
+
+      const hook = renderHook(
+        () => useSelection(toSlabIndexArray([0, 1, 2]), 0, virtualListRef),
+      );
+
+      act(() => {
+        hook.result.current.moveSelection(1);
+      });
+
+      expect(hook.result.current.selectedIndices).toEqual([]);
+      expect(hook.result.current.activeRowIndex).toBeNull();
+    });
+  });
+
+  describe('version changes and selection reset', () => {
+    it('does not reset when version changes but selection is already empty', () => {
+      const { result, bumpVersion } = renderSelection([0, 1, 2, 3]);
+
+      expect(result.current.selectedIndices).toEqual([]);
+      expect(result.current.activeRowIndex).toBeNull();
+
+      bumpVersion();
+
+      expect(result.current.selectedIndices).toEqual([]);
+      expect(result.current.activeRowIndex).toBeNull();
+    });
+
+    it('resets selection when version changes even with no result changes', () => {
+      const { result, selectRow, rerenderResults } = renderSelection([0, 1, 2, 3]);
+
+      selectRow(2);
+      expect(result.current.selectedIndices).toEqual([2]);
+
+      rerenderResults([0, 1, 2, 3], { bumpVersion: true });
+
+      expect(result.current.selectedIndices).toEqual([]);
+      expect(result.current.activeRowIndex).toBeNull();
+      expect(result.current.shiftAnchorIndex).toBeNull();
+    });
+
+    it('preserves selection when rerendering without version bump', () => {
+      const { result, selectRow, rerenderResults } = renderSelection([0, 1, 2, 3]);
+
+      selectRow(2);
+      expect(result.current.selectedIndices).toEqual([2]);
+
+      rerenderResults([0, 1, 2, 3], { bumpVersion: false });
+
+      expect(result.current.selectedIndices).toEqual([2]);
+      expect(result.current.activeRowIndex).toBe(2);
+      expect(result.current.shiftAnchorIndex).toBe(2);
+    });
+
+    it('resets multi-selection and anchor state on version bump', () => {
+      const { result, selectRow, bumpVersion } = renderSelection([0, 1, 2, 3, 4, 5]);
+
+      selectRow(1);
+      selectRow(4, { isShift: true });
+      expect(result.current.selectedIndices).toEqual([1, 2, 3, 4]);
+      expect(result.current.shiftAnchorIndex).toBe(1);
+
+      bumpVersion();
+
+      expect(result.current.selectedIndices).toEqual([]);
+      expect(result.current.activeRowIndex).toBeNull();
+      expect(result.current.shiftAnchorIndex).toBeNull();
+    });
+  });
+
+  describe('selectedPaths computation', () => {
+    it('returns an empty array when no items are selected', () => {
+      const { result } = renderSelection([0, 1, 2]);
+
+      expect(result.current.selectedPaths).toEqual([]);
+    });
+
+    it('returns paths for all selected indices', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
+
+      selectRow(1);
+      selectRow(3, { isMeta: true });
+
+      expect(result.current.selectedPaths).toEqual(['item-1', 'item-3']);
+    });
+
+    it('returns an empty array when virtualListRef is null', () => {
+      const virtualListRef = createRef<VirtualListHandle>();
+      virtualListRef.current = null;
+
+      const hook = renderHook(
+        () => useSelection(toSlabIndexArray([0, 1, 2]), 0, virtualListRef),
+      );
+
+      act(() => {
+        hook.result.current.selectSingleRow(1);
+      });
+
+      expect(hook.result.current.selectedPaths).toEqual([]);
+    });
+
+    it('skips items without paths when computing selectedPaths', () => {
+      const virtualListRef = createRef<VirtualListHandle>();
+      virtualListRef.current = {
+        scrollToTop: () => {},
+        scrollToRow: () => {},
+        ensureRangeLoaded: () => {},
+        getItem: (index) => {
+          if (index === 1) {
+            return {} as SearchResultItem;
+          }
+          return { path: `item-${index}` } as SearchResultItem;
+        },
+      };
+
+      const hook = renderHook(
+        () => useSelection(toSlabIndexArray([0, 1, 2, 3]), 0, virtualListRef),
+      );
+
+      act(() => {
+        hook.result.current.selectSingleRow(0);
+      });
+      act(() => {
+        hook.result.current.handleRowSelect(1, {
+          isShift: false,
+          isMeta: true,
+          isCtrl: false,
+        });
+      });
+      act(() => {
+        hook.result.current.handleRowSelect(2, {
+          isShift: false,
+          isMeta: true,
+          isCtrl: false,
+        });
+      });
+
+      expect(hook.result.current.selectedPaths).toEqual(['item-0', 'item-2']);
+    });
+
+    it('updates selectedPaths when selection changes', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3]);
+
+      selectRow(0);
+      expect(result.current.selectedPaths).toEqual(['item-0']);
+
+      selectRow(2, { isMeta: true });
+      expect(result.current.selectedPaths).toEqual(['item-0', 'item-2']);
+
+      selectRow(0, { isMeta: true });
+      expect(result.current.selectedPaths).toEqual(['item-2']);
+    });
+  });
+
+  describe('selectedIndicesRef synchronization', () => {
+    it('keeps selectedIndicesRef in sync with selectedIndices state', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3]);
+
+      expect(result.current.selectedIndicesRef.current).toEqual([]);
+
+      selectRow(1);
+      expect(result.current.selectedIndicesRef.current).toEqual([1]);
+
+      selectRow(3, { isMeta: true });
+      expect(result.current.selectedIndicesRef.current).toEqual([1, 3]);
+
+      act(() => {
+        result.current.clearSelection();
+      });
+      expect(result.current.selectedIndicesRef.current).toEqual([]);
+    });
+  });
+
+  describe('complex interaction sequences', () => {
+    it('handles cmd-toggle -> shift-extend -> normal-click sequence', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6, 7]);
+
+      selectRow(2);
+      selectRow(4, { isMeta: true });
+      expect(result.current.selectedIndices).toEqual([2, 4]);
+
+      selectRow(6, { isShift: true });
+      expect(result.current.selectedIndices).toEqual([4, 5, 6]);
+
+      selectRow(1);
+      expect(result.current.selectedIndices).toEqual([1]);
+      expect(result.current.shiftAnchorIndex).toBe(1);
+    });
+
+    it('handles shift-extend -> cmd-toggle -> shift-extend from new anchor', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+
+      selectRow(2);
+      selectRow(4, { isShift: true });
+      expect(result.current.selectedIndices).toEqual([2, 3, 4]);
+
+      selectRow(6, { isMeta: true });
+      expect(result.current.selectedIndices).toEqual([2, 3, 4, 6]);
+      expect(result.current.shiftAnchorIndex).toBe(6);
+
+      selectRow(8, { isShift: true });
+      expect(result.current.selectedIndices).toEqual([6, 7, 8]);
+    });
+
+    it('handles moveSelection after cmd-toggle multi-selection', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6]);
+
+      selectRow(1);
+      selectRow(3, { isMeta: true });
+      selectRow(5, { isMeta: true });
+      expect(result.current.selectedIndices).toEqual([1, 3, 5]);
+      expect(result.current.activeRowIndex).toBe(5);
+
+      act(() => {
+        result.current.moveSelection(1);
+      });
+
+      expect(result.current.selectedIndices).toEqual([6]);
+      expect(result.current.activeRowIndex).toBe(6);
+    });
+
+    it('preserves activeRowIndex through cmd toggles', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
+
+      selectRow(1);
+      expect(result.current.activeRowIndex).toBe(1);
+
+      selectRow(3, { isMeta: true });
+      expect(result.current.activeRowIndex).toBe(3);
+
+      selectRow(3, { isMeta: true });
+      expect(result.current.activeRowIndex).toBe(3);
+    });
+
+    it('handles selectSingleRow replacing existing multi-selection', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
+
+      selectRow(1);
+      selectRow(3, { isShift: true });
+      expect(result.current.selectedIndices).toEqual([1, 2, 3]);
+
+      act(() => {
+        result.current.selectSingleRow(4);
+      });
+
+      expect(result.current.selectedIndices).toEqual([4]);
+      expect(result.current.activeRowIndex).toBe(4);
+      expect(result.current.shiftAnchorIndex).toBe(4);
+    });
+  });
+
+  describe('single-item list edge cases', () => {
+    it('handles selection in a single-item list', () => {
+      const { result, selectRow } = renderSelection([0]);
+
+      selectRow(0);
+      expect(result.current.selectedIndices).toEqual([0]);
+      expect(result.current.activeRowIndex).toBe(0);
+    });
+
+    it('handles moveSelection down in a single-item list', () => {
+      const { result, selectRow } = renderSelection([0]);
+
+      selectRow(0);
+
+      act(() => {
+        result.current.moveSelection(1);
+      });
+
+      expect(result.current.selectedIndices).toEqual([0]);
+      expect(result.current.activeRowIndex).toBe(0);
+    });
+
+    it('handles moveSelection up in a single-item list', () => {
+      const { result, selectRow } = renderSelection([0]);
+
+      selectRow(0);
+
+      act(() => {
+        result.current.moveSelection(-1);
+      });
+
+      expect(result.current.selectedIndices).toEqual([0]);
+      expect(result.current.activeRowIndex).toBe(0);
+    });
+
+    it('handles shift-click in a single-item list', () => {
+      const { result, selectRow } = renderSelection([0]);
+
+      selectRow(0);
+      selectRow(0, { isShift: true });
+
+      expect(result.current.selectedIndices).toEqual([0]);
+    });
+  });
 });
