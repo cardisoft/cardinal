@@ -90,7 +90,6 @@ const EventRowBase = ({
       {...ariaAttributes}
       style={{ ...style, width: 'var(--columns-events-total)' }}
       className={`row columns-events ${index % 2 === 0 ? 'row-even' : 'row-odd'}`}
-      title={pathSource}
       onContextMenu={handleContextMenu}
     >
       <div className="event-time-column">
