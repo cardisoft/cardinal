@@ -341,12 +341,15 @@ button:active {
 /* Events grid layout - similar to files grid */
 .columns-events {
   display: grid;
-  grid-template-columns: var(--w-event-time) var(--w-event-name) var(--w-event-path);
+  grid-template-columns:
+    var(--w-event-time) var(--w-event-flags) var(--w-event-name)
+    var(--w-event-path);
   align-items: center;
   width: var(--columns-events-total);
   min-width: var(--columns-events-total);
 }
 
+.event-flags-column,
 .event-name-column,
 .event-path-text,
 .event-time-column {
@@ -374,6 +377,13 @@ button:active {
   gap: 2px;
 }
 
+.event-flags-column {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Apply monospace font only to data cells, not headers */
 .row .event-time-primary {
   font-size: 0.95em;
@@ -388,12 +398,21 @@ button:active {
   line-height: 1.2;
 }
 
+.event-flags-text {
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .events-loading {
   color: var(--color-muted);
   font-style: italic;
   font-size: 0.9em;
 }
 
+.event-event-header,
 .event-name-header,
 .event-path-header,
 .event-time-header {

@@ -639,10 +639,13 @@ function App() {
     '--w-size': `${colWidths.size}px`,
     '--w-modified': `${colWidths.modified}px`,
     '--w-created': `${colWidths.created}px`,
+    '--w-event-flags': `${eventColWidths.event}px`,
     '--w-event-name': `${eventColWidths.name}px`,
     '--w-event-path': `${eventColWidths.path}px`,
     '--w-event-time': `${eventColWidths.time}px`,
-    '--columns-events-total': `${eventColWidths.name + eventColWidths.path + eventColWidths.time}px`,
+    '--columns-events-total': `${
+      eventColWidths.event + eventColWidths.name + eventColWidths.path + eventColWidths.time
+    }px`,
   } as CSSProperties;
 
   const showFullDiskAccessOverlay = fullDiskAccessStatus === 'denied';

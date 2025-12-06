@@ -27,6 +27,7 @@
   "events": {
     "columns": {
       "time": "時刻",
+      "event": "イベント",
       "name": "ファイル名",
       "path": "パス"
     },
