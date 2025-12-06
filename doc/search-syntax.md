@@ -36,15 +36,17 @@ ext:png;jpg travel|vacation   # PNG or JPG whose names contain “travel” or �
   - `"Application Support"` matches `/Library/Application Support/...`.
 - The UI case‑sensitivity toggle applies to both.
 
-### 2.2 Wildcards (`*` and `?`)
+### 2.2 Wildcards (`*`, `?`, `**`)
 
 - `*` matches zero or more characters.
 - `?` matches exactly one character.
+- `**` is a globstar that crosses **any number of folder segments** when it appears between slashes.
 - Wildcards are understood **within a single token**:
   - `*.rs` — any name ending with `.rs`.
   - `report-??.txt` — `report-01.txt`, `report-AB.txt`, etc.
   - `a*b` — names starting with `a` and ending with `b`.
-- If you need literal `*` or `?`, quote the token: `"*.rs"`.
+  - `src/**/Cargo.toml` — `Cargo.toml` anywhere below `src/`.
+- If you need literal `*` or `?`, quote the token: `"*.rs"`. Globstars must be standalone slash segments (`foo/**/bar`, `/Users/**`, `**/notes`).
 
 ### 2.3 Path‑style segmentation with `/`
 
@@ -204,8 +206,8 @@ size:empty                # exactly 0 bytes
 
 ### 4.7 Date filters: `dm:`, `dc:`
 
-- `dm:` — date modified.
-- `dc:` — date created.
+- `dm:` / `datemodified:` — date modified.
+- `dc:` / `datecreated:` — date created.
 
 They accept:
 
