@@ -28,8 +28,13 @@ const renderSelection = (initial: number[], initialVersion = 0) => {
   let currentResults = toSlabIndexArray(initial);
   let version = initialVersion;
   const hook = renderHook(
-    ({ results, version: activeVersion }: { results: ReturnType<typeof toSlabIndexArray>; version: number }) =>
-      useSelection(results, activeVersion, virtualListRef),
+    ({
+      results,
+      version: activeVersion,
+    }: {
+      results: ReturnType<typeof toSlabIndexArray>;
+      version: number;
+    }) => useSelection(results, activeVersion, virtualListRef),
     { initialProps: { results: currentResults, version } },
   );
 
