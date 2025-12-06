@@ -5,7 +5,9 @@ use objc2::{
     AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send,
     rc::Retained, runtime::ProtocolObject,
 };
-use objc2_app_kit::{NSEvent, NSEventModifierFlags, NSEventType, NSImage, NSWindowDelegate};
+use objc2_app_kit::{
+    NSCursor, NSEvent, NSEventModifierFlags, NSEventType, NSImage, NSWindowDelegate,
+};
 use objc2_foundation::{
     NSData, NSInteger, NSObject, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString, NSURL,
 };
@@ -362,7 +364,8 @@ pub fn toggle_preview_panel(app_handle: AppHandle, items: Vec<QuickLookItemInput
     }
 
     update_preview_items(mtm, &panel, &app_handle, items);
-    panel.makeKeyAndOrderFront(None);
+    NSCursor::setHiddenUntilMouseMoves(false);
+    panel.orderFront(None);
 }
 
 pub fn update_preview_panel(app_handle: AppHandle, items: Vec<QuickLookItemInput>) {
