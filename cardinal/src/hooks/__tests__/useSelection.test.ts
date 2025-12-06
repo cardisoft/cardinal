@@ -120,14 +120,14 @@ describe('useSelection', () => {
 
     selectRow(3, { isMeta: true });
     expect(result.current.selectedIndices).toEqual([1]);
-    expect(result.current.shiftAnchorIndex).toBe(3);
+    expect(result.current.shiftAnchorIndex).toBe(1);
 
     selectRow(5, { isShift: true });
-    expect(result.current.selectedIndices).toEqual([3, 4, 5]);
-    expect(result.current.shiftAnchorIndex).toBe(3);
+    expect(result.current.selectedIndices).toEqual([1, 2, 3, 4, 5]);
+    expect(result.current.shiftAnchorIndex).toBe(1);
 
     selectRow(6, { isCtrl: true });
-    expect(result.current.selectedIndices).toEqual([3, 4, 5, 6]);
+    expect(result.current.selectedIndices).toEqual([1, 2, 3, 4, 5, 6]);
     expect(result.current.shiftAnchorIndex).toBe(6);
   });
 
@@ -277,7 +277,7 @@ describe('useSelection', () => {
 
       selectRow(1, { isMeta: true });
       expect(result.current.selectedIndices).toEqual([]);
-      expect(result.current.shiftAnchorIndex).toBe(1);
+      expect(result.current.shiftAnchorIndex).toBeNull();
     });
 
     it('supports adding multiple items with consecutive cmd-clicks', () => {
@@ -301,17 +301,84 @@ describe('useSelection', () => {
       expect(result.current.shiftAnchorIndex).toBe(3);
     });
 
-    it('updates anchor to the toggled item even when removing it', () => {
+    it('moves anchor when deselecting the anchor in a multi-selection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
 
       selectRow(1);
       selectRow(2, { isMeta: true });
       selectRow(3, { isMeta: true });
       expect(result.current.selectedIndices).toEqual([1, 2, 3]);
+      expect(result.current.shiftAnchorIndex).toBe(3);
+
+      // Deselect anchor (3), should move to next below (none), then up to 2
+      selectRow(3, { isMeta: true });
+      expect(result.current.selectedIndices).toEqual([1, 2]);
+      expect(result.current.shiftAnchorIndex).toBe(2);
+    });
+
+    it('moves shift anchor to the nearest selected item below when deselecting the anchor', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5]);
+
+      selectRow(1);
+      selectRow(3, { isMeta: true });
+      selectRow(5, { isMeta: true });
+      expect(result.current.selectedIndices).toEqual([1, 3, 5]);
+      expect(result.current.shiftAnchorIndex).toBe(5);
+
+      // Deselect the anchor (5), should move to next below (none), then check upward (3)
+      selectRow(5, { isMeta: true });
+      expect(result.current.selectedIndices).toEqual([1, 3]);
+      expect(result.current.shiftAnchorIndex).toBe(3);
+    });
+
+    it('moves shift anchor downward to next selected item when available', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6, 7]);
+
+      selectRow(1);
+      selectRow(3, { isMeta: true });
+      selectRow(5, { isMeta: true });
+      selectRow(7, { isMeta: true });
+      expect(result.current.selectedIndices).toEqual([1, 3, 5, 7]);
+      expect(result.current.shiftAnchorIndex).toBe(7);
+
+      // Change anchor by adding 5
+      selectRow(5, { isMeta: true });
+      selectRow(5, { isMeta: true });
+      expect(result.current.shiftAnchorIndex).toBe(5);
+
+      // Deselect the anchor (5), should move to next below (7), not upward
+      selectRow(5, { isMeta: true });
+      expect(result.current.selectedIndices).toEqual([1, 3, 7]);
+      expect(result.current.shiftAnchorIndex).toBe(7);
+    });
+
+    it('moves shift anchor downward when deselecting the anchor in the middle', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6]);
+
+      selectRow(1);
+      selectRow(3, { isMeta: true });
+      selectRow(5, { isMeta: true });
+      expect(result.current.shiftAnchorIndex).toBe(5);
+
+      // Deselect row 3, but it's not the anchor, so anchor stays at 5
+      selectRow(3, { isMeta: true });
+      expect(result.current.shiftAnchorIndex).toBe(5);
+
+      // Now deselect the current anchor (5), should move to the next selected below (none), then up to 1
+      selectRow(5, { isMeta: true });
+      expect(result.current.selectedIndices).toEqual([1]);
+      expect(result.current.shiftAnchorIndex).toBe(1);
+    });
+
+    it('clears shift anchor when deselecting the last remaining anchor', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
+
+      selectRow(2);
+      expect(result.current.shiftAnchorIndex).toBe(2);
 
       selectRow(2, { isMeta: true });
-      expect(result.current.selectedIndices).toEqual([1, 3]);
-      expect(result.current.shiftAnchorIndex).toBe(2);
+      expect(result.current.selectedIndices).toEqual([]);
+      expect(result.current.shiftAnchorIndex).toBeNull();
     });
 
     it('builds a shift range from the last cmd-toggled anchor', () => {
@@ -323,6 +390,24 @@ describe('useSelection', () => {
 
       selectRow(5, { isShift: true });
       expect(result.current.selectedIndices).toEqual([3, 4, 5]);
+    });
+
+    it('uses the new anchor after deselecting the old anchor', () => {
+      const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6, 7]);
+
+      selectRow(2);
+      selectRow(4, { isMeta: true });
+      selectRow(6, { isMeta: true });
+      expect(result.current.selectedIndices).toEqual([2, 4, 6]);
+      expect(result.current.shiftAnchorIndex).toBe(6);
+
+      // Deselect the anchor (6), anchor moves to next selected below (none), then up to 4
+      selectRow(6, { isMeta: true });
+      expect(result.current.shiftAnchorIndex).toBe(4);
+
+      // Now shift-select from the new anchor (4) to 7
+      selectRow(7, { isShift: true });
+      expect(result.current.selectedIndices).toEqual([4, 5, 6, 7]);
     });
   });
 
@@ -410,9 +495,7 @@ describe('useSelection', () => {
         getItem: () => undefined,
       };
 
-      const hook = renderHook(
-        () => useSelection(toSlabIndexArray([0, 1, 2]), 0, virtualListRef),
-      );
+      const hook = renderHook(() => useSelection(toSlabIndexArray([0, 1, 2]), 0, virtualListRef));
 
       act(() => {
         hook.result.current.moveSelection(1);
@@ -498,9 +581,7 @@ describe('useSelection', () => {
       const virtualListRef = createRef<VirtualListHandle>();
       virtualListRef.current = null;
 
-      const hook = renderHook(
-        () => useSelection(toSlabIndexArray([0, 1, 2]), 0, virtualListRef),
-      );
+      const hook = renderHook(() => useSelection(toSlabIndexArray([0, 1, 2]), 0, virtualListRef));
 
       act(() => {
         hook.result.current.selectSingleRow(1);
@@ -523,8 +604,8 @@ describe('useSelection', () => {
         },
       };
 
-      const hook = renderHook(
-        () => useSelection(toSlabIndexArray([0, 1, 2, 3]), 0, virtualListRef),
+      const hook = renderHook(() =>
+        useSelection(toSlabIndexArray([0, 1, 2, 3]), 0, virtualListRef),
       );
 
       act(() => {

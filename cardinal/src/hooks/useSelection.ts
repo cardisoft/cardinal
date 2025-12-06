@@ -54,12 +54,39 @@ export const useSelection = (
         setSelectedIndices(range);
       } else if (isCmdOrCtrl) {
         setSelectedIndices((prevIndices) => {
-          if (prevIndices.includes(rowIndex)) {
-            return prevIndices.filter((index) => index !== rowIndex);
+          const isDeselecting = prevIndices.includes(rowIndex);
+          const nextIndices = isDeselecting
+            ? prevIndices.filter((index) => index !== rowIndex)
+            : [...prevIndices, rowIndex];
+
+          // Handle shift anchor updates
+          if (isDeselecting && rowIndex === shiftAnchorIndex) {
+            // If deselecting the current shift anchor, find the next closest selected item below it
+            let newAnchor: number | null = null;
+            for (let i = rowIndex + 1; i < displayedResults.length; i += 1) {
+              if (nextIndices.includes(i)) {
+                newAnchor = i;
+                break;
+              }
+            }
+            // If nothing below, look upward
+            if (newAnchor === null) {
+              for (let i = rowIndex - 1; i >= 0; i -= 1) {
+                if (nextIndices.includes(i)) {
+                  newAnchor = i;
+                  break;
+                }
+              }
+            }
+            setShiftAnchorIndex(newAnchor);
+          } else if (!isDeselecting) {
+            // Only update anchor when adding (not removing) an item
+            setShiftAnchorIndex(rowIndex);
           }
-          return [...prevIndices, rowIndex];
+          // If deselecting a non-anchor item, keep the anchor unchanged
+
+          return nextIndices;
         });
-        setShiftAnchorIndex(rowIndex);
       } else {
         setSelectedIndices([rowIndex]);
         setShiftAnchorIndex(rowIndex);
@@ -67,7 +94,7 @@ export const useSelection = (
 
       setActiveRowIndex(rowIndex);
     },
-    [shiftAnchorIndex],
+    [shiftAnchorIndex, displayedResults.length],
   );
 
   const selectSingleRow = useCallback((rowIndex: number) => {
