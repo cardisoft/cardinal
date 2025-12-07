@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.16 — 2025-12-08
+- Improve sort order so directories are prioritized and folder size ranking stays stable.
+- Refine selection handling for smoother keyboard and pointer interactions.
+- Add an event column to the events panel for better debugging context.
+- Fix the cursor state resetting incorrectly after Quick Look opens.
+
 ## 0.1.15 — 2025-12-06
 - Implement double asterisk `**` in glob search.
 - Implement history navigation with `ArrowUp`/`ArrowDown` for search bar.
