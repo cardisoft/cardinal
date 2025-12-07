@@ -61,7 +61,7 @@ fn metadata_numeric(meta: &SlabNodeMetadataCompact, key: SortKeyPayload) -> i64 
         return i64::MIN;
     };
     match key {
-        SortKeyPayload::Size => meta_ref.size() as i64,
+        SortKeyPayload::Size => meta_ref.size(),
         SortKeyPayload::Mtime => meta_ref
             .mtime()
             .map(|value| value.get() as i64)
@@ -162,7 +162,7 @@ pub struct SearchResponse {
 #[derive(Serialize)]
 pub struct NodeInfoMetadata {
     pub r#type: u8,
-    pub size: u64,
+    pub size: i64,
     pub ctime: u32,
     pub mtime: u32,
 }

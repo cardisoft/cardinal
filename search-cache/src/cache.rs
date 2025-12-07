@@ -1643,7 +1643,7 @@ mod tests {
             .expect("Metadata for event_file.txt should be populated by event handler");
         assert_eq!(
             file_slab_meta.size(),
-            new_file_meta_on_disk.len(),
+            new_file_meta_on_disk.len() as i64,
             "Size mismatch for event_file.txt"
         );
         assert_eq!(file_slab_meta.size(), 4, "Size mismatch for event_file.txt");
@@ -1703,7 +1703,7 @@ mod tests {
             .expect("Metadata for file_in_event_subdir.txt should be populated");
         assert_eq!(
             file_in_subdir_slab_meta.size(),
-            file_in_subdir_meta_on_disk.len(),
+            file_in_subdir_meta_on_disk.len() as i64,
             "Size mismatch for file_in_event_subdir.txt"
         );
         assert!(

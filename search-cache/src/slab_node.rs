@@ -147,7 +147,7 @@ impl<'a> SlabNodeMetadata<'a> {
         self.0.state_type_and_size.r#type()
     }
 
-    pub fn size(&self) -> u64 {
+    pub fn size(&self) -> i64 {
         self.0.state_type_and_size.size()
     }
 

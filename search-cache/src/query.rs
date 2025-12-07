@@ -663,10 +663,16 @@ impl SearchCache {
             if node.file_type_hint() != NodeFileType::File {
                 return false;
             }
-            let Some(size) = self.node_size_bytes(index) else {
+            let metadata = self.ensure_metadata(index);
+            let Some(meta) = metadata.as_ref() else {
                 return false;
             };
-            predicate.matches(size)
+            let size = meta.size();
+            // folder doesn't have positive size, skip them
+            if size < 0 {
+                return false;
+            }
+            predicate.matches(size as u64)
         }))
     }
 
@@ -827,10 +833,6 @@ impl SearchCache {
             Some(nodes) => Some(nodes),
             None => self.search_empty(token),
         }
-    }
-
-    fn node_size_bytes(&mut self, index: SlabIndex) -> Option<u64> {
-        self.ensure_metadata(index).as_ref().map(|x| x.size())
     }
 
     fn node_timestamp(&mut self, index: SlabIndex, field: DateField) -> Option<i64> {
