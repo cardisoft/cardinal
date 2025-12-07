@@ -668,10 +668,7 @@ impl SearchCache {
                 return false;
             };
             let size = meta.size();
-            // folder doesn't have positive size, skip them
-            if size < 0 {
-                return false;
-            }
+
             predicate.matches(size as u64)
         }))
     }
