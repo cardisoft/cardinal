@@ -182,21 +182,9 @@ mod tests {
             direction: SortDirectionPayload::Asc,
         };
         let mut entries = vec![
-            entry_with_metadata(
-                1,
-                "/tmp/z/foo",
-                metadata_with_type(NodeFileType::File, 5),
-            ),
-            entry_with_metadata(
-                0,
-                "/tmp/m/foo",
-                metadata_with_type(NodeFileType::Dir, 5),
-            ),
-            entry_with_metadata(
-                2,
-                "/tmp/a/foo",
-                metadata_with_type(NodeFileType::File, 5),
-            ),
+            entry_with_metadata(1, "/tmp/z/foo", metadata_with_type(NodeFileType::File, 5)),
+            entry_with_metadata(0, "/tmp/m/foo", metadata_with_type(NodeFileType::Dir, 5)),
+            entry_with_metadata(2, "/tmp/a/foo", metadata_with_type(NodeFileType::File, 5)),
         ];
 
         sort_entries(&mut entries, &sort_state);

@@ -4,6 +4,7 @@ use crate::{
     quicklook::{
         QuickLookItemInput, close_preview_panel, toggle_preview_panel, update_preview_panel,
     },
+    sort::{SortEntry, SortStatePayload, sort_entries},
     window_controls::{WindowToggle, activate_window, hide_window, toggle_window},
 };
 use anyhow::Result;
@@ -16,8 +17,6 @@ use serde::{Deserialize, Serialize};
 use std::process::Command;
 use tauri::{AppHandle, Manager, State};
 use tracing::{error, info, warn};
-
-use crate::sort::{sort_entries, SortEntry, SortStatePayload};
 
 #[derive(Debug, Clone, Copy, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
