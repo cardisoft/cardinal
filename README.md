@@ -11,6 +11,8 @@
 
 ---
 
+[中文版](README.zh-CN.md)
+
 ## Using Cardinal
 
 ### Download
