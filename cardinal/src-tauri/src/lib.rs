@@ -1,5 +1,6 @@
 mod background;
 mod commands;
+mod sort;
 mod lifecycle;
 mod quicklook;
 mod window_controls;
