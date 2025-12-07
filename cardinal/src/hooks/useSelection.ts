@@ -60,8 +60,8 @@ export const useSelection = (
             : [...prevIndices, rowIndex];
 
           // Handle shift anchor updates
-          if (isDeselecting && rowIndex === shiftAnchorIndex) {
-            // If deselecting the current shift anchor, find the next closest selected item below it
+          if (isDeselecting) {
+            // If deselecting, find the next closest selected item below it as the new anchor
             let newAnchor: number | null = null;
             for (let i = rowIndex + 1; i < displayedResults.length; i += 1) {
               if (nextIndices.includes(i)) {
