@@ -9,6 +9,7 @@ use crate::{
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
 use crossbeam_channel::{Receiver, Sender, bounded};
+use fswalk::NodeFileType;
 use parking_lot::Mutex;
 use search_cache::{
     SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, SlabNodeMetadata,
@@ -310,7 +311,6 @@ pub struct SortStatePayload {
 
 #[derive(Debug)]
 struct SortEntry {
-    original_index: usize,
     slab_index: SlabIndex,
     node: SearchResultNode,
     path_key: String,
@@ -325,17 +325,33 @@ fn extract_filename(node: &SearchResultNode) -> String {
         .unwrap_or_else(|| node.path.to_string_lossy().into_owned())
 }
 
+fn type_order(node: &SearchResultNode) -> u8 {
+    // Directories first
+    match node.metadata.as_ref().map(|m| m.r#type()) {
+        Some(NodeFileType::Dir) => 0, // Dir
+        None => 2,                    // No metadata
+        _ => 1,                       // Other types
+    }
+}
+
 fn compare_entries(a: &SortEntry, b: &SortEntry, sort: &SortStatePayload) -> StdOrdering {
     let ordering = match sort.key {
-        SortKeyPayload::FullPath => a.path_key.cmp(&b.path_key),
-        SortKeyPayload::Filename => a.name_key.cmp(&b.name_key),
+        SortKeyPayload::FullPath => a.path_key.cmp(&b.path_key)
+            .then_with(|| a.name_key.cmp(&b.name_key))
+            .then_with(|| type_order(&a.node).cmp(&type_order(&b.node))),
+        SortKeyPayload::Filename => a
+            .name_key
+            .cmp(&b.name_key)
+            .then_with(|| type_order(&a.node).cmp(&type_order(&b.node)))
+            .then_with(|| a.path_key.cmp(&b.path_key)),
         SortKeyPayload::Size | SortKeyPayload::Mtime | SortKeyPayload::Ctime => {
             metadata_numeric(&a.node.metadata, sort.key)
                 .cmp(&metadata_numeric(&b.node.metadata, sort.key))
+                .then_with(|| a.name_key.cmp(&b.name_key))
+                .then_with(|| type_order(&a.node).cmp(&type_order(&b.node)))
+                .then_with(|| a.path_key.cmp(&b.path_key))
         }
     };
-
-    let ordering = ordering.then_with(|| a.original_index.cmp(&b.original_index));
 
     match sort.direction {
         SortDirectionPayload::Asc => ordering,
@@ -360,7 +376,6 @@ pub fn get_sorted_view(
         .zip(nodes)
         .enumerate()
         .map(|(idx, (slab_index, node))| SortEntry {
-            original_index: idx,
             path_key: normalize_path(&node.path),
             name_key: extract_filename(&node),
             slab_index,
