@@ -190,7 +190,9 @@ export function describeEventFlags(flagBits?: number | null): EventFlagDescripti
     labels.push('Other');
   }
 
-  const tooltipParts = matchedEntries.map((entry) => `${entry.raw}: ${entry.description}`);
+  const tooltipParts = matchedEntries.map(
+    (entry) => `${entry.raw} (0x${entry.bit.toString(16)}): ${entry.description}`,
+  );
 
   const unknownBits = flagBits & ~ALL_FLAG_MASK;
   if (unknownBits) {
@@ -199,7 +201,7 @@ export function describeEventFlags(flagBits?: number | null): EventFlagDescripti
 
   const tooltip =
     tooltipParts.length > 0
-      ? `${tooltipParts.join('\n')}\n(flags: ${flagBits})`
+      ? `${tooltipParts.join('\n')}\n(flags: 0x${flagBits.toString(16)})`
       : `0x${flagBits.toString(16)}`;
 
   return { labels, tooltip };

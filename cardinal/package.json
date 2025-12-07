@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test": "vitest",
+    "test": "vitest --watch=false",
     "test:watch": "vitest --watch",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
