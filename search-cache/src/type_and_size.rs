@@ -33,6 +33,10 @@ impl StateTypeSize {
         NodeFileType::n((self.0 >> 60 & 0b11) as u8).unwrap()
     }
 
+    /// Returns the size in bytes, or -1 for directories.
+    ///
+    /// Directories return -1 to facilitate proper sorting where directories
+    /// should appear before or after files based on sort direction.
     pub fn size(&self) -> i64 {
         if self.r#type() == NodeFileType::Dir {
             -1
