@@ -123,12 +123,17 @@ export const FileRow = memo(function FileRow({
 
       pendingSelectRef.current = null;
 
+      const dataTransfer = e.dataTransfer;
+      if (!dataTransfer) {
+        return;
+      }
+
       const isDraggingSelected = isSelected && selectedPathsForDrag.length > 0;
       const pathsToDrag =
         isDraggingSelected && selectedPathsForDrag.length > 0 ? selectedPathsForDrag : [path];
 
-      e.dataTransfer.effectAllowed = 'copy';
-      e.dataTransfer.setData('text/plain', pathsToDrag.join('\n'));
+      dataTransfer.effectAllowed = 'copy';
+      dataTransfer.setData('text/plain', pathsToDrag.join('\n'));
       void startNativeFileDrag({ paths: pathsToDrag, icon: item.icon });
     },
     [isSelected, item.icon, path, selectedPathsForDrag],
