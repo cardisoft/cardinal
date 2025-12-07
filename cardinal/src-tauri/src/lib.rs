@@ -2,6 +2,7 @@ mod background;
 mod commands;
 mod lifecycle;
 mod quicklook;
+mod sort;
 mod window_controls;
 
 use anyhow::{Context, Result};

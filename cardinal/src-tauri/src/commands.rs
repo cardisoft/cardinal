@@ -4,19 +4,17 @@ use crate::{
     quicklook::{
         QuickLookItemInput, close_preview_panel, toggle_preview_panel, update_preview_panel,
     },
+    sort::{SortEntry, SortStatePayload, sort_entries},
     window_controls::{WindowToggle, activate_window, hide_window, toggle_window},
 };
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
 use crossbeam_channel::{Receiver, Sender, bounded};
 use parking_lot::Mutex;
-use search_cache::{
-    SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, SlabNodeMetadata,
-    SlabNodeMetadataCompact,
-};
+use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, SlabNodeMetadata};
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering as StdOrdering, process::Command};
+use std::process::Command;
 use tauri::{AppHandle, Manager, State};
 use tracing::{error, info, warn};
 
@@ -50,28 +48,6 @@ pub struct NodeInfoRequest {
 struct SortedViewCache {
     slab_indices: Vec<SlabIndex>,
     nodes: Vec<SearchResultNode>,
-}
-
-fn normalize_path(path: &std::path::Path) -> String {
-    path.to_string_lossy().into_owned()
-}
-
-fn metadata_numeric(meta: &SlabNodeMetadataCompact, key: SortKeyPayload) -> i64 {
-    let Some(meta_ref) = meta.as_ref() else {
-        return i64::MIN;
-    };
-    match key {
-        SortKeyPayload::Size => meta_ref.size(),
-        SortKeyPayload::Mtime => meta_ref
-            .mtime()
-            .map(|value| value.get() as i64)
-            .unwrap_or(i64::MIN),
-        SortKeyPayload::Ctime => meta_ref
-            .ctime()
-            .map(|value| value.get() as i64)
-            .unwrap_or(i64::MIN),
-        SortKeyPayload::FullPath | SortKeyPayload::Filename => 0,
-    }
 }
 
 pub struct SearchState {
@@ -285,64 +261,6 @@ pub fn get_nodes_info(
         .collect()
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum SortKeyPayload {
-    Filename,
-    FullPath,
-    Size,
-    Mtime,
-    Ctime,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum SortDirectionPayload {
-    Asc,
-    Desc,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct SortStatePayload {
-    pub key: SortKeyPayload,
-    pub direction: SortDirectionPayload,
-}
-
-#[derive(Debug)]
-struct SortEntry {
-    original_index: usize,
-    slab_index: SlabIndex,
-    node: SearchResultNode,
-    path_key: String,
-    name_key: String,
-}
-
-fn extract_filename(node: &SearchResultNode) -> String {
-    node.path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .map(|x| x.to_string())
-        .unwrap_or_else(|| node.path.to_string_lossy().into_owned())
-}
-
-fn compare_entries(a: &SortEntry, b: &SortEntry, sort: &SortStatePayload) -> StdOrdering {
-    let ordering = match sort.key {
-        SortKeyPayload::FullPath => a.path_key.cmp(&b.path_key),
-        SortKeyPayload::Filename => a.name_key.cmp(&b.name_key),
-        SortKeyPayload::Size | SortKeyPayload::Mtime | SortKeyPayload::Ctime => {
-            metadata_numeric(&a.node.metadata, sort.key)
-                .cmp(&metadata_numeric(&b.node.metadata, sort.key))
-        }
-    };
-
-    let ordering = ordering.then_with(|| a.original_index.cmp(&b.original_index));
-
-    match sort.direction {
-        SortDirectionPayload::Asc => ordering,
-        SortDirectionPayload::Desc => ordering.reverse(),
-    }
-}
-
 #[tauri::command(async)]
 pub fn get_sorted_view(
     results: Vec<SlabIndex>,
@@ -358,17 +276,10 @@ pub fn get_sorted_view(
     let mut entries: Vec<SortEntry> = results
         .into_iter()
         .zip(nodes)
-        .enumerate()
-        .map(|(idx, (slab_index, node))| SortEntry {
-            original_index: idx,
-            path_key: normalize_path(&node.path),
-            name_key: extract_filename(&node),
-            slab_index,
-            node,
-        })
+        .map(|(slab_index, node)| SortEntry::new(slab_index, node))
         .collect();
 
-    entries.sort_by(|a, b| compare_entries(a, b, &sort_state));
+    sort_entries(&mut entries, &sort_state);
 
     entries.into_iter().map(|entry| entry.slab_index).collect()
 }
