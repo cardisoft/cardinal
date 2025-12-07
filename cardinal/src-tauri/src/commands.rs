@@ -336,7 +336,9 @@ fn type_order(node: &SearchResultNode) -> u8 {
 
 fn compare_entries(a: &SortEntry, b: &SortEntry, sort: &SortStatePayload) -> StdOrdering {
     let ordering = match sort.key {
-        SortKeyPayload::FullPath => a.path_key.cmp(&b.path_key)
+        SortKeyPayload::FullPath => a
+            .path_key
+            .cmp(&b.path_key)
             .then_with(|| a.name_key.cmp(&b.name_key))
             .then_with(|| type_order(&a.node).cmp(&type_order(&b.node))),
         SortKeyPayload::Filename => a
@@ -374,8 +376,7 @@ pub fn get_sorted_view(
     let mut entries: Vec<SortEntry> = results
         .into_iter()
         .zip(nodes)
-        .enumerate()
-        .map(|(idx, (slab_index, node))| SortEntry {
+        .map(|(slab_index, node)| SortEntry {
             path_key: normalize_path(&node.path),
             name_key: extract_filename(&node),
             slab_index,
@@ -425,6 +426,92 @@ pub async fn open_path(path: String) {
 pub async fn start_logic() {
     if let Some(sender) = LOGIC_START.get() {
         let _ = sender.send(());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fswalk::NodeMetadata;
+    use std::path::PathBuf;
+
+    fn entry_with_metadata(
+        slab_index: usize,
+        path: &str,
+        metadata: SlabNodeMetadataCompact,
+    ) -> SortEntry {
+        let node = SearchResultNode {
+            path: PathBuf::from(path),
+            metadata,
+        };
+
+        SortEntry {
+            slab_index: SlabIndex::new(slab_index),
+            path_key: normalize_path(&node.path),
+            name_key: extract_filename(&node),
+            node,
+        }
+    }
+
+    fn metadata_with_type(r#type: NodeFileType, size: u64) -> SlabNodeMetadataCompact {
+        SlabNodeMetadataCompact::some(NodeMetadata {
+            r#type,
+            size,
+            ctime: None,
+            mtime: None,
+        })
+    }
+
+    #[test]
+    fn filename_sort_keeps_directories_before_files() {
+        let sort_state = SortStatePayload {
+            key: SortKeyPayload::Filename,
+            direction: SortDirectionPayload::Asc,
+        };
+        let mut entries = vec![
+            entry_with_metadata(
+                1,
+                "/tmp/b/foo.txt",
+                metadata_with_type(NodeFileType::File, 0),
+            ),
+            entry_with_metadata(2, "/tmp/c/foo.txt", SlabNodeMetadataCompact::none()),
+            entry_with_metadata(
+                0,
+                "/tmp/a/foo.txt",
+                metadata_with_type(NodeFileType::Dir, 0),
+            ),
+        ];
+
+        entries.sort_by(|a, b| compare_entries(a, b, &sort_state));
+        let order: Vec<usize> = entries.iter().map(|entry| entry.slab_index.get()).collect();
+
+        assert_eq!(
+            order,
+            vec![0, 1, 2],
+            "directories should be listed before files, and files before nodes without metadata"
+        );
+    }
+
+    #[test]
+    fn size_sort_prioritizes_directories_and_paths_for_ties() {
+        let sort_state = SortStatePayload {
+            key: SortKeyPayload::Size,
+            direction: SortDirectionPayload::Asc,
+        };
+        let mut entries = vec![
+            entry_with_metadata(1, "/tmp/z/foo", metadata_with_type(NodeFileType::File, 5)),
+            entry_with_metadata(0, "/tmp/m/foo", metadata_with_type(NodeFileType::Dir, 5)),
+            entry_with_metadata(2, "/tmp/a/foo", metadata_with_type(NodeFileType::File, 5)),
+        ];
+
+        entries.sort_by(|a, b| compare_entries(a, b, &sort_state));
+        let order: Vec<usize> = entries.iter().map(|entry| entry.slab_index.get()).collect();
+
+        assert_eq!(
+            order,
+            vec![0, 2, 1],
+            "directories stay ahead when size and names match, while files fall back to path order"
+        );
     }
 }
 
