@@ -27,6 +27,7 @@
   "events": {
     "columns": {
       "time": "Zeit",
+      "event": "Ereignis",
       "name": "Dateiname",
       "path": "Pfad"
     },

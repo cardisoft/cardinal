@@ -5,7 +5,7 @@ import { CONTAINER_PADDING, MAX_COL_WIDTH, MIN_COL_WIDTH } from '../constants';
 const clampWidth = (value: number): number =>
   Math.max(MIN_COL_WIDTH, Math.min(MAX_COL_WIDTH, value));
 
-export type EventColumnKey = 'time' | 'name' | 'path';
+export type EventColumnKey = 'time' | 'event' | 'name' | 'path';
 type EventColumnWidths = Record<EventColumnKey, number>;
 
 export function useEventColumnWidths() {
@@ -13,9 +13,10 @@ export function useEventColumnWidths() {
   const calculateEventColWidths = useCallback((): EventColumnWidths => {
     const totalWidth = window.innerWidth - CONTAINER_PADDING * 2;
     return {
-      time: clampWidth(Math.floor(totalWidth * 0.2)),
-      name: clampWidth(Math.floor(totalWidth * 0.3)),
-      path: clampWidth(Math.floor(totalWidth * 0.5)),
+      time: clampWidth(Math.floor(totalWidth * 0.18)),
+      event: clampWidth(Math.floor(totalWidth * 0.24)),
+      name: clampWidth(Math.floor(totalWidth * 0.24)),
+      path: clampWidth(Math.floor(totalWidth * 0.34)),
     };
   }, []);
 

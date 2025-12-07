@@ -27,6 +27,7 @@
   "events": {
     "columns": {
       "time": "时间",
+      "event": "事件",
       "name": "文件名",
       "path": "路径"
     },

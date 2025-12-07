@@ -14,11 +14,13 @@ import type { ListImperativeAPI, RowComponentProps } from 'react-window';
 import { ROW_HEIGHT } from '../constants';
 import { MiddleEllipsisHighlight } from './MiddleEllipsisHighlight';
 import { formatTimestamp } from '../utils/format';
+import { describeEventFlags } from '../utils/eventFlags';
 import type { RecentEventPayload } from '../types/ipc';
 import { useTranslation } from 'react-i18next';
 
 const COLUMNS = [
   { key: 'time', labelKey: 'events.columns.time' },
+  { key: 'event', labelKey: 'events.columns.event' },
   { key: 'name', labelKey: 'events.columns.name' },
   { key: 'path', labelKey: 'events.columns.path' },
 ] as const;
@@ -70,6 +72,9 @@ const EventRowBase = ({
   const { name, directory } = splitPath(pathSource);
   const timestamp = typeof event?.timestamp === 'number' ? event.timestamp : undefined;
   const formattedDate = formatTimestamp(timestamp) || '—';
+  const flagBits = event?.flagBits;
+  const flagDetails = describeEventFlags(flagBits);
+  const flagText = flagDetails.labels.join(' • ');
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -85,11 +90,13 @@ const EventRowBase = ({
       {...ariaAttributes}
       style={{ ...style, width: 'var(--columns-events-total)' }}
       className={`row columns-events ${index % 2 === 0 ? 'row-even' : 'row-odd'}`}
-      title={pathSource}
       onContextMenu={handleContextMenu}
     >
       <div className="event-time-column">
         <span className="event-time-primary">{formattedDate}</span>
+      </div>
+      <div className="event-flags-column" title={flagDetails.tooltip}>
+        <span className="event-flags-text">{flagText}</span>
       </div>
       <div className="event-name-column">
         <MiddleEllipsisHighlight
