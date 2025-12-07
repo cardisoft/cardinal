@@ -9,7 +9,7 @@ use std::{
 pub struct MetadataCache {
     ctime_index: BTreeMap<NonZeroU32, Vec<usize>>,
     mtime_index: BTreeMap<NonZeroU32, Vec<usize>>,
-    size_index: BTreeMap<u64, Vec<usize>>,
+    size_index: BTreeMap<i64, Vec<usize>>,
     /// For slab nodes without metadata
     no_ctime_index: BTreeSet<usize>,
     no_mtime_index: BTreeSet<usize>,

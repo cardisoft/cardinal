@@ -33,8 +33,16 @@ impl StateTypeSize {
         NodeFileType::n((self.0 >> 60 & 0b11) as u8).unwrap()
     }
 
-    pub fn size(&self) -> u64 {
-        self.0 & ((1u64 << 60) - 1)
+    /// Returns the size in bytes, or -1 for directories.
+    ///
+    /// Directories return -1 to facilitate proper sorting where directories
+    /// should appear before or after files based on sort direction.
+    pub fn size(&self) -> i64 {
+        if self.r#type() == NodeFileType::Dir {
+            -1
+        } else {
+            (self.0 & ((1u64 << 60) - 1)) as i64
+        }
     }
 }
 
@@ -58,14 +66,14 @@ mod tests {
         let ts = StateTypeSize::new(state, file_type, max_size);
         assert_eq!(ts.state(), State::Some);
         assert_eq!(ts.r#type(), file_type);
-        assert_eq!(ts.size(), max_size);
+        assert_eq!(ts.size(), max_size as i64);
 
         let file_type = NodeFileType::Dir;
         let size = 12345;
         let ts = StateTypeSize::new(state, file_type, size);
         assert_eq!(ts.state(), State::Some);
         assert_eq!(ts.r#type(), file_type);
-        assert_eq!(ts.size(), size);
+        assert_eq!(ts.size(), -1);
 
         let state = State::None;
         let file_type = NodeFileType::Symlink;
@@ -73,7 +81,7 @@ mod tests {
         let ts = StateTypeSize::new(state, file_type, size);
         assert_eq!(ts.state(), State::None);
         assert_eq!(ts.r#type(), file_type);
-        assert_eq!(ts.size(), size);
+        assert_eq!(ts.size(), size as i64);
 
         let state = State::Unaccessible;
         let file_type = NodeFileType::Unknown;
@@ -81,7 +89,7 @@ mod tests {
         let ts = StateTypeSize::new(state, file_type, size);
         assert_eq!(ts.state(), State::Unaccessible);
         assert_eq!(ts.r#type(), file_type);
-        assert_eq!(ts.size(), size);
+        assert_eq!(ts.size(), size as i64);
     }
 
     #[test]
@@ -92,18 +100,18 @@ mod tests {
         let ts = StateTypeSize::new(state, file_type, too_large_size);
         assert_eq!(ts.state(), State::Some);
         assert_eq!(ts.r#type(), file_type);
-        assert_eq!(ts.size(), (1 << 60) - 1); // size saturating
+        assert_eq!(ts.size(), ((1u64 << 60) - 1) as i64); // size saturating
 
         let another_large_size = ((1u64 << 60) - 1) + 100;
         let ts = StateTypeSize::new(state, file_type, another_large_size);
         assert_eq!(ts.state(), State::Some);
         assert_eq!(ts.r#type(), file_type);
-        assert_eq!(ts.size(), (1 << 60) - 1);
+        assert_eq!(ts.size(), ((1u64 << 60) - 1) as i64);
 
         let max_size = (1 << 60) - 1;
         let ts = StateTypeSize::new(state, file_type, max_size);
         assert_eq!(ts.state(), State::Some);
         assert_eq!(ts.r#type(), file_type);
-        assert_eq!(ts.size(), max_size);
+        assert_eq!(ts.size(), max_size as i64);
     }
 }
