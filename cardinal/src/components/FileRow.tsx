@@ -1,4 +1,4 @@
-import React, { memo, useCallback, DragEvent } from 'react';
+import React, { memo, useCallback, DragEvent, useRef } from 'react';
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import { MiddleEllipsisHighlight } from './MiddleEllipsisHighlight';
 import { formatKB, formatTimestamp } from '../utils/format';
@@ -11,7 +11,7 @@ type FileRowProps = {
   style?: CSSProperties;
   onContextMenu?: (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => void;
   onOpen?: (path: string) => void;
-  onSelect?: (
+  onSelect: (
     rowIndex: number,
     options: { isShift: boolean; isMeta: boolean; isCtrl: boolean },
   ) => void;
@@ -33,6 +33,12 @@ export const FileRow = memo(function FileRow({
   caseInsensitive,
   highlightTerms,
 }: FileRowProps): React.JSX.Element | null {
+  const pendingSelectRef = useRef<{
+    isShift: boolean;
+    isMeta: boolean;
+    isCtrl: boolean;
+  } | null>(null);
+
   if (!item) {
     return null;
   }
@@ -68,20 +74,38 @@ export const FileRow = memo(function FileRow({
   };
 
   const handleMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!onSelect || e.button !== 0) {
+    if (e.button !== 0) {
       return;
     }
 
-    const wantsSelectionChange = !isSelected || e.shiftKey || e.metaKey || e.ctrlKey;
-    if (!wantsSelectionChange) {
-      return;
-    }
-
-    onSelect(rowIndex, {
+    const options = {
       isShift: e.shiftKey,
       isMeta: e.metaKey,
       isCtrl: e.ctrlKey,
-    });
+    };
+
+    const hasModifier = options.isShift || options.isMeta || options.isCtrl;
+    if (!isSelected || hasModifier) {
+      onSelect(rowIndex, options);
+      pendingSelectRef.current = null;
+      return;
+    }
+
+    pendingSelectRef.current = options;
+  };
+
+  const handleMouseUp = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) {
+      return;
+    }
+
+    const pending = pendingSelectRef.current;
+    if (!pending) {
+      return;
+    }
+
+    pendingSelectRef.current = null;
+    onSelect(rowIndex, pending);
   };
 
   const handleDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -97,12 +121,19 @@ export const FileRow = memo(function FileRow({
         return;
       }
 
+      pendingSelectRef.current = null;
+
+      const dataTransfer = e.dataTransfer;
+      if (!dataTransfer) {
+        return;
+      }
+
       const isDraggingSelected = isSelected && selectedPathsForDrag.length > 0;
       const pathsToDrag =
         isDraggingSelected && selectedPathsForDrag.length > 0 ? selectedPathsForDrag : [path];
 
-      e.dataTransfer.effectAllowed = 'copy';
-      e.dataTransfer.setData('text/plain', pathsToDrag.join('\n'));
+      dataTransfer.effectAllowed = 'copy';
+      dataTransfer.setData('text/plain', pathsToDrag.join('\n'));
       void startNativeFileDrag({ paths: pathsToDrag, icon: item.icon });
     },
     [isSelected, item.icon, path, selectedPathsForDrag],
@@ -124,6 +155,7 @@ export const FileRow = memo(function FileRow({
       data-row-path={path ?? undefined}
       onContextMenu={handleContextMenu}
       onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
       onDoubleClick={handleDoubleClick}
       draggable={true}
       onDragStart={handleDragStart}

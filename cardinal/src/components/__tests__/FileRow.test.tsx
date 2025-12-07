@@ -22,6 +22,31 @@ describe('FileRow selection interactions', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it('fires once on mouseup when a selected row is clicked without modifiers', () => {
+    const onSelect = vi.fn();
+    const { getByTitle } = renderRow({ onSelect });
+    const node = getByTitle(baseItem.path);
+    fireEvent.mouseDown(node, { button: 0 });
+    expect(onSelect).not.toHaveBeenCalled();
+    fireEvent.mouseUp(node, { button: 0 });
+    expect(onSelect).toHaveBeenCalledWith(0, {
+      isShift: false,
+      isMeta: false,
+      isCtrl: false,
+    });
+  });
+
+  it('fires immediately when clicking an unselected row without modifiers', () => {
+    const onSelect = vi.fn();
+    const { getByTitle } = renderRow({ onSelect, isSelected: false });
+    fireEvent.mouseDown(getByTitle(baseItem.path), { button: 0 });
+    expect(onSelect).toHaveBeenCalledWith(0, {
+      isShift: false,
+      isMeta: false,
+      isCtrl: false,
+    });
+  });
+
   it('tells the selection controller to extend the range when shift-clicking a selected row', () => {
     const onSelect = vi.fn();
     const { getByTitle } = renderRow({ onSelect });
@@ -42,5 +67,14 @@ describe('FileRow selection interactions', () => {
       isMeta: true,
       isCtrl: false,
     });
+  });
+
+  it('does not fire when a pending click turns into a drag gesture', () => {
+    const onSelect = vi.fn();
+    const { getByTitle } = renderRow({ onSelect });
+    const node = getByTitle(baseItem.path);
+    fireEvent.mouseDown(node, { button: 0 });
+    fireEvent.dragStart(node);
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });
