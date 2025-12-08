@@ -54,8 +54,9 @@ impl Query {
 /// choose whether they want the raw Everything AST or a normalized shape that:
 /// - Removes `Expr::Empty` operands from conjunctions (returning `Expr::Empty`
 ///   or the lone operand when appropriate).
-/// - Moves all filters to the tail of AND chains so cheaper textual terms run
-///   first.
+/// - Reorders filters by cost: `tag:` first (cheapest), then `infolder:` and
+///   `parent:` (same priority), and all others last. Non-filters stay after the
+///   priority filters but before the tail filters.
 /// - Collapses any OR chain containing `Expr::Empty` into a single
 ///   `Expr::Empty`, matching Cardinal's "empty means whole universe" semantics.
 ///
@@ -121,41 +122,53 @@ fn optimize_or(parts: Vec<Expr>) -> Expr {
     }
 }
 
-/// Reorders `filter:` terms to the end of `parts`.
-///
-/// Returns `true` when any movement was performed so future optimizations could
-/// skip redundant work.
+/// Reorders filters so `tag:` appears first (cheapest), followed by `infolder:`
+/// and `parent:`, with all other filters at the tail and non-filter terms
+/// in the middle.
 fn move_filters_to_tail(parts: &mut Vec<Expr>) -> bool {
     if parts.len() <= 1 {
         return false;
     }
 
-    let Some(first) = parts.iter().position(is_filter_term) else {
-        return false;
-    };
-
-    if parts[first..].iter().all(is_filter_term) {
-        return false;
-    }
-
-    let mut reordered = Vec::with_capacity(parts.len());
-    let mut metadata = Vec::new();
+    let mut priority_filters = Vec::new();
+    let mut tail_filters = Vec::new();
+    let mut non_filters = Vec::new();
 
     for expr in parts.drain(..) {
-        if is_filter_term(&expr) {
-            metadata.push(expr);
-        } else {
-            reordered.push(expr);
+        match &expr {
+            Expr::Term(Term::Filter(filter)) => match filter.kind {
+                FilterKind::Tag | FilterKind::InFolder | FilterKind::Parent => {
+                    priority_filters.push(expr)
+                }
+                _ => tail_filters.push(expr),
+            },
+            _ => non_filters.push(expr),
         }
     }
 
-    parts.extend(reordered);
-    parts.extend(metadata);
-    true
-}
+    if priority_filters.is_empty() && tail_filters.is_empty() {
+        parts.extend(non_filters);
+        return false;
+    }
 
-fn is_filter_term(expr: &Expr) -> bool {
-    matches!(expr, Expr::Term(Term::Filter(_)))
+    // Stable sort by priority: Tag=0, InFolder=1, Parent=1
+    priority_filters.sort_by_key(|expr| {
+        if let Expr::Term(Term::Filter(filter)) = expr {
+            match filter.kind {
+                FilterKind::Tag => 0,
+                FilterKind::InFolder => 1,
+                FilterKind::Parent => 1,
+                _ => 3, // unreachable
+            }
+        } else {
+            3 // unreachable
+        }
+    });
+
+    parts.extend(priority_filters);
+    parts.extend(non_filters);
+    parts.extend(tail_filters);
+    true
 }
 
 /// Logical structure for Everything queries.
