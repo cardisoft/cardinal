@@ -1,8 +1,44 @@
 use plist::Value;
-use std::{io::Cursor, path::Path};
+use std::{
+    io::{self, Cursor},
+    path::{Path, PathBuf},
+    process::Command,
+};
 use xattr::get;
 
 const USER_TAG_XATTR: &str = "com.apple.metadata:_kMDItemUserTags";
+
+/// Searches for files with the specified tag using the `mdfind` command-line tool.
+///
+/// Returns a vector of file paths that have the specified tag.
+pub fn search_tags_using_mdfind(tag: &str, case_insensitive: bool) -> io::Result<Vec<PathBuf>> {
+    if tag_has_spotlight_forbidden_chars(tag) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("tag filter contains characters unsupported: {tag}"),
+        ));
+    }
+
+    let modifier = if case_insensitive { "c" } else { "" };
+    let query = format!("kMDItemUserTags == '*{}*'{}", tag, modifier);
+    let output = Command::new("mdfind").arg(query).output()?;
+
+    if !output.status.success() {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            "mdfind command failed",
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let paths = stdout.lines().map(|line| PathBuf::from(line)).collect();
+
+    Ok(paths)
+}
+
+fn tag_has_spotlight_forbidden_chars(tag: &str) -> bool {
+    tag.chars().any(|c| matches!(c, '\'' | '\\' | '*'))
+}
 
 /// Reads Finder-style user tags from an on-disk item.
 /// Returns `None` if cancellation or filesystem errors occur.

@@ -54,9 +54,9 @@ impl Query {
 /// choose whether they want the raw Everything AST or a normalized shape that:
 /// - Removes `Expr::Empty` operands from conjunctions (returning `Expr::Empty`
 ///   or the lone operand when appropriate).
-/// - Reorders filters by cost: `tag:` first (cheapest), then `infolder:` and
-///   `parent:` (same priority), and all others last. Non-filters stay after the
-///   priority filters but before the tail filters.
+/// - Reorders filters by cost: `infolder:` and `parent:` first (same priority),
+///   other filters next, and `tag:` always last. Non-filters stay between the
+///   scope filters and the remaining filter tail.
 /// - Collapses any OR chain containing `Expr::Empty` into a single
 ///   `Expr::Empty`, matching Cardinal's "empty means whole universe" semantics.
 ///
@@ -122,53 +122,33 @@ fn optimize_or(parts: Vec<Expr>) -> Expr {
     }
 }
 
-/// Reorders filters so `tag:` appears first (cheapest), followed by `infolder:`
-/// and `parent:`, with all other filters at the tail and non-filter terms
-/// in the middle.
-fn move_filters_to_tail(parts: &mut Vec<Expr>) -> bool {
+/// Reorders filters so `infolder:` and `parent:` bubble to the front, generic
+/// filters come after any non-filter terms, and `tag:` operands always move to
+/// the very end of the conjunction.
+fn move_filters_to_tail(parts: &mut Vec<Expr>) {
     if parts.len() <= 1 {
-        return false;
+        return;
     }
 
-    let mut priority_filters = Vec::new();
-    let mut tail_filters = Vec::new();
-    let mut non_filters = Vec::new();
-
-    for expr in parts.drain(..) {
-        match &expr {
+    let priority = |expr: &Expr| -> u8 {
+        match expr {
             Expr::Term(Term::Filter(filter)) => match filter.kind {
-                FilterKind::Tag | FilterKind::InFolder | FilterKind::Parent => {
-                    priority_filters.push(expr)
-                }
-                _ => tail_filters.push(expr),
+                FilterKind::InFolder | FilterKind::Parent => 0,
+                FilterKind::Tag => 3,
+                _ => 2,
             },
-            _ => non_filters.push(expr),
+            _ => 1,
         }
-    }
+    };
 
-    if priority_filters.is_empty() && tail_filters.is_empty() {
-        parts.extend(non_filters);
-        return false;
-    }
+    let mut keyed: Vec<_> = parts
+        .drain(..)
+        .map(|expr| (priority(&expr), expr))
+        .collect();
 
-    // Stable sort by priority: Tag=0, InFolder=1, Parent=1
-    priority_filters.sort_by_key(|expr| {
-        if let Expr::Term(Term::Filter(filter)) = expr {
-            match filter.kind {
-                FilterKind::Tag => 0,
-                FilterKind::InFolder => 1,
-                FilterKind::Parent => 1,
-                _ => 3, // unreachable
-            }
-        } else {
-            3 // unreachable
-        }
-    });
+    keyed.sort_by_key(|(prio, _)| *prio);
 
-    parts.extend(priority_filters);
-    parts.extend(non_filters);
-    parts.extend(tail_filters);
-    true
+    parts.extend(keyed.into_iter().map(|(_, expr)| expr));
 }
 
 /// Logical structure for Everything queries.

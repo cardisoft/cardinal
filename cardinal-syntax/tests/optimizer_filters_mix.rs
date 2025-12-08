@@ -41,17 +41,17 @@ fn block_06_filters_mix() {
 }
 
 #[test]
-fn tag_filters_move_to_front() {
+fn tag_filters_move_to_end() {
     let expr = parse_ok("alpha tag:first beta tag:second ext:txt folder:src");
     let parts = as_and(&expr);
-    assert!(parts.len() >= 6);
+    assert_eq!(parts.len(), 6);
 
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Tag);
-    word_is(&parts[2], "alpha");
-    word_is(&parts[3], "beta");
-    filter_is_kind(&parts[parts.len() - 2], &FilterKind::Ext);
-    filter_is_kind(&parts[parts.len() - 1], &FilterKind::Folder);
+    word_is(&parts[0], "alpha");
+    word_is(&parts[1], "beta");
+    filter_is_kind(&parts[2], &FilterKind::Ext);
+    filter_is_kind(&parts[3], &FilterKind::Folder);
+    filter_is_kind(&parts[4], &FilterKind::Tag);
+    filter_is_kind(&parts[5], &FilterKind::Tag);
 }
 
 #[test]
@@ -69,8 +69,8 @@ fn tag_filter_with_single_word() {
     let expr = parse_ok("tag:project alpha");
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 2);
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    word_is(&parts[1], "alpha");
+    word_is(&parts[0], "alpha");
+    filter_is_kind(&parts[1], &FilterKind::Tag);
 }
 
 #[test]
@@ -84,23 +84,23 @@ fn multiple_tag_filters_preserve_order() {
 }
 
 #[test]
-fn tag_filter_at_end_moves_to_front() {
+fn tag_filter_at_end_stays_last() {
     let expr = parse_ok("alpha beta tag:project");
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 3);
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    word_is(&parts[1], "alpha");
-    word_is(&parts[2], "beta");
+    word_is(&parts[0], "alpha");
+    word_is(&parts[1], "beta");
+    filter_is_kind(&parts[2], &FilterKind::Tag);
 }
 
 #[test]
-fn tag_filter_in_middle_moves_to_front() {
+fn tag_filter_moves_to_tail_from_middle() {
     let expr = parse_ok("alpha tag:project beta");
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 3);
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    word_is(&parts[1], "alpha");
-    word_is(&parts[2], "beta");
+    word_is(&parts[0], "alpha");
+    word_is(&parts[1], "beta");
+    filter_is_kind(&parts[2], &FilterKind::Tag);
 }
 
 #[test]
@@ -108,9 +108,9 @@ fn tag_and_other_filters_ordered_correctly() {
     let expr = parse_ok("ext:txt tag:important dm:today");
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 3);
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Ext);
-    filter_is_kind(&parts[2], &FilterKind::DateModified);
+    filter_is_kind(&parts[0], &FilterKind::Ext);
+    filter_is_kind(&parts[1], &FilterKind::DateModified);
+    filter_is_kind(&parts[2], &FilterKind::Tag);
 }
 
 #[test]
@@ -118,9 +118,9 @@ fn tag_filter_with_size_and_type() {
     let expr = parse_ok("size:>1mb tag:archive type:file");
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 3);
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Size);
-    filter_is_kind(&parts[2], &FilterKind::Type);
+    filter_is_kind(&parts[0], &FilterKind::Size);
+    filter_is_kind(&parts[1], &FilterKind::Type);
+    filter_is_kind(&parts[2], &FilterKind::Tag);
 }
 
 #[test]
@@ -129,17 +129,14 @@ fn tag_filter_with_parent_and_infolder() {
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 7);
 
-    // Stable sort by priority: tag=0, infolder=1, parent=1
-    // parent appears before infolder in source, so stable sort preserves that order
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Parent);
-    filter_is_kind(&parts[2], &FilterKind::InFolder);
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::InFolder);
 
-    // Remaining words maintain their relative order after the priority filters.
-    word_is(&parts[3], "alpha");
-    word_is(&parts[4], "beta");
-    word_is(&parts[5], "gamma");
-    word_is(&parts[6], "delta");
+    word_is(&parts[2], "alpha");
+    word_is(&parts[3], "beta");
+    word_is(&parts[4], "gamma");
+    word_is(&parts[5], "delta");
+    filter_is_kind(&parts[6], &FilterKind::Tag);
 }
 
 #[test]
@@ -170,13 +167,12 @@ fn scope_filters_preserve_relative_order() {
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 6);
 
-    // Stable sort: tag first, then parent and infolder (equal priority, stable order)
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Parent);
-    filter_is_kind(&parts[2], &FilterKind::InFolder);
-    word_is(&parts[3], "alpha");
-    word_is(&parts[4], "beta");
-    word_is(&parts[5], "gamma");
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::InFolder);
+    word_is(&parts[2], "alpha");
+    word_is(&parts[3], "beta");
+    word_is(&parts[4], "gamma");
+    filter_is_kind(&parts[5], &FilterKind::Tag);
 }
 
 #[test]
@@ -184,11 +180,11 @@ fn tag_filters_with_words_and_phrases() {
     let expr = parse_ok("alpha tag:proj1 \"beta gamma\" tag:proj2 delta");
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 5);
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Tag);
-    word_is(&parts[2], "alpha");
-    phrase_is(&parts[3], "beta gamma");
-    word_is(&parts[4], "delta");
+    word_is(&parts[0], "alpha");
+    phrase_is(&parts[1], "beta gamma");
+    word_is(&parts[2], "delta");
+    filter_is_kind(&parts[3], &FilterKind::Tag);
+    filter_is_kind(&parts[4], &FilterKind::Tag);
 }
 
 #[test]
@@ -196,8 +192,8 @@ fn tag_filter_with_regex() {
     let expr = parse_ok("regex:.*\\.txt$ tag:docs");
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 2);
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    regex_is(&parts[1], ".*\\.txt$");
+    regex_is(&parts[0], ".*\\.txt$");
+    filter_is_kind(&parts[1], &FilterKind::Tag);
 }
 
 #[test]
@@ -218,33 +214,32 @@ fn tag_filter_with_all_filter_types() {
     let parts = as_and(&expr);
     assert!(parts.len() >= 15);
 
-    // First filter should be tag
-    filter_is_kind(&parts[0], &FilterKind::Tag);
+    // Parent/infolder scopes bubble up front
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::InFolder);
 
-    // All other filters should be at the end after any words
-    for (i, part) in parts.iter().enumerate().skip(1) {
-        match as_term(&part) {
-            Term::Filter(_) => {}
-            _ => panic!("expected filter at position {i}"),
+    let tag_count = parts
+        .iter()
+        .filter(|part| match as_term(part) {
+            Term::Filter(filter) => matches!(filter.kind, FilterKind::Tag),
+            _ => false,
+        })
+        .count();
+    assert_eq!(tag_count, 1);
+
+    // Tag filter should be the final element
+    let tail_start = parts.len() - tag_count;
+    filter_is_kind(&parts[tail_start], &FilterKind::Tag);
+
+    // Everything before the tail must not be a tag filter
+    for (i, part) in parts[..tail_start].iter().enumerate() {
+        if let Expr::Term(Term::Filter(filter)) = part {
+            assert!(
+                !matches!(filter.kind, FilterKind::Tag),
+                "unexpected tag filter before tail at position {i}"
+            );
         }
     }
-}
-
-#[test]
-fn multiple_tags_with_multiple_other_filters() {
-    let expr = parse_ok("tag:alpha tag:beta ext:rs size:>10kb tag:gamma dm:today");
-    let parts = as_and(&expr);
-    assert_eq!(parts.len(), 6);
-
-    // All tag filters should be at the front
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Tag);
-    filter_is_kind(&parts[2], &FilterKind::Tag);
-
-    // Other filters at the end
-    filter_is_kind(&parts[3], &FilterKind::Ext);
-    filter_is_kind(&parts[4], &FilterKind::Size);
-    filter_is_kind(&parts[5], &FilterKind::DateModified);
 }
 
 #[test]
@@ -253,15 +248,12 @@ fn tag_filter_preserves_relative_order_with_other_tags() {
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 6);
 
-    // Tags should be at front in original order
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Tag);
-    filter_is_kind(&parts[2], &FilterKind::Tag);
-
-    // Words after tags
-    word_is(&parts[3], "word1");
-    word_is(&parts[4], "word2");
-    word_is(&parts[5], "word3");
+    word_is(&parts[0], "word1");
+    word_is(&parts[1], "word2");
+    word_is(&parts[2], "word3");
+    filter_is_kind(&parts[3], &FilterKind::Tag);
+    filter_is_kind(&parts[4], &FilterKind::Tag);
+    filter_is_kind(&parts[5], &FilterKind::Tag);
 }
 
 #[test]
@@ -271,10 +263,9 @@ fn tag_filter_with_nested_groups() {
     // Optimizer flattens nested AND groups, so (tag:alpha beta) gamma becomes tag:alpha beta gamma
     assert_eq!(parts.len(), 3);
 
-    // Tag filter moved to front
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    word_is(&parts[1], "beta");
-    word_is(&parts[2], "gamma");
+    word_is(&parts[0], "beta");
+    word_is(&parts[1], "gamma");
+    filter_is_kind(&parts[2], &FilterKind::Tag);
 }
 
 #[test]
@@ -330,8 +321,8 @@ fn tag_filter_with_empty_query_parts() {
     let expr = parse_ok("  tag:alpha   beta  ");
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 2);
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    word_is(&parts[1], "beta");
+    word_is(&parts[0], "beta");
+    filter_is_kind(&parts[1], &FilterKind::Tag);
 }
 
 #[test]
@@ -339,8 +330,8 @@ fn tag_filter_with_wildcard() {
     let expr = parse_ok("*.txt tag:docs");
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 2);
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    word_is(&parts[1], "*.txt");
+    word_is(&parts[0], "*.txt");
+    filter_is_kind(&parts[1], &FilterKind::Tag);
 }
 
 // ============ Corner Cases ============
@@ -351,35 +342,39 @@ fn multiple_priority_filters_with_duplicates() {
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 6);
 
-    // All tags first (priority 0), then parent/infolder (priority 1) in encounter order
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Tag);
-    filter_is_kind(&parts[2], &FilterKind::Tag);
-    filter_is_kind(&parts[3], &FilterKind::Parent);
-    filter_is_kind(&parts[4], &FilterKind::InFolder);
-    filter_is_kind(&parts[5], &FilterKind::Parent);
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::InFolder);
+    filter_is_kind(&parts[2], &FilterKind::Parent);
+    filter_is_kind(&parts[3], &FilterKind::Tag);
+    filter_is_kind(&parts[4], &FilterKind::Tag);
+    filter_is_kind(&parts[5], &FilterKind::Tag);
 }
 
 #[test]
 fn all_three_priority_levels_mixed() {
-    let expr = parse_ok("word1 ext:txt parent:/a tag:one dm:today infolder:/b word2 tag:two size:>1kb parent:/c");
+    let expr = parse_ok(
+        "word1 ext:txt parent:/a tag:one dm:today infolder:/b word2 tag:two size:>1kb parent:/c",
+    );
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 10);
 
-    // Priority 0: tags
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Tag);
-    // Priority 1: parent/infolder
+    // Parent/infolder bubble up first
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::InFolder);
     filter_is_kind(&parts[2], &FilterKind::Parent);
-    filter_is_kind(&parts[3], &FilterKind::InFolder);
-    filter_is_kind(&parts[4], &FilterKind::Parent);
-    // Non-filters
-    word_is(&parts[5], "word1");
-    word_is(&parts[6], "word2");
-    // Tail filters
-    filter_is_kind(&parts[7], &FilterKind::Ext);
-    filter_is_kind(&parts[8], &FilterKind::DateModified);
-    filter_is_kind(&parts[9], &FilterKind::Size);
+
+    // Words stay immediately after scope filters
+    word_is(&parts[3], "word1");
+    word_is(&parts[4], "word2");
+
+    // Other filters follow
+    filter_is_kind(&parts[5], &FilterKind::Ext);
+    filter_is_kind(&parts[6], &FilterKind::DateModified);
+    filter_is_kind(&parts[7], &FilterKind::Size);
+
+    // Tags live at the very end in encounter order
+    filter_is_kind(&parts[8], &FilterKind::Tag);
+    filter_is_kind(&parts[9], &FilterKind::Tag);
 }
 
 #[test]
@@ -411,10 +406,10 @@ fn tag_with_phrase_and_regex() {
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 4);
 
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Tag);
-    phrase_is(&parts[2], "hello world");
-    regex_is(&parts[3], "^foo.*bar$");
+    phrase_is(&parts[0], "hello world");
+    regex_is(&parts[1], "^foo.*bar$");
+    filter_is_kind(&parts[2], &FilterKind::Tag);
+    filter_is_kind(&parts[3], &FilterKind::Tag);
 }
 
 #[test]
@@ -425,14 +420,14 @@ fn nested_not_with_priority_filters() {
 
     // word comes first (non-filter), then NOT expressions
     word_is(&parts[0], "word");
-    
+
     // Both NOT expressions should be present (they are non-filters too)
     match &parts[1] {
-        Expr::Not(_) => {},
+        Expr::Not(_) => {}
         other => panic!("expected Not expression, got: {other:?}"),
     }
     match &parts[2] {
-        Expr::Not(_) => {},
+        Expr::Not(_) => {}
         other => panic!("expected Not expression, got: {other:?}"),
     }
 }
@@ -456,12 +451,11 @@ fn priority_filters_in_nested_and_groups() {
     // Optimizer flattens nested AND groups
     assert_eq!(parts.len(), 5);
 
-    // Priority filters bubble to front
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Parent);
-    word_is(&parts[2], "word1");
-    word_is(&parts[3], "word2");
-    filter_is_kind(&parts[4], &FilterKind::Ext);
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    word_is(&parts[1], "word1");
+    word_is(&parts[2], "word2");
+    filter_is_kind(&parts[3], &FilterKind::Ext);
+    filter_is_kind(&parts[4], &FilterKind::Tag);
 }
 
 #[test]
@@ -470,12 +464,12 @@ fn single_priority_filter_with_many_tail_filters() {
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 6);
 
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Ext);
-    filter_is_kind(&parts[2], &FilterKind::Size);
-    filter_is_kind(&parts[3], &FilterKind::DateModified);
-    filter_is_kind(&parts[4], &FilterKind::DateCreated);
-    filter_is_kind(&parts[5], &FilterKind::Type);
+    filter_is_kind(&parts[0], &FilterKind::Ext);
+    filter_is_kind(&parts[1], &FilterKind::Size);
+    filter_is_kind(&parts[2], &FilterKind::DateModified);
+    filter_is_kind(&parts[3], &FilterKind::DateCreated);
+    filter_is_kind(&parts[4], &FilterKind::Type);
+    filter_is_kind(&parts[5], &FilterKind::Tag);
 }
 
 #[test]
@@ -484,40 +478,39 @@ fn empty_tag_argument() {
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 2);
 
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    word_is(&parts[1], "word");
+    word_is(&parts[0], "word");
+    filter_is_kind(&parts[1], &FilterKind::Tag);
 }
 
 #[test]
 fn priority_filters_with_comparison_and_range() {
-    let expr = parse_ok("parent:/tmp size:>1gb..10gb infolder:/home dm:2024/1/1-2024/12/31 tag:work");
+    let expr =
+        parse_ok("parent:/tmp size:>1gb..10gb infolder:/home dm:2024/1/1-2024/12/31 tag:work");
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 5);
 
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Parent);
-    filter_is_kind(&parts[2], &FilterKind::InFolder);
-    filter_is_kind(&parts[3], &FilterKind::Size);
-    filter_is_kind(&parts[4], &FilterKind::DateModified);
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::InFolder);
+    filter_is_kind(&parts[2], &FilterKind::Size);
+    filter_is_kind(&parts[3], &FilterKind::DateModified);
+    filter_is_kind(&parts[4], &FilterKind::Tag);
 }
 
 #[test]
 fn interleaved_priority_and_tail_filters() {
-    let expr = parse_ok("ext:txt tag:a size:>1kb parent:/tmp dm:today infolder:/home type:file tag:b");
+    let expr =
+        parse_ok("ext:txt tag:a size:>1kb parent:/tmp dm:today infolder:/home type:file tag:b");
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 8);
 
-    // Tags first
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Tag);
-    // Parent/infolder next
-    filter_is_kind(&parts[2], &FilterKind::Parent);
-    filter_is_kind(&parts[3], &FilterKind::InFolder);
-    // Tail filters last, in original order
-    filter_is_kind(&parts[4], &FilterKind::Ext);
-    filter_is_kind(&parts[5], &FilterKind::Size);
-    filter_is_kind(&parts[6], &FilterKind::DateModified);
-    filter_is_kind(&parts[7], &FilterKind::Type);
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::InFolder);
+    filter_is_kind(&parts[2], &FilterKind::Ext);
+    filter_is_kind(&parts[3], &FilterKind::Size);
+    filter_is_kind(&parts[4], &FilterKind::DateModified);
+    filter_is_kind(&parts[5], &FilterKind::Type);
+    filter_is_kind(&parts[6], &FilterKind::Tag);
+    filter_is_kind(&parts[7], &FilterKind::Tag);
 }
 
 #[test]
@@ -533,28 +526,29 @@ fn all_filter_types_comprehensive() {
     );
     let parts = as_and(&expr);
 
-    // First should be all tags (priority 0)
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Tag);
-    filter_is_kind(&parts[2], &FilterKind::Tag);
+    // Scope filters bubble up first in encounter order
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::InFolder);
+    filter_is_kind(&parts[2], &FilterKind::Parent);
 
-    // Then parent/infolder (priority 1)
-    filter_is_kind(&parts[3], &FilterKind::Parent);
-    filter_is_kind(&parts[4], &FilterKind::InFolder);
-    filter_is_kind(&parts[5], &FilterKind::Parent);
+    // Words live immediately after the scope block
+    word_is(&parts[3], "word1");
+    word_is(&parts[4], "word2");
 
-    // Then words
-    let word_start_idx = 6;
-    word_is(&parts[word_start_idx], "word1");
-    word_is(&parts[word_start_idx + 1], "word2");
+    // Tags should be the final three elements
+    let tail_start = parts.len() - 3;
+    filter_is_kind(&parts[tail_start], &FilterKind::Tag);
+    filter_is_kind(&parts[tail_start + 1], &FilterKind::Tag);
+    filter_is_kind(&parts[tail_start + 2], &FilterKind::Tag);
 
-    // Rest are tail filters in order
-    let tail_start = word_start_idx + 2;
-    assert!(parts.len() > tail_start);
-    for part in &parts[tail_start..] {
-        // All remaining should be filters
+    // No tag filters should appear before the tail
+    for (i, part) in parts[5..tail_start].iter().enumerate() {
         match as_term(part) {
-            Term::Filter(_) => {}
+            Term::Filter(filter) => assert!(
+                !matches!(filter.kind, FilterKind::Tag),
+                "unexpected tag filter before tail at position {}",
+                i + 5
+            ),
             other => panic!("expected filter, got: {other:?}"),
         }
     }
@@ -562,13 +556,15 @@ fn all_filter_types_comprehensive() {
 
 #[test]
 fn quoted_priority_filter_arguments() {
-    let expr = parse_ok("parent:\"/Users/My Documents\" tag:\"Work Projects\" infolder:\"/home/user/files\"");
+    let expr = parse_ok(
+        "parent:\"/Users/My Documents\" tag:\"Work Projects\" infolder:\"/home/user/files\"",
+    );
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 3);
 
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Parent);
-    filter_is_kind(&parts[2], &FilterKind::InFolder);
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::InFolder);
+    filter_is_kind(&parts[2], &FilterKind::Tag);
 }
 
 #[test]
@@ -577,9 +573,9 @@ fn priority_filters_with_wildcards_in_arguments() {
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 3);
 
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Parent);
-    filter_is_kind(&parts[2], &FilterKind::InFolder);
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::InFolder);
+    filter_is_kind(&parts[2], &FilterKind::Tag);
 }
 
 #[test]
@@ -605,10 +601,10 @@ fn deeply_nested_groups_with_priority_filters() {
     // Flattened: tag:a word1 word2 parent:/tmp
     assert_eq!(parts.len(), 4);
 
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Parent);
-    word_is(&parts[2], "word1");
-    word_is(&parts[3], "word2");
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    word_is(&parts[1], "word1");
+    word_is(&parts[2], "word2");
+    filter_is_kind(&parts[3], &FilterKind::Tag);
 }
 
 #[test]
@@ -617,17 +613,17 @@ fn priority_filter_at_every_position() {
     let expr1 = parse_ok("tag:start word1 word2");
     let p1 = as_and(&expr1);
     assert_eq!(p1.len(), 3);
-    filter_is_kind(&p1[0], &FilterKind::Tag);
+    filter_is_kind(&p1[2], &FilterKind::Tag);
 
     let expr2 = parse_ok("word1 tag:middle word2");
     let p2 = as_and(&expr2);
     assert_eq!(p2.len(), 3);
-    filter_is_kind(&p2[0], &FilterKind::Tag);
+    filter_is_kind(&p2[2], &FilterKind::Tag);
 
     let expr3 = parse_ok("word1 word2 tag:end");
     let p3 = as_and(&expr3);
     assert_eq!(p3.len(), 3);
-    filter_is_kind(&p3[0], &FilterKind::Tag);
+    filter_is_kind(&p3[2], &FilterKind::Tag);
 }
 
 #[test]
@@ -636,11 +632,11 @@ fn priority_filters_only_no_other_terms() {
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 5);
 
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Tag);
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::InFolder);
     filter_is_kind(&parts[2], &FilterKind::Parent);
-    filter_is_kind(&parts[3], &FilterKind::InFolder);
-    filter_is_kind(&parts[4], &FilterKind::Parent);
+    filter_is_kind(&parts[3], &FilterKind::Tag);
+    filter_is_kind(&parts[4], &FilterKind::Tag);
 }
 
 #[test]
@@ -649,28 +645,26 @@ fn single_word_with_all_filter_types() {
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 5);
 
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Parent);
-    filter_is_kind(&parts[2], &FilterKind::InFolder);
-    word_is(&parts[3], "word");
-    filter_is_kind(&parts[4], &FilterKind::Ext);
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::InFolder);
+    word_is(&parts[2], "word");
+    filter_is_kind(&parts[3], &FilterKind::Ext);
+    filter_is_kind(&parts[4], &FilterKind::Tag);
 }
 
 #[test]
 fn alternating_priority_and_non_priority() {
-    let expr = parse_ok("tag:a ext:rs parent:/tmp size:>1kb infolder:/home dm:today tag:b type:file");
+    let expr =
+        parse_ok("tag:a ext:rs parent:/tmp size:>1kb infolder:/home dm:today tag:b type:file");
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 8);
 
-    // Priority filters at front
-    filter_is_kind(&parts[0], &FilterKind::Tag);
-    filter_is_kind(&parts[1], &FilterKind::Tag);
-    filter_is_kind(&parts[2], &FilterKind::Parent);
-    filter_is_kind(&parts[3], &FilterKind::InFolder);
-
-    // Tail filters preserve order
-    filter_is_kind(&parts[4], &FilterKind::Ext);
-    filter_is_kind(&parts[5], &FilterKind::Size);
-    filter_is_kind(&parts[6], &FilterKind::DateModified);
-    filter_is_kind(&parts[7], &FilterKind::Type);
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::InFolder);
+    filter_is_kind(&parts[2], &FilterKind::Ext);
+    filter_is_kind(&parts[3], &FilterKind::Size);
+    filter_is_kind(&parts[4], &FilterKind::DateModified);
+    filter_is_kind(&parts[5], &FilterKind::Type);
+    filter_is_kind(&parts[6], &FilterKind::Tag);
+    filter_is_kind(&parts[7], &FilterKind::Tag);
 }

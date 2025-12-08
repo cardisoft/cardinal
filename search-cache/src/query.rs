@@ -6,7 +6,7 @@ use anyhow::{Result, anyhow, bail};
 use cardinal_syntax::{
     ArgumentKind, ComparisonOp, Expr, Filter, FilterArgument, FilterKind, RangeSeparator, Term,
 };
-use file_tags::read_tags_from_path;
+use file_tags::{read_tags_from_path, search_tags_using_mdfind};
 use fswalk::NodeFileType;
 use hashbrown::HashSet;
 use jiff::{Timestamp, civil::Date, tz::TimeZone};
@@ -744,37 +744,53 @@ impl SearchCache {
         options: SearchOptions,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
-        let mut needles: Vec<String> = match &argument.kind {
-            ArgumentKind::List(values) => values
-                .iter()
-                .map(|value| value.trim().to_string())
-                .collect(),
-            _ => vec![argument.raw.trim().to_string()],
-        };
-        needles.retain(|value| !value.is_empty());
-        if needles.is_empty() {
+        if matches!(argument.kind, ArgumentKind::List(_)) {
+            bail!("tag: accepts a single value; chain multiple tag: filters for AND semantics");
+        }
+
+        let raw = argument.raw.trim();
+        if raw.is_empty() {
             bail!("tag: requires a value");
         }
+        let needle = if options.case_insensitive {
+            raw.to_ascii_lowercase()
+        } else {
+            raw.to_string()
+        };
 
-        if options.case_insensitive {
-            for value in &mut needles {
-                *value = value.to_ascii_lowercase();
-            }
-        }
-
-        let Some(nodes) = self.nodes_from_base(base, token) else {
+        let Some(nodes) = self.nodes_from_base(base.clone(), token) else {
             return Ok(None);
         };
 
-        let matched_indices = nodes
-            .into_iter()
-            .filter_map(|index| self.node_path(index).map(|path| (index, path)))
-            .par_bridge()
-            .filter_map(|(index, path)| {
-                self.node_tags_match(&path, &needles, options.case_insensitive, token)?
-                    .then_some(index)
-            })
-            .collect();
+        // If base is a small set, filtering it by accessing file metadata;
+        // otherwise use mdfind to quickly narrow down.
+        let matched_indices = if nodes.len() <= 10000 {
+            nodes
+                .into_iter()
+                .filter_map(|index| self.node_path(index).map(|path| (index, path)))
+                .par_bridge()
+                .filter_map(|(index, path)| {
+                    self.node_tags_match(&path, &needle, options.case_insensitive, token)?
+                        .then_some(index)
+                })
+                .collect()
+        } else {
+            let spotlight_indices: Vec<SlabIndex> =
+                search_tags_using_mdfind(needle.as_str(), options.case_insensitive)?
+                    .into_iter()
+                    .filter_map(|path| self.node_index_for_raw_path(&path))
+                    .collect();
+
+            match base {
+                Some(base) => {
+                    let mut nodes = base;
+                    let allowed = spotlight_indices.iter().copied().collect::<HashSet<_>>();
+                    nodes.retain(|index| allowed.contains(index));
+                    nodes
+                }
+                None => spotlight_indices,
+            }
+        };
 
         Ok(token.is_cancelled().map(|()| matched_indices))
     }
@@ -874,16 +890,14 @@ impl SearchCache {
     fn node_tags_match(
         &self,
         path: &Path,
-        needles: &[String],
+        needle: &str,
         case_insensitive: bool,
         token: CancellationToken,
     ) -> Option<bool> {
         token.is_cancelled()?;
 
         let tags = read_tags_from_path(path, case_insensitive)?;
-        let matched = tags
-            .iter()
-            .any(|tag| needles.iter().any(|needle| tag.contains(needle.as_str())));
+        let matched = tags.iter().any(|tag| tag.contains(needle));
         Some(matched)
     }
 
