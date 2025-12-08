@@ -19,6 +19,11 @@ use std::{collections::BTreeSet, fs::File, io::Read, path::Path};
 
 pub(crate) const CONTENT_BUFFER_BYTES: usize = 64 * 1024;
 
+/// Threshold for switching from iterating file metadata to using Spotlight (mdfind).
+/// When the base set exceeds this size, Spotlight's indexed search is faster than
+/// reading xattr metadata for each file individually.
+const TAG_FILTER_MDFIND_THRESHOLD: usize = 10000;
+
 impl SearchCache {
     pub(crate) fn evaluate_expr(
         &mut self,
@@ -764,7 +769,7 @@ impl SearchCache {
 
         // If base is a small set, filtering it by accessing file metadata;
         // otherwise use mdfind to quickly narrow down.
-        let matched_indices = if nodes.len() <= 10000 {
+        let matched_indices = if nodes.len() <= TAG_FILTER_MDFIND_THRESHOLD {
             nodes
                 .into_iter()
                 .filter_map(|index| self.node_path(index).map(|path| (index, path)))

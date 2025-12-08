@@ -12,10 +12,10 @@ const USER_TAG_XATTR: &str = "com.apple.metadata:_kMDItemUserTags";
 ///
 /// Returns a vector of file paths that have the specified tag.
 pub fn search_tags_using_mdfind(tag: &str, case_insensitive: bool) -> io::Result<Vec<PathBuf>> {
-    if tag_has_spotlight_forbidden_chars(tag) {
+    if let Some(forbidden_char) = tag_has_spotlight_forbidden_chars(tag) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("tag filter contains characters unsupported: {tag}"),
+            format!("tag filter contains unsupported character '{forbidden_char}': {tag}"),
         ));
     }
 
@@ -33,8 +33,8 @@ pub fn search_tags_using_mdfind(tag: &str, case_insensitive: bool) -> io::Result
     Ok(paths)
 }
 
-fn tag_has_spotlight_forbidden_chars(tag: &str) -> bool {
-    tag.chars().any(|c| matches!(c, '\'' | '\\' | '*'))
+fn tag_has_spotlight_forbidden_chars(tag: &str) -> Option<char> {
+    tag.chars().find(|c| matches!(c, '\'' | '\\' | '*'))
 }
 
 /// Reads Finder-style user tags from an on-disk item.

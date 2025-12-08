@@ -8,7 +8,7 @@ Cardinal’s query language is intentionally close to Everything’s syntax, whi
 
 - Every query is parsed into a tree of:
   - **Words / phrases** (plain text, quoted strings, wildcards),
-- **Filters** (`ext:`, `type:`, `dm:`, `content:`, …),
+  - **Filters** (`ext:`, `type:`, `dm:`, `content:`, …),
   - **Boolean operators** (`AND`, `OR`, `NOT` / `!`).
 - Matching runs against the **full path** of every indexed file, not just the basename.
 - Case sensitivity is controlled by the UI toggle:

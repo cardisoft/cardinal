@@ -92,7 +92,7 @@ fn optimize_and(parts: Vec<Expr>) -> Expr {
         0 => Expr::Empty,
         1 => flattened.pop().unwrap(),
         _ => {
-            move_filters_to_tail(&mut flattened);
+            reorder_by_priority(&mut flattened);
             Expr::And(flattened)
         }
     }
@@ -122,10 +122,14 @@ fn optimize_or(parts: Vec<Expr>) -> Expr {
     }
 }
 
-/// Reorders filters so `infolder:` and `parent:` bubble to the front, generic
-/// filters come after any non-filter terms, and `tag:` operands always move to
-/// the very end of the conjunction.
-fn move_filters_to_tail(parts: &mut Vec<Expr>) {
+/// Reorders expression parts by priority to optimize query evaluation.
+///
+/// Priority levels (lower executes first):
+/// - 0: Scope filters (`infolder:`, `parent:`) - narrow search space first
+/// - 1: Non-filter terms (words, phrases, boolean ops) - cheap string matching
+/// - 2: Generic filters (`ext:`, `type:`, `size:`, etc.) - moderate cost
+/// - 3: Tag filters (`tag:`) - expensive metadata access, runs last
+fn reorder_by_priority(parts: &mut Vec<Expr>) {
     if parts.len() <= 1 {
         return;
     }
