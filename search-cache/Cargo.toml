@@ -28,6 +28,8 @@ regex = "1"
 jiff = "0.2"
 rayon = "1.9"
 slab-mmap = { path = "../slab-mmap" }
+xattr = "1.4"
+plist = "1.7"
 
 [dev-dependencies]
 tempdir = "0.3"

@@ -512,6 +512,13 @@ pub enum FilterKind {
     /// assert!(matches!(filter.kind, FilterKind::CaseSensitive));
     /// ```
     CaseSensitive,
+    /// Finder tag filter (`tag:`).
+    /// ```
+    /// use cardinal_syntax::{parse_query, Expr, Term, FilterKind};
+    /// let Expr::Term(Term::Filter(filter)) = parse_query("tag:Project").unwrap().expr else { panic!() };
+    /// assert!(matches!(filter.kind, FilterKind::Tag));
+    /// ```
+    Tag,
     /// Content search (`content:`).
     /// ```
     /// use cardinal_syntax::{parse_query, Expr, Term, FilterKind};
@@ -575,6 +582,7 @@ impl FilterKind {
             "orientation" => FilterKind::Orientation,
             "bitdepth" => FilterKind::BitDepth,
             "case" => FilterKind::CaseSensitive,
+            "tag" => FilterKind::Tag,
             "content" => FilterKind::Content,
             "nowholefilename" => FilterKind::NoWholeFilename,
             _ => FilterKind::Custom(name.to_string()),

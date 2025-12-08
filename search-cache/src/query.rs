@@ -10,13 +10,21 @@ use fswalk::NodeFileType;
 use hashbrown::HashSet;
 use jiff::{Timestamp, civil::Date, tz::TimeZone};
 use memchr::arch::all::rabinkarp;
+use plist::Value;
 use query_segmentation::query_segmentation;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use regex::RegexBuilder;
 use search_cancel::CancellationToken;
-use std::{collections::BTreeSet, fs::File, io::Read, path::Path};
+use std::{
+    collections::BTreeSet,
+    fs::File,
+    io::{Cursor, Read},
+    path::Path,
+};
+use xattr::get;
 
 pub(crate) const CONTENT_BUFFER_BYTES: usize = 64 * 1024;
+const USER_TAG_XATTR: &str = "com.apple.metadata:_kMDItemUserTags";
 
 impl SearchCache {
     pub(crate) fn evaluate_expr(
@@ -413,6 +421,13 @@ impl SearchCache {
                     .ok_or_else(|| anyhow!("content: requires a value"))?;
                 self.evaluate_content_filter(argument, base, options, token)
             }
+            FilterKind::Tag => {
+                let argument = filter
+                    .argument
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("tag: requires a value"))?;
+                self.evaluate_tag_filter(argument, base, options, token)
+            }
             _ => bail!("Filter {:?} is not supported yet", filter.kind),
         }
     }
@@ -729,6 +744,48 @@ impl SearchCache {
         Ok(token.is_cancelled().map(|()| matched_indices))
     }
 
+    fn evaluate_tag_filter(
+        &mut self,
+        argument: &FilterArgument,
+        base: Option<Vec<SlabIndex>>,
+        options: SearchOptions,
+        token: CancellationToken,
+    ) -> Result<Option<Vec<SlabIndex>>> {
+        let mut needles: Vec<String> = match &argument.kind {
+            ArgumentKind::List(values) => values
+                .iter()
+                .map(|value| value.trim().to_string())
+                .collect(),
+            _ => vec![argument.raw.trim().to_string()],
+        };
+        needles.retain(|value| !value.is_empty());
+        if needles.is_empty() {
+            bail!("tag: requires a value");
+        }
+
+        if options.case_insensitive {
+            for value in &mut needles {
+                *value = value.to_ascii_lowercase();
+            }
+        }
+
+        let Some(nodes) = self.nodes_from_base(base, token) else {
+            return Ok(None);
+        };
+
+        let matched_indices = nodes
+            .into_iter()
+            .filter_map(|index| self.node_path(index).map(|path| (index, path)))
+            .par_bridge()
+            .filter_map(|(index, path)| {
+                self.node_tags_match(&path, &needles, options.case_insensitive, token)?
+                    .then_some(index)
+            })
+            .collect();
+
+        Ok(token.is_cancelled().map(|()| matched_indices))
+    }
+
     /// user need to ensure that needle is lowercased when case_insensitive is set
     fn node_content_matches(
         &self,
@@ -821,6 +878,22 @@ impl SearchCache {
         Some(false)
     }
 
+    fn node_tags_match(
+        &self,
+        path: &Path,
+        needles: &[String],
+        case_insensitive: bool,
+        token: CancellationToken,
+    ) -> Option<bool> {
+        token.is_cancelled()?;
+
+        let tags = read_tags_from_path(path, case_insensitive)?;
+        let matched = tags
+            .iter()
+            .any(|tag| needles.iter().any(|needle| tag.contains(needle.as_str())));
+        Some(matched)
+    }
+
     fn nodes_from_base(
         &self,
         base: Option<Vec<SlabIndex>>,
@@ -856,6 +929,37 @@ impl SearchCache {
         };
         self.file_nodes[index].metadata = metadata;
         metadata
+    }
+}
+
+fn read_tags_from_path(path: &Path, case_insensitive: bool) -> Option<Vec<String>> {
+    let raw = match get(path, USER_TAG_XATTR) {
+        Ok(Some(data)) => data,
+        Ok(None) | Err(_) => Vec::new(),
+    };
+    Some(parse_tags(&raw, case_insensitive))
+}
+
+fn parse_tags(raw: &[u8], case_insensitive: bool) -> Vec<String> {
+    let Ok(Value::Array(items)) = Value::from_reader(Cursor::new(raw)) else {
+        return Vec::new();
+    };
+
+    items
+        .into_iter()
+        .filter_map(|value| match value {
+            Value::String(text) => Some(strip_tag_suffix(&text, case_insensitive)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn strip_tag_suffix(value: &str, case_insensitive: bool) -> String {
+    let name = value.split('\n').next().unwrap_or(value);
+    if case_insensitive {
+        name.to_ascii_lowercase()
+    } else {
+        name.to_string()
     }
 }
 

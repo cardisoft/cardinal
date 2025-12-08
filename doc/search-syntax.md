@@ -8,7 +8,7 @@ Cardinal’s query language is intentionally close to Everything’s syntax, whi
 
 - Every query is parsed into a tree of:
   - **Words / phrases** (plain text, quoted strings, wildcards),
-  - **Filters** (`ext:`, `type:`, `dm:`, `content:`, …),
+- **Filters** (`ext:`, `type:`, `dm:`, `content:`, …),
   - **Boolean operators** (`AND`, `OR`, `NOT` / `!`).
 - Matching runs against the **full path** of every indexed file, not just the basename.
 - Case sensitivity is controlled by the UI toggle:
@@ -265,6 +265,21 @@ type:doc content:"Q4 budget"
 ```
 
 Content matching is done in streaming fashion over the file; multi-byte sequences can span buffer boundaries.
+
+### 4.10 Tag filter: `tag:`
+
+Filters by Finder tags (macOS). Cardinal fetches tags on demand from the file’s metadata (no caching) and matches the needle against each tag name.
+
+- Accepts a single tag or a semicolon-delimited list: `tag:Project`, `tag:Project;Important`.
+- Case-sensitivity follows the UI toggle.
+- Matches tag names by substring: `tag:proj` matches `Project` and `project`.
+
+Examples:
+```text
+tag:Important
+tag:Project;Archive report
+infolder:/Users/demo/Documents tag:"Q4"
+```
 
 ---
 
