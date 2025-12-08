@@ -6,6 +6,7 @@ use anyhow::{Result, anyhow, bail};
 use cardinal_syntax::{
     ArgumentKind, ComparisonOp, Expr, Filter, FilterArgument, FilterKind, RangeSeparator, Term,
 };
+use file_tags::{read_tags_from_path, search_tags_using_mdfind};
 use fswalk::NodeFileType;
 use hashbrown::HashSet;
 use jiff::{Timestamp, civil::Date, tz::TimeZone};
@@ -17,6 +18,11 @@ use search_cancel::CancellationToken;
 use std::{collections::BTreeSet, fs::File, io::Read, path::Path};
 
 pub(crate) const CONTENT_BUFFER_BYTES: usize = 64 * 1024;
+
+/// Threshold for switching from iterating file metadata to using Spotlight (mdfind).
+/// When the base set exceeds this size, Spotlight's indexed search is faster than
+/// reading xattr metadata for each file individually.
+const TAG_FILTER_MDFIND_THRESHOLD: usize = 10000;
 
 impl SearchCache {
     pub(crate) fn evaluate_expr(
@@ -413,6 +419,13 @@ impl SearchCache {
                     .ok_or_else(|| anyhow!("content: requires a value"))?;
                 self.evaluate_content_filter(argument, base, options, token)
             }
+            FilterKind::Tag => {
+                let argument = filter
+                    .argument
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("tag: requires a value"))?;
+                self.evaluate_tag_filter(argument, base, options, token)
+            }
             _ => bail!("Filter {:?} is not supported yet", filter.kind),
         }
     }
@@ -729,6 +742,64 @@ impl SearchCache {
         Ok(token.is_cancelled().map(|()| matched_indices))
     }
 
+    fn evaluate_tag_filter(
+        &mut self,
+        argument: &FilterArgument,
+        base: Option<Vec<SlabIndex>>,
+        options: SearchOptions,
+        token: CancellationToken,
+    ) -> Result<Option<Vec<SlabIndex>>> {
+        if matches!(argument.kind, ArgumentKind::List(_)) {
+            bail!("tag: accepts a single value; chain multiple tag: filters for AND semantics");
+        }
+
+        let raw = argument.raw.trim();
+        if raw.is_empty() {
+            bail!("tag: requires a value");
+        }
+        let needle = if options.case_insensitive {
+            raw.to_ascii_lowercase()
+        } else {
+            raw.to_string()
+        };
+
+        let Some(nodes) = self.nodes_from_base(base.clone(), token) else {
+            return Ok(None);
+        };
+
+        // If base is a small set, filtering it by accessing file metadata;
+        // otherwise use mdfind to quickly narrow down.
+        let matched_indices = if nodes.len() <= TAG_FILTER_MDFIND_THRESHOLD {
+            nodes
+                .into_iter()
+                .filter_map(|index| self.node_path(index).map(|path| (index, path)))
+                .par_bridge()
+                .filter_map(|(index, path)| {
+                    self.node_tags_match(&path, &needle, options.case_insensitive, token)?
+                        .then_some(index)
+                })
+                .collect()
+        } else {
+            let spotlight_indices: Vec<SlabIndex> =
+                search_tags_using_mdfind(needle.as_str(), options.case_insensitive)?
+                    .into_iter()
+                    .filter_map(|path| self.node_index_for_raw_path(&path))
+                    .collect();
+
+            match base {
+                Some(base) => {
+                    let mut nodes = base;
+                    let allowed = spotlight_indices.iter().copied().collect::<HashSet<_>>();
+                    nodes.retain(|index| allowed.contains(index));
+                    nodes
+                }
+                None => spotlight_indices,
+            }
+        };
+
+        Ok(token.is_cancelled().map(|()| matched_indices))
+    }
+
     /// user need to ensure that needle is lowercased when case_insensitive is set
     fn node_content_matches(
         &self,
@@ -819,6 +890,20 @@ impl SearchCache {
         }
 
         Some(false)
+    }
+
+    fn node_tags_match(
+        &self,
+        path: &Path,
+        needle: &str,
+        case_insensitive: bool,
+        token: CancellationToken,
+    ) -> Option<bool> {
+        token.is_cancelled()?;
+
+        let tags = read_tags_from_path(path, case_insensitive)?;
+        let matched = tags.iter().any(|tag| tag.contains(needle));
+        Some(matched)
     }
 
     fn nodes_from_base(

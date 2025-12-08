@@ -47,6 +47,13 @@ fn content_filter_has_bare_argument() {
 }
 
 #[test]
+fn tag_filter_has_bare_argument() {
+    let expr = parse_ok("tag:Project");
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_raw(&expr, "Project");
+}
+
+#[test]
 fn phrase_argument_is_detected() {
     let expr = parse_ok("parent:\"/Users/demo\"");
     let (_, arg) = filter_kind(&expr);

@@ -54,8 +54,9 @@ impl Query {
 /// choose whether they want the raw Everything AST or a normalized shape that:
 /// - Removes `Expr::Empty` operands from conjunctions (returning `Expr::Empty`
 ///   or the lone operand when appropriate).
-/// - Moves all filters to the tail of AND chains so cheaper textual terms run
-///   first.
+/// - Reorders filters by cost: `infolder:` and `parent:` first (same priority),
+///   other filters next, and `tag:` always last. Non-filters stay between the
+///   scope filters and the remaining filter tail.
 /// - Collapses any OR chain containing `Expr::Empty` into a single
 ///   `Expr::Empty`, matching Cardinal's "empty means whole universe" semantics.
 ///
@@ -91,7 +92,7 @@ fn optimize_and(parts: Vec<Expr>) -> Expr {
         0 => Expr::Empty,
         1 => flattened.pop().unwrap(),
         _ => {
-            move_filters_to_tail(&mut flattened);
+            reorder_by_priority(&mut flattened);
             Expr::And(flattened)
         }
     }
@@ -121,41 +122,37 @@ fn optimize_or(parts: Vec<Expr>) -> Expr {
     }
 }
 
-/// Reorders `filter:` terms to the end of `parts`.
+/// Reorders expression parts by priority to optimize query evaluation.
 ///
-/// Returns `true` when any movement was performed so future optimizations could
-/// skip redundant work.
-fn move_filters_to_tail(parts: &mut Vec<Expr>) -> bool {
+/// Priority levels (lower executes first):
+/// - 0: Scope filters (`infolder:`, `parent:`) - narrow search space first
+/// - 1: Non-filter terms (words, phrases, boolean ops) - cheap string matching
+/// - 2: Generic filters (`ext:`, `type:`, `size:`, etc.) - moderate cost
+/// - 3: Tag filters (`tag:`) - expensive metadata access, runs last
+fn reorder_by_priority(parts: &mut Vec<Expr>) {
     if parts.len() <= 1 {
-        return false;
+        return;
     }
 
-    let Some(first) = parts.iter().position(is_filter_term) else {
-        return false;
+    let priority = |expr: &Expr| -> u8 {
+        match expr {
+            Expr::Term(Term::Filter(filter)) => match filter.kind {
+                FilterKind::InFolder | FilterKind::Parent => 0,
+                FilterKind::Tag => 3,
+                _ => 2,
+            },
+            _ => 1,
+        }
     };
 
-    if parts[first..].iter().all(is_filter_term) {
-        return false;
-    }
+    let mut keyed: Vec<_> = parts
+        .drain(..)
+        .map(|expr| (priority(&expr), expr))
+        .collect();
 
-    let mut reordered = Vec::with_capacity(parts.len());
-    let mut metadata = Vec::new();
+    keyed.sort_by_key(|(prio, _)| *prio);
 
-    for expr in parts.drain(..) {
-        if is_filter_term(&expr) {
-            metadata.push(expr);
-        } else {
-            reordered.push(expr);
-        }
-    }
-
-    parts.extend(reordered);
-    parts.extend(metadata);
-    true
-}
-
-fn is_filter_term(expr: &Expr) -> bool {
-    matches!(expr, Expr::Term(Term::Filter(_)))
+    parts.extend(keyed.into_iter().map(|(_, expr)| expr));
 }
 
 /// Logical structure for Everything queries.
@@ -512,6 +509,13 @@ pub enum FilterKind {
     /// assert!(matches!(filter.kind, FilterKind::CaseSensitive));
     /// ```
     CaseSensitive,
+    /// Finder tag filter (`tag:`).
+    /// ```
+    /// use cardinal_syntax::{parse_query, Expr, Term, FilterKind};
+    /// let Expr::Term(Term::Filter(filter)) = parse_query("tag:Project").unwrap().expr else { panic!() };
+    /// assert!(matches!(filter.kind, FilterKind::Tag));
+    /// ```
+    Tag,
     /// Content search (`content:`).
     /// ```
     /// use cardinal_syntax::{parse_query, Expr, Term, FilterKind};
@@ -575,6 +579,7 @@ impl FilterKind {
             "orientation" => FilterKind::Orientation,
             "bitdepth" => FilterKind::BitDepth,
             "case" => FilterKind::CaseSensitive,
+            "tag" => FilterKind::Tag,
             "content" => FilterKind::Content,
             "nowholefilename" => FilterKind::NoWholeFilename,
             _ => FilterKind::Custom(name.to_string()),

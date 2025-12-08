@@ -266,6 +266,21 @@ type:doc content:"Q4 budget"
 
 Content matching is done in streaming fashion over the file; multi-byte sequences can span buffer boundaries.
 
+### 4.10 Tag filter: `tag:`
+
+Filters by Finder tags (macOS). Cardinal fetches tags on demand from the file’s metadata (no caching) and matches the needle against each tag name.
+
+- Accepts one tag per filter. Chain multiple `tag:` filters (logical AND) for multi-tag matches: `tag:Project tag:Important`.
+- Case-sensitivity follows the UI toggle.
+- Matches tag names by substring: `tag:proj` matches `Project` and `project`.
+
+Examples:
+```text
+tag:Important
+tag:Project tag:Archive report
+infolder:/Users/demo/Documents tag:"Q4"
+```
+
 ---
 
 ## 5. Examples

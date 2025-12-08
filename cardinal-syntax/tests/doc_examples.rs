@@ -42,6 +42,7 @@ fn all_examples_parse() {
         Example("dm:today"),
         Example("dc:thisweek"),
         Example("dc:2023-01-01..2023-12-31"),
+        Example("tag:Project"),
         Example(r"parent:C:\\Windows"),
         Example(r"D:\\Music\\"),
         Example(r"D:\\Music\\ !child:*.mp3"),
