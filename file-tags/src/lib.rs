@@ -54,7 +54,7 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     fn bytes_to_hex(data: &[u8]) -> String {
-        data.iter().map(|b| format!("{:02X}", b)).collect()
+        data.iter().map(|b| format!("{b:02X}")).collect()
     }
 
     #[test]
