@@ -1105,6 +1105,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "file-tags"
+version = "0.1.0"
+dependencies = [
+ "plist",
+ "xattr",
+]
+
+[[package]]
 name = "find-msvc-tools"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3623,13 +3631,13 @@ dependencies = [
  "cardinal-syntax",
  "crossbeam-channel",
  "enumn",
+ "file-tags",
  "fswalk",
  "hashbrown 0.16.1",
  "itertools",
  "jiff",
  "memchr",
  "namepool",
- "plist",
  "postcard",
  "query-segmentation",
  "rayon",
@@ -3640,7 +3648,6 @@ dependencies = [
  "thin-vec",
  "tracing",
  "typed-num",
- "xattr",
  "zstd",
 ]
 

@@ -1,6 +1,6 @@
 #![cfg(target_os = "macos")]
 
-use plist::Value;
+use plist::{Value, to_writer_binary};
 use search_cache::{SearchCache, SearchOptions, SlabIndex};
 use search_cancel::CancellationToken;
 use std::{fs, path::Path};
@@ -21,7 +21,8 @@ fn write_tags(path: &Path, tags: &[&str]) {
         .iter()
         .map(|tag| Value::String(format!("{tag}\n0")))
         .collect();
-    let data = plist::to_bytes_binary(&Value::Array(values)).expect("serialize tags");
+    let mut data = Vec::new();
+    to_writer_binary(&mut data, &Value::Array(values)).expect("serialize tags");
     set(path, USER_TAG_XATTR, &data).expect("write tag xattr");
 }
 

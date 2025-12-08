@@ -6,25 +6,18 @@ use anyhow::{Result, anyhow, bail};
 use cardinal_syntax::{
     ArgumentKind, ComparisonOp, Expr, Filter, FilterArgument, FilterKind, RangeSeparator, Term,
 };
+use file_tags::read_tags_from_path;
 use fswalk::NodeFileType;
 use hashbrown::HashSet;
 use jiff::{Timestamp, civil::Date, tz::TimeZone};
 use memchr::arch::all::rabinkarp;
-use plist::Value;
 use query_segmentation::query_segmentation;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use regex::RegexBuilder;
 use search_cancel::CancellationToken;
-use std::{
-    collections::BTreeSet,
-    fs::File,
-    io::{Cursor, Read},
-    path::Path,
-};
-use xattr::get;
+use std::{collections::BTreeSet, fs::File, io::Read, path::Path};
 
 pub(crate) const CONTENT_BUFFER_BYTES: usize = 64 * 1024;
-const USER_TAG_XATTR: &str = "com.apple.metadata:_kMDItemUserTags";
 
 impl SearchCache {
     pub(crate) fn evaluate_expr(
@@ -929,37 +922,6 @@ impl SearchCache {
         };
         self.file_nodes[index].metadata = metadata;
         metadata
-    }
-}
-
-fn read_tags_from_path(path: &Path, case_insensitive: bool) -> Option<Vec<String>> {
-    let raw = match get(path, USER_TAG_XATTR) {
-        Ok(Some(data)) => data,
-        Ok(None) | Err(_) => Vec::new(),
-    };
-    Some(parse_tags(&raw, case_insensitive))
-}
-
-fn parse_tags(raw: &[u8], case_insensitive: bool) -> Vec<String> {
-    let Ok(Value::Array(items)) = Value::from_reader(Cursor::new(raw)) else {
-        return Vec::new();
-    };
-
-    items
-        .into_iter()
-        .filter_map(|value| match value {
-            Value::String(text) => Some(strip_tag_suffix(&text, case_insensitive)),
-            _ => None,
-        })
-        .collect()
-}
-
-fn strip_tag_suffix(value: &str, case_insensitive: bool) -> String {
-    let name = value.split('\n').next().unwrap_or(value);
-    if case_insensitive {
-        name.to_ascii_lowercase()
-    } else {
-        name.to_string()
     }
 }
 

@@ -7,6 +7,7 @@ members = [
   "namepool",
   "was",
   "fs-icon",
+  "file-tags",
   "query-segmentation",
   "cardinal-syntax",
   "search-cancel",

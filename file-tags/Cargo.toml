@@ -1,0 +1,11 @@
+[package]
+name = "file-tags"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+plist = "1.7"
+xattr = "1.4"
+
+[dev-dependencies]
+tempfile = "3.10"
