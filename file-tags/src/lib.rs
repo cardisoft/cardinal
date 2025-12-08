@@ -20,18 +20,15 @@ pub fn search_tags_using_mdfind(tag: &str, case_insensitive: bool) -> io::Result
     }
 
     let modifier = if case_insensitive { "c" } else { "" };
-    let query = format!("kMDItemUserTags == '*{}*'{}", tag, modifier);
+    let query = format!("kMDItemUserTags == '*{tag}*'{modifier}");
     let output = Command::new("mdfind").arg(query).output()?;
 
     if !output.status.success() {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            "mdfind command failed",
-        ));
+        return Err(io::Error::other("mdfind command failed"));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let paths = stdout.lines().map(|line| PathBuf::from(line)).collect();
+    let paths = stdout.lines().map(PathBuf::from).collect();
 
     Ok(paths)
 }

@@ -785,7 +785,7 @@ fn tag_mdfind_speed() {
         CancellationToken::noop(),
     ));
     let elapsed = now.elapsed();
-    println!("mdfind search took: {:?}", elapsed);
+    println!("mdfind search took: {elapsed:?}");
     assert!(elapsed.as_secs() < 1, "Search using mdfind took too long");
 }
 
@@ -802,7 +802,7 @@ fn tag_filter_very_long_tag_name() {
 
     let mut cache = SearchCache::walk_fs(dir.to_path_buf());
     let indices = guard_indices(cache.search_with_options(
-        &format!("tag:{}", long_tag),
+        &format!("tag:{long_tag}"),
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
@@ -879,7 +879,7 @@ fn tag_filter_performance_many_files() {
     let dir = temp_dir.path();
 
     for i in 0..100 {
-        let file = dir.join(format!("file{}.txt", i));
+        let file = dir.join(format!("file{i}.txt"));
         fs::write(&file, b"dummy").unwrap();
         if i % 3 == 0 {
             write_tags(&file, &["Project"]);
