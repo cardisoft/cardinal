@@ -272,11 +272,11 @@ button {
   cursor: pointer;
 }
 
-button:hover {
+button:hover:not(:disabled) {
   border-color: var(--color-accent);
 }
 
-button:active {
+button:active:not(:disabled) {
   border-color: var(--color-accent);
   background-color: #e9ecef;
 }
@@ -546,6 +546,7 @@ button:active {
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
+  pointer-events: none;
 }
 
 .sort-indicator {
@@ -555,6 +556,7 @@ button:active {
   flex-shrink: 0;
   margin-left: auto;
   color: var(--color-header);
+  pointer-events: none;
 }
 
 .sort-indicator--active {
@@ -891,7 +893,7 @@ button:active {
   }
 
   /* Preserve dark active background */
-  :root:not([data-theme]) button:active {
+  :root:not([data-theme]) button:active:not(:disabled) {
     background-color: #343a40;
   }
 
@@ -973,7 +975,7 @@ button:active {
 }
 
 /* Preserve dark active background */
-[data-theme='dark'] button:active {
+[data-theme='dark'] button:active:not(:disabled) {
   background-color: #343a40;
 }
 

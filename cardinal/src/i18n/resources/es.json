@@ -22,7 +22,7 @@
     "created": "Creado"
   },
   "sorting": {
-    "disabled": "Hay más de {{limit}} resultados. No se puede ordenar."
+    "disabled": "La ordenación está deshabilitada. Demasiados resultados ({{limit}}+) pueden afectar el rendimiento. Puede ajustar el umbral en Preferencias."
   },
   "events": {
     "columns": {
