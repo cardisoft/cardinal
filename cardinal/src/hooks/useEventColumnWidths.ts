@@ -28,10 +28,15 @@ export function useEventColumnWidths() {
       e.preventDefault();
       e.stopPropagation();
 
+      const resizerElement = e.currentTarget;
       const startX = e.clientX;
       const startWidth = eventColWidths[key];
 
+      resizerElement.classList.add('col-resizer--dragging');
+
       const handleMouseMove = (moveEvent: MouseEvent) => {
+        moveEvent.preventDefault();
+        document.body.style.cursor = 'col-resize';
         const delta = moveEvent.clientX - startX;
         const newWidth = clampWidth(startWidth + delta);
         setEventColWidths((prev) => ({ ...prev, [key]: newWidth }));
@@ -42,6 +47,7 @@ export function useEventColumnWidths() {
         document.removeEventListener('mouseup', handleMouseUp);
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
+        resizerElement.classList.remove('col-resizer--dragging');
       };
 
       document.addEventListener('mousemove', handleMouseMove);

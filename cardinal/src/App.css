@@ -82,8 +82,6 @@
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
-  /* Disable the text cursor; interactive elements override this. */
-  cursor: default;
   overscroll-behavior: none;
   /* Prevent Safari WebView rubber-band scrolling. */
   -webkit-overflow-scrolling: touch;
@@ -483,9 +481,8 @@ button:active:not(:disabled) {
 
 .col-resizer {
   position: absolute;
-  right: -6px;
   top: 0;
-  width: 12px;
+  width: 6px;
   height: 100%;
   cursor: col-resize;
   user-select: none;
@@ -495,22 +492,24 @@ button:active:not(:disabled) {
   content: '';
   position: absolute;
   left: 50%;
-  top: 15%;
-  bottom: 15%;
+  top: 0;
+  bottom: 0;
   width: 1px;
-  height: 100%;
   transform: translateX(-0.5px);
   background-color: var(--color-resizer);
   /* resizer line color */
-  opacity: 0.95;
+  opacity: 0.5;
   transition:
-    background-color 0.15s ease,
+    background-color 0.3s ease,
     width 0.1s ease,
     opacity 0.15s ease;
 }
 
-.col-resizer:hover::before {
-  width: 2px;
+.col-resizer:hover::before,
+.col-resizer--dragging::before {
+  width: 3px;
+  /* offset: (3px - 1px) / 2 */
+  left: calc(50% - 1px);
   background-color: var(--color-accent);
   /* accent on hover */
 }
@@ -530,11 +529,12 @@ button:active:not(:disabled) {
   width: 100%;
   justify-content: flex-start;
   text-align: left;
-  cursor: default;
+  cursor: pointer;
 }
 
 .sort-button:disabled {
   opacity: 0.75;
+  cursor: default;
 }
 
 .sort-button:focus-visible {
