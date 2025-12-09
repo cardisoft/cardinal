@@ -22,7 +22,7 @@
     "created": "Erstellt"
   },
   "sorting": {
-    "disabled": "Mehr als {{limit}} Ergebnisse. Sortieren ist nicht möglich."
+    "disabled": "Sortieren ist deaktiviert. Zu viele Ergebnisse ({{limit}}+) können die Leistung beeinträchtigen. Sie können den Schwellenwert in den Einstellungen anpassen."
   },
   "events": {
     "columns": {

@@ -22,7 +22,7 @@
     "created": "Créé"
   },
   "sorting": {
-    "disabled": "Plus de {{limit}} résultats. Le tri est indisponible."
+    "disabled": "Le tri est désactivé. Trop de résultats ({{limit}}+) peuvent affecter les performances. Vous pouvez ajuster le seuil dans les Préférences."
   },
   "events": {
     "columns": {

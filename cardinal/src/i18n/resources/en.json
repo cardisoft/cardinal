@@ -22,7 +22,7 @@
     "created": "Created"
   },
   "sorting": {
-    "disabled": "More than {{limit}} results. Sorting is unavailable."
+    "disabled": "Sorting is disabled. Too many results ({{limit}}+) may impact performance. You can adjust the threshold in Preferences."
   },
   "events": {
     "columns": {
