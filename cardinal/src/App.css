@@ -481,9 +481,8 @@ button:active:not(:disabled) {
 
 .col-resizer {
   position: absolute;
-  right: -6px;
   top: 0;
-  width: 12px;
+  width: 6px;
   height: 100%;
   cursor: col-resize;
   user-select: none;
@@ -502,13 +501,16 @@ button:active:not(:disabled) {
   /* resizer line color */
   opacity: 0.95;
   transition:
-    background-color 0.15s ease,
+    background-color 0.3s ease,
     width 0.1s ease,
     opacity 0.15s ease;
 }
 
-.col-resizer:hover::before {
-  width: 2px;
+.col-resizer:hover::before,
+.col-resizer--dragging::before {
+  width: 3px;
+  /* offset: (3px - 1px) / 2 */
+  left: calc(50% - 1px);
   background-color: var(--color-accent);
   /* accent on hover */
 }

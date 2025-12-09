@@ -16,8 +16,11 @@ export function useColumnResize() {
       e.preventDefault();
       e.stopPropagation();
 
+      const resizerElement = e.currentTarget;
       const startX = e.clientX;
       const startWidth = colWidths[key];
+
+      resizerElement.classList.add('col-resizer--dragging');
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         moveEvent.preventDefault();
@@ -32,6 +35,7 @@ export function useColumnResize() {
         document.removeEventListener('mouseup', handleMouseUp);
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
+        resizerElement.classList.remove('col-resizer--dragging');
       };
 
       document.addEventListener('mousemove', handleMouseMove);
