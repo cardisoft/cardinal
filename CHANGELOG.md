@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.17 — 2025-12-10
+- Add `tag:` filter support so Finder tags can scope searches.
+- Better i18n support.
+- Improve the column resizing experience
+- Improve the sorting experience
+
 ## 0.1.16 — 2025-12-08
 - Improve sort order so directories are prioritized and folder size ranking stays stable.
 - Refine selection handling for smoother keyboard and pointer interactions.
