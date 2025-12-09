@@ -492,14 +492,13 @@ button:active:not(:disabled) {
   content: '';
   position: absolute;
   left: 50%;
-  top: 15%;
-  bottom: 15%;
+  top: 0;
+  bottom: 0;
   width: 1px;
-  height: 100%;
   transform: translateX(-0.5px);
   background-color: var(--color-resizer);
   /* resizer line color */
-  opacity: 0.95;
+  opacity: 0.5;
   transition:
     background-color 0.3s ease,
     width 0.1s ease,
