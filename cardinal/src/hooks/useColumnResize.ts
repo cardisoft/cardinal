@@ -20,6 +20,8 @@ export function useColumnResize() {
       const startWidth = colWidths[key];
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
+        moveEvent.preventDefault();
+        document.body.style.cursor = 'col-resize';
         const delta = moveEvent.clientX - startX;
         const newWidth = Math.max(MIN_COL_WIDTH, Math.min(MAX_COL_WIDTH, startWidth + delta));
         setColWidths((prev) => ({ ...prev, [key]: newWidth }));

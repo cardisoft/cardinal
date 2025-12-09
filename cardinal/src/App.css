@@ -82,8 +82,6 @@
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
-  /* Disable the text cursor; interactive elements override this. */
-  cursor: default;
   overscroll-behavior: none;
   /* Prevent Safari WebView rubber-band scrolling. */
   -webkit-overflow-scrolling: touch;
@@ -530,11 +528,12 @@ button:active:not(:disabled) {
   width: 100%;
   justify-content: flex-start;
   text-align: left;
-  cursor: default;
+  cursor: pointer;
 }
 
 .sort-button:disabled {
   opacity: 0.75;
+  cursor: default;
 }
 
 .sort-button:focus-visible {

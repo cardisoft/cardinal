@@ -32,6 +32,8 @@ export function useEventColumnWidths() {
       const startWidth = eventColWidths[key];
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
+        moveEvent.preventDefault();
+        document.body.style.cursor = 'col-resize';
         const delta = moveEvent.clientX - startX;
         const newWidth = clampWidth(startWidth + delta);
         setEventColWidths((prev) => ({ ...prev, [key]: newWidth }));
