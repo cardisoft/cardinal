@@ -59,30 +59,30 @@ async function buildAppMenu(): Promise<void> {
     id: 'menu.edit',
     text: i18n.t('menu.edit'),
     items: [
-      await PredefinedMenuItem.new({ item: 'Undo' }),
-      await PredefinedMenuItem.new({ item: 'Redo' }),
+      await PredefinedMenuItem.new({ item: 'Undo', text: i18n.t('menu.undo') }),
+      await PredefinedMenuItem.new({ item: 'Redo', text: i18n.t('menu.redo') }),
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      await PredefinedMenuItem.new({ item: 'Cut' }),
-      await PredefinedMenuItem.new({ item: 'Copy' }),
-      await PredefinedMenuItem.new({ item: 'Paste' }),
-      await PredefinedMenuItem.new({ item: 'SelectAll' }),
+      await PredefinedMenuItem.new({ item: 'Cut', text: i18n.t('menu.cut') }),
+      await PredefinedMenuItem.new({ item: 'Copy', text: i18n.t('menu.copy') }),
+      await PredefinedMenuItem.new({ item: 'Paste', text: i18n.t('menu.paste') }),
+      await PredefinedMenuItem.new({ item: 'SelectAll', text: i18n.t('menu.selectAll') }),
     ],
   });
 
   const viewSubmenu = await Submenu.new({
     id: 'menu.view',
     text: i18n.t('menu.view'),
-    items: [await PredefinedMenuItem.new({ item: 'Fullscreen' })],
+    items: [await PredefinedMenuItem.new({ item: 'Fullscreen', text: i18n.t('menu.fullscreen') })],
   });
 
   const windowSubmenu = await Submenu.new({
     id: 'menu.window',
     text: i18n.t('menu.window'),
     items: [
-      await PredefinedMenuItem.new({ item: 'Minimize' }),
-      await PredefinedMenuItem.new({ item: 'Maximize' }),
+      await PredefinedMenuItem.new({ item: 'Minimize', text: i18n.t('menu.minimize') }),
+      await PredefinedMenuItem.new({ item: 'Maximize', text: i18n.t('menu.maximize') }),
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      await PredefinedMenuItem.new({ item: 'CloseWindow' }),
+      await PredefinedMenuItem.new({ item: 'CloseWindow', text: i18n.t('menu.closeWindow') }),
     ],
   });
 
