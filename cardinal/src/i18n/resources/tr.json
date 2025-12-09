@@ -1,0 +1,131 @@
+{
+  "search": {
+    "placeholder": {
+      "files": "Dosya ve klasör arayın...",
+      "events": "Olayları yol veya ada göre filtreleyin..."
+    },
+    "options": {
+      "caseSensitive": "Büyük/küçük harfe duyarlı eşleşmeyi değiştir"
+    }
+  },
+  "stateDisplay": {
+    "loading": "Aranıyor...",
+    "error": "Arama hatası",
+    "emptyTitle": "\"{{query}}\" için sonuç yok",
+    "emptyMessage": "Anahtar kelimeleri veya filtreleri değiştirmeyi deneyin."
+  },
+  "columns": {
+    "filename": "Dosya adı",
+    "path": "Yol",
+    "size": "Boyut",
+    "modified": "Değiştirildi",
+    "created": "Oluşturuldu"
+  },
+  "sorting": {
+    "disabled": "Sıralama devre dışı. Çok fazla sonuç ({{limit}}+) performansı etkileyebilir. Eşiği Tercihler'de ayarlayabilirsiniz."
+  },
+  "events": {
+    "columns": {
+      "time": "Saat",
+      "event": "Olay",
+      "name": "Dosya adı",
+      "path": "Yol"
+    },
+    "empty": {
+      "title": "Henüz son olay yok.",
+      "hint": "Çalışmaya devam edin ve sonra tekrar kontrol edin."
+    }
+  },
+  "contextMenu": {
+    "openItem": "Aç",
+    "quickLook": "Hızlı Bakış",
+    "revealInFinder": "Finder'da göster",
+    "copyPath": "Yolu kopyala",
+    "copyFilename": "Dosya adını kopyala",
+    "resetColumnWidths": "Sütun genişliklerini sıfırla"
+  },
+  "statusBar": {
+    "tabs": {
+      "files": "Dosyalar",
+      "events": "Olaylar"
+    },
+    "lifecycle": {
+      "Initializing": "Başlatılıyor",
+      "Updating": "Güncelleniyor",
+      "Ready": "Hazır"
+    },
+    "aria": {
+      "status": "Uygulama durumu: {{status}}",
+      "tablist": "Arama durumu görünümü",
+      "rescan": "Dosya sistemini yeniden tara",
+      "settings": "Tercihleri aç"
+    },
+    "rescan": {
+      "disabledHint": "Cardinal hazır olduğunda yeniden tarama kullanılabilir.",
+      "enabledHint": "Dosya sistemini tamamen tara."
+    },
+    "searchLabel": "Arama:",
+    "resultsUnavailable": "—",
+    "resultsCount_one": "{{formatted}} sonuç",
+    "resultsCount_other": "{{formatted}} sonuç",
+    "duration": "{{value}} ms",
+    "resultsWithDuration": "{{results}} • {{duration}}",
+    "resultsTitle": "Sonuçlar • Süre"
+  },
+  "app": {
+    "fullDiskAccess": {
+      "title": "Tam Disk Erişimi gerekli",
+      "description": "Cardinal'in sistem genelindeki dosyaları dizine ekleyip izlemesi için macOS Tam Disk Erişimi gerekir. Lütfen Sistem Ayarları'nda Cardinal'e izin verin.",
+      "steps": {
+        "one": "Sistem Ayarları > Gizlilik ve Güvenlik > Tam Disk Erişimi'ni açın.",
+        "two": "Kilidi açıp değişikliklere izin verin ve Cardinal'i etkinleştirin.",
+        "three": "İstendiğinde macOS'un Cardinal'i yeniden başlatmasına izin verin."
+      },
+      "status": {
+        "checking": "İzin durumu kontrol ediliyor...",
+        "disabled": "Tam Disk Erişimi devre dışı."
+      },
+      "openSettings": "Sistem Ayarlarını aç"
+    }
+  },
+  "menu": {
+    "about": "{{appName}} Hakkında",
+    "preferences": "Tercihler",
+    "hide": "Gizle",
+    "quit": "{{appName}} uygulamasından çık",
+    "edit": "Düzenle",
+    "view": "Görünüm",
+    "window": "Pencere",
+    "help": "Yardım",
+    "getUpdates": "Güncellemeleri al"
+  },
+  "preferences": {
+    "title": "Tercihler",
+    "heading": "Cardinal'i kişiselleştir",
+    "subtitle": "Görünüm ve dili istediğin gibi ayarla.",
+    "appearance": "Görünüm",
+    "themeHint": "Açık, koyu veya sistem varsayılanını seç.",
+    "language": "Dil",
+    "languageHint": "Arayüz dilini anında değiştir.",
+    "sortingLimit": {
+      "label": "Sıralama sınırı"
+    },
+    "close": "Kapat"
+  },
+  "language": {
+    "label": "Dil",
+    "separator": ":",
+    "trigger": "🌐"
+  },
+  "theme": {
+    "label": "Tema",
+    "options": {
+      "system": "Sistem varsayılanı",
+      "light": "Açık",
+      "dark": "Koyu"
+    }
+  },
+  "tray": {
+    "quit": "Cardinal'den çık"
+  }
+}

@@ -3,13 +3,33 @@ import { initReactI18next } from 'react-i18next';
 import en from './resources/en.json';
 import zh from './resources/zh.json';
 import ja from './resources/ja.json';
+import ko from './resources/ko.json';
 import fr from './resources/fr.json';
 import es from './resources/es.json';
+import pt from './resources/pt.json';
 import de from './resources/de.json';
+import it from './resources/it.json';
 import ru from './resources/ru.json';
 import uk from './resources/uk.json';
+import ar from './resources/ar.json';
+import hi from './resources/hi.json';
+import tr from './resources/tr.json';
 
-export type SupportedLanguage = 'en' | 'zh' | 'ja' | 'fr' | 'es' | 'de' | 'ru' | 'uk';
+export type SupportedLanguage =
+  | 'en'
+  | 'zh'
+  | 'ja'
+  | 'ko'
+  | 'fr'
+  | 'es'
+  | 'pt'
+  | 'de'
+  | 'it'
+  | 'ru'
+  | 'uk'
+  | 'ar'
+  | 'hi'
+  | 'tr';
 
 type LanguageOption = {
   code: SupportedLanguage;
@@ -20,11 +40,17 @@ export const LANGUAGE_OPTIONS: LanguageOption[] = [
   { code: 'en', label: 'English' },
   { code: 'zh', label: '中文' },
   { code: 'ja', label: '日本語' },
+  { code: 'ko', label: '한국어' },
   { code: 'fr', label: 'Français' },
   { code: 'es', label: 'Español' },
+  { code: 'pt', label: 'Português' },
   { code: 'de', label: 'Deutsch' },
+  { code: 'it', label: 'Italiano' },
   { code: 'ru', label: 'Русский' },
   { code: 'uk', label: 'Українська' },
+  { code: 'ar', label: 'العربية' },
+  { code: 'hi', label: 'हिन्दी' },
+  { code: 'tr', label: 'Türkçe' },
 ];
 
 const STORAGE_KEY = 'cardinal.language';
@@ -34,11 +60,17 @@ const resources = {
   en: { translation: en },
   zh: { translation: zh },
   ja: { translation: ja },
+  ko: { translation: ko },
   fr: { translation: fr },
   es: { translation: es },
+  pt: { translation: pt },
   de: { translation: de },
+  it: { translation: it },
   ru: { translation: ru },
   uk: { translation: uk },
+  ar: { translation: ar },
+  hi: { translation: hi },
+  tr: { translation: tr },
 } as const;
 
 const detectInitialLanguage = (): SupportedLanguage => {

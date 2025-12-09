@@ -1,0 +1,131 @@
+{
+  "search": {
+    "placeholder": {
+      "files": "Cerca file e cartelle...",
+      "events": "Filtra eventi per percorso o nome..."
+    },
+    "options": {
+      "caseSensitive": "Attiva/disattiva distinzione tra maiuscole e minuscole"
+    }
+  },
+  "stateDisplay": {
+    "loading": "Ricerca in corso...",
+    "error": "Errore di ricerca",
+    "emptyTitle": "Nessun risultato per \"{{query}}\"",
+    "emptyMessage": "Prova a modificare parole chiave o filtri."
+  },
+  "columns": {
+    "filename": "Nome file",
+    "path": "Percorso",
+    "size": "Dimensione",
+    "modified": "Modificato",
+    "created": "Creato"
+  },
+  "sorting": {
+    "disabled": "L'ordinamento è disattivato. Troppi risultati ({{limit}}+) potrebbero influire sulle prestazioni. Puoi regolare la soglia in Preferenze."
+  },
+  "events": {
+    "columns": {
+      "time": "Ora",
+      "event": "Evento",
+      "name": "Nome",
+      "path": "Percorso"
+    },
+    "empty": {
+      "title": "Nessun evento recente ancora.",
+      "hint": "Continua a lavorare e torna più tardi."
+    }
+  },
+  "contextMenu": {
+    "openItem": "Apri",
+    "quickLook": "Anteprima rapida",
+    "revealInFinder": "Mostra nel Finder",
+    "copyPath": "Copia percorso",
+    "copyFilename": "Copia nome file",
+    "resetColumnWidths": "Reimposta larghezze colonne"
+  },
+  "statusBar": {
+    "tabs": {
+      "files": "File",
+      "events": "Eventi"
+    },
+    "lifecycle": {
+      "Initializing": "Inizializzazione",
+      "Updating": "Aggiornamento",
+      "Ready": "Pronto"
+    },
+    "aria": {
+      "status": "Stato applicazione: {{status}}",
+      "tablist": "Vista stato ricerca",
+      "rescan": "Avvia nuova scansione del file system",
+      "settings": "Apri preferenze"
+    },
+    "rescan": {
+      "disabledHint": "La nuova scansione sarà disponibile quando Cardinal è pronto.",
+      "enabledHint": "Avvia una scansione completa del file system."
+    },
+    "searchLabel": "Ricerca:",
+    "resultsUnavailable": "—",
+    "resultsCount_one": "{{formatted}} risultato",
+    "resultsCount_other": "{{formatted}} risultati",
+    "duration": "{{value}} ms",
+    "resultsWithDuration": "{{results}} • {{duration}}",
+    "resultsTitle": "Risultati • Durata"
+  },
+  "app": {
+    "fullDiskAccess": {
+      "title": "È necessario l'accesso completo al disco",
+      "description": "Cardinal necessita dell'accesso completo al disco di macOS per indicizzare e monitorare i file in tutto il sistema. Abilita l'accesso per Cardinal in Impostazioni di sistema.",
+      "steps": {
+        "one": "Apri Impostazioni di sistema > Privacy e sicurezza > Accesso completo al disco.",
+        "two": "Fai clic sul lucchetto per consentire modifiche e abilita Cardinal.",
+        "three": "Quando richiesto, consenti a macOS di riavviare Cardinal."
+      },
+      "status": {
+        "checking": "Verifica dello stato delle autorizzazioni...",
+        "disabled": "L'accesso completo al disco è disattivato."
+      },
+      "openSettings": "Apri Impostazioni di sistema"
+    }
+  },
+  "menu": {
+    "about": "Informazioni su {{appName}}",
+    "preferences": "Preferenze",
+    "hide": "Nascondi",
+    "quit": "Esci da {{appName}}",
+    "edit": "Modifica",
+    "view": "Vista",
+    "window": "Finestra",
+    "help": "Aiuto",
+    "getUpdates": "Ricevi aggiornamenti"
+  },
+  "preferences": {
+    "title": "Preferenze",
+    "heading": "Personalizza Cardinal",
+    "subtitle": "Regola aspetto e lingua come preferisci.",
+    "appearance": "Aspetto",
+    "themeHint": "Scegli chiaro, scuro o segui il sistema.",
+    "language": "Lingua",
+    "languageHint": "Cambia istantaneamente la lingua dell'interfaccia.",
+    "sortingLimit": {
+      "label": "Limite ordinamento"
+    },
+    "close": "Chiudi"
+  },
+  "language": {
+    "label": "Lingua",
+    "separator": ":",
+    "trigger": "🌐"
+  },
+  "theme": {
+    "label": "Tema",
+    "options": {
+      "system": "Predefinito di sistema",
+      "light": "Chiaro",
+      "dark": "Scuro"
+    }
+  },
+  "tray": {
+    "quit": "Esci da Cardinal"
+  }
+}

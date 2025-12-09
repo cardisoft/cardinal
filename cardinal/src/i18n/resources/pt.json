@@ -1,0 +1,131 @@
+{
+  "search": {
+    "placeholder": {
+      "files": "Buscar por arquivos e pastas...",
+      "events": "Filtrar eventos por caminho ou nome..."
+    },
+    "options": {
+      "caseSensitive": "Alternar correspondência sensível a maiúsculas"
+    }
+  },
+  "stateDisplay": {
+    "loading": "Pesquisando...",
+    "error": "Erro na busca",
+    "emptyTitle": "Nenhum resultado para \"{{query}}\"",
+    "emptyMessage": "Tente ajustar suas palavras-chave ou filtros."
+  },
+  "columns": {
+    "filename": "Nome do arquivo",
+    "path": "Caminho",
+    "size": "Tamanho",
+    "modified": "Modificado",
+    "created": "Criado"
+  },
+  "sorting": {
+    "disabled": "A ordenação está desativada. Muitos resultados ({{limit}}+) podem afetar o desempenho. Ajuste o limite em Preferências."
+  },
+  "events": {
+    "columns": {
+      "time": "Hora",
+      "event": "Evento",
+      "name": "Nome",
+      "path": "Caminho"
+    },
+    "empty": {
+      "title": "Ainda não há eventos recentes.",
+      "hint": "Continue trabalhando e volte para conferir."
+    }
+  },
+  "contextMenu": {
+    "openItem": "Abrir",
+    "quickLook": "Visualização rápida",
+    "revealInFinder": "Mostrar no Finder",
+    "copyPath": "Copiar caminho",
+    "copyFilename": "Copiar nome",
+    "resetColumnWidths": "Redefinir larguras das colunas"
+  },
+  "statusBar": {
+    "tabs": {
+      "files": "Arquivos",
+      "events": "Eventos"
+    },
+    "lifecycle": {
+      "Initializing": "Inicializando",
+      "Updating": "Atualizando",
+      "Ready": "Pronto"
+    },
+    "aria": {
+      "status": "Status do aplicativo: {{status}}",
+      "tablist": "Visão de status da busca",
+      "rescan": "Iniciar nova varredura do sistema de arquivos",
+      "settings": "Abrir preferências"
+    },
+    "rescan": {
+      "disabledHint": "A varredura fica disponível quando o Cardinal estiver pronto.",
+      "enabledHint": "Iniciar uma varredura completa do sistema de arquivos."
+    },
+    "searchLabel": "Busca:",
+    "resultsUnavailable": "—",
+    "resultsCount_one": "{{formatted}} resultado",
+    "resultsCount_other": "{{formatted}} resultados",
+    "duration": "{{value}} ms",
+    "resultsWithDuration": "{{results}} • {{duration}}",
+    "resultsTitle": "Resultados • Duração"
+  },
+  "app": {
+    "fullDiskAccess": {
+      "title": "É necessário Acesso Total ao Disco",
+      "description": "O Cardinal precisa do Acesso Total ao Disco do macOS para indexar e monitorar arquivos em todo o sistema. Ative o acesso para o Cardinal nos Ajustes do Sistema.",
+      "steps": {
+        "one": "Abra Ajustes do Sistema > Privacidade e Segurança > Acesso Total ao Disco.",
+        "two": "Clique no cadeado para permitir alterações e habilite o Cardinal.",
+        "three": "Quando solicitado, permita que o macOS reinicie o Cardinal."
+      },
+      "status": {
+        "checking": "Verificando status da permissão...",
+        "disabled": "O Acesso Total ao Disco está desativado."
+      },
+      "openSettings": "Abrir Ajustes do Sistema"
+    }
+  },
+  "menu": {
+    "about": "Sobre {{appName}}",
+    "preferences": "Preferências",
+    "hide": "Ocultar",
+    "quit": "Sair do {{appName}}",
+    "edit": "Editar",
+    "view": "Visualizar",
+    "window": "Janela",
+    "help": "Ajuda",
+    "getUpdates": "Obter atualizações"
+  },
+  "preferences": {
+    "title": "Preferências",
+    "heading": "Deixe o Cardinal com a sua cara",
+    "subtitle": "Ajuste aparência e idioma como preferir.",
+    "appearance": "Aparência",
+    "themeHint": "Escolha claro, escuro ou seguir o sistema.",
+    "language": "Idioma",
+    "languageHint": "Altere o idioma da interface instantaneamente.",
+    "sortingLimit": {
+      "label": "Limite de ordenação"
+    },
+    "close": "Fechar"
+  },
+  "language": {
+    "label": "Idioma",
+    "separator": ":",
+    "trigger": "🌐"
+  },
+  "theme": {
+    "label": "Tema",
+    "options": {
+      "system": "Padrão do sistema",
+      "light": "Claro",
+      "dark": "Escuro"
+    }
+  },
+  "tray": {
+    "quit": "Sair do Cardinal"
+  }
+}
