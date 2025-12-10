@@ -19,7 +19,7 @@ export type SelectionController = {
   handleRowSelect: (rowIndex: number, options: RowSelectOptions) => void;
   selectSingleRow: (rowIndex: number) => void;
   clearSelection: () => void;
-  moveSelection: (delta: 1 | -1) => void;
+  moveSelection: (delta: 1 | -1, options?: { extend?: boolean }) => void;
 };
 
 /**
@@ -110,7 +110,7 @@ export const useSelection = (
   }, []);
 
   const moveSelection = useCallback(
-    (delta: 1 | -1) => {
+    (delta: 1 | -1, options?: { extend?: boolean }) => {
       if (displayedResults.length === 0) {
         return;
       }
@@ -129,7 +129,7 @@ export const useSelection = (
       }
 
       handleRowSelect(nextIndex, {
-        isShift: false,
+        isShift: options?.extend ?? false,
         isMeta: false,
         isCtrl: false,
       });

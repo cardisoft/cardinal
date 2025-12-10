@@ -269,7 +269,7 @@ function App() {
       }
       event.preventDefault();
       const delta = event.key === 'ArrowDown' ? 1 : -1;
-      navigateSelection(delta);
+      navigateSelection(delta, { extend: event.shiftKey });
       return true;
     }
 
@@ -423,9 +423,9 @@ function App() {
           }
 
           if (keyCode === QUICK_LOOK_KEYCODE_DOWN) {
-            navigateSelection(1);
+            navigateSelection(1, { extend: modifiers.shift });
           } else if (keyCode === QUICK_LOOK_KEYCODE_UP) {
-            navigateSelection(-1);
+            navigateSelection(-1, { extend: modifiers.shift });
           }
         });
       } catch (error) {

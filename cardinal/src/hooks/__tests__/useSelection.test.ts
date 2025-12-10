@@ -182,6 +182,35 @@ describe('useSelection', () => {
     expect(result.current.shiftAnchorIndex).toBe(0);
   });
 
+  it('extends selection when moveSelection is called with extend=true', () => {
+    const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5]);
+
+    selectRow(2);
+    expect(result.current.selectedIndices).toEqual([2]);
+
+    act(() => {
+      result.current.moveSelection(1, { extend: true });
+    });
+    expect(result.current.selectedIndices).toEqual([2, 3]);
+    expect(result.current.shiftAnchorIndex).toBe(2);
+
+    act(() => {
+      result.current.moveSelection(1, { extend: true });
+    });
+    expect(result.current.selectedIndices).toEqual([2, 3, 4]);
+
+    act(() => {
+      result.current.moveSelection(-1, { extend: true });
+    });
+    expect(result.current.selectedIndices).toEqual([2, 3]);
+
+    act(() => {
+      result.current.moveSelection(-1, { extend: true });
+    });
+    expect(result.current.selectedIndices).toEqual([2]);
+    expect(result.current.shiftAnchorIndex).toBe(2);
+  });
+
   it('drops any active shift range when a refresh arrives mid-selection', () => {
     const { result, selectRow, rerenderResults } = renderSelection([0, 1, 2, 3, 4]);
 
