@@ -516,23 +516,19 @@ function App() {
     }
   }, []);
 
+  const selectedIndexSet = useMemo(() => new Set(selectedIndices), [selectedIndices]);
+
   const handleRowContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => {
-      if (!selectedIndices.includes(rowIndex)) {
+      if (!selectedIndexSet.has(rowIndex)) {
         selectSingleRow(rowIndex);
       }
       if (path) {
         showFilesContextMenu(event, path);
       }
     },
-    [selectedIndices, selectSingleRow, showFilesContextMenu],
+    [selectedIndexSet, selectSingleRow, showFilesContextMenu],
   );
-
-  const handleRowOpen = useCallback((path: string) => {
-    openResultPath(path);
-  }, []);
-
-  const selectedIndexSet = useMemo(() => new Set(selectedIndices), [selectedIndices]);
 
   const renderRow = useCallback(
     (rowIndex: number, item: SearchResultItem | undefined, rowStyle: CSSProperties) => {
@@ -558,18 +554,17 @@ function App() {
           highlightTerms={highlightTerms}
           onContextMenu={(event, contextPath) => handleRowContextMenu(event, contextPath, rowIndex)}
           onSelect={handleRowSelect}
-          onOpen={handleRowOpen}
+          onOpen={openResultPath}
         />
       );
     },
     [
       handleRowContextMenu,
       handleRowSelect,
-      handleRowOpen,
       highlightTerms,
       caseSensitive,
-      selectedPaths,
       selectedIndexSet,
+      selectedPaths,
     ],
   );
 
