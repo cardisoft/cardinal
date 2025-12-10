@@ -361,13 +361,15 @@ function App() {
   }, [activeTab, clearSelection]);
 
   useEffect(() => {
-    if (activeTab === 'files') {
+    if (activeTab !== 'files') {
+      closeQuickLook();
       return;
     }
 
-    // Close Quick Look when leaving the files tab
-    closeQuickLook();
-  }, [activeTab, closeQuickLook]);
+    if (selectedIndices.length) {
+      updateQuickLook();
+    }
+  }, [activeTab, selectedIndices, closeQuickLook, updateQuickLook]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -393,14 +395,6 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleMetaShortcut, handleFilesNavigation]);
-
-  useEffect(() => {
-    if (activeTab !== 'files' || !selectedIndices.length) {
-      return;
-    }
-
-    updateQuickLook();
-  }, [activeTab, selectedIndices, updateQuickLook]);
 
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
