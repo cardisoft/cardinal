@@ -20,13 +20,21 @@ const isRecentEventPayload = (value: unknown): value is RecentEventPayload => {
   );
 };
 
+type RecentEventRecord = {
+  payload: RecentEventPayload;
+  path: string;
+  name: string;
+  lowerPath: string;
+  lowerName: string;
+};
+
 type RecentEventsOptions = {
   caseSensitive: boolean;
   isActive: boolean;
 };
 
 export function useRecentFSEvents({ caseSensitive, isActive }: RecentEventsOptions) {
-  const eventsRef = useRef<RecentEventPayload[]>([]);
+  const eventsRef = useRef<RecentEventRecord[]>([]);
   const [eventFilterQuery, setEventFilterQuery] = useState('');
   const [, triggerRender] = useReducer((count) => count + 1, 0);
   const isMountedRef = useRef(false);
@@ -57,7 +65,8 @@ export function useRecentFSEvents({ caseSensitive, isActive }: RecentEventsOptio
           }
 
           const previous = eventsRef.current;
-          let updated = [...previous, ...validEvents];
+          const normalizedBatch = validEvents.map(toEventRecord);
+          let updated = [...previous, ...normalizedBatch];
           if (updated.length > MAX_EVENTS) {
             updated = updated.slice(updated.length - MAX_EVENTS);
           }
@@ -93,20 +102,32 @@ const normalize = (value: string, caseSensitive: boolean): string =>
   caseSensitive ? value : value.toLowerCase();
 
 const filterBuffer = (
-  events: RecentEventPayload[],
+  events: RecentEventRecord[],
   query: string,
   caseSensitive: boolean,
 ): RecentEventPayload[] => {
   const trimmed = query.trim();
   if (!trimmed) {
-    return events;
+    return events.map((record) => record.payload);
   }
   const comparable = normalize(trimmed, caseSensitive);
-  return events.filter((event) => {
-    const path = event.path || '';
-    const name = path.split('/').pop() || '';
-    const normalizedPath = normalize(path, caseSensitive);
-    const normalizedName = normalize(name, caseSensitive);
-    return normalizedPath.includes(comparable) || normalizedName.includes(comparable);
-  });
+  return events
+    .filter((record) => {
+      const haystackPath = caseSensitive ? record.path : record.lowerPath;
+      const haystackName = caseSensitive ? record.name : record.lowerName;
+      return haystackPath.includes(comparable) || haystackName.includes(comparable);
+    })
+    .map((record) => record.payload);
+};
+
+const toEventRecord = (payload: RecentEventPayload): RecentEventRecord => {
+  const path = payload.path || '';
+  const name = path.split('/').pop() || '';
+  return {
+    payload,
+    path,
+    name,
+    lowerPath: path.toLowerCase(),
+    lowerName: name.toLowerCase(),
+  };
 };
