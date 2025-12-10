@@ -514,18 +514,11 @@ function App() {
   );
 
   useEffect(() => {
-    // Reset vertical scroll and prefetch initial rows to keep first render responsive
+    // Reset vertical scroll
     const list = virtualListRef.current;
     if (!list) return;
 
     list.scrollToTop?.();
-
-    if (!results.length || !list.ensureRangeLoaded) {
-      return;
-    }
-
-    const preloadCount = Math.min(30, results.length);
-    list.ensureRangeLoaded(0, preloadCount - 1);
   }, [results]);
 
   const handleHorizontalSync = useCallback((scrollLeft: number) => {
