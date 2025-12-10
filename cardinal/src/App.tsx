@@ -264,7 +264,7 @@ function App() {
     }
 
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      if (event.altKey || event.ctrlKey) {
+      if (event.altKey || event.ctrlKey || event.metaKey) {
         return true;
       }
       event.preventDefault();
