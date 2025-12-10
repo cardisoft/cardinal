@@ -37,6 +37,7 @@ import { useFullDiskAccessPermission } from './hooks/useFullDiskAccessPermission
 import { OPEN_PREFERENCES_EVENT } from './constants/appEvents';
 import type { DisplayState } from './components/StateDisplay';
 import { openResultPath } from './utils/openResultPath';
+import { useStableEvent } from './hooks/useStableEvent';
 
 type ActiveTab = StatusTabKey;
 
@@ -103,6 +104,10 @@ function App() {
   const virtualListRef = useRef<VirtualListHandle | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const isMountedRef = useRef(false);
+  const keyboardStateRef = useRef<{ activeTab: ActiveTab; activePath: string | null }>({
+    activeTab,
+    activePath: null,
+  });
   const {
     handleInputChange: updateHistoryFromInput,
     navigate: navigateSearchHistory,
@@ -152,6 +157,7 @@ function App() {
   const { toggleQuickLook, updateQuickLook, closeQuickLook } = useQuickLook({
     getPaths: getQuickLookPaths,
   });
+  const triggerQuickLook = useStableEvent(toggleQuickLook);
 
   const {
     showContextMenu: showFilesContextMenu,
@@ -162,6 +168,7 @@ function App() {
     showContextMenu: showEventsContextMenu,
     showHeaderContextMenu: showEventsHeaderContextMenu,
   } = useContextMenu(autoFitEventColumns);
+  const navigateSelection = useStableEvent(moveSelection);
 
   const {
     status: fullDiskAccessStatus,
@@ -174,6 +181,12 @@ function App() {
     activeRowIndex !== null
       ? (virtualListRef.current?.getItem?.(activeRowIndex)?.path ?? null)
       : null;
+  useEffect(() => {
+    keyboardStateRef.current.activeTab = activeTab;
+  }, [activeTab]);
+  useEffect(() => {
+    keyboardStateRef.current.activePath = activePath;
+  }, [activePath]);
 
   useEffect(() => {
     if (isCheckingFullDiskAccess) {
@@ -194,6 +207,74 @@ function App() {
       input.select();
     });
   }, []);
+  const focusSearchInputStable = useStableEvent(focusSearchInput);
+  const handleMetaShortcut = useStableEvent(
+    (event: KeyboardEvent, currentTab: ActiveTab, currentPath: string | null) => {
+      const key = event.key.toLowerCase();
+      if (key === 'f') {
+        event.preventDefault();
+        focusSearchInputStable();
+        return true;
+      }
+
+      if (currentTab !== 'files') {
+        return false;
+      }
+
+      if (key === 'r' && currentPath) {
+        event.preventDefault();
+        void invoke('open_in_finder', { path: currentPath });
+        return true;
+      }
+
+      if (key === 'o' && currentPath) {
+        event.preventDefault();
+        openResultPath(currentPath);
+        return true;
+      }
+
+      if (key === 'c' && currentPath) {
+        event.preventDefault();
+        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+          navigator.clipboard.writeText(currentPath).catch((error) => {
+            console.error('Failed to copy file path', error);
+          });
+        }
+        return true;
+      }
+
+      return false;
+    },
+  );
+
+  const handleFilesNavigation = useStableEvent((event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (isEditableTarget(target)) {
+      return false;
+    }
+
+    const isSpaceKey = event.code === 'Space' || event.key === ' ';
+    if (isSpaceKey) {
+      if (event.repeat || !selectedIndicesRef.current.length) {
+        return true;
+      }
+      event.preventDefault();
+      triggerQuickLook();
+      return true;
+    }
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (event.altKey || event.ctrlKey) {
+        return true;
+      }
+      event.preventDefault();
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      navigateSelection(delta);
+      return true;
+    }
+
+    return false;
+  });
 
   const handleSearchFocus = useCallback(() => {
     setIsSearchFocused(true);
@@ -289,32 +370,29 @@ function App() {
   }, [activeTab, closeQuickLook]);
 
   useEffect(() => {
-    if (activeTab !== 'files') {
+    if (typeof window === 'undefined') {
       return;
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      const isSpaceKey = event.code === 'Space' || event.key === ' ';
-      if (!isSpaceKey || event.repeat) {
+      const { activeTab: currentTab, activePath: currentPath } = keyboardStateRef.current;
+
+      if (event.metaKey && handleMetaShortcut(event, currentTab, currentPath)) {
         return;
       }
 
-      const target = event.target as HTMLElement | null;
-      if (isEditableTarget(target)) {
+      if (currentTab !== 'files') {
         return;
       }
 
-      if (!selectedIndices.length) {
+      if (handleFilesNavigation(event)) {
         return;
       }
-
-      event.preventDefault();
-      toggleQuickLook();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, toggleQuickLook, selectedIndices]);
+  }, [handleMetaShortcut, handleFilesNavigation]);
 
   useEffect(() => {
     if (activeTab !== 'files' || !selectedIndices.length) {
@@ -325,88 +403,12 @@ function App() {
   }, [activeTab, selectedIndices, updateQuickLook]);
 
   useEffect(() => {
-    if (activeTab !== 'files') {
-      return;
-    }
-
-    const handleArrowNavigation = (event: KeyboardEvent) => {
-      if (event.altKey || event.metaKey || event.ctrlKey) {
-        return;
-      }
-
-      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
-        return;
-      }
-
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-
-      event.preventDefault();
-      const delta = event.key === 'ArrowDown' ? 1 : -1;
-      moveSelection(delta);
-    };
-
-    window.addEventListener('keydown', handleArrowNavigation);
-    return () => window.removeEventListener('keydown', handleArrowNavigation);
-  }, [activeTab, moveSelection]);
-
-  useEffect(() => {
-    const handleGlobalShortcuts = (event: KeyboardEvent) => {
-      if (!event.metaKey) {
-        return;
-      }
-
-      const key = event.key.toLowerCase();
-
-      if (key === 'f') {
-        event.preventDefault();
-        focusSearchInput();
-        return;
-      }
-
-      if (key === 'r') {
-        if (activeTab !== 'files' || !activePath) {
-          return;
-        }
-        event.preventDefault();
-        void invoke('open_in_finder', { path: activePath });
-        return;
-      }
-
-      if (key === 'o') {
-        if (activeTab !== 'files' || !activePath) {
-          return;
-        }
-        event.preventDefault();
-        openResultPath(activePath);
-        return;
-      }
-
-      if (key === 'c') {
-        if (activeTab !== 'files' || !activePath) {
-          return;
-        }
-        event.preventDefault();
-        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-          navigator.clipboard.writeText(activePath).catch((error) => {
-            console.error('Failed to copy file path', error);
-          });
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalShortcuts);
-    return () => window.removeEventListener('keydown', handleGlobalShortcuts);
-  }, [focusSearchInput, activeTab, activePath]);
-
-  useEffect(() => {
     let unlisten: UnlistenFn | null = null;
 
     const setup = async () => {
       try {
         unlisten = await listen<QuickLookKeydownPayload>('quicklook-keydown', (event) => {
-          if (activeTab !== 'files') {
+          if (keyboardStateRef.current.activeTab !== 'files') {
             return;
           }
 
@@ -421,9 +423,9 @@ function App() {
           }
 
           if (keyCode === QUICK_LOOK_KEYCODE_DOWN) {
-            moveSelection(1);
+            navigateSelection(1);
           } else if (keyCode === QUICK_LOOK_KEYCODE_UP) {
-            moveSelection(-1);
+            navigateSelection(-1);
           }
         });
       } catch (error) {
@@ -438,7 +440,7 @@ function App() {
         unlisten();
       }
     };
-  }, [activeTab, moveSelection]);
+  }, [navigateSelection]);
 
   useEffect(() => {
     if (activeRowIndex == null) {
