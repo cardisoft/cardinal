@@ -114,6 +114,7 @@ function App() {
   const { eventColWidths, onEventResizeStart, autoFitEventColumns } = useEventColumnWidths();
   const { filteredEvents, eventFilterQuery, setEventFilterQuery } = useRecentFSEvents({
     caseSensitive,
+    isActive: activeTab === 'events',
   });
   const { t, i18n } = useTranslation();
   const {

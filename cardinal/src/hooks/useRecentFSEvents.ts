@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import type { RecentEventPayload } from '../types/ipc';
@@ -20,17 +20,24 @@ const isRecentEventPayload = (value: unknown): value is RecentEventPayload => {
   );
 };
 
-const toComparable = (value: string, caseSensitive: boolean): string =>
-  caseSensitive ? value : value.toLowerCase();
-
 type RecentEventsOptions = {
   caseSensitive: boolean;
+  isActive: boolean;
 };
 
-export function useRecentFSEvents({ caseSensitive }: RecentEventsOptions) {
-  const [recentEvents, setRecentEvents] = useState<RecentEventPayload[]>([]);
+export function useRecentFSEvents({ caseSensitive, isActive }: RecentEventsOptions) {
+  const eventsRef = useRef<RecentEventPayload[]>([]);
   const [eventFilterQuery, setEventFilterQuery] = useState('');
+  const [, triggerRender] = useReducer((count) => count + 1, 0);
   const isMountedRef = useRef(false);
+  const isActiveRef = useRef(isActive);
+
+  useEffect(() => {
+    isActiveRef.current = isActive;
+    if (isActive) {
+      triggerRender();
+    }
+  }, [isActive]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -49,13 +56,16 @@ export function useRecentFSEvents({ caseSensitive }: RecentEventsOptions) {
             return;
           }
 
-          setRecentEvents((prev) => {
-            let updated = [...prev, ...validEvents];
-            if (updated.length > MAX_EVENTS) {
-              updated = updated.slice(updated.length - MAX_EVENTS);
-            }
-            return updated;
-          });
+          const previous = eventsRef.current;
+          let updated = [...previous, ...validEvents];
+          if (updated.length > MAX_EVENTS) {
+            updated = updated.slice(updated.length - MAX_EVENTS);
+          }
+          eventsRef.current = updated;
+
+          if (isActiveRef.current) {
+            triggerRender();
+          }
         });
       } catch (error) {
         console.error('Failed to listen for file events', error);
@@ -68,29 +78,35 @@ export function useRecentFSEvents({ caseSensitive }: RecentEventsOptions) {
       isMountedRef.current = false;
       unlistenEvents?.();
     };
-  }, []);
+  }, [triggerRender]);
 
-  const filteredEvents = useMemo(() => {
-    const query = eventFilterQuery.trim();
-    if (!query) {
-      return recentEvents;
-    }
-
-    const searchQuery = toComparable(query, caseSensitive);
-    return recentEvents.filter((event) => {
-      const path = event.path || '';
-      const name = path.split('/').pop() || '';
-      const testPath = toComparable(path, caseSensitive);
-      const testName = toComparable(name, caseSensitive);
-      // Perform basic substring matching across path and filename.
-      return testPath.includes(searchQuery) || testName.includes(searchQuery);
-    });
-  }, [recentEvents, eventFilterQuery, caseSensitive]);
+  const filteredEvents = filterBuffer(eventsRef.current, eventFilterQuery, caseSensitive);
 
   return {
-    recentEvents,
     filteredEvents,
     eventFilterQuery,
     setEventFilterQuery,
   };
 }
+
+const normalize = (value: string, caseSensitive: boolean): string =>
+  caseSensitive ? value : value.toLowerCase();
+
+const filterBuffer = (
+  events: RecentEventPayload[],
+  query: string,
+  caseSensitive: boolean,
+): RecentEventPayload[] => {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return events;
+  }
+  const comparable = normalize(trimmed, caseSensitive);
+  return events.filter((event) => {
+    const path = event.path || '';
+    const name = path.split('/').pop() || '';
+    const normalizedPath = normalize(path, caseSensitive);
+    const normalizedName = normalize(name, caseSensitive);
+    return normalizedPath.includes(comparable) || normalizedName.includes(comparable);
+  });
+};
