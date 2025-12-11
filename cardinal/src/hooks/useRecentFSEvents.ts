@@ -45,7 +45,7 @@ export function useRecentFSEvents({ caseSensitive, isActive }: RecentEventsOptio
     if (isActive) {
       bumpBufferVersion();
     }
-  }, [isActive, bumpBufferVersion]);
+  }, [isActive]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -87,10 +87,11 @@ export function useRecentFSEvents({ caseSensitive, isActive }: RecentEventsOptio
       isMountedRef.current = false;
       unlistenEvents?.();
     };
-  }, [bumpBufferVersion]);
+  }, []);
 
   const filteredEvents = useMemo(
     () => filterBuffer(eventsRef.current, eventFilterQuery, caseSensitive),
+    // bufferVersion acts as the signal that the mutable eventsRef contents changed.
     [eventFilterQuery, caseSensitive, bufferVersion],
   );
 
