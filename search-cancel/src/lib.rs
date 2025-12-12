@@ -38,7 +38,7 @@ impl CancellationToken {
     }
 
     pub fn is_cancelled_sparse(&self, counter: usize) -> Option<()> {
-        if counter % CANCEL_CHECK_INTERVAL == 0 {
+        if counter.is_multiple_of(CANCEL_CHECK_INTERVAL) {
             self.is_cancelled()
         } else {
             Some(())

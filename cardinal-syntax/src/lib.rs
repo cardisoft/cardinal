@@ -1123,10 +1123,10 @@ impl<'a> Parser<'a> {
         if !candidate.eq_ignore_ascii_case(keyword) {
             return false;
         }
-        if let Some(next) = rest[keyword.len()..].chars().next() {
-            if !is_keyword_boundary_char(next) {
-                return false;
-            }
+        if let Some(next) = rest[keyword.len()..].chars().next()
+            && !is_keyword_boundary_char(next)
+        {
+            return false;
         }
         self.pos += keyword.len();
         true
@@ -1282,10 +1282,10 @@ fn try_parse_range(kind: &FilterKind, raw: &str) -> Option<RangeValue> {
         return Some(range);
     }
 
-    if allows_hyphen_range(kind) {
-        if let Some(range) = try_parse_hyphen_range(raw) {
-            return Some(range);
-        }
+    if allows_hyphen_range(kind)
+        && let Some(range) = try_parse_hyphen_range(raw)
+    {
+        return Some(range);
     }
 
     None
