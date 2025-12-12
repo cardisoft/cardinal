@@ -37,6 +37,7 @@ Cardinal now speaks an Everything-compatible syntax layer on top of the classic 
 - `*.pdf briefing` – filter to PDF results whose names include “briefing”.
 - `*.zip size:>100MB` – search for ZIP files larger than 100MB.
 - `infolder:/Users demo !.psd` – restrict the search root to `/Users`, then search for files whose names contain `demo` but exclude `.psd`.
+- `tag:ProjectA;ProjectB` – match Finder tags (macOS); `;` acts as `OR`.
 - `*.md content:"Bearer "` – filter to Markdown files containing the string `Bearer `.
 - `"Application Support"` – quote exact phrases.
 - `brary/Applicat` – use `/` as a path separator for sub-path searching, matching directories like `Library/Application Support`.

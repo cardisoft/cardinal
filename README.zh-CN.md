@@ -35,6 +35,7 @@ Cardinal 现在在经典的子串/前缀匹配基础上叠加了 Everything 兼�
 - `*.pdf briefing` – 只显示文件名包含 “briefing” 的 PDF 结果。
 - `*.zip size:>100MB` – 查找大于 100MB 的 ZIP 文件。
 - `infolder:/Users demo !.psd` – 把搜索范围限制在 `/Users`，然后匹配包含 `demo` 但排除 `.psd` 的文件。
+- `tag:ProjectA;ProjectB` – 按 Finder 标签（macOS）过滤；`;` 表示 `OR`（满足任一标签即可）。
 - `*.md content:"Bearer "` – 仅筛选包含字符串 `Bearer ` 的 Markdown 文件。
 - `"Application Support"` – 使用引号匹配完整短语。
 - `brary/Applicat` – 使用 `/` 作为路径分隔符向下匹配子路径，例如 `Library/Application Support`。
