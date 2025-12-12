@@ -9,16 +9,16 @@ pub enum WindowToggle {
 }
 
 pub fn activate_window<R: Runtime>(window: &WebviewWindow<R>) {
-    if let Ok(true) = window.is_minimized() {
-        if let Err(err) = window.unminimize() {
-            error!(?err, "Failed to unminimize window");
-        }
+    if let Ok(true) = window.is_minimized()
+        && let Err(err) = window.unminimize()
+    {
+        error!(?err, "Failed to unminimize window");
     }
 
-    if let Ok(false) = window.is_visible() {
-        if let Err(err) = window.show() {
-            error!(?err, "Failed to show window");
-        }
+    if let Ok(false) = window.is_visible()
+        && let Err(err) = window.show()
+    {
+        error!(?err, "Failed to show window");
     }
 
     if let Err(err) = window.set_focus() {

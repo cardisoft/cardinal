@@ -326,10 +326,10 @@ pub async fn start_logic() {
 
 #[tauri::command]
 pub async fn hide_main_window(app: AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        if hide_window(&window) {
-            info!("Main window hidden via command");
-        }
+    if let Some(window) = app.get_webview_window("main")
+        && hide_window(&window)
+    {
+        info!("Main window hidden via command");
     }
 }
 

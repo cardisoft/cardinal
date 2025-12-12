@@ -223,10 +223,10 @@ define_class!(
                 return false.into();
             }
 
-            if let Some(app_handle) = self.ivars().app_handle.borrow().as_ref().cloned() {
-                if let Some(payload) = QuickLookKeyEvent::from_event(event) {
-                    let _ = app_handle.emit("quicklook-keydown", payload);
-                }
+            if let Some(app_handle) = self.ivars().app_handle.borrow().as_ref().cloned()
+                && let Some(payload) = QuickLookKeyEvent::from_event(event)
+            {
+                let _ = app_handle.emit("quicklook-keydown", payload);
             }
 
             true
@@ -327,14 +327,13 @@ fn update_preview_items(
         if let Some(rect) = item.rect {
             frames.insert(item.path.clone(), rect);
         }
-        if let Some(base64_data_uri) = &item.transition_image {
-            if let Some(base64_data) = base64_data_uri.split(',').nth(1) {
-                if let Ok(image_bytes) = general_purpose::STANDARD.decode(base64_data) {
-                    let data = NSData::from_vec(image_bytes);
-                    if let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) {
-                        transitions.insert(item.path.clone(), image);
-                    }
-                }
+        if let Some(base64_data_uri) = &item.transition_image
+            && let Some(base64_data) = base64_data_uri.split(',').nth(1)
+            && let Ok(image_bytes) = general_purpose::STANDARD.decode(base64_data)
+        {
+            let data = NSData::from_vec(image_bytes);
+            if let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) {
+                transitions.insert(item.path.clone(), image);
             }
         }
     }
@@ -381,12 +380,12 @@ pub fn update_preview_panel(app_handle: AppHandle, items: Vec<QuickLookItemInput
 }
 
 pub fn close_preview_panel(app_handle: AppHandle) {
-    if let Some((_, panel)) = shared_panel() {
-        if panel.isVisible() {
-            panel.close();
-            if let Some(window) = app_handle.get_webview_window("main") {
-                activate_window(&window);
-            }
+    if let Some((_, panel)) = shared_panel()
+        && panel.isVisible()
+    {
+        panel.close();
+        if let Some(window) = app_handle.get_webview_window("main") {
+            activate_window(&window);
         }
     };
     clear_preview_controller();
