@@ -40,6 +40,13 @@ fn ext_list_is_semicolon_split() {
 }
 
 #[test]
+fn ext_trailing_semicolon_is_singleton_list() {
+    let expr = parse_ok("ext:jpg;");
+    filter_is_kind(&expr, &FilterKind::Ext);
+    filter_arg_is_list(&expr, &["jpg"]);
+}
+
+#[test]
 fn content_filter_has_bare_argument() {
     let expr = parse_ok("content:error");
     filter_is_kind(&expr, &FilterKind::Content);
@@ -51,6 +58,13 @@ fn tag_filter_has_bare_argument() {
     let expr = parse_ok("tag:Project");
     filter_is_kind(&expr, &FilterKind::Tag);
     filter_arg_raw(&expr, "Project");
+}
+
+#[test]
+fn tag_filter_trailing_semicolon_is_singleton_list() {
+    let expr = parse_ok("tag:Orange;");
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &["Orange"]);
 }
 
 #[test]

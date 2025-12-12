@@ -3,12 +3,10 @@ use cardinal_syntax::*;
 use common::*;
 
 #[test]
-fn list_with_single_item_or_trailing_semicolon_is_bare() {
+fn list_with_single_item_or_trailing_semicolon_is_list() {
     let expr = parse_ok("ext:jpg;");
     filter_is_kind(&expr, &FilterKind::Ext);
-    // classify_argument should treat this as Bare because only one non-empty item
-    let (_, arg) = filter_kind(&expr);
-    assert!(matches!(arg.as_ref().unwrap().kind, ArgumentKind::Bare));
+    filter_arg_is_list(&expr, &["jpg"]);
 
     let expr = parse_ok("ext:jpg");
     let (_, arg) = filter_kind(&expr);

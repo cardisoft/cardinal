@@ -11,16 +11,28 @@ const USER_TAG_XATTR: &str = "com.apple.metadata:_kMDItemUserTags";
 /// Searches for files with the specified tag using the `mdfind` command-line tool.
 ///
 /// Returns a vector of file paths that have the specified tag.
-pub fn search_tags_using_mdfind(tag: &str, case_insensitive: bool) -> io::Result<Vec<PathBuf>> {
-    if let Some(forbidden_char) = tag_has_spotlight_forbidden_chars(tag) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("tag filter contains unsupported character '{forbidden_char}': {tag}"),
-        ));
+pub fn search_tags_using_mdfind(
+    tags: Vec<String>,
+    case_insensitive: bool,
+) -> io::Result<Vec<PathBuf>> {
+    if tags.is_empty() {
+        return Ok(Vec::new());
+    }
+    for tag in &tags {
+        if let Some(forbidden_char) = tag_has_spotlight_forbidden_chars(tag) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("tag filter contains unsupported character '{forbidden_char}': {tag}"),
+            ));
+        }
     }
 
     let modifier = if case_insensitive { "c" } else { "" };
-    let query = format!("kMDItemUserTags == '*{tag}*'{modifier}");
+    let query = tags
+        .into_iter()
+        .map(|tag| format!("kMDItemUserTags == '*{tag}*'{modifier}"))
+        .collect::<Vec<_>>()
+        .join(" || ");
     let output = Command::new("mdfind").arg(query).output()?;
 
     if !output.status.success() {
@@ -217,5 +229,251 @@ mod tests {
 
         let tags = read_tags_from_path(file.path(), false).expect("read tags");
         assert!(tags.is_empty());
+    }
+
+    // Tests for search_tags_using_mdfind edge cases
+    #[test]
+    fn search_tags_using_mdfind_empty_list_returns_empty() {
+        let result = search_tags_using_mdfind(vec![], false);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn search_tags_using_mdfind_rejects_single_quote() {
+        let result = search_tags_using_mdfind(vec!["Project'Alpha".to_string()], false);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+        assert!(err.to_string().contains("unsupported character '''"));
+    }
+
+    #[test]
+    fn search_tags_using_mdfind_rejects_backslash() {
+        let result = search_tags_using_mdfind(vec!["Project\\Alpha".to_string()], false);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+        assert!(err.to_string().contains("unsupported character '\\'"));
+    }
+
+    #[test]
+    fn search_tags_using_mdfind_rejects_asterisk() {
+        let result = search_tags_using_mdfind(vec!["Project*".to_string()], false);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+        assert!(err.to_string().contains("unsupported character '*'"));
+    }
+
+    #[test]
+    fn search_tags_using_mdfind_rejects_forbidden_char_in_second_tag() {
+        let result = search_tags_using_mdfind(
+            vec!["ValidTag".to_string(), "Invalid'Tag".to_string()],
+            false,
+        );
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+        assert!(err.to_string().contains("Invalid'Tag"));
+    }
+
+    #[test]
+    fn search_tags_using_mdfind_allows_hyphen() {
+        // Hyphen is not a forbidden character
+        let result = search_tags_using_mdfind(vec!["Project-Alpha".to_string()], false);
+        // We can't verify success without actual files, but it should not reject the input
+        // If mdfind is not available or returns no results, that's fine for this test
+        match result {
+            Ok(_) => {}                                                     // Success is fine
+            Err(e) if e.to_string().contains("mdfind command failed") => {} // mdfind not available is fine
+            Err(e) => panic!("Unexpected error: {e}"),
+        }
+    }
+
+    #[test]
+    fn search_tags_using_mdfind_allows_underscore() {
+        let result = search_tags_using_mdfind(vec!["Project_Alpha".to_string()], false);
+        match result {
+            Ok(_) => {}
+            Err(e) if e.to_string().contains("mdfind command failed") => {}
+            Err(e) => panic!("Unexpected error: {e}"),
+        }
+    }
+
+    #[test]
+    fn search_tags_using_mdfind_allows_unicode() {
+        let result = search_tags_using_mdfind(vec!["项目".to_string()], false);
+        match result {
+            Ok(_) => {}
+            Err(e) if e.to_string().contains("mdfind command failed") => {}
+            Err(e) => panic!("Unexpected error: {e}"),
+        }
+    }
+
+    #[test]
+    fn search_tags_using_mdfind_allows_emoji() {
+        let result = search_tags_using_mdfind(vec!["🔴Important".to_string()], false);
+        match result {
+            Ok(_) => {}
+            Err(e) if e.to_string().contains("mdfind command failed") => {}
+            Err(e) => panic!("Unexpected error: {e}"),
+        }
+    }
+
+    #[test]
+    fn search_tags_using_mdfind_multiple_tags_constructs_or_query() {
+        // We can't easily verify the exact query without mocking, but we can verify
+        // that multiple tags are accepted without error
+        let result =
+            search_tags_using_mdfind(vec!["Project".to_string(), "Important".to_string()], false);
+        match result {
+            Ok(_) => {}
+            Err(e) if e.to_string().contains("mdfind command failed") => {}
+            Err(e) => panic!("Unexpected error: {e}"),
+        }
+    }
+
+    #[test]
+    fn tag_has_spotlight_forbidden_chars_returns_none_for_safe_string() {
+        assert_eq!(tag_has_spotlight_forbidden_chars("Project-Alpha_123"), None);
+    }
+
+    #[test]
+    fn tag_has_spotlight_forbidden_chars_detects_single_quote() {
+        assert_eq!(
+            tag_has_spotlight_forbidden_chars("Project'Alpha"),
+            Some('\'')
+        );
+    }
+
+    #[test]
+    fn tag_has_spotlight_forbidden_chars_detects_backslash() {
+        assert_eq!(
+            tag_has_spotlight_forbidden_chars("Project\\Alpha"),
+            Some('\\')
+        );
+    }
+
+    #[test]
+    fn tag_has_spotlight_forbidden_chars_detects_asterisk() {
+        assert_eq!(tag_has_spotlight_forbidden_chars("Project*"), Some('*'));
+    }
+
+    #[test]
+    fn tag_has_spotlight_forbidden_chars_detects_first_occurrence() {
+        assert_eq!(
+            tag_has_spotlight_forbidden_chars("Project'Alpha*Beta"),
+            Some('\'')
+        );
+    }
+
+    #[test]
+    fn parse_tags_handles_empty_array() {
+        let bytes = plist_bytes(&[]);
+        assert!(parse_tags(&bytes, false).is_empty());
+    }
+
+    #[test]
+    fn parse_tags_handles_tag_without_suffix() {
+        let bytes = plist_bytes(&[Value::String("NoSuffix".into())]);
+        let tags = parse_tags(&bytes, false);
+        assert_eq!(tags, vec!["NoSuffix".to_string()]);
+    }
+
+    #[test]
+    fn parse_tags_handles_multiple_newlines_in_tag() {
+        let bytes = plist_bytes(&[Value::String("Tag\n0\nextra".into())]);
+        let tags = parse_tags(&bytes, false);
+        assert_eq!(tags, vec!["Tag".to_string()]);
+    }
+
+    #[test]
+    fn strip_tag_suffix_preserves_case_when_not_lowercasing() {
+        assert_eq!(strip_tag_suffix("Important\n0", false), "Important");
+        assert_eq!(strip_tag_suffix("IMPORTANT\n0", false), "IMPORTANT");
+    }
+
+    #[test]
+    fn strip_tag_suffix_lowercases_when_requested() {
+        assert_eq!(strip_tag_suffix("Important\n0", true), "important");
+        assert_eq!(strip_tag_suffix("IMPORTANT\n0", true), "important");
+        assert_eq!(strip_tag_suffix("ImPoRtAnT\n0", true), "important");
+    }
+
+    #[test]
+    fn strip_tag_suffix_handles_empty_string() {
+        assert_eq!(strip_tag_suffix("", false), "");
+        assert_eq!(strip_tag_suffix("", true), "");
+    }
+
+    #[test]
+    fn strip_tag_suffix_handles_unicode() {
+        assert_eq!(strip_tag_suffix("项目\n0", false), "项目");
+        assert_eq!(strip_tag_suffix("项目\n0", true), "项目");
+    }
+
+    #[test]
+    fn read_tags_from_path_returns_none_for_nonexistent_path() {
+        let result = read_tags_from_path(Path::new("/nonexistent/path"), false);
+        assert!(result.is_some());
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn read_tags_from_path_case_insensitive() {
+        let file = NamedTempFile::new().expect("create temp file");
+        write_xattr(file.path(), &["Important", "PROJECT"]);
+
+        let tags = read_tags_from_path(file.path(), true).expect("read tags");
+        assert_eq!(tags, vec!["important".to_string(), "project".to_string()]);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn read_tags_from_path_case_sensitive() {
+        let file = NamedTempFile::new().expect("create temp file");
+        write_xattr(file.path(), &["Important", "PROJECT"]);
+
+        let tags = read_tags_from_path(file.path(), false).expect("read tags");
+        assert_eq!(tags, vec!["Important".to_string(), "PROJECT".to_string()]);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn read_tags_from_path_handles_unicode_tags() {
+        let file = NamedTempFile::new().expect("create temp file");
+        write_xattr(file.path(), &["项目", "重要", "🔴"]);
+
+        let tags = read_tags_from_path(file.path(), false).expect("read tags");
+        assert_eq!(
+            tags,
+            vec!["项目".to_string(), "重要".to_string(), "🔴".to_string()]
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn read_tags_from_path_handles_very_long_tag_name() {
+        let file = NamedTempFile::new().expect("create temp file");
+        let long_tag = "a".repeat(1000);
+        write_xattr(file.path(), &[&long_tag]);
+
+        let tags = read_tags_from_path(file.path(), false).expect("read tags");
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].len(), 1000);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn read_tags_from_path_handles_many_tags() {
+        let file = NamedTempFile::new().expect("create temp file");
+        let tags_to_write: Vec<String> = (0..100).map(|i| format!("Tag{i}")).collect();
+        let tag_refs: Vec<&str> = tags_to_write.iter().map(|s| s.as_str()).collect();
+        write_xattr(file.path(), &tag_refs);
+
+        let tags = read_tags_from_path(file.path(), false).expect("read tags");
+        assert_eq!(tags.len(), 100);
     }
 }

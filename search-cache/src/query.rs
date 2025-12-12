@@ -747,18 +747,38 @@ impl SearchCache {
         options: SearchOptions,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
-        if matches!(argument.kind, ArgumentKind::List(_)) {
-            bail!("tag: accepts a single value; chain multiple tag: filters for AND semantics");
-        }
+        let raw_needles: Vec<String> = match &argument.kind {
+            ArgumentKind::Bare | ArgumentKind::Phrase => {
+                let raw = argument.raw.trim();
+                if raw.is_empty() {
+                    bail!("tag: requires a value");
+                }
+                vec![raw.to_string()]
+            }
+            ArgumentKind::List(values) => {
+                let normalized: Vec<String> = values
+                    .iter()
+                    .map(|value| value.trim())
+                    .filter(|value| !value.is_empty())
+                    .map(|value| value.to_string())
+                    .collect();
 
-        let raw = argument.raw.trim();
-        if raw.is_empty() {
-            bail!("tag: requires a value");
-        }
-        let needle = if options.case_insensitive {
-            raw.to_ascii_lowercase()
+                if normalized.is_empty() {
+                    bail!("tag: requires a value");
+                }
+                normalized
+            }
+            ArgumentKind::Range(_) | ArgumentKind::Comparison(_) => {
+                bail!("tag: does not support ranges or comparisons");
+            }
+        };
+        let needles = if options.case_insensitive {
+            raw_needles
+                .into_iter()
+                .map(|value| value.to_ascii_lowercase())
+                .collect()
         } else {
-            raw.to_string()
+            raw_needles
         };
 
         let Some(nodes) = self.nodes_from_base(base.clone(), token) else {
@@ -773,13 +793,13 @@ impl SearchCache {
                 .filter_map(|index| self.node_path(index).map(|path| (index, path)))
                 .par_bridge()
                 .filter_map(|(index, path)| {
-                    self.node_tags_match(&path, &needle, options.case_insensitive, token)?
+                    self.node_tags_match_any(&path, &needles, options.case_insensitive, token)?
                         .then_some(index)
                 })
                 .collect()
         } else {
             let spotlight_indices: Vec<SlabIndex> =
-                search_tags_using_mdfind(needle.as_str(), options.case_insensitive)?
+                search_tags_using_mdfind(needles, options.case_insensitive)?
                     .into_iter()
                     .filter_map(|path| self.node_index_for_raw_path(&path))
                     .collect();
@@ -890,17 +910,19 @@ impl SearchCache {
         Some(false)
     }
 
-    fn node_tags_match(
+    fn node_tags_match_any(
         &self,
         path: &Path,
-        needle: &str,
+        needles: &[String],
         case_insensitive: bool,
         token: CancellationToken,
     ) -> Option<bool> {
         token.is_cancelled()?;
 
         let tags = read_tags_from_path(path, case_insensitive)?;
-        let matched = tags.iter().any(|tag| tag.contains(needle));
+        let matched = tags
+            .iter()
+            .any(|tag| needles.iter().any(|needle| tag.contains(needle)));
         Some(matched)
     }
 

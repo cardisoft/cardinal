@@ -1248,7 +1248,7 @@ fn try_parse_list(raw: &str) -> Option<Vec<String>> {
         .map(|p| p.to_string())
         .collect();
 
-    if parts.len() > 1 { Some(parts) } else { None }
+    (!parts.is_empty()).then_some(parts)
 }
 
 /// Detects `<, <=, >, >=, =, !=` prefixes.
