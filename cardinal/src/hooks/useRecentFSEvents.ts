@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import type { RecentEventPayload } from '../types/ipc';
@@ -36,14 +36,14 @@ type RecentEventsOptions = {
 export function useRecentFSEvents({ caseSensitive, isActive }: RecentEventsOptions) {
   const eventsRef = useRef<RecentEventRecord[]>([]);
   const [eventFilterQuery, setEventFilterQuery] = useState('');
-  const [, triggerRender] = useReducer((count) => count + 1, 0);
   const isMountedRef = useRef(false);
   const isActiveRef = useRef(isActive);
+  const [bufferVersion, bumpBufferVersion] = useReducer((count: number) => count + 1, 0);
 
   useEffect(() => {
     isActiveRef.current = isActive;
     if (isActive) {
-      triggerRender();
+      bumpBufferVersion();
     }
   }, [isActive]);
 
@@ -73,7 +73,7 @@ export function useRecentFSEvents({ caseSensitive, isActive }: RecentEventsOptio
           eventsRef.current = updated;
 
           if (isActiveRef.current) {
-            triggerRender();
+            bumpBufferVersion();
           }
         });
       } catch (error) {
@@ -87,9 +87,13 @@ export function useRecentFSEvents({ caseSensitive, isActive }: RecentEventsOptio
       isMountedRef.current = false;
       unlistenEvents?.();
     };
-  }, [triggerRender]);
+  }, []);
 
-  const filteredEvents = filterBuffer(eventsRef.current, eventFilterQuery, caseSensitive);
+  const filteredEvents = useMemo(
+    () => filterBuffer(eventsRef.current, eventFilterQuery, caseSensitive),
+    // bufferVersion acts as the signal that the mutable eventsRef contents changed.
+    [eventFilterQuery, caseSensitive, bufferVersion],
+  );
 
   return {
     filteredEvents,
