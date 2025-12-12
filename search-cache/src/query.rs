@@ -450,14 +450,12 @@ impl SearchCache {
             },
         };
 
-        if !argument_applied {
-            if let Some(arg) = argument {
-                let Some(matches) = self.evaluate_phrase(&arg.raw, options, token)? else {
-                    return Ok(None);
-                };
-                if intersect_in_place(&mut nodes, &matches, token).is_none() {
-                    return Ok(None);
-                }
+        if !argument_applied && let Some(arg) = argument {
+            let Some(matches) = self.evaluate_phrase(&arg.raw, options, token)? else {
+                return Ok(None);
+            };
+            if intersect_in_place(&mut nodes, &matches, token).is_none() {
+                return Ok(None);
             }
         }
 
@@ -1103,10 +1101,10 @@ impl DatePredicate {
                     Some(value) => Some(parse_date_value(value, context)?.end),
                     None => None,
                 };
-                if let (Some(s), Some(e)) = (start, end) {
-                    if s > e {
-                        bail!("date range start must not exceed end");
-                    }
+                if let (Some(s), Some(e)) = (start, end)
+                    && s > e
+                {
+                    bail!("date range start must not exceed end");
                 }
                 Ok(Self {
                     kind: DatePredicateKind::Range { start, end },
@@ -1149,15 +1147,15 @@ impl DatePredicate {
     fn matches(&self, timestamp: i64) -> bool {
         match self.kind {
             DatePredicateKind::Range { start, end } => {
-                if let Some(bound) = start {
-                    if timestamp < bound {
-                        return false;
-                    }
+                if let Some(bound) = start
+                    && timestamp < bound
+                {
+                    return false;
                 }
-                if let Some(bound) = end {
-                    if timestamp > bound {
-                        return false;
-                    }
+                if let Some(bound) = end
+                    && timestamp > bound
+                {
+                    return false;
                 }
                 true
             }
@@ -1368,10 +1366,10 @@ impl SizePredicate {
                     Some(value) => Some(parse_size_literal(value)?),
                     None => None,
                 };
-                if let (Some(s), Some(e)) = (start, end) {
-                    if s > e {
-                        bail!("size range start must be less than or equal to the end");
-                    }
+                if let (Some(s), Some(e)) = (start, end)
+                    && s > e
+                {
+                    bail!("size range start must be less than or equal to the end");
                 }
                 Ok(SizePredicate {
                     kind: SizePredicateKind::Range {
@@ -1418,15 +1416,15 @@ impl SizePredicate {
                 ComparisonOp::Ne => size != *value,
             },
             SizePredicateKind::Range { min, max } => {
-                if let Some(start) = min {
-                    if size < *start {
-                        return false;
-                    }
+                if let Some(start) = min
+                    && size < *start
+                {
+                    return false;
                 }
-                if let Some(end) = max {
-                    if size > *end {
-                        return false;
-                    }
+                if let Some(end) = max
+                    && size > *end
+                {
+                    return false;
                 }
                 true
             }

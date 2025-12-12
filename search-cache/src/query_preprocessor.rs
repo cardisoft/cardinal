@@ -45,10 +45,10 @@ fn expand_term(term: Term, home: &str) -> Term {
 }
 
 fn expand_filter(mut filter: Filter, home: &str) -> Filter {
-    if filter_requires_path(&filter.kind) {
-        if let Some(argument) = filter.argument.as_mut() {
-            expand_filter_argument(argument, home);
-        }
+    if filter_requires_path(&filter.kind)
+        && let Some(argument) = filter.argument.as_mut()
+    {
+        expand_filter_argument(argument, home);
     }
     filter
 }
@@ -79,15 +79,15 @@ fn expand_filter_argument(argument: &mut FilterArgument, home: &str) {
 }
 
 fn expand_range(range: &mut RangeValue, home: &str) {
-    if let Some(start) = range.start.as_mut() {
-        if let Some(expanded) = expand_home_prefix(start, home) {
-            *start = expanded;
-        }
+    if let Some(start) = range.start.as_mut()
+        && let Some(expanded) = expand_home_prefix(start, home)
+    {
+        *start = expanded;
     }
-    if let Some(end) = range.end.as_mut() {
-        if let Some(expanded) = expand_home_prefix(end, home) {
-            *end = expanded;
-        }
+    if let Some(end) = range.end.as_mut()
+        && let Some(expanded) = expand_home_prefix(end, home)
+    {
+        *end = expanded;
     }
 }
 
