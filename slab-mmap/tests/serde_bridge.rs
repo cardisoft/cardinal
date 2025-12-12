@@ -37,7 +37,7 @@ fn build_patterned_slabs() -> (Slab<i32>, slab::Slab<i32>) {
         seed ^= seed << 7;
         seed ^= seed >> 9;
         seed ^= seed << 8;
-        let do_insert = keys.is_empty() || seed % 3 != 0;
+        let do_insert = keys.is_empty() || !seed.is_multiple_of(3);
         if do_insert {
             let value = (step ^ (seed as i32)) & 0x7fff;
             let k_m = mmap.insert(value).unwrap();
