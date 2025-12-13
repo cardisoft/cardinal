@@ -1,4 +1,3 @@
-// update_window_states removed; window state triggers use a bare channel.
 mod background;
 mod commands;
 mod lifecycle;
