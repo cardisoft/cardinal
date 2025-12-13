@@ -40,6 +40,14 @@ impl FileNodes {
         &self.path
     }
 
+    pub(crate) fn take_slab(&mut self) -> ThinSlab<SlabNode> {
+        std::mem::take(&mut self.slab)
+    }
+
+    pub(crate) fn put_slab(&mut self, slab: ThinSlab<SlabNode>) {
+        self.slab = slab;
+    }
+
     pub(crate) fn into_parts(self) -> (PathBuf, SlabIndex, ThinSlab<SlabNode>) {
         let Self { path, slab, root } = self;
         (path, root, slab)

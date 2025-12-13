@@ -2,6 +2,7 @@ mod background;
 mod commands;
 mod lifecycle;
 mod quicklook;
+mod search_activity;
 mod sort;
 mod window_controls;
 
@@ -54,6 +55,7 @@ pub fn run() -> Result<()> {
     let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>)>();
     let (rescan_tx, rescan_rx) = unbounded::<()>();
     let (icon_update_tx, icon_update_rx) = unbounded::<IconPayload>();
+    let (update_window_state_tx, update_window_state_rx) = bounded::<()>(1);
     let (logic_start_tx, logic_start_rx) = bounded(1);
     LOGIC_START
         .set(logic_start_tx)
@@ -64,34 +66,40 @@ pub fn run() -> Result<()> {
     {
         builder = builder.plugin(tauri_plugin_prevent_default::init());
     }
+    let update_window_state_tx_for_window = update_window_state_tx.clone();
     builder = builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
-        .on_window_event(|window, event| {
+        .on_window_event(move |window, event| {
             if window.label() != "main" {
                 return;
             }
 
-            let WindowEvent::CloseRequested { api, .. } = event else {
-                return;
-            };
+            match event {
+                WindowEvent::Focused(_) => {
+                    let _ = update_window_state_tx_for_window.try_send(());
+                }
+                WindowEvent::CloseRequested { api, .. } => {
+                    if EXIT_REQUESTED.load(Ordering::Relaxed) {
+                        return;
+                    }
 
-            if EXIT_REQUESTED.load(Ordering::Relaxed) {
-                return;
-            }
+                    api.prevent_close();
 
-            api.prevent_close();
+                    let Some(window) = window.get_webview_window("main") else {
+                        warn!("Close requested but main window is unavailable");
+                        return;
+                    };
 
-            let Some(window) = window.get_webview_window("main") else {
-                warn!("Close requested but main window is unavailable");
-                return;
-            };
-
-            if hide_window(&window) {
-                info!("Main window hidden; Cardinal keeps running in the background");
+                    if hide_window(&window) {
+                        let _ = update_window_state_tx_for_window.try_send(());
+                        info!("Main window hidden; Cardinal keeps running in the background");
+                    }
+                }
+                _ => {}
             }
         });
 
@@ -102,6 +110,7 @@ pub fn run() -> Result<()> {
             node_info_tx,
             icon_viewport_tx.clone(),
             rescan_tx.clone(),
+            update_window_state_tx.clone(),
         ))
         .invoke_handler(tauri::generate_handler![
             search,
@@ -136,6 +145,7 @@ pub fn run() -> Result<()> {
         icon_viewport_rx,
         rescan_rx,
         icon_update_tx,
+        update_window_state_rx,
     };
     emit_app_state(app_handle);
     let icon_update_rx = &icon_update_rx;
@@ -282,6 +292,7 @@ fn run_logic_thread(
         channels,
         WATCH_ROOT,
         FSE_LATENCY_SECS,
+        db_path.to_path_buf(),
     );
 
     info!("Background thread exited");
