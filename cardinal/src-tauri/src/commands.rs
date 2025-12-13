@@ -4,6 +4,7 @@ use crate::{
     quicklook::{
         QuickLookItemInput, close_preview_panel, toggle_preview_panel, update_preview_panel,
     },
+    search_activity,
     sort::{SortEntry, SortStatePayload, sort_entries},
     window_controls::{WindowToggle, activate_window, hide_window, toggle_window},
 };
@@ -59,6 +60,7 @@ pub struct SearchState {
     icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
     rescan_tx: Sender<()>,
     sorted_view_cache: Mutex<Option<SortedViewCache>>,
+    update_window_state_tx: Sender<()>,
 }
 
 impl SearchState {
@@ -68,6 +70,7 @@ impl SearchState {
         node_info_tx: Sender<NodeInfoRequest>,
         icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
         rescan_tx: Sender<()>,
+        update_window_state_tx: Sender<()>,
     ) -> Self {
         Self {
             search_tx,
@@ -76,6 +79,7 @@ impl SearchState {
             icon_viewport_tx,
             rescan_tx,
             sorted_view_cache: Mutex::new(None),
+            update_window_state_tx,
         }
     }
 
@@ -191,6 +195,8 @@ pub async fn search(
     version: u64,
     state: State<'_, SearchState>,
 ) -> Result<SearchResponse, String> {
+    search_activity::note_search_activity();
+
     let options = options.unwrap_or_default();
     let cancellation_token = CancellationToken::new(version);
     if let Err(e) = state.search_tx.send(SearchJob {
@@ -330,6 +336,9 @@ pub async fn hide_main_window(app: AppHandle) {
         && hide_window(&window)
     {
         info!("Main window hidden via command");
+        if let Some(state) = app.try_state::<SearchState>() {
+            let _ = state.update_window_state_tx.try_send(());
+        }
     }
 }
 
@@ -338,6 +347,9 @@ pub async fn activate_main_window(app: AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         activate_window(&window);
         info!("Main window activated via command");
+        if let Some(state) = app.try_state::<SearchState>() {
+            let _ = state.update_window_state_tx.try_send(());
+        }
     } else {
         warn!("Activate requested but main window is unavailable");
     }
@@ -350,6 +362,9 @@ pub async fn toggle_main_window(app: AppHandle) {
             info!("Main window hidden via command");
         } else {
             info!("Main window shown via command");
+        }
+        if let Some(state) = app.try_state::<SearchState>() {
+            let _ = state.update_window_state_tx.try_send(());
         }
     } else {
         warn!("Toggle requested but main window is unavailable");

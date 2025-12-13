@@ -1,4 +1,4 @@
-use tauri::{Emitter, Runtime, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow};
 use tracing::error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,4 +57,16 @@ pub fn toggle_window<R: Runtime>(window: &WebviewWindow<R>) -> WindowToggle {
         trigger_quick_launch(window);
         WindowToggle::Shown
     }
+}
+
+pub fn is_main_window_foreground(app_handle: &AppHandle) -> bool {
+    let Some(window) = app_handle.get_webview_window("main") else {
+        return false;
+    };
+
+    let visible = window.is_visible().unwrap_or(false);
+    let focused = window.is_focused().unwrap_or(false);
+    let minimized = window.is_minimized().unwrap_or(false);
+
+    visible && focused && !minimized
 }

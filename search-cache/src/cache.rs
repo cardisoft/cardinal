@@ -434,6 +434,28 @@ impl SearchCache {
         }
     }
 
+    pub fn flush_snapshot_to_file(&mut self, cache_path: &Path) -> Result<()> {
+        let name_index = self.name_index.as_persistent();
+        let slab = self.file_nodes.take_slab();
+
+        let storage = PersistentStorage {
+            version: Num,
+            last_event_id: self.last_event_id,
+            path: self.file_nodes.path().to_path_buf(),
+            slab_root: self.file_nodes.root(),
+            name_index,
+            slab,
+        };
+
+        let flush_result =
+            write_cache_to_file(cache_path, &storage).context("Write cache to file failed.");
+
+        let PersistentStorage { slab, .. } = storage;
+        self.file_nodes.put_slab(slab);
+
+        flush_result
+    }
+
     pub fn flush_to_file(self, cache_path: &Path) -> Result<()> {
         let Self {
             file_nodes: slab,
@@ -446,7 +468,7 @@ impl SearchCache {
         let name_index = name_index.into_persistent();
         write_cache_to_file(
             cache_path,
-            PersistentStorage {
+            &PersistentStorage {
                 version: Num,
                 path,
                 slab_root,

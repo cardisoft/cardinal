@@ -40,7 +40,7 @@ pub fn read_cache_from_file(path: &Path) -> Result<PersistentStorage> {
     Ok(storage)
 }
 
-pub fn write_cache_to_file(path: &Path, storage: PersistentStorage) -> Result<()> {
+pub fn write_cache_to_file(path: &Path, storage: &PersistentStorage) -> Result<()> {
     let cache_encode_time = Instant::now();
     let _ = fs::create_dir_all(path.parent().unwrap());
     let tmp_path = &path.with_extension(".sctmp");
@@ -52,7 +52,7 @@ pub fn write_cache_to_file(path: &Path, storage: PersistentStorage) -> Result<()
             .context("Failed to create parallel zstd encoder")?;
         let output = output.auto_finish();
         let mut output = BufWriter::new(output);
-        postcard::to_io(&storage, &mut output).context("Failed to encode cache")?;
+        postcard::to_io(storage, &mut output).context("Failed to encode cache")?;
     }
     fs::rename(tmp_path, path).context("Failed to rename cache file")?;
     info!("Cache encode time: {:?}", cache_encode_time.elapsed());

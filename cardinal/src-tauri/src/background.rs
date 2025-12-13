@@ -1,6 +1,8 @@
 use crate::{
     commands::{NodeInfoRequest, SearchJob},
     lifecycle::{AppLifecycleState, load_app_state, update_app_state},
+    search_activity,
+    window_controls::is_main_window_foreground,
 };
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
@@ -17,7 +19,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Emitter};
-use tracing::info;
+use tracing::{error, info};
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +37,7 @@ pub struct IconPayload {
 
 pub struct BackgroundLoopChannels {
     pub finish_rx: Receiver<Sender<Option<SearchCache>>>,
+    pub update_window_state_rx: Receiver<()>,
     pub search_rx: Receiver<SearchJob>,
     pub result_tx: Sender<Result<SearchOutcome>>,
     pub node_info_rx: Receiver<NodeInfoRequest>,
@@ -82,9 +85,11 @@ pub fn run_background_event_loop(
     channels: BackgroundLoopChannels,
     watch_root: &str,
     fse_latency_secs: f64,
+    db_path: PathBuf,
 ) {
     let BackgroundLoopChannels {
         finish_rx,
+        update_window_state_rx,
         search_rx,
         result_tx,
         node_info_rx,
@@ -94,12 +99,34 @@ pub fn run_background_event_loop(
     } = channels;
     let mut processed_events = 0usize;
     let mut history_ready = load_app_state() == AppLifecycleState::Ready;
+
+    let mut window_is_foreground = true;
+    let mut hide_flush_remaining_ticks: u8 = 0;
+    // Hide flush is polled on a 10s ticker; idle flush shares the same tick.
+    let flush_ticker = crossbeam_channel::tick(Duration::from_secs(10));
+
     loop {
         crossbeam_channel::select! {
             recv(finish_rx) -> tx => {
                 let tx = tx.expect("Finish channel closed");
                 tx.send(Some(cache)).expect("Failed to send cache");
                 return;
+            }
+            recv(update_window_state_rx) -> _ => {
+                // Recompute foreground state on demand instead of mirroring events.
+                let new_foreground = is_main_window_foreground(app_handle);
+                if window_is_foreground && !new_foreground {
+                    hide_flush_remaining_ticks = 2; // allow 10~20s before running hide flush
+                } else if new_foreground {
+                    hide_flush_remaining_ticks = 0;
+                }
+                window_is_foreground = new_foreground;
+            }
+            recv(flush_ticker) -> _ => {
+                if load_app_state() != AppLifecycleState::Ready {
+                    continue;
+                }
+                start_flush_checks(app_handle, &mut cache, &db_path, &mut hide_flush_remaining_ticks);
             }
             recv(search_rx) -> job => {
                 let SearchJob {
@@ -277,4 +304,40 @@ fn forward_new_events(app_handle: &AppHandle, snapshots: &[EventSnapshot]) {
         .collect();
 
     let _ = app_handle.emit("fs_events_batch", new_events);
+}
+
+fn start_flush_checks(
+    app_handle: &AppHandle,
+    cache: &mut SearchCache,
+    db_path: &PathBuf,
+    hide_flush_remaining_ticks: &mut u8,
+) {
+    let idle_flush = search_activity::search_idles();
+    let hide_flush = {
+        // Consume the pending hide flush counter; only fire once.
+        if *hide_flush_remaining_ticks > 0 {
+            *hide_flush_remaining_ticks -= 1;
+            *hide_flush_remaining_ticks == 0
+        } else {
+            false
+        }
+    };
+    let hide_flush = hide_flush && !is_main_window_foreground(app_handle);
+
+    if hide_flush {
+        let label = "background_after_close";
+        match cache.flush_snapshot_to_file(&db_path) {
+            Ok(()) => info!("Cache flushed successfully ({label}) to {:?}", db_path),
+            Err(e) => error!("Cache flush failed ({label}) to {:?}: {e:?}", db_path),
+        }
+        // Treat this as satisfying idle so we don't immediately follow with an idle flush.
+        search_activity::note_search_activity();
+    } else if idle_flush {
+        let label = "idle_fallback";
+        match cache.flush_snapshot_to_file(&db_path) {
+            Ok(()) => info!("Cache flushed successfully ({label}) to {:?}", db_path),
+            Err(e) => error!("Cache flush failed ({label}) to {:?}: {e:?}", db_path),
+        }
+        search_activity::note_search_activity(); // bump idle window forward
+    }
 }
