@@ -728,7 +728,7 @@ button:active:not(:disabled) {
   background-color: var(--row-even);
 }
 
-.row:hover {
+.row:not(.row-loading):hover {
   background-color: var(--row-hover);
 }
 
