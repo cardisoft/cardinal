@@ -11,7 +11,7 @@ pub fn note_search_activity() {
 }
 
 pub fn search_idles() -> bool {
-    elapsed_since_last_search().map_or(false, |elapsed| elapsed >= IDLE_FLUSH_INTERVAL)
+    elapsed_since_last_search().is_some_and(|elapsed| elapsed >= IDLE_FLUSH_INTERVAL)
 }
 
 fn elapsed_since_last_search() -> Option<Duration> {

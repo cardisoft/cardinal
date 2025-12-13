@@ -326,7 +326,7 @@ fn start_flush_checks(
 
     if hide_flush {
         let label = "background_after_close";
-        match cache.flush_snapshot_to_file(&db_path) {
+        match cache.flush_snapshot_to_file(db_path) {
             Ok(()) => info!("Cache flushed successfully ({label}) to {:?}", db_path),
             Err(e) => error!("Cache flush failed ({label}) to {:?}: {e:?}", db_path),
         }
@@ -334,7 +334,7 @@ fn start_flush_checks(
         search_activity::note_search_activity();
     } else if idle_flush {
         let label = "idle_fallback";
-        match cache.flush_snapshot_to_file(&db_path) {
+        match cache.flush_snapshot_to_file(db_path) {
             Ok(()) => info!("Cache flushed successfully ({label}) to {:?}", db_path),
             Err(e) => error!("Cache flush failed ({label}) to {:?}: {e:?}", db_path),
         }
