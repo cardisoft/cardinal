@@ -1,17 +1,17 @@
 <div align="center">
-  <img src="cardinal/mac-icon_1024x1024.png" alt="Icona di Cardinal" width="120" height="120">
+  <img src="../cardinal/mac-icon_1024x1024.png" alt="Icona di Cardinal" width="120" height="120">
   <h1>Cardinal</h1>
-  <p>Lo strumento di ricerca file più veloce per macOS.</p>
+  <p>App di ricerca file per macOS più veloce e precisa.</p>
   <p>
     <a href="#utilizzare-cardinal">Utilizzare Cardinal</a> ·
     <a href="#compilare-cardinal">Compilare Cardinal</a>
   </p>
-  <img src="doc/UI.gif" alt="Anteprima dell'interfaccia di Cardinal" width="720">
+  <img src="UI.gif" alt="Anteprima dell'interfaccia di Cardinal" width="720">
 </div>
 
 ---
 
-[English](README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
+[English](../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
 
 ## Utilizzare Cardinal
 
@@ -44,7 +44,7 @@ Cardinal ora affianca alla classica corrispondenza per sottostringa/prefisso una
 - `/report` · `draft/` · `/report/` – avvolgi i token con barre iniziali o finali per forzare corrispondenze di prefisso, suffisso o nome esatto quando serve controllo per parola oltre la sintassi Everything.
 - `~/**/.DS_Store` – il globstar (`**`) attraversa tutte le sottocartelle della tua home per trovare file `.DS_Store` sparsi.
 
-Consulta il catalogo degli operatori supportati—inclusi raggruppamento booleano, ambito cartelle, filtri per estensione, uso di regex e altri esempi—in [`doc/search-syntax.md`](doc/search-syntax.md).
+Consulta il catalogo degli operatori supportati—inclusi raggruppamento booleano, ambito cartelle, filtri per estensione, uso di regex e altri esempi—in [`search-syntax.md`](search-syntax.md).
 
 ### Scorciatoie da tastiera e anteprime
 

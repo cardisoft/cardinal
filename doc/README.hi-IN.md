@@ -1,17 +1,17 @@
 <div align="center">
-  <img src="cardinal/mac-icon_1024x1024.png" alt="Cardinal आइकन" width="120" height="120">
+  <img src="../cardinal/mac-icon_1024x1024.png" alt="Cardinal आइकन" width="120" height="120">
   <h1>Cardinal</h1>
-  <p>macOS के लिए सबसे तेज़ फ़ाइल खोज टूल।</p>
+  <p>macOS के लिए सबसे तेज़ और सबसे सटीक फ़ाइल खोज ऐप।</p>
   <p>
     <a href="#cardinal-का-उपयोग">Cardinal का उपयोग</a> ·
     <a href="#cardinal-बिल्ड-करें">Cardinal बिल्ड करें</a>
   </p>
-  <img src="doc/UI.gif" alt="Cardinal UI प्रीव्यू" width="720">
+  <img src="UI.gif" alt="Cardinal UI प्रीव्यू" width="720">
 </div>
 
 ---
 
-[English](README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
+[English](../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
 
 ## Cardinal का उपयोग
 
@@ -44,7 +44,7 @@ Cardinal अब क्लासिक substring/prefix मैचिंग के
 - `/report` · `draft/` · `/report/` – token के आगे/पीछे `/` लगाकर prefix, suffix या exact नाम मैच को मजबूर करें, जब Everything सिंटैक्स से आगे whole-word नियंत्रण चाहिए।
 - `~/**/.DS_Store` – globstar (`**`) आपके home directory के सभी subfolders में जाकर कहीं भी पड़े `.DS_Store` ढूँढता है।
 
-समर्थित ऑपरेटर कैटलॉग (boolean grouping, folder scoping, extension filters, regex और अधिक उदाहरण) के लिए [`doc/search-syntax.md`](doc/search-syntax.md) देखें।
+समर्थित ऑपरेटर कैटलॉग (boolean grouping, folder scoping, extension filters, regex और अधिक उदाहरण) के लिए [`search-syntax.md`](search-syntax.md) देखें।
 
 ### कीबोर्ड शॉर्टकट और प्रीव्यू
 

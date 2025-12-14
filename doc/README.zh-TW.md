@@ -1,17 +1,17 @@
 <div align="center">
-  <img src="cardinal/mac-icon_1024x1024.png" alt="Cardinal icon" width="120" height="120">
+  <img src="../cardinal/mac-icon_1024x1024.png" alt="Cardinal icon" width="120" height="120">
   <h1>Cardinal</h1>
-  <p>最快的 macOS 檔案搜尋工具。</p>
+  <p>最快又最準的 macOS 檔案搜尋應用程式</p>
   <p>
     <a href="#使用-cardinal">使用 Cardinal</a> ·
     <a href="#建置-cardinal">建置 Cardinal</a>
   </p>
-  <img src="doc/UI.gif" alt="Cardinal UI preview" width="720">
+  <img src="UI.gif" alt="Cardinal UI preview" width="720">
 </div>
 
 ---
 
-[English](README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
+[English](../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
 
 ## 使用 Cardinal
 
@@ -44,7 +44,7 @@ Cardinal 現在在經典的子字串/前綴匹配基礎上疊加了 Everything �
 - `/report` · `draft/` · `/report/` – 在詞首/詞尾添加 `/`，分別強制匹配前綴、後綴或精確檔名，補足 Everything 語法之外的整詞控制。
 - `~/**/.DS_Store` – `**` 會深入所有子目錄，在整個家目錄中查找散落的 `.DS_Store` 檔案。
 
-更多支援的運算子（布林組合、資料夾限定、擴充名過濾、正則示例等）請參見 [`doc/search-syntax.md`](doc/search-syntax.md)。
+更多支援的運算子（布林組合、資料夾限定、擴充名過濾、正則示例等）請參見 [`search-syntax.md`](search-syntax.md)。
 
 ### 鍵盤快捷鍵與預覽
 

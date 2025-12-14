@@ -1,7 +1,7 @@
 <div align="center">
   <img src="cardinal/mac-icon_1024x1024.png" alt="Cardinal icon" width="120" height="120">
   <h1>Cardinal</h1>
-  <p>Fastest file searching tool for macOS.</p>
+  <p>Fastest and most accurate file search app for macOS.</p>
   <p>
     <a href="#using-cardinal">Using Cardinal</a> ·
     <a href="#building-cardinal">Building Cardinal</a>
@@ -11,7 +11,7 @@
 
 ---
 
-[English](README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
+[English](README.md) · [Español](doc/README.es-ES.md) · [한국어](doc/README.ko-KR.md) · [Русский](doc/README.ru-RU.md) · [简体中文](doc/README.zh-CN.md) · [繁體中文](doc/README.zh-TW.md) · [Português](doc/README.pt-BR.md) · [Italiano](doc/README.it-IT.md) · [日本語](doc/README.ja-JP.md) · [Français](doc/README.fr-FR.md) · [Deutsch](doc/README.de-DE.md) · [Українська](doc/README.uk-UA.md) · [العربية](doc/README.ar-SA.md) · [हिन्दी](doc/README.hi-IN.md) · [Türkçe](doc/README.tr-TR.md)
 
 ## Using Cardinal
 
