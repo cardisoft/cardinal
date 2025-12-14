@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.18 — 2025-12-15
+- Persistent cache when idle or enter background.
+- Improve i18n locale detection and add zh-TW translation.
+- Make tags filtering accepts multiple value.
+- Supports shift+arrow to select multiple rows.
+- Various UI/UX improvements and bug fixes.
+
 ## 0.1.17 — 2025-12-10
 - Add `tag:` filter support so Finder tags can scope searches.
 - Better i18n support.
