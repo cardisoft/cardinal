@@ -729,8 +729,12 @@ button:active:not(:disabled) {
   background-color: var(--row-even);
 }
 
-.row:not(.row-loading):hover {
+.row:hover {
   background-color: var(--row-hover);
+}
+
+.row-loading:hover {
+  background-color: var(--row-even);
 }
 
 .row-selected {
