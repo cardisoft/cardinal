@@ -193,16 +193,13 @@ pub fn run() -> Result<()> {
                     app_handle.exit(0);
                 }
             }
-            RunEvent::Reopen {
-                has_visible_windows,
-                ..
-            } => {
-                if !has_visible_windows {
-                    if let Some(window) = app_handle.get_webview_window("main") {
-                        activate_window(&window);
-                    } else {
-                        warn!("Reopen requested but main window is unavailable");
-                    }
+            RunEvent::Reopen { .. } => {
+                // On macOS, clicking the Dock icon should bring the main window back even if the
+                // app still "has windows" but they are hidden.
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    activate_window(&window);
+                } else {
+                    warn!("Reopen requested but main window is unavailable");
                 }
             }
             _ => {}
