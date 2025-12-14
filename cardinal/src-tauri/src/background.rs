@@ -330,7 +330,7 @@ trait FlushSnapshot {
 
 impl FlushSnapshot for FlushSearchCache<'_> {
     fn flush_snapshot_to_file(&mut self) -> Result<()> {
-        SearchCache::flush_snapshot_to_file(&mut self.cache, self.db_path)
+        SearchCache::flush_snapshot_to_file(self.cache, self.db_path)
     }
     fn db_path(&self) -> &Path {
         self.db_path
