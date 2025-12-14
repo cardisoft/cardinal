@@ -192,6 +192,12 @@ const detectInitialLanguage = (): SupportedLanguage => {
   return DEFAULT_LANGUAGE;
 };
 
+export const __test__ = {
+  detectInitialLanguage,
+  normalizeBrowserLanguage,
+  normalizeStoredLanguage,
+} as const;
+
 void i18n.use(initReactI18next).init({
   resources,
   lng: detectInitialLanguage(),
