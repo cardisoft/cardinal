@@ -482,6 +482,7 @@ button:active:not(:disabled) {
 .col-resizer {
   position: absolute;
   top: 0;
+  right: 0;
   width: 6px;
   height: 100%;
   cursor: col-resize;
