@@ -1,17 +1,17 @@
 <div align="center">
-  <img src="cardinal/mac-icon_1024x1024.png" alt="أيقونة Cardinal" width="120" height="120">
+  <img src="../cardinal/mac-icon_1024x1024.png" alt="أيقونة Cardinal" width="120" height="120">
   <h1>Cardinal</h1>
-  <p>أسرع أداة للبحث عن الملفات على macOS.</p>
+  <p>أسرع وأدق تطبيق للبحث عن الملفات على macOS.</p>
   <p>
     <a href="#استخدام-cardinal">استخدام Cardinal</a> ·
     <a href="#بناء-cardinal">بناء Cardinal</a>
   </p>
-  <img src="doc/UI.gif" alt="معاينة واجهة Cardinal" width="720">
+  <img src="UI.gif" alt="معاينة واجهة Cardinal" width="720">
 </div>
 
 ---
 
-[English](README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
+[English](../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
 
 ## استخدام Cardinal
 
@@ -44,7 +44,7 @@ brew install --cask cardinal-search
 - `/report` · `draft/` · `/report/` – ضع `/` في بداية و/أو نهاية الرمز لفرض مطابقة البادئة أو اللاحقة أو الاسم الكامل عندما تحتاج تحكمًا أدق من صياغة Everything.
 - `~/**/.DS_Store` – الـ globstar (`**`) يتعمق في كل المجلدات الفرعية ضمن مجلد المنزل للعثور على ملفات `.DS_Store` المتناثرة.
 
-للاطلاع على قائمة المعاملات المدعومة (تجميع منطقي، تحديد نطاق المجلدات، فلاتر الامتداد، regex، وأمثلة إضافية)، راجع [`doc/search-syntax.md`](doc/search-syntax.md).
+للاطلاع على قائمة المعاملات المدعومة (تجميع منطقي، تحديد نطاق المجلدات، فلاتر الامتداد، regex، وأمثلة إضافية)، راجع [`search-syntax.md`](search-syntax.md).
 
 ### اختصارات لوحة المفاتيح والمعاينات
 

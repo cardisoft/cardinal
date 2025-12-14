@@ -1,17 +1,17 @@
 <div align="center">
-  <img src="cardinal/mac-icon_1024x1024.png" alt="Іконка Cardinal" width="120" height="120">
+  <img src="../cardinal/mac-icon_1024x1024.png" alt="Іконка Cardinal" width="120" height="120">
   <h1>Cardinal</h1>
-  <p>Найшвидший інструмент пошуку файлів для macOS.</p>
+  <p>Найшвидший і найточніший застосунок для пошуку файлів на macOS.</p>
   <p>
     <a href="#використання-cardinal">Використання Cardinal</a> ·
     <a href="#збірка-cardinal">Збірка Cardinal</a>
   </p>
-  <img src="doc/UI.gif" alt="Попередній перегляд інтерфейсу Cardinal" width="720">
+  <img src="UI.gif" alt="Попередній перегляд інтерфейсу Cardinal" width="720">
 </div>
 
 ---
 
-[English](README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
+[English](../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
 
 ## Використання Cardinal
 
@@ -44,7 +44,7 @@ Cardinal підтримує Everything-сумісний синтаксичний
 - `/report` · `draft/` · `/report/` – обгорніть токени провідним та/або кінцевим `/`, щоб примусити збіг за префіксом, суфіксом або точним ім’ям, коли потрібен контроль цілими словами поза Everything-синтаксисом.
 - `~/**/.DS_Store` – globstar (`**`) проходить усі підпапки домашнього каталогу, щоб знайти розкидані `.DS_Store`.
 
-Повний перелік операторів (булеві групи, обмеження папок, фільтри розширень, regex та інші приклади) див. у [`doc/search-syntax.md`](doc/search-syntax.md).
+Повний перелік операторів (булеві групи, обмеження папок, фільтри розширень, regex та інші приклади) див. у [`search-syntax.md`](search-syntax.md).
 
 ### Гарячі клавіші та перегляди
 

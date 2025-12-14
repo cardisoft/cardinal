@@ -1,17 +1,17 @@
 <div align="center">
-  <img src="cardinal/mac-icon_1024x1024.png" alt="Cardinal simgesi" width="120" height="120">
+  <img src="../cardinal/mac-icon_1024x1024.png" alt="Cardinal simgesi" width="120" height="120">
   <h1>Cardinal</h1>
-  <p>macOS için en hızlı dosya arama aracı.</p>
+  <p>macOS için en hızlı ve en doğru dosya arama uygulaması.</p>
   <p>
     <a href="#cardinali-kullanma">Cardinal’i kullanma</a> ·
     <a href="#cardinali-derleme">Cardinal’i derleme</a>
   </p>
-  <img src="doc/UI.gif" alt="Cardinal arayüz önizlemesi" width="720">
+  <img src="UI.gif" alt="Cardinal arayüz önizlemesi" width="720">
 </div>
 
 ---
 
-[English](README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
+[English](../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
 
 ## Cardinal’i kullanma
 
@@ -44,7 +44,7 @@ Cardinal artık klasik alt dize/ön ek eşleştirmesinin üzerine Everything uyu
 - `/report` · `draft/` · `/report/` – belirtecin başına/sonuna `/` ekleyerek Everything söz diziminin ötesinde, ön ek, son ek veya tam ad eşleştirmesini zorlayın.
 - `~/**/.DS_Store` – globstar (`**`) ev dizininizin altındaki tüm klasörlere iner ve her yerdeki `.DS_Store` dosyalarını bulur.
 
-Desteklenen operatör kataloğu (mantıksal gruplama, klasör kapsamı, uzantı filtreleri, regex kullanımı ve daha fazla örnek) için [`doc/search-syntax.md`](doc/search-syntax.md) dosyasına bakın.
+Desteklenen operatör kataloğu (mantıksal gruplama, klasör kapsamı, uzantı filtreleri, regex kullanımı ve daha fazla örnek) için [`search-syntax.md`](search-syntax.md) dosyasına bakın.
 
 ### Klavye kısayolları ve önizlemeler
 

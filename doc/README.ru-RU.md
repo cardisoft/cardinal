@@ -1,17 +1,17 @@
 <div align="center">
-  <img src="cardinal/mac-icon_1024x1024.png" alt="Иконка Cardinal" width="120" height="120">
+  <img src="../cardinal/mac-icon_1024x1024.png" alt="Иконка Cardinal" width="120" height="120">
   <h1>Cardinal</h1>
-  <p>Самый быстрый инструмент поиска файлов для macOS.</p>
+  <p>Самое быстрое и точное приложение для поиска файлов на macOS.</p>
   <p>
     <a href="#использование-cardinal">Использование Cardinal</a> ·
     <a href="#сборка-cardinal">Сборка Cardinal</a>
   </p>
-  <img src="doc/UI.gif" alt="Предпросмотр интерфейса Cardinal" width="720">
+  <img src="UI.gif" alt="Предпросмотр интерфейса Cardinal" width="720">
 </div>
 
 ---
 
-[English](README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
+[English](../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
 
 ## Использование Cardinal
 
@@ -44,7 +44,7 @@ Cardinal теперь поддерживает совместимую с Everyth
 - `/report` · `draft/` · `/report/` – добавляйте косые черты в начале или конце токена, чтобы принудить совпадения по префиксу, суффиксу или точному имени, когда нужен контроль на уровне слова, выходящий за рамки синтаксиса Everything.
 - `~/**/.DS_Store` – `**` углубляется во все вложенные папки домашнего каталога, чтобы найти разбросанные `.DS_Store`.
 
-Каталог поддерживаемых операторов (булева группировка, ограничение папок, фильтры по расширению, регулярные выражения и дополнительные примеры) смотрите в [`doc/search-syntax.md`](doc/search-syntax.md).
+Каталог поддерживаемых операторов (булева группировка, ограничение папок, фильтры по расширению, регулярные выражения и дополнительные примеры) смотрите в [`search-syntax.md`](search-syntax.md).
 
 ### Горячие клавиши и предпросмотры
 
