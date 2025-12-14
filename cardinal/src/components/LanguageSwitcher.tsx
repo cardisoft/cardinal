@@ -14,8 +14,12 @@ const LanguageSwitcher = ({ className }: LanguageSwitcherProps): React.JSX.Eleme
     void i18n.changeLanguage(nextLang);
   };
 
+  // Match exact code first, then fall back to the longest prefix so values like "en-US" map to "en".
   const currentCode =
-    LANGUAGE_OPTIONS.find((option) => i18n.language.startsWith(option.code))?.code ??
+    LANGUAGE_OPTIONS.find((option) => option.code === i18n.language)?.code ??
+    [...LANGUAGE_OPTIONS]
+      .sort((a, b) => b.code.length - a.code.length)
+      .find((option) => i18n.language.startsWith(option.code))?.code ??
     LANGUAGE_OPTIONS[0].code;
 
   return (
