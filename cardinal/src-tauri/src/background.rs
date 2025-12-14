@@ -199,6 +199,7 @@ pub fn run_background_event_loop(
                     watch_root,
                     fse_latency_secs,
                     &mut history_ready,
+                    &mut processed_events
                 );
             }
             recv(event_watcher) -> events => {
@@ -232,6 +233,7 @@ pub fn run_background_event_loop(
                         watch_root,
                         fse_latency_secs,
                         &mut history_ready,
+                        &mut processed_events
                     );
                 }
 
@@ -250,11 +252,13 @@ fn perform_rescan(
     watch_root: &str,
     fse_latency_secs: f64,
     history_ready: &mut bool,
+    processed_events: &mut usize,
 ) {
     *event_watcher = EventWatcher::noop();
     update_app_state(app_handle, AppLifecycleState::Initializing);
     emit_status_bar_update(app_handle, 0, 0);
     *history_ready = false;
+    *processed_events = 0;
 
     let walk_data = cache.walk_data();
     let walking_done = AtomicBool::new(false);
