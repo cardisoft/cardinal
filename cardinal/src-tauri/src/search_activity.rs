@@ -3,7 +3,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-const IDLE_FLUSH_INTERVAL: Duration = Duration::from_secs(5 * 60);
+pub(crate) const IDLE_FLUSH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 static LAST_SEARCH_AT_MS: AtomicU64 = AtomicU64::new(0);
 
 pub fn note_search_activity() {
