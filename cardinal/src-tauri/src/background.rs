@@ -468,7 +468,7 @@ mod tests {
         assert_eq!(cache.flushes, 0, "no flush on first tick");
         assert_eq!(pending, 1, "pending decremented to 1");
 
-        // Second tick should trigger the hide/hide flush
+        // Second tick should trigger the hide flush
         let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
         assert!(flushed, "hide flush was performed");
         assert_eq!(cache.flushes, 1, "flush should run on second tick");
@@ -480,7 +480,7 @@ mod tests {
         let mut cache = FakeCache::default();
         let mut pending = 1;
 
-        // When both an idle flush is due and a hide/hide flush fires, hide flush
+        // When both an idle flush is due and a hide flush fires, hide flush
         // should run and it should satisfy the idle window so we don't double-flush.
         let flushed = start_flush_checks(|| false, || true, &mut cache, &mut pending);
 
@@ -508,7 +508,7 @@ mod tests {
         let mut cache = FakeCacheErr;
         let mut pending = 1;
 
-        // Hide flush attempt fails; hide/background code treats the hide flush as
+        // Hide flush attempt fails; the hide flush logic treats the flush as
         // satisfying the idle window (it bumps the idle timestamp even on errors).
         let flushed = start_flush_checks(|| false, || true, &mut cache, &mut pending);
 
@@ -516,7 +516,7 @@ mod tests {
         // idle window should still be considered idle and search_idles() should be true.
         assert!(
             flushed,
-            "failed hide/hide flush should still satisfy idle window (bumped)"
+            "failed hide flush should still satisfy idle window (bumped)"
         );
         assert_eq!(
             pending, 0,
