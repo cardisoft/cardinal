@@ -121,15 +121,27 @@ const normalizeStoredLanguage = (stored: string): SupportedLanguage | undefined 
 };
 
 const normalizeBrowserLanguage = (lng: string): SupportedLanguage => {
-  if (lng in resources) {
-    return lng as SupportedLanguage;
+  const normalizedInput = lng.replace(/_/g, '-');
+
+  if (normalizedInput in resources) {
+    return normalizedInput as SupportedLanguage;
   }
 
-  const [base, regionOrScript] = lng.split('-', 2);
+  const [rawBase, ...subtags] = normalizedInput
+    .split('-')
+    .filter((part): part is string => part.length > 0);
+  const base = rawBase?.toLowerCase();
 
   if (base === 'zh') {
-    const tag = regionOrScript?.toUpperCase();
-    if (tag === 'HANT' || tag === 'TW' || tag === 'HK' || tag === 'MO') {
+    const upperSubtags = subtags.map((subtag) => subtag.toUpperCase());
+
+    if (upperSubtags.includes('HANT')) {
+      return 'zh-TW';
+    }
+    if (upperSubtags.includes('HANS')) {
+      return 'zh-CN';
+    }
+    if (upperSubtags.some((subtag) => subtag === 'TW' || subtag === 'HK' || subtag === 'MO')) {
       return 'zh-TW';
     }
     return 'zh-CN';

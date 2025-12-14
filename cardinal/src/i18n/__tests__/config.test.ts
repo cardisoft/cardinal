@@ -30,11 +30,36 @@ describe('i18n locale normalization', () => {
 
     expect(__test__.normalizeBrowserLanguage('zh')).toBe('zh-CN');
     expect(__test__.normalizeBrowserLanguage('zh-Hans')).toBe('zh-CN');
+    expect(__test__.normalizeBrowserLanguage('zh-Hans-CN')).toBe('zh-CN');
     expect(__test__.normalizeBrowserLanguage('zh-Hant')).toBe('zh-TW');
+    expect(__test__.normalizeBrowserLanguage('zh-Hant-HK')).toBe('zh-TW');
     expect(__test__.normalizeBrowserLanguage('zh-hk')).toBe('zh-TW');
     expect(__test__.normalizeBrowserLanguage('zh-MO')).toBe('zh-TW');
+    expect(__test__.normalizeBrowserLanguage('zh_TW')).toBe('zh-TW');
 
     expect(__test__.normalizeBrowserLanguage('unknown')).toBe('en-US');
+  });
+
+  it('normalizes all legacy language codes correctly', () => {
+    expect(__test__.normalizeBrowserLanguage('en')).toBe('en-US');
+    expect(__test__.normalizeBrowserLanguage('ja')).toBe('ja-JP');
+    expect(__test__.normalizeBrowserLanguage('ko')).toBe('ko-KR');
+    expect(__test__.normalizeBrowserLanguage('fr')).toBe('fr-FR');
+    expect(__test__.normalizeBrowserLanguage('es')).toBe('es-ES');
+    expect(__test__.normalizeBrowserLanguage('pt')).toBe('pt-BR');
+    expect(__test__.normalizeBrowserLanguage('de')).toBe('de-DE');
+    expect(__test__.normalizeBrowserLanguage('it')).toBe('it-IT');
+    expect(__test__.normalizeBrowserLanguage('ru')).toBe('ru-RU');
+    expect(__test__.normalizeBrowserLanguage('uk')).toBe('uk-UA');
+    expect(__test__.normalizeBrowserLanguage('ar')).toBe('ar-SA');
+    expect(__test__.normalizeBrowserLanguage('hi')).toBe('hi-IN');
+    expect(__test__.normalizeBrowserLanguage('tr')).toBe('tr-TR');
+  });
+
+  it('handles underscore separators in browser language tags', () => {
+    expect(__test__.normalizeBrowserLanguage('zh_CN')).toBe('zh-CN');
+    expect(__test__.normalizeBrowserLanguage('zh_TW')).toBe('zh-TW');
+    expect(__test__.normalizeBrowserLanguage('en_US')).toBe('en-US');
   });
 
   it('detects initial language from localStorage first (supported + legacy)', () => {
@@ -77,5 +102,50 @@ describe('i18n locale normalization', () => {
   it('initializes i18n with a supported language', () => {
     expect(LANGUAGE_OPTIONS.map((option) => option.code)).toContain(i18n.language);
   });
+
+  it('handles empty localStorage gracefully', () => {
+    window.localStorage.setItem('cardinal.language', '');
+
+    const navigatorLanguage = vi
+      .spyOn(window.navigator, 'language', 'get')
+      .mockReturnValue('fr-FR');
+
+    expect(__test__.detectInitialLanguage()).toBe('fr-FR');
+    navigatorLanguage.mockRestore();
+  });
+
+  it('detects initial language in SSR environment (window undefined)', () => {
+    const originalWindow = global.window;
+
+    // @ts-expect-error - testing SSR scenario
+    delete global.window;
+
+    expect(__test__.detectInitialLanguage()).toBe('en-US');
+
+    global.window = originalWindow;
+  });
 });
 
+describe('i18n language change events', () => {
+  it('persists language to localStorage on change', () => {
+    i18n.changeLanguage('ja-JP');
+    expect(window.localStorage.getItem('cardinal.language')).toBe('ja-JP');
+  });
+
+  it('updates document.documentElement.lang on change', () => {
+    i18n.changeLanguage('ko-KR');
+    expect(document.documentElement.lang).toBe('ko-KR');
+  });
+
+  it('handles localStorage write errors gracefully', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('quota exceeded');
+    });
+
+    expect(() => i18n.changeLanguage('de-DE')).not.toThrow();
+
+    setItemSpy.mockRestore();
+    warn.mockRestore();
+  });
+});
