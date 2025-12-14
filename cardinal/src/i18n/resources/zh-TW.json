@@ -1,0 +1,140 @@
+{
+  "search": {
+    "placeholder": {
+      "files": "搜尋檔案和資料夾…",
+      "events": "依路徑或名稱篩選事件…"
+    },
+    "options": {
+      "caseSensitive": "切換區分大小寫比對"
+    }
+  },
+  "stateDisplay": {
+    "loading": "正在搜尋…",
+    "error": "搜尋發生錯誤",
+    "emptyTitle": "「{{query}}」沒有符合結果",
+    "emptyMessage": "試著調整關鍵字或篩選條件。"
+  },
+  "columns": {
+    "filename": "檔名",
+    "path": "路徑",
+    "size": "大小",
+    "modified": "修改時間",
+    "created": "建立時間"
+  },
+  "sorting": {
+    "disabled": "排序已停用。結果超過 {{limit}} 個可能影響效能。你可以在偏好設定中調整門檻。"
+  },
+  "events": {
+    "columns": {
+      "time": "時間",
+      "event": "事件",
+      "name": "檔名",
+      "path": "路徑"
+    },
+    "empty": {
+      "title": "目前沒有檔案事件。",
+      "hint": "繼續工作，稍後回來查看更新。"
+    }
+  },
+  "contextMenu": {
+    "openItem": "打開",
+    "quickLook": "快速檢視",
+    "revealInFinder": "在 Finder 中顯示",
+    "copyPath": "複製路徑",
+    "copyFilename": "複製檔名",
+    "resetColumnWidths": "重設欄寬"
+  },
+  "statusBar": {
+    "tabs": {
+      "files": "檔案",
+      "events": "事件"
+    },
+    "lifecycle": {
+      "Initializing": "正在初始化",
+      "Updating": "正在更新",
+      "Ready": "就緒"
+    },
+    "aria": {
+      "status": "應用狀態：{{status}}",
+      "tablist": "搜尋狀態視圖",
+      "rescan": "觸發檔案系統重新掃描",
+      "settings": "打開偏好設定"
+    },
+    "rescan": {
+      "disabledHint": "Cardinal 就緒後即可重新掃描。",
+      "enabledHint": "觸發一次完整的檔案系統重新掃描。"
+    },
+    "searchLabel": "搜尋：",
+    "resultsUnavailable": "—",
+    "resultsCount_other": "{{formatted}} 個結果",
+    "duration": "{{value}} 毫秒",
+    "resultsWithDuration": "{{results}} • {{duration}}",
+    "resultsTitle": "結果 • 耗時"
+  },
+  "app": {
+    "fullDiskAccess": {
+      "title": "需要完整磁碟存取權",
+      "description": "Cardinal 需要 macOS 的「完整磁碟存取」權限才能索引並監控系統中的檔案。請在系統設定中為 Cardinal 啟用完整磁碟存取。",
+      "steps": {
+        "one": "打開 系統設定 > 隱私權與安全性 > 完整磁碟存取。",
+        "two": "點擊鎖頭圖示以允許變更，並啟用 Cardinal。",
+        "three": "依提示允許 macOS 重新啟動 Cardinal。"
+      },
+      "status": {
+        "checking": "正在檢查權限狀態…",
+        "disabled": "完整磁碟存取已停用。"
+      },
+      "openSettings": "打開系統設定"
+    }
+  },
+  "menu": {
+    "about": "關於 {{appName}}",
+    "preferences": "偏好設定",
+    "hide": "隱藏",
+    "quit": "結束 {{appName}}",
+    "edit": "編輯",
+    "undo": "復原",
+    "redo": "重做",
+    "cut": "剪下",
+    "copy": "複製",
+    "paste": "貼上",
+    "selectAll": "全選",
+    "view": "檢視",
+    "fullscreen": "切換全螢幕",
+    "window": "視窗",
+    "minimize": "最小化",
+    "maximize": "縮放視窗",
+    "closeWindow": "關閉視窗",
+    "help": "說明",
+    "getUpdates": "取得更新"
+  },
+  "preferences": {
+    "title": "偏好設定",
+    "heading": "自訂 Cardinal",
+    "subtitle": "隨心調整外觀與語言。",
+    "appearance": "外觀",
+    "themeHint": "選擇淺色、深色或跟隨系統。",
+    "language": "語言",
+    "languageHint": "立即切換介面語言。",
+    "sortingLimit": {
+      "label": "排序上限"
+    },
+    "close": "關閉"
+  },
+  "language": {
+    "label": "語言",
+    "separator": "：",
+    "trigger": "🌐"
+  },
+  "theme": {
+    "label": "主題",
+    "options": {
+      "system": "跟隨系統",
+      "light": "淺色模式",
+      "dark": "深色模式"
+    }
+  },
+  "tray": {
+    "quit": "結束 Cardinal"
+  }
+}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { LANGUAGE_OPTIONS } from '../i18n/config';
+import { LANGUAGE_OPTIONS, normalizeLanguageTag } from '../i18n/config';
 
 type LanguageSwitcherProps = {
   className?: string;
@@ -14,9 +14,7 @@ const LanguageSwitcher = ({ className }: LanguageSwitcherProps): React.JSX.Eleme
     void i18n.changeLanguage(nextLang);
   };
 
-  const currentCode =
-    LANGUAGE_OPTIONS.find((option) => i18n.language.startsWith(option.code))?.code ??
-    LANGUAGE_OPTIONS[0].code;
+  const currentCode = normalizeLanguageTag(i18n.language);
 
   return (
     <div className={className}>

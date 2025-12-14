@@ -1,21 +1,83 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import en from './resources/en.json';
-import zh from './resources/zh.json';
-import ja from './resources/ja.json';
-import ko from './resources/ko.json';
-import fr from './resources/fr.json';
-import es from './resources/es.json';
-import pt from './resources/pt.json';
-import de from './resources/de.json';
-import it from './resources/it.json';
-import ru from './resources/ru.json';
-import uk from './resources/uk.json';
-import ar from './resources/ar.json';
-import hi from './resources/hi.json';
-import tr from './resources/tr.json';
+import enUS from './resources/en-US.json';
+import zhCN from './resources/zh-CN.json';
+import zhTW from './resources/zh-TW.json';
+import jaJP from './resources/ja-JP.json';
+import koKR from './resources/ko-KR.json';
+import frFR from './resources/fr-FR.json';
+import esES from './resources/es-ES.json';
+import ptBR from './resources/pt-BR.json';
+import deDE from './resources/de-DE.json';
+import itIT from './resources/it-IT.json';
+import ruRU from './resources/ru-RU.json';
+import ukUA from './resources/uk-UA.json';
+import arSA from './resources/ar-SA.json';
+import hiIN from './resources/hi-IN.json';
+import trTR from './resources/tr-TR.json';
 
 export type SupportedLanguage =
+  | 'en-US'
+  | 'zh-CN'
+  | 'zh-TW'
+  | 'ja-JP'
+  | 'ko-KR'
+  | 'fr-FR'
+  | 'es-ES'
+  | 'pt-BR'
+  | 'de-DE'
+  | 'it-IT'
+  | 'ru-RU'
+  | 'uk-UA'
+  | 'ar-SA'
+  | 'hi-IN'
+  | 'tr-TR';
+
+type LanguageOption = {
+  code: SupportedLanguage;
+  label: string;
+};
+
+export const LANGUAGE_OPTIONS: LanguageOption[] = [
+  { code: 'en-US', label: 'English' },
+  { code: 'zh-CN', label: '简体中文' },
+  { code: 'zh-TW', label: '繁體中文' },
+  { code: 'ja-JP', label: '日本語' },
+  { code: 'ko-KR', label: '한국어' },
+  { code: 'fr-FR', label: 'Français' },
+  { code: 'es-ES', label: 'Español' },
+  { code: 'pt-BR', label: 'Português (Brasil)' },
+  { code: 'de-DE', label: 'Deutsch' },
+  { code: 'it-IT', label: 'Italiano' },
+  { code: 'ru-RU', label: 'Русский' },
+  { code: 'uk-UA', label: 'Українська' },
+  { code: 'ar-SA', label: 'العربية' },
+  { code: 'hi-IN', label: 'हिन्दी' },
+  { code: 'tr-TR', label: 'Türkçe' },
+];
+
+const STORAGE_KEY = 'cardinal.language';
+const DEFAULT_LANGUAGE: SupportedLanguage = 'en-US';
+
+const resources = {
+  'en-US': { translation: enUS },
+  'zh-CN': { translation: zhCN },
+  'zh-TW': { translation: zhTW },
+  'ja-JP': { translation: jaJP },
+  'ko-KR': { translation: koKR },
+  'fr-FR': { translation: frFR },
+  'es-ES': { translation: esES },
+  'pt-BR': { translation: ptBR },
+  'de-DE': { translation: deDE },
+  'it-IT': { translation: itIT },
+  'ru-RU': { translation: ruRU },
+  'uk-UA': { translation: ukUA },
+  'ar-SA': { translation: arSA },
+  'hi-IN': { translation: hiIN },
+  'tr-TR': { translation: trTR },
+} as const;
+
+type LegacyLanguage =
   | 'en'
   | 'zh'
   | 'ja'
@@ -31,47 +93,94 @@ export type SupportedLanguage =
   | 'hi'
   | 'tr';
 
-type LanguageOption = {
-  code: SupportedLanguage;
-  label: string;
+const LEGACY_LANGUAGE_MAP: Record<LegacyLanguage, SupportedLanguage> = {
+  en: 'en-US',
+  zh: 'zh-CN',
+  ja: 'ja-JP',
+  ko: 'ko-KR',
+  fr: 'fr-FR',
+  es: 'es-ES',
+  pt: 'pt-BR',
+  de: 'de-DE',
+  it: 'it-IT',
+  ru: 'ru-RU',
+  uk: 'uk-UA',
+  ar: 'ar-SA',
+  hi: 'hi-IN',
+  tr: 'tr-TR',
 };
 
-export const LANGUAGE_OPTIONS: LanguageOption[] = [
-  { code: 'en', label: 'English' },
-  { code: 'zh', label: '中文' },
-  { code: 'ja', label: '日本語' },
-  { code: 'ko', label: '한국어' },
-  { code: 'fr', label: 'Français' },
-  { code: 'es', label: 'Español' },
-  { code: 'pt', label: 'Português' },
-  { code: 'de', label: 'Deutsch' },
-  { code: 'it', label: 'Italiano' },
-  { code: 'ru', label: 'Русский' },
-  { code: 'uk', label: 'Українська' },
-  { code: 'ar', label: 'العربية' },
-  { code: 'hi', label: 'हिन्दी' },
-  { code: 'tr', label: 'Türkçe' },
-];
+const normalizeStoredLanguage = (stored: string): SupportedLanguage | undefined => {
+  if (stored in resources) {
+    return stored as SupportedLanguage;
+  }
+  if (stored in LEGACY_LANGUAGE_MAP) {
+    return LEGACY_LANGUAGE_MAP[stored as LegacyLanguage];
+  }
+  return undefined;
+};
 
-const STORAGE_KEY = 'cardinal.language';
-const DEFAULT_LANGUAGE: SupportedLanguage = 'en';
+const normalizeBrowserLanguage = (lng: string): SupportedLanguage => {
+  const normalizedInput = lng.replace(/_/g, '-');
 
-const resources = {
-  en: { translation: en },
-  zh: { translation: zh },
-  ja: { translation: ja },
-  ko: { translation: ko },
-  fr: { translation: fr },
-  es: { translation: es },
-  pt: { translation: pt },
-  de: { translation: de },
-  it: { translation: it },
-  ru: { translation: ru },
-  uk: { translation: uk },
-  ar: { translation: ar },
-  hi: { translation: hi },
-  tr: { translation: tr },
-} as const;
+  if (normalizedInput in resources) {
+    return normalizedInput as SupportedLanguage;
+  }
+
+  const [rawBase, ...subtags] = normalizedInput
+    .split('-')
+    .filter((part): part is string => part.length > 0);
+  const base = rawBase?.toLowerCase();
+
+  if (base === 'zh') {
+    const upperSubtags = subtags.map((subtag) => subtag.toUpperCase());
+
+    if (upperSubtags.includes('HANT')) {
+      return 'zh-TW';
+    }
+    if (upperSubtags.includes('HANS')) {
+      return 'zh-CN';
+    }
+    if (upperSubtags.some((subtag) => subtag === 'TW' || subtag === 'HK' || subtag === 'MO')) {
+      return 'zh-TW';
+    }
+    return 'zh-CN';
+  }
+
+  switch (base) {
+    case 'en':
+      return 'en-US';
+    case 'ja':
+      return 'ja-JP';
+    case 'ko':
+      return 'ko-KR';
+    case 'fr':
+      return 'fr-FR';
+    case 'es':
+      return 'es-ES';
+    case 'pt':
+      return 'pt-BR';
+    case 'de':
+      return 'de-DE';
+    case 'it':
+      return 'it-IT';
+    case 'ru':
+      return 'ru-RU';
+    case 'uk':
+      return 'uk-UA';
+    case 'ar':
+      return 'ar-SA';
+    case 'hi':
+      return 'hi-IN';
+    case 'tr':
+      return 'tr-TR';
+    default:
+      return DEFAULT_LANGUAGE;
+  }
+};
+
+export const normalizeLanguageTag = (lng: string): SupportedLanguage =>
+  normalizeBrowserLanguage(lng);
 
 const detectInitialLanguage = (): SupportedLanguage => {
   if (typeof window === 'undefined') {
@@ -79,26 +188,36 @@ const detectInitialLanguage = (): SupportedLanguage => {
   }
 
   try {
-    const stored = window.localStorage.getItem(STORAGE_KEY) as SupportedLanguage | null;
-    if (stored && resources[stored]) {
-      return stored;
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const normalized = normalizeStoredLanguage(stored);
+      if (normalized) {
+        return normalized;
+      }
     }
   } catch (error) {
     console.warn('Unable to read saved language preference', error);
   }
 
-  const browserLang = window.navigator.language?.split('-')?.[0] as SupportedLanguage | undefined;
-  if (browserLang && resources[browserLang]) {
-    return browserLang;
+  const browserLang = window.navigator.language;
+  if (browserLang) {
+    return normalizeLanguageTag(browserLang);
   }
 
   return DEFAULT_LANGUAGE;
 };
 
+export const __test__ = {
+  detectInitialLanguage,
+  normalizeBrowserLanguage,
+  normalizeStoredLanguage,
+} as const;
+
 void i18n.use(initReactI18next).init({
   resources,
   lng: detectInitialLanguage(),
   fallbackLng: DEFAULT_LANGUAGE,
+  supportedLngs: Object.keys(resources),
   interpolation: {
     escapeValue: false,
   },
