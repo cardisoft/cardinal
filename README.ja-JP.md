@@ -3,8 +3,8 @@
   <h1>Cardinal</h1>
   <p>macOS で最速のファイル検索ツール。</p>
   <p>
-    <a href="#cardinalの使い方">Cardinal の使い方</a> ·
-    <a href="#cardinalのビルド">Cardinal のビルド</a>
+    <a href="#cardinalの使い方">Cardinalの使い方</a> ·
+    <a href="#cardinalのビルド">Cardinalのビルド</a>
   </p>
   <img src="doc/UI.gif" alt="Cardinal UI プレビュー" width="720">
 </div>
