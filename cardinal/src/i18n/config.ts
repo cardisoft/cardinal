@@ -179,6 +179,9 @@ const normalizeBrowserLanguage = (lng: string): SupportedLanguage => {
   }
 };
 
+export const normalizeLanguageTag = (lng: string): SupportedLanguage =>
+  normalizeBrowserLanguage(lng);
+
 const detectInitialLanguage = (): SupportedLanguage => {
   if (typeof window === 'undefined') {
     return DEFAULT_LANGUAGE;
@@ -198,7 +201,7 @@ const detectInitialLanguage = (): SupportedLanguage => {
 
   const browserLang = window.navigator.language;
   if (browserLang) {
-    return normalizeBrowserLanguage(browserLang);
+    return normalizeLanguageTag(browserLang);
   }
 
   return DEFAULT_LANGUAGE;
