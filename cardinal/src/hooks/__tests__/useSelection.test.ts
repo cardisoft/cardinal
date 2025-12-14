@@ -1,21 +1,22 @@
 import { renderHook, act } from '@testing-library/react';
-import { createRef } from 'react';
+import type { MutableRefObject } from 'react';
 import { describe, expect, it } from 'vitest';
 import type { VirtualListHandle } from '../../components/VirtualList';
 import type { SearchResultItem } from '../../types/search';
 import { toSlabIndexArray } from '../../types/slab';
 import { useSelection } from '../useSelection';
 
-const createVirtualListRef = () => {
-  const ref = createRef<VirtualListHandle>();
-  ref.current = {
+const createVirtualListRef = (
+  overrides?: Partial<VirtualListHandle>,
+): MutableRefObject<VirtualListHandle | null> => ({
+  current: {
     scrollToTop: () => {},
     scrollToRow: () => {},
     ensureRangeLoaded: () => {},
-    getItem: (index) => ({ path: `item-${index}` }) as SearchResultItem,
-  };
-  return ref;
-};
+    getItem: (index: number) => ({ path: `item-${index}` }) as SearchResultItem,
+    ...overrides,
+  },
+});
 
 type SelectOptions = {
   isShift?: boolean;
@@ -516,13 +517,7 @@ describe('useSelection', () => {
     });
 
     it('does nothing when getItem returns undefined', () => {
-      const virtualListRef = createRef<VirtualListHandle>();
-      virtualListRef.current = {
-        scrollToTop: () => {},
-        scrollToRow: () => {},
-        ensureRangeLoaded: () => {},
-        getItem: () => undefined,
-      };
+      const virtualListRef = createVirtualListRef({ getItem: () => undefined });
 
       const hook = renderHook(() => useSelection(toSlabIndexArray([0, 1, 2]), 0, virtualListRef));
 
@@ -607,8 +602,7 @@ describe('useSelection', () => {
     });
 
     it('returns an empty array when virtualListRef is null', () => {
-      const virtualListRef = createRef<VirtualListHandle>();
-      virtualListRef.current = null;
+      const virtualListRef: MutableRefObject<VirtualListHandle | null> = { current: null };
 
       const hook = renderHook(() => useSelection(toSlabIndexArray([0, 1, 2]), 0, virtualListRef));
 
@@ -620,18 +614,14 @@ describe('useSelection', () => {
     });
 
     it('skips items without paths when computing selectedPaths', () => {
-      const virtualListRef = createRef<VirtualListHandle>();
-      virtualListRef.current = {
-        scrollToTop: () => {},
-        scrollToRow: () => {},
-        ensureRangeLoaded: () => {},
-        getItem: (index) => {
+      const virtualListRef = createVirtualListRef({
+        getItem: (index: number) => {
           if (index === 1) {
             return {} as SearchResultItem;
           }
           return { path: `item-${index}` } as SearchResultItem;
         },
-      };
+      });
 
       const hook = renderHook(() =>
         useSelection(toSlabIndexArray([0, 1, 2, 3]), 0, virtualListRef),
