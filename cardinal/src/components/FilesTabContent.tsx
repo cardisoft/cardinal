@@ -11,13 +11,13 @@ import type { SlabIndex } from '../types/slab';
 import type { SortKey, SortState } from '../types/sort';
 
 type FilesTabContentProps = {
-  headerRef: React.RefObject<HTMLDivElement | null>;
+  headerRef: React.RefObject<HTMLDivElement>;
   onResizeStart: (columnKey: ColumnKey) => (event: ReactMouseEvent<HTMLSpanElement>) => void;
   onHeaderContextMenu?: (event: ReactMouseEvent<HTMLDivElement>) => void;
   displayState: DisplayState;
   searchErrorMessage: string | null;
   currentQuery: string;
-  virtualListRef: React.RefObject<VirtualListHandle | null>;
+  virtualListRef: React.RefObject<VirtualListHandle>;
   results: SlabIndex[];
   rowHeight: number;
   overscan: number;
