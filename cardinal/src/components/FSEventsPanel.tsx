@@ -248,8 +248,10 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
       observer.observe(node);
 
       // Populate initial size synchronously so the list renders on first mount.
-      const rect = node.getBoundingClientRect();
-      setListSize({ width: rect.width, height: rect.height });
+      const { width, height } = node.getBoundingClientRect();
+      setListSize((prev) =>
+        prev.width === width && prev.height === height ? prev : { width, height },
+      );
 
       return () => {
         observer.disconnect();
@@ -283,27 +285,18 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
           </div>
         </div>
         <div className="flex-fill">
-          {events.length === 0 ? (
-            <div className="events-empty" role="status">
-              <p>{t('events.empty.title')}</p>
-              <p className="events-empty__hint">{t('events.empty.hint')}</p>
-            </div>
-          ) : (
-            <div className="events-list-container" ref={listContainerRef}>
-              {listSize.width > 0 && listSize.height > 0 && (
-                <List
-                  listRef={attachScrollContainer}
-                  rowComponent={renderEventRow}
-                  rowCount={events.length}
-                  rowHeight={ROW_HEIGHT}
-                  rowProps={rowProps}
-                  className="events-list"
-                  style={{ width: listSize.width, height: listSize.height }}
-                  overscanCount={10}
-                />
-              )}
-            </div>
-          )}
+          <div className="events-list-container" ref={listContainerRef}>
+            <List
+              listRef={attachScrollContainer}
+              rowComponent={renderEventRow}
+              rowCount={events.length}
+              rowHeight={ROW_HEIGHT}
+              rowProps={rowProps}
+              className="events-list"
+              style={{ width: listSize.width, height: listSize.height }}
+              overscanCount={10}
+            />
+          </div>
         </div>
       </div>
     );
