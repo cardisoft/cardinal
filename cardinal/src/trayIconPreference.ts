@@ -16,4 +16,3 @@ export const persistTrayIconEnabled = (enabled: boolean): void => {
     // Ignore storage failures.
   }
 };
-
