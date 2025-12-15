@@ -117,6 +117,9 @@
     "themeHint": "Elige claro, oscuro o según el sistema.",
     "language": "Idioma",
     "languageHint": "Cambia el idioma de la interfaz al instante.",
+    "trayIcon": {
+      "label": "Mostrar icono en la bandeja"
+    },
     "sortingLimit": {
       "label": "Límite de ordenación"
     },

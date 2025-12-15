@@ -117,6 +117,9 @@
     "themeHint": "Açık, koyu veya sistem varsayılanını seç.",
     "language": "Dil",
     "languageHint": "Arayüz dilini anında değiştir.",
+    "trayIcon": {
+      "label": "Tepsi simgesini göster"
+    },
     "sortingLimit": {
       "label": "Sıralama sınırı"
     },

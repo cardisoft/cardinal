@@ -8,6 +8,8 @@ type PreferencesOverlayProps = {
   onClose: () => void;
   sortThreshold: number;
   onSortThresholdChange: (value: number) => void;
+  trayIconEnabled: boolean;
+  onTrayIconEnabledChange: (enabled: boolean) => void;
 };
 
 export function PreferencesOverlay({
@@ -15,6 +17,8 @@ export function PreferencesOverlay({
   onClose,
   sortThreshold,
   onSortThresholdChange,
+  trayIconEnabled,
+  onTrayIconEnabledChange,
 }: PreferencesOverlayProps): React.JSX.Element | null {
   const { t } = useTranslation();
   const [thresholdInput, setThresholdInput] = useState<string>(() => sortThreshold.toString());
@@ -108,6 +112,21 @@ export function PreferencesOverlay({
           <div className="preferences-row">
             <p className="preferences-label">{t('preferences.language')}</p>
             <LanguageSwitcher className="preferences-control" />
+          </div>
+          <div className="preferences-row">
+            <p className="preferences-label">{t('preferences.trayIcon.label')}</p>
+            <div className="preferences-control">
+              <label className="preferences-switch">
+                <input
+                  className="preferences-switch__input"
+                  type="checkbox"
+                  checked={trayIconEnabled}
+                  onChange={(event) => onTrayIconEnabledChange(event.target.checked)}
+                  aria-label={t('preferences.trayIcon.label')}
+                />
+                <span className="preferences-switch__track" aria-hidden="true" />
+              </label>
+            </div>
           </div>
           <div className="preferences-row">
             <div className="preferences-row__details">

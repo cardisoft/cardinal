@@ -20,6 +20,23 @@ export function initializeTray(): Promise<void> {
   return trayInitPromise;
 }
 
+export async function setTrayEnabled(enabled: boolean): Promise<void> {
+  if (enabled) {
+    await initializeTray();
+    return;
+  }
+
+  const pendingInit = trayInitPromise;
+  trayInitPromise = null;
+
+  await pendingInit?.catch(() => {});
+
+  const current = trayIcon;
+  trayIcon = null;
+
+  await Promise.allSettled([current?.close(), TrayIcon.removeById(TRAY_ID)]);
+}
+
 async function createTray(): Promise<void> {
   const options: TrayIconOptions = {
     id: TRAY_ID,

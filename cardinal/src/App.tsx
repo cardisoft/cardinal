@@ -38,6 +38,8 @@ import { OPEN_PREFERENCES_EVENT } from './constants/appEvents';
 import type { DisplayState } from './components/StateDisplay';
 import { openResultPath } from './utils/openResultPath';
 import { useStableEvent } from './hooks/useStableEvent';
+import { getStoredTrayIconEnabled, persistTrayIconEnabled } from './trayIconPreference';
+import { setTrayEnabled } from './tray';
 
 type ActiveTab = StatusTabKey;
 
@@ -176,6 +178,12 @@ function App() {
     requestPermission: requestFullDiskAccessPermission,
   } = useFullDiskAccessPermission();
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
+  const [trayIconEnabled, setTrayIconEnabled] = useState<boolean>(() => getStoredTrayIconEnabled());
+
+  useEffect(() => {
+    persistTrayIconEnabled(trayIconEnabled);
+    void setTrayEnabled(trayIconEnabled);
+  }, [trayIconEnabled]);
 
   const activePath =
     activeRowIndex !== null
@@ -702,6 +710,8 @@ function App() {
         onClose={() => setIsPreferencesOpen(false)}
         sortThreshold={sortThreshold}
         onSortThresholdChange={setSortThreshold}
+        trayIconEnabled={trayIconEnabled}
+        onTrayIconEnabledChange={setTrayIconEnabled}
       />
       {showFullDiskAccessOverlay && (
         <PermissionOverlay

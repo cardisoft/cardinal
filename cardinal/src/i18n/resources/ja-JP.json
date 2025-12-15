@@ -117,6 +117,9 @@
     "themeHint": "ライト / ダーク / システムから選択。",
     "language": "言語",
     "languageHint": "UI 言語をすぐに切り替えます。",
+    "trayIcon": {
+      "label": "トレイアイコンを表示"
+    },
     "sortingLimit": {
       "label": "並び替えの上限"
     },

@@ -1581,6 +1581,69 @@ button:active:not(:disabled) {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+.preferences-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.preferences-switch__input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.preferences-switch__track {
+  width: 44px;
+  height: 26px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--color-elevated-bg);
+  border: 1px solid var(--color-elevated-border, var(--color-border));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.preferences-switch__track::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--color-text);
+  opacity: 0.9;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease;
+  transform: translateY(-50%);
+}
+
+.preferences-switch__input:checked + .preferences-switch__track {
+  background: rgba(var(--color-accent-rgb), 0.18);
+  border-color: rgba(var(--color-accent-rgb), 0.65);
+}
+
+.preferences-switch__input:checked + .preferences-switch__track::after {
+  transform: translateX(17px) translateY(-50%);
+  background: var(--color-accent);
+}
+
+.preferences-switch__input:focus-visible + .preferences-switch__track {
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.45);
+  outline-offset: 2px;
+}
+
 :root[data-theme='dark'] .preferences-number-input {
   background: var(--color-elevated-bg);
   border-color: var(--color-elevated-border, var(--color-border));

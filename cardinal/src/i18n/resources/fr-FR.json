@@ -117,6 +117,9 @@
     "themeHint": "Choisissez clair, sombre ou selon le système.",
     "language": "Langue",
     "languageHint": "Changez la langue de l'interface instantanément.",
+    "trayIcon": {
+      "label": "Afficher l’icône dans la barre d’état"
+    },
     "sortingLimit": {
       "label": "Limite de tri"
     },
