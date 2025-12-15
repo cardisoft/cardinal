@@ -117,6 +117,9 @@
     "themeHint": "Wähle Hell, Dunkel oder Systemstandard.",
     "language": "Sprache",
     "languageHint": "Wechsle die Oberflächensprache sofort.",
+    "trayIcon": {
+      "label": "Tray-Symbol anzeigen"
+    },
     "sortingLimit": {
       "label": "Sortierlimit"
     },

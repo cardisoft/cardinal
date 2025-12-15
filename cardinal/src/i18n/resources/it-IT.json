@@ -117,6 +117,9 @@
     "themeHint": "Scegli chiaro, scuro o segui il sistema.",
     "language": "Lingua",
     "languageHint": "Cambia istantaneamente la lingua dell'interfaccia.",
+    "trayIcon": {
+      "label": "Mostra icona nel vassoio"
+    },
     "sortingLimit": {
       "label": "Limite ordinamento"
     },

@@ -116,6 +116,9 @@
     "themeHint": "选择浅色、深色或跟随系统。",
     "language": "语言",
     "languageHint": "立即切换界面语言。",
+    "trayIcon": {
+      "label": "显示托盘图标"
+    },
     "sortingLimit": {
       "label": "排序上限"
     },
