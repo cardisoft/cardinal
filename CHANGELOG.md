@@ -1,10 +1,11 @@
 # Changelog
 
 ## 0.1.18 — 2025-12-15
+- Add option for tray icon and defaults to disable
 - Persistent cache when idle or enter background.
 - Improve i18n locale detection and add zh-TW translation.
 - Make tags filtering accepts multiple value.
-- Supports shift+arrow to select multiple rows.
+- Supports `shift+arrow` to select multiple rows.
 - Various UI/UX improvements and bug fixes.
 
 ## 0.1.17 — 2025-12-10
