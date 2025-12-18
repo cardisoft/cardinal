@@ -1,4 +1,3 @@
-import type { SearchResultItem } from '../types/search';
 import type { SlabIndex } from '../types/slab';
 import type { VirtualListHandle } from '../components/VirtualList';
 

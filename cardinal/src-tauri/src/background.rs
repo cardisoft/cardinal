@@ -33,6 +33,8 @@ pub struct StatusBarUpdate {
 pub struct IconPayload {
     pub slab_index: SlabIndex,
     pub icon: String,
+    pub width: f64,
+    pub height: f64,
 }
 
 pub struct BackgroundLoopChannels {
@@ -41,7 +43,7 @@ pub struct BackgroundLoopChannels {
     pub search_rx: Receiver<SearchJob>,
     pub result_tx: Sender<Result<SearchOutcome>>,
     pub node_info_rx: Receiver<NodeInfoRequest>,
-    pub icon_viewport_rx: Receiver<(u64, Vec<SlabIndex>)>,
+    pub icon_viewport_rx: Receiver<(u64, Vec<SlabIndex>, f64)>,
     pub rescan_rx: Receiver<()>,
     pub icon_update_tx: Sender<IconPayload>,
 }
@@ -160,7 +162,7 @@ pub fn run_background_event_loop(
                 let _ = response_tx.send(node_info_results);
             }
             recv(icon_viewport_rx) -> update => {
-                let (_request_id, viewport) = update.expect("Icon viewport channel closed");
+                let (_request_id, viewport, icon_size) = update.expect("Icon viewport channel closed");
 
                 let nodes = cache.expand_file_nodes(&viewport);
                 let icon_jobs: Vec<_> = viewport
@@ -180,11 +182,17 @@ pub fn run_background_event_loop(
                     .for_each(|(slab_index, path)| {
                         let icon_update_tx = icon_update_tx.clone();
                         spawn(move || {
-                            if let Some(icon) = fs_icon::icon_of_path_ql(&path).map(|data| format!(
-                                "data:image/png;base64,{}",
-                                general_purpose::STANDARD.encode(&data)
-                            )) {
-                                let _ = icon_update_tx.send(IconPayload { slab_index, icon });
+                            if let Some((data, width, height)) = fs_icon::icon_of_path(&path, icon_size) {
+                                let icon = format!(
+                                    "data:image/png;base64,{}",
+                                    general_purpose::STANDARD.encode(&data)
+                                );
+                                let _ = icon_update_tx.send(IconPayload {
+                                    slab_index,
+                                    icon,
+                                    width,
+                                    height,
+                                });
                             }
                         });
                     });

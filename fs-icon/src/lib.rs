@@ -3,7 +3,7 @@ use crossbeam_channel::bounded;
 use objc2::{AnyThread, rc::Retained};
 use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSImage, NSWorkspace};
 use objc2_core_foundation::{CFNumber, CFString, CFURL, Type};
-use objc2_foundation::{NSData, NSDictionary, NSError, NSSize, NSString, NSURL};
+use objc2_foundation::{NSDictionary, NSError, NSSize, NSString, NSURL};
 use objc2_image_io::{CGImageSource, kCGImagePropertyPixelHeight, kCGImagePropertyPixelWidth};
 use objc2_quick_look_thumbnailing::{
     QLThumbnailGenerationRequest, QLThumbnailGenerationRequestRepresentationTypes,
@@ -23,30 +23,40 @@ pub fn scale_with_aspect_ratio(
     (width * ratio, height * ratio)
 }
 
-pub fn icon_of_path(path: &str) -> Option<Vec<u8>> {
-    if let Some(data) = icon_of_path_ql(path) {
-        return Some(data);
+pub fn icon_of_path(path: &str, requested_size: f64) -> Option<(Vec<u8>, f64, f64)> {
+    // Try QuickLook for images first (optimized path with aspect ratio)
+    if let Some(result) = icon_of_path_ql(path, requested_size) {
+        return Some(result);
     }
-    icon_of_path_ns(path)
+    // Try generic QuickLook for PDFs and other file types
+    if let Some(result) = icon_of_path_ql_generic(path, requested_size) {
+        return Some(result);
+    }
+    // Fallback to NSWorkspace icon
+    icon_of_path_ns(path, requested_size)
 }
 
 // https://stackoverflow.com/questions/73062803/resizing-nsimage-keeping-aspect-ratio-reducing-the-image-size-while-trying-to-sc
-pub fn icon_of_path_ns(path: &str) -> Option<Vec<u8>> {
-    objc2::rc::autoreleasepool(|_| -> Option<Vec<u8>> {
+// https://stackoverflow.com/questions/73062803/resizing-nsimage-keeping-aspect-ratio-reducing-the-image-size-while-trying-to-sc
+pub fn icon_of_path_ns(path: &str, requested_size: f64) -> Option<(Vec<u8>, f64, f64)> {
+    objc2::rc::autoreleasepool(|_| -> Option<(Vec<u8>, f64, f64)> {
         let path_ns = NSString::from_str(path);
         let image = NSWorkspace::sharedWorkspace().iconForFile(&path_ns);
 
-        let png_data: Retained<NSData> = (|| -> Option<_> {
+        const PADDING_COMPENSATION: f64 = 2.0;
+        let effective_size = requested_size * PADDING_COMPENSATION;
+
+        let (png_data, _width, _height) = (|| -> Option<_> {
             unsafe {
                 // https://stackoverflow.com/questions/66270656/macos-determine-real-size-of-icon-returned-from-iconforfile-method
                 for image in image.representations().iter() {
                     let size = image.size();
-                    if size.width > 31.0
-                        && size.height > 31.0
-                        && size.width < 33.0
-                        && size.height < 33.0
+                    if size.width > (effective_size - 1.0)
+                        && size.height > (effective_size - 1.0)
+                        && size.width < (effective_size + 1.0)
+                        && size.height < (effective_size + 1.0)
                     {
-                        // println!("representation: {}x{}", size.width, size.height);
+                        // println!(\"representation: {}x{}\", size.width, size.height);
                         let new_image = NSImage::imageWithSize_flipped_drawingHandler(
                             NSSize::new(size.width, size.height),
                             false,
@@ -55,20 +65,20 @@ pub fn icon_of_path_ns(path: &str) -> Option<Vec<u8>> {
                                 true.into()
                             }),
                         );
-                        return NSBitmapImageRep::imageRepWithData(
-                            &*new_image.TIFFRepresentation()?,
-                        )?
-                        .representationUsingType_properties(
-                            NSBitmapImageFileType::PNG,
-                            &NSDictionary::new(),
-                        );
+                        let data =
+                            NSBitmapImageRep::imageRepWithData(&*new_image.TIFFRepresentation()?)?
+                                .representationUsingType_properties(
+                                    NSBitmapImageFileType::PNG,
+                                    &NSDictionary::new(),
+                                )?;
+                        return Some((Retained::into_raw(data), size.width, size.height));
                     }
                 }
             }
             // zoom in and you will see that the small icon in Finder is 32x32, here we keep it at 64x64 for better visibility
             let (new_width, new_height) = {
-                let width = 32.0;
-                let height = 32.0;
+                let width = effective_size;
+                let height = effective_size;
                 // keep aspect ratio
                 let old_width = image.size().width;
                 let old_height = image.size().height;
@@ -83,14 +93,27 @@ pub fn icon_of_path_ns(path: &str) -> Option<Vec<u8>> {
                         true.into()
                     }),
                 );
-                NSBitmapImageRep::imageRepWithData(&*new_image.TIFFRepresentation()?)?
+                let data = NSBitmapImageRep::imageRepWithData(&*new_image.TIFFRepresentation()?)?
                     .representationUsingType_properties(
-                        NSBitmapImageFileType::PNG,
-                        &NSDictionary::new(),
-                    )
+                    NSBitmapImageFileType::PNG,
+                    &NSDictionary::new(),
+                )?;
+                Some((Retained::into_raw(data), new_width, new_height))
             }
         })()?;
-        Some(png_data.to_vec())
+
+        let png_data = unsafe { Retained::from_raw(png_data)? };
+
+        let width = {
+            let rep = NSBitmapImageRep::imageRepWithData(&png_data)?;
+            rep.pixelsWide() as f64
+        };
+        let height = {
+            let rep = NSBitmapImageRep::imageRepWithData(&png_data)?;
+            rep.pixelsHigh() as f64
+        };
+
+        Some((png_data.to_vec(), width, height))
     })
 }
 
@@ -116,16 +139,14 @@ pub fn image_dimension(image_path: &str) -> Option<(f64, f64)> {
     })
 }
 
-pub fn icon_of_path_ql(path: &str) -> Option<Vec<u8>> {
-    // We only get QLThumbnail for image, get NSWorkspace icon for other file types.
-    // Therefore we just error out when image_dimension is not found.
-    let (width, height) = image_dimension(path)?;
-    objc2::rc::autoreleasepool(|_| -> Option<Vec<u8>> {
-        const THUMBNAIL_SIZE: f64 = 64.0;
-        const THUMBNAIL_SCALE: f64 = 1.0;
-        let (width, height) =
-            scale_with_aspect_ratio(width, height, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
-        // use a slightly larger thumbnail size with 0.5 scale
+fn generate_ql_thumbnail(
+    path: &str,
+    width: f64,
+    height: f64,
+    representation_type: QLThumbnailGenerationRequestRepresentationTypes,
+) -> Option<(Vec<u8>, f64, f64)> {
+    objc2::rc::autoreleasepool(|_| -> Option<(Vec<u8>, f64, f64)> {
+        const THUMBNAIL_SCALE: f64 = 2.0; // Retina scaling
         let path_url = NSURL::fileURLWithPath(&NSString::from_str(path));
         let generator = unsafe { QLThumbnailGenerator::sharedGenerator() };
         {
@@ -137,31 +158,59 @@ pub fn icon_of_path_ql(path: &str) -> Option<Vec<u8>> {
                         &path_url,
                         NSSize::new(width, height),
                         THUMBNAIL_SCALE,
-                        QLThumbnailGenerationRequestRepresentationTypes::LowQualityThumbnail,
+                        representation_type,
                     );
+                request.setIconMode(true);
                 generator.generateBestRepresentationForRequest_completionHandler(
                     &request,
                     &RcBlock::new(
                         move |result: *mut QLThumbnailRepresentation, _error: *mut NSError| {
                             let _ = tx.send(result.as_ref().and_then(|result| {
-                                Some(
-                                    NSBitmapImageRep::imageRepWithData(
-                                        &*result.NSImage().TIFFRepresentation()?,
-                                    )?
+                                let image = result.NSImage();
+                                let tiff = image.TIFFRepresentation()?;
+                                let bitmap = NSBitmapImageRep::imageRepWithData(&tiff)?;
+                                let data = bitmap
                                     .representationUsingType_properties(
                                         NSBitmapImageFileType::PNG,
                                         &NSDictionary::new(),
                                     )?
-                                    .to_vec(),
-                                )
+                                    .to_vec();
+
+                                Some((data, bitmap.pixelsWide() as f64, bitmap.pixelsHigh() as f64))
                             }));
                         },
                     ),
                 )
             };
-            rx.recv().ok().flatten()
+            let (data, actual_width, actual_height) = rx.recv().ok().flatten()?;
+            Some((data, actual_width, actual_height))
         }
     })
+}
+
+/// Generate QuickLook thumbnail for any file type (PDFs, documents, etc.)
+/// This function doesn't require image dimensions and works for all QuickLook-supported formats
+pub fn icon_of_path_ql_generic(path: &str, requested_size: f64) -> Option<(Vec<u8>, f64, f64)> {
+    generate_ql_thumbnail(
+        path,
+        requested_size,
+        requested_size,
+        QLThumbnailGenerationRequestRepresentationTypes::Thumbnail,
+    )
+}
+
+pub fn icon_of_path_ql(path: &str, requested_size: f64) -> Option<(Vec<u8>, f64, f64)> {
+    // We only get QLThumbnail for image, get NSWorkspace icon for other file types.
+    // Therefore we just error out when image_dimension is not found.
+    let (width, height) = image_dimension(path)?;
+    let (width, height) = scale_with_aspect_ratio(width, height, requested_size, requested_size);
+    generate_ql_thumbnail(
+        path,
+        width,
+        height,
+        QLThumbnailGenerationRequestRepresentationTypes::Icon
+            | QLThumbnailGenerationRequestRepresentationTypes::Thumbnail,
+    )
 }
 
 #[cfg(test)]
@@ -175,13 +224,13 @@ mod tests {
             .unwrap()
             .to_string_lossy()
             .into_owned();
-        let data = icon_of_path_ns(&pwd).unwrap();
+        let (data, _, _) = icon_of_path_ns(&pwd, 32.0).unwrap();
         std::fs::write("/tmp/icon.png", data).unwrap();
     }
 
     #[test]
     fn test_icon_of_path_ql_normal() {
-        let data = icon_of_path_ql("../cardinal/mac-icon_1024x1024.png").unwrap();
+        let (data, _, _) = icon_of_path_ql("../cardinal/mac-icon_1024x1024.png", 64.0).unwrap();
         std::fs::write("/tmp/icon_ql.png", data).unwrap();
     }
 
@@ -192,7 +241,7 @@ mod tests {
             .unwrap()
             .to_string_lossy()
             .into_owned();
-        icon_of_path_ql(&pwd).expect("should fail for non-image file");
+        icon_of_path_ql(&pwd, 64.0).expect("should fail for non-image file");
     }
 
     #[test]
@@ -244,8 +293,8 @@ mod tests {
             .into_owned();
         loop {
             for _ in 0..10000 {
-                let _data = icon_of_path_ns(&pwd).unwrap();
-                let _data = icon_of_path_ql(&pwd).unwrap();
+                let _ = icon_of_path_ns(&pwd, 64.0).unwrap();
+                let _ = icon_of_path_ql(&pwd, 64.0).unwrap();
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
         }
@@ -271,11 +320,12 @@ mod tests {
             let path_str = path.to_string_lossy().into_owned();
 
             let start_ns = Instant::now();
-            let icon_ns = icon_of_path_ns(&path_str).expect("NSWorkspace icon lookup failed");
+            let (icon_ns, _, _) =
+                icon_of_path_ns(&path_str, 64.0).expect("NSWorkspace icon lookup failed");
             let ns_elapsed = start_ns.elapsed();
 
             let start_ql = Instant::now();
-            let Some(icon_ql) = icon_of_path_ql(&path_str) else {
+            let Some((icon_ql, _, _)) = icon_of_path_ql(&path_str, 64.0) else {
                 println!("QuickLook thumbnail generation failed for path {path_str}");
                 continue;
             };

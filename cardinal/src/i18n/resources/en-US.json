@@ -42,6 +42,8 @@
     "revealInFinder": "Reveal in Finder",
     "copyPath": "Copy Path",
     "copyFilename": "Copy Filename",
+    "moveToTrash": "Move to Trash",
+    "deletePermanently": "Delete Permanently",
     "resetColumnWidths": "Reset Column Widths"
   },
   "statusBar": {
@@ -122,6 +124,14 @@
     },
     "sortingLimit": {
       "label": "Sorting limit"
+    },
+    "defaultView": {
+      "label": "Default view",
+      "list": "List",
+      "grid": "Grid"
+    },
+    "defaultIconSize": {
+      "label": "Default icon size"
     },
     "close": "Close"
   },

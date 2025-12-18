@@ -14,6 +14,8 @@ type UseContextMenuResult = {
 export function useContextMenu(
   autoFitColumns: (() => void) | null = null,
   onQuickLookRequest?: () => void | Promise<void>,
+  onTrashRequest?: (path: string) => void | Promise<void>,
+  onDeleteRequest?: (path: string) => void | Promise<void>,
 ): UseContextMenuResult {
   const { t } = useTranslation();
 
@@ -62,6 +64,26 @@ export function useContextMenu(
             }
           },
         },
+        {
+          id: 'context_menu.trash',
+          text: t('contextMenu.moveToTrash'),
+          accelerator: 'Cmd+Backspace',
+          action: () => {
+            if (onTrashRequest) {
+              void onTrashRequest(path);
+            }
+          },
+        },
+        {
+          id: 'context_menu.delete_permanent',
+          text: t('contextMenu.deletePermanently'),
+          accelerator: 'Opt+Cmd+Backspace',
+          action: () => {
+            if (onDeleteRequest) {
+              void onDeleteRequest(path);
+            }
+          },
+        },
       ];
 
       if (onQuickLookRequest) {
@@ -79,7 +101,7 @@ export function useContextMenu(
 
       return items;
     },
-    [onQuickLookRequest, t],
+    [onQuickLookRequest, onTrashRequest, onDeleteRequest, t],
   );
 
   const buildHeaderMenuItems = useCallback((): MenuItemOptions[] => {

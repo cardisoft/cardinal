@@ -4,6 +4,8 @@ import type { AppLifecycleStatus } from '../types/ipc';
 import { useTranslation } from 'react-i18next';
 import { OPEN_PREFERENCES_EVENT } from '../constants/appEvents';
 
+import { ViewMode, MIN_ICON_SIZE, MAX_ICON_SIZE } from '../constants';
+
 export type StatusTabKey = 'files' | 'events';
 
 type StatusBarProps = {
@@ -15,6 +17,9 @@ type StatusBarProps = {
   activeTab?: StatusTabKey;
   onTabChange?: (tab: StatusTabKey) => void;
   onRequestRescan?: () => void;
+  viewMode: ViewMode;
+  iconSize: number;
+  onIconSizeChange: (size: number) => void;
 };
 
 const TABS: StatusTabKey[] = ['files', 'events'];
@@ -34,6 +39,9 @@ const StatusBar = ({
   activeTab = 'files',
   onTabChange,
   onRequestRescan,
+  viewMode,
+  iconSize,
+  onIconSizeChange,
 }: StatusBarProps): React.JSX.Element => {
   const { t } = useTranslation();
   const tabsRef = useRef<HTMLDivElement | null>(null);
@@ -188,12 +196,30 @@ const StatusBar = ({
         </div>
       </div>
 
-      <div className="status-right">
+      <div className="status-center">
         <div className="status-section">
           <span className="status-label">{t('statusBar.searchLabel')}</span>
           <span className="status-value" title={t('statusBar.resultsTitle')}>
             {searchDisplay}
           </span>
+        </div>
+      </div>
+
+      <div className="status-right">
+        <div className="grid-size-slider-container">
+          <input
+            type="range"
+            min={MIN_ICON_SIZE}
+            max={MAX_ICON_SIZE}
+            step={1}
+            value={iconSize}
+            onInput={(e) => onIconSizeChange(parseInt((e.target as HTMLInputElement).value, 10))}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            className="grid-size-slider"
+            title="Icon Size"
+            disabled={viewMode === 'list'}
+          />
         </div>
       </div>
     </div>

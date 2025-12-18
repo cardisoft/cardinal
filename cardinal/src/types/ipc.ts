@@ -8,11 +8,15 @@ export type StatusBarUpdatePayload = {
 export type IconUpdateWirePayload = {
   slabIndex: number;
   icon?: string;
+  width?: number;
+  height?: number;
 };
 
 export type IconUpdatePayload = {
   slabIndex: SlabIndex;
   icon?: string;
+  width?: number;
+  height?: number;
 };
 
 export type RecentEventPayload = {

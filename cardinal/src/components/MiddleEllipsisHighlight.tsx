@@ -76,7 +76,10 @@ export function splitTextWithHighlights(
   return parts;
 }
 
-function applyMiddleEllipsis(parts: HighlightSegment[], maxChars: number): HighlightSegment[] {
+export function applyMiddleEllipsis(
+  parts: HighlightSegment[],
+  maxChars: number,
+): HighlightSegment[] {
   if (maxChars <= 2) {
     return [{ text: '…', isHighlight: false }];
   }
@@ -126,6 +129,16 @@ function applyMiddleEllipsis(parts: HighlightSegment[], maxChars: number): Highl
       });
       break;
     }
+  }
+
+  // Trim the parts adjacent to the ellipsis to avoid awkward spacing
+  if (leftParts.length > 0) {
+    const lastPart = leftParts[leftParts.length - 1];
+    leftParts[leftParts.length - 1] = { ...lastPart, text: lastPart.text.trimEnd() };
+  }
+  if (rightParts.length > 0) {
+    const firstPart = rightParts[0];
+    rightParts[0] = { ...firstPart, text: firstPart.text.trimStart() };
   }
 
   return [...leftParts, { text: '…', isHighlight: false }, ...rightParts];

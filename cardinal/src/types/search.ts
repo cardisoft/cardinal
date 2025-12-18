@@ -12,11 +12,15 @@ export type SearchResultItem = Readonly<{
   mtime?: number;
   ctime?: number;
   icon?: string;
+  iconWidth?: number;
+  iconHeight?: number;
 }>;
 
 export type NodeInfoResponse = Readonly<{
   path: string;
   icon?: string | null;
+  iconWidth?: number | null;
+  iconHeight?: number | null;
   metadata?: SearchResultMetadata | null;
   size?: number | null;
   mtime?: number | null;

@@ -6,10 +6,11 @@ type UseIconViewportProps = {
   results: SlabIndex[];
   start: number;
   end: number;
+  iconSize: number;
 };
 
 // Deduplicates and throttles icon viewport updates to the backend.
-export function useIconViewport({ results, start, end }: UseIconViewportProps) {
+export function useIconViewport({ results, start, end, iconSize }: UseIconViewportProps) {
   const requestIdRef = useRef(0);
   const lastRangeRef = useRef<{ start: number; end: number } | null>(null);
   const pendingRef = useRef<SlabIndex[] | null>(null);
@@ -21,8 +22,9 @@ export function useIconViewport({ results, start, end }: UseIconViewportProps) {
     if (!viewport) return;
     pendingRef.current = null;
     requestIdRef.current += 1;
-    void invoke('update_icon_viewport', { id: requestIdRef.current, viewport });
-  }, []);
+    requestIdRef.current += 1;
+    void invoke('update_icon_viewport', { id: requestIdRef.current, viewport, iconSize });
+  }, [iconSize]);
 
   const scheduleIconViewport = useCallback(
     (viewport: SlabIndex[]) => {
@@ -60,7 +62,7 @@ export function useIconViewport({ results, start, end }: UseIconViewportProps) {
 
     lastRangeRef.current = { start: clampedStart, end: clampedEnd };
     scheduleIconViewport(results.slice(clampedStart, clampedEnd + 1));
-  }, [results, start, end, scheduleIconViewport]);
+  }, [results, start, end, iconSize, scheduleIconViewport]);
 
   useEffect(
     () => () => {

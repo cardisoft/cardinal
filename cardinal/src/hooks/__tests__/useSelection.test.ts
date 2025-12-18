@@ -12,6 +12,7 @@ const createVirtualListRef = (
   current: {
     scrollToTop: () => {},
     scrollToRow: () => {},
+    getColumnsCount: () => 1,
     ensureRangeLoaded: () => {},
     getItem: (index: number) => ({ path: `item-${index}` }) as SearchResultItem,
     ...overrides,
