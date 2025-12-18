@@ -25,6 +25,6 @@ fn scale_zero_width_graceful() {
 fn icon_of_path_fallback_for_non_image() {
     // Non-image path should still return some data via NSWorkspace fallback.
     let cwd = std::env::current_dir().unwrap();
-    let data = icon_of_path(cwd.to_str().unwrap()).expect("fallback icon should exist");
+    let data = icon_of_path(cwd.to_str().unwrap(), 64.0).expect("fallback icon should exist");
     assert!(!data.is_empty());
 }

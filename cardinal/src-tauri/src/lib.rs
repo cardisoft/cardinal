@@ -1,6 +1,7 @@
 mod background;
 mod commands;
 mod lifecycle;
+mod query_parser;
 mod quicklook;
 mod search_activity;
 mod sort;
@@ -12,16 +13,17 @@ use background::{
 };
 use cardinal_sdk::EventWatcher;
 use commands::{
-    NodeInfoRequest, SearchJob, SearchState, activate_main_window, close_quicklook, get_app_status,
-    get_nodes_info, get_sorted_view, hide_main_window, open_in_finder, open_path, search,
-    start_logic, toggle_main_window, toggle_quicklook, trigger_rescan, update_icon_viewport,
-    update_quicklook,
+    NodeInfoRequest, SearchJob, SearchState, activate_main_window, close_quicklook, delete_paths,
+    get_app_status, get_nodes_info, get_sorted_view, hide_main_window, open_in_finder, open_path,
+    search, start_logic, toggle_main_window, toggle_quicklook, trash_paths, trigger_rescan,
+    update_icon_viewport, update_quicklook,
 };
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, bounded, unbounded};
 use lifecycle::{
     APP_QUIT, AppLifecycleState, EXIT_REQUESTED, emit_app_state, load_app_state, update_app_state,
 };
 use once_cell::sync::OnceCell;
+use query_parser::parse_search_query;
 use search_cache::{SearchCache, SearchOutcome, SlabIndex, WalkData};
 use std::{
     path::{Path, PathBuf},
@@ -73,6 +75,7 @@ pub fn run() -> Result<()> {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .on_window_event(move |window, event| {
             if window.label() != "main" {
                 return;
@@ -128,6 +131,9 @@ pub fn run() -> Result<()> {
             hide_main_window,
             activate_main_window,
             toggle_main_window,
+            trash_paths,
+            delete_paths,
+            parse_search_query,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

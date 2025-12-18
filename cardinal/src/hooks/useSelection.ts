@@ -18,8 +18,9 @@ export type SelectionController = {
   selectedPaths: string[];
   handleRowSelect: (rowIndex: number, options: RowSelectOptions) => void;
   selectSingleRow: (rowIndex: number) => void;
+  bulkSelect: (indices: number[]) => void;
   clearSelection: () => void;
-  moveSelection: (delta: 1 | -1, options?: { extend?: boolean }) => void;
+  moveSelection: (delta: number, options?: { extend?: boolean }) => void;
 };
 
 /**
@@ -103,6 +104,13 @@ export const useSelection = (
     setShiftAnchorIndex(rowIndex);
   }, []);
 
+  const bulkSelect = useCallback((indices: number[]) => {
+    setSelectedIndices(indices);
+    if (indices.length > 0) {
+      setActiveRowIndex(indices[indices.length - 1]);
+    }
+  }, []);
+
   const clearSelection = useCallback(() => {
     setSelectedIndices([]);
     setActiveRowIndex(null);
@@ -110,7 +118,7 @@ export const useSelection = (
   }, []);
 
   const moveSelection = useCallback(
-    (delta: 1 | -1, options?: { extend?: boolean }) => {
+    (delta: number, options?: { extend?: boolean }) => {
       if (displayedResults.length === 0) {
         return;
       }
@@ -179,6 +187,7 @@ export const useSelection = (
     selectedPaths,
     handleRowSelect,
     selectSingleRow,
+    bulkSelect,
     clearSelection,
     moveSelection,
   };

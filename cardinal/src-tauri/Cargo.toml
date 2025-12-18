@@ -22,6 +22,7 @@ tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-drag = "2"
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 crossbeam-channel = "0.5.15"
@@ -39,8 +40,10 @@ tauri-plugin-prevent-default = "4"
 tauri-plugin-macos-permissions = "2.3.0"
 tauri-plugin-window-state = "2"
 once_cell = { version = "1.20", features = ["parking_lot"] }
+trash = "5.2"
 
 cardinal-sdk.path = "../../cardinal-sdk"
+cardinal-syntax.path = "../../cardinal-syntax"
 search-cache.path = "../../search-cache"
 fswalk.path = "../../fswalk"
 fs-icon.path = "../../fs-icon"
