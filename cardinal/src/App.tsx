@@ -498,6 +498,13 @@ function App() {
       if (activeTab !== 'files') {
         return;
       }
+      if (event.key === 'Enter') {
+        queueSearch(event.currentTarget.value, {
+          immediate: true,
+          onSearchCommitted: updateHistoryFromInput,
+        });
+        return;
+      }
       if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
         return;
       }
@@ -508,7 +515,7 @@ function App() {
       event.preventDefault();
       handleHistoryNavigation(event.key === 'ArrowUp' ? 'older' : 'newer');
     },
-    [activeTab, handleHistoryNavigation],
+    [activeTab, handleHistoryNavigation, queueSearch, updateHistoryFromInput],
   );
 
   const handleHorizontalSync = useCallback((scrollLeft: number) => {
@@ -600,7 +607,6 @@ function App() {
         // Switch to files: sync with reducer-managed search state and cancel pending timers
         ensureHistoryBuffer('');
         resetSearchQuery();
-        cancelPendingSearches();
       }
     },
     [

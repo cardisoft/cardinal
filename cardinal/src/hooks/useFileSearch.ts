@@ -29,6 +29,7 @@ type SearchParams = {
 };
 
 type QueueSearchOptions = {
+  immediate?: boolean;
   onSearchCommitted?: (query: string) => void;
 };
 
@@ -285,13 +286,19 @@ export function useFileSearch(): UseFileSearchResult {
   const queueSearch = useCallback(
     (query: string, options?: QueueSearchOptions) => {
       updateSearchParams({ query });
-      cancelTimer(debounceTimerRef);
+      cancelPendingSearches();
+      if (options?.immediate) {
+        options.onSearchCommitted?.(query);
+        void handleSearch({ query });
+        return;
+      }
+
       debounceTimerRef.current = setTimeout(() => {
         options?.onSearchCommitted?.(query);
         handleSearch({ query });
       }, SEARCH_DEBOUNCE_MS);
     },
-    [handleSearch, updateSearchParams],
+    [cancelPendingSearches, handleSearch, updateSearchParams],
   );
 
   const resetSearchQuery = useCallback(() => {
