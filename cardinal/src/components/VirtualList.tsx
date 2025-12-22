@@ -21,6 +21,7 @@ export type VirtualListHandle = {
   scrollToRow: (rowIndex: number, align?: 'nearest' | 'start' | 'end' | 'center') => void;
   ensureRangeLoaded: (startIndex: number, endIndex: number) => Promise<void> | void;
   getItem: (index: number) => SearchResultItem | undefined;
+  getColumnsCount: () => number;
 };
 
 type VirtualListProps = {
@@ -185,6 +186,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
       scrollToRow,
       ensureRangeLoaded,
       getItem: getItemAt,
+      getColumnsCount: () => 1,
     }),
     [updateScrollAndRange, scrollToRow, ensureRangeLoaded, getItemAt],
   );
@@ -194,7 +196,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   const renderedItems = useMemo(() => {
     if (end < start) return null;
 
-    const baseTop = start * rowHeight - scrollTop;
+    const baseTop = start * rowHeight;
     return Array.from({ length: end - start + 1 }, (_, i) => {
       const rowIndex = start + i;
       const item = cache.get(rowIndex);
@@ -206,7 +208,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
         right: 0,
       });
     });
-  }, [start, end, scrollTop, rowHeight, cache, renderRow]);
+  }, [start, end, rowHeight, cache, renderRow]);
 
   // ----- render -----
   return (
@@ -218,7 +220,17 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
       aria-rowcount={rowCount}
     >
       <div className="virtual-list-viewport" onScroll={handleHorizontalScroll}>
-        <div className="virtual-list-items">{renderedItems}</div>
+        <div
+          className="virtual-list-items"
+          style={{
+            height: totalHeight,
+            position: 'relative',
+            transform: `translate3d(0, ${-scrollTop}px, 0)`,
+            willChange: 'transform',
+          }}
+        >
+          {renderedItems}
+        </div>
       </div>
       <Scrollbar
         totalHeight={totalHeight}

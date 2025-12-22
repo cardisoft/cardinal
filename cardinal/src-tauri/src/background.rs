@@ -180,7 +180,7 @@ pub fn run_background_event_loop(
                     .for_each(|(slab_index, path)| {
                         let icon_update_tx = icon_update_tx.clone();
                         spawn(move || {
-                            if let Some(icon) = fs_icon::icon_of_path_ql(&path).map(|data| format!(
+                            if let Some(icon) = fs_icon::icon_of_path(&path, 512.0).map(|data| format!(
                                 "data:image/png;base64,{}",
                                 general_purpose::STANDARD.encode(&data)
                             )) {

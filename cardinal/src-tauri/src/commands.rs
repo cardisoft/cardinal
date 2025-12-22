@@ -15,7 +15,7 @@ use parking_lot::Mutex;
 use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, SlabNodeMetadata};
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use std::{fs, path::PathBuf, process::Command};
 use tauri::{AppHandle, Manager, State};
 use tracing::{error, info, warn};
 
@@ -249,7 +249,7 @@ pub fn get_nodes_info(
         .map(|SearchResultNode { path, metadata }| {
             let path = path.to_string_lossy().into_owned();
             let icon = if include_icons {
-                fs_icon::icon_of_path_ns(&path).map(|data| {
+                fs_icon::icon_of_path_ns(&path, 512.0).map(|data| {
                     format!(
                         "data:image/png;base64,{}",
                         general_purpose::STANDARD.encode(data)
@@ -369,4 +369,29 @@ pub async fn toggle_main_window(app: AppHandle) {
     } else {
         warn!("Toggle requested but main window is unavailable");
     }
+}
+#[tauri::command]
+pub async fn trash_paths(paths: Vec<String>) -> Result<(), String> {
+    let path_bufs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+    trash::delete_all(path_bufs).map_err(|e| {
+        error!("Failed to trash paths: {e}");
+        e.to_string()
+    })
+}
+
+#[tauri::command]
+pub async fn delete_paths(paths: Vec<String>) -> Result<(), String> {
+    for path in paths {
+        let p = PathBuf::from(path);
+        if p.is_dir() {
+            if let Err(e) = fs::remove_dir_all(&p) {
+                error!("Failed to delete directory {p:?}: {e}");
+                return Err(e.to_string());
+            }
+        } else if let Err(e) = fs::remove_file(&p) {
+            error!("Failed to delete file {p:?}: {e}");
+            return Err(e.to_string());
+        }
+    }
+    Ok(())
 }

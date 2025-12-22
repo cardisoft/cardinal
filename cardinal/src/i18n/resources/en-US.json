@@ -42,6 +42,8 @@
     "revealInFinder": "Reveal in Finder",
     "copyPath": "Copy Path",
     "copyFilename": "Copy Filename",
+    "moveToTrash": "Move to Trash",
+    "deletePermanently": "Delete Permanently",
     "resetColumnWidths": "Reset Column Widths"
   },
   "statusBar": {
@@ -123,6 +125,14 @@
     "sortingLimit": {
       "label": "Sorting limit"
     },
+    "defaultView": {
+      "label": "Default view",
+      "list": "List",
+      "grid": "Grid"
+    },
+    "defaultIconSize": {
+      "label": "Default icon size"
+    },
     "close": "Close"
   },
   "language": {
@@ -136,6 +146,61 @@
       "system": "System Default",
       "light": "Light",
       "dark": "Dark"
+    }
+  },
+  "queryBuilder": {
+    "title": "Advanced Search",
+    "addRule": "Add Rule",
+    "removeRule": "Remove rule",
+    "exclude": "Exclude",
+    "not": "NOT",
+    "preview": "Preview",
+    "search": "Search",
+    "inputPlaceholder": "Enter value...",
+    "selectType": "Select type...",
+    "selectDate": "Select date...",
+    "selectSize": "Select size...",
+    "field": {
+      "name": "Name",
+      "ext": "Extension",
+      "type": "Type",
+      "size": "Size",
+      "dm": "Date Modified",
+      "dc": "Date Created",
+      "tag": "Tag",
+      "content": "Content",
+      "regex": "Regex",
+      "parent": "Parent Folder",
+      "infolder": "In Folder",
+      "nosubfolders": "No Subfolders"
+    },
+    "type": {
+      "image": "Image",
+      "video": "Video",
+      "audio": "Audio",
+      "doc": "Document",
+      "code": "Code",
+      "archive": "Archive",
+      "exe": "Executable"
+    },
+    "date": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisweek": "This Week",
+      "pastweek": "Past Week",
+      "thismonth": "This Month",
+      "pastmonth": "Past Month",
+      "thisyear": "This Year",
+      "pastyear": "Past Year"
+    },
+    "size": {
+      "empty": "Empty (0kb)",
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Large",
+      "gt1mb": "> 1MB",
+      "gt100mb": "> 100MB",
+      "gt1gb": "> 1GB"
     }
   },
   "tray": {
