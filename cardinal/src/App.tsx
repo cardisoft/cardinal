@@ -24,8 +24,9 @@ import { useRemoteSort } from './hooks/useRemoteSort';
 import { useSelection } from './hooks/useSelection';
 import { useQuickLook } from './hooks/useQuickLook';
 import { useSearchHistory } from './hooks/useSearchHistory';
-import { ROW_HEIGHT, OVERSCAN_ROW_COUNT } from './constants';
+import { ROW_HEIGHT, OVERSCAN_ROW_COUNT, DEFAULT_ICON_SIZE, type ViewMode } from './constants';
 import type { VirtualListHandle } from './components/VirtualList';
+import type { VirtualGridHandle } from './components/VirtualGrid';
 import FSEventsPanel from './components/FSEventsPanel';
 import type { FSEventsPanelHandle } from './components/FSEventsPanel';
 import { invoke } from '@tauri-apps/api/core';
@@ -40,6 +41,13 @@ import { openResultPath } from './utils/openResultPath';
 import { useStableEvent } from './hooks/useStableEvent';
 import { getStoredTrayIconEnabled, persistTrayIconEnabled } from './trayIconPreference';
 import { setTrayEnabled } from './tray';
+import { startNativeFileDrag } from './utils/drag';
+import {
+  getStoredViewMode,
+  getStoredIconSize,
+  persistViewMode,
+  persistIconSize,
+} from './utils/viewPreferences';
 
 type ActiveTab = StatusTabKey;
 
@@ -101,9 +109,35 @@ function App() {
     return document.hasFocus();
   });
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => getStoredViewMode());
+  const [iconSize, setIconSizeState] = useState<number>(() => getStoredIconSize());
+
+  // Default settings state (persisted)
+  const [defaultViewMode, setDefaultViewMode] = useState<ViewMode>(() => getStoredViewMode());
+  const [defaultIconSize, setDefaultIconSize] = useState<number>(() => getStoredIconSize());
+
+  // Session-only updates (for main window controls) - do not persist.
+  const handleSessionViewModeChange = useCallback((mode: ViewMode) => {
+    setViewModeState(mode);
+  }, []);
+
+  const handleSessionIconSizeChange = useCallback((size: number) => {
+    setIconSizeState(size);
+  }, []);
+
+  // Default preference updates (for Preferences overlay) - persist to storage.
+  const handleDefaultViewModeChange = useCallback((mode: ViewMode) => {
+    setDefaultViewMode(mode);
+    persistViewMode(mode);
+  }, []);
+
+  const handleDefaultIconSizeChange = useCallback((size: number) => {
+    setDefaultIconSize(size);
+    persistIconSize(size);
+  }, []);
   const eventsPanelRef = useRef<FSEventsPanelHandle | null>(null);
   const headerRef = useRef<HTMLDivElement | null>(null);
-  const virtualListRef = useRef<VirtualListHandle | null>(null);
+  const virtualListRef = useRef<VirtualListHandle | VirtualGridHandle | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const isMountedRef = useRef(false);
   const keyboardStateRef = useRef<{ activeTab: ActiveTab; activePath: string | null }>({
@@ -145,8 +179,9 @@ function App() {
     selectedIndicesRef,
     activeRowIndex,
     selectedPaths,
-    handleRowSelect,
+    handleRowSelect: onRowSelectInternal,
     selectSingleRow,
+    bulkSelect,
     clearSelection,
     moveSelection,
   } = useSelection(displayedResults, displayedResultsVersion, virtualListRef);
@@ -161,10 +196,39 @@ function App() {
   });
   const triggerQuickLook = useStableEvent(toggleQuickLook);
 
+  const handleTrash = useCallback(
+    async (path?: string) => {
+      const paths = path ? [path] : selectedPaths;
+      if (!paths.length) return;
+      try {
+        await invoke('trash_paths', { paths });
+        queueSearch(currentQuery); // Refresh current search
+      } catch (error) {
+        console.error('Failed to trash paths', error);
+      }
+    },
+    [selectedPaths, currentQuery, queueSearch],
+  );
+
+  const handleDelete = useCallback(
+    async (path?: string) => {
+      const paths = path ? [path] : selectedPaths;
+      if (!paths.length) return;
+      // TODO: Add confirmation dialog if needed
+      try {
+        await invoke('delete_paths', { paths });
+        queueSearch(currentQuery); // Refresh current search
+      } catch (error) {
+        console.error('Failed to delete paths', error);
+      }
+    },
+    [selectedPaths, currentQuery, queueSearch],
+  );
+
   const {
     showContextMenu: showFilesContextMenu,
     showHeaderContextMenu: showFilesHeaderContextMenu,
-  } = useContextMenu(autoFitColumns, toggleQuickLook);
+  } = useContextMenu(autoFitColumns, toggleQuickLook, handleTrash, handleDelete);
 
   const {
     showContextMenu: showEventsContextMenu,
@@ -216,6 +280,25 @@ function App() {
     });
   }, []);
   const focusSearchInputStable = useStableEvent(focusSearchInput);
+  const handleDragStart = useStableEvent((path: string, itemIsSelected: boolean, icon?: string) => {
+    const list = virtualListRef.current;
+    if (!list) return;
+
+    let paths: string[] = [];
+    if (itemIsSelected) {
+      selectedIndicesRef.current.forEach((idx) => {
+        const item = list.getItem?.(idx);
+        if (item?.path) paths.push(item.path);
+      });
+    }
+
+    if (paths.length === 0) {
+      paths = [path];
+    }
+
+    void startNativeFileDrag({ paths, icon });
+  });
+
   const handleMetaShortcut = useStableEvent(
     (event: KeyboardEvent, currentTab: ActiveTab, currentPath: string | null) => {
       const key = event.key.toLowerCase();
@@ -271,13 +354,35 @@ function App() {
       return true;
     }
 
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    if (event.key === 'Backspace') {
+      if (event.metaKey && selectedIndicesRef.current.length > 0) {
+        event.preventDefault();
+        if (event.altKey) {
+          void handleDelete();
+        } else {
+          void handleTrash();
+        }
+        return true;
+      }
+    }
+
+    if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
       if (event.altKey || event.ctrlKey || event.metaKey) {
         return true;
       }
       event.preventDefault();
-      const delta = event.key === 'ArrowDown' ? 1 : -1;
-      navigateSelection(delta, { extend: event.shiftKey });
+
+      const columnsCount = virtualListRef.current?.getColumnsCount?.() ?? 1;
+      let delta = 0;
+
+      if (event.key === 'ArrowDown') delta = columnsCount;
+      else if (event.key === 'ArrowUp') delta = -columnsCount;
+      else if (event.key === 'ArrowLeft') delta = -1;
+      else if (event.key === 'ArrowRight') delta = 1;
+
+      if (delta !== 0) {
+        navigateSelection(delta, { extend: event.shiftKey });
+      }
       return true;
     }
 
@@ -527,16 +632,26 @@ function App() {
 
   const selectedIndexSet = useMemo(() => new Set(selectedIndices), [selectedIndices]);
 
-  const handleRowContextMenu = useCallback(
+  const handleRowContextMenu = useStableEvent(
     (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => {
-      if (!selectedIndexSet.has(rowIndex)) {
+      const isSelected = selectedIndicesRef.current.includes(rowIndex);
+      if (!isSelected) {
         selectSingleRow(rowIndex);
       }
       if (path) {
         showFilesContextMenu(event, path);
       }
     },
-    [selectedIndexSet, selectSingleRow, showFilesContextMenu],
+  );
+
+  const handleRowOpen = useStableEvent((path: string) => {
+    openResultPath(path);
+  });
+
+  const handleRowSelect = useStableEvent(
+    (rowIndex: number, options: { isShift: boolean; isMeta: boolean; isCtrl: boolean }) => {
+      onRowSelectInternal(rowIndex, options);
+    },
   );
 
   const renderRow = useCallback(
@@ -558,23 +673,16 @@ function App() {
           item={item}
           style={rowStyle}
           isSelected={selectedIndexSet.has(rowIndex)}
-          selectedPaths={selectedPaths}
+          onDragStart={handleDragStart}
           caseInsensitive={!caseSensitive}
           highlightTerms={highlightTerms}
-          onContextMenu={(event, contextPath) => handleRowContextMenu(event, contextPath, rowIndex)}
+          onContextMenu={handleRowContextMenu}
           onSelect={handleRowSelect}
-          onOpen={openResultPath}
+          onOpen={handleRowOpen}
         />
       );
     },
-    [
-      handleRowContextMenu,
-      handleRowSelect,
-      highlightTerms,
-      caseSensitive,
-      selectedIndexSet,
-      selectedPaths,
-    ],
+    [handleRowContextMenu, handleRowSelect, highlightTerms, caseSensitive, selectedIndexSet],
   );
 
   const displayState: DisplayState = (() => {
@@ -666,6 +774,8 @@ function App() {
           caseSensitiveLabel={caseSensitiveLabel}
           onFocus={handleSearchFocus}
           onBlur={handleSearchBlur}
+          viewMode={viewMode}
+          onToggleViewMode={handleSessionViewModeChange}
         />
         <div className={resultsContainerClassName} style={containerStyle}>
           {activeTab === 'events' ? (
@@ -686,12 +796,23 @@ function App() {
               displayState={displayState}
               searchErrorMessage={searchErrorMessage}
               currentQuery={currentQuery}
-              virtualListRef={virtualListRef}
+              virtualListRef={virtualListRef as any}
+              viewMode={viewMode}
+              iconSize={iconSize}
               results={displayedResults}
               rowHeight={ROW_HEIGHT}
               overscan={OVERSCAN_ROW_COUNT}
               renderRow={renderRow}
               onScrollSync={handleHorizontalSync}
+              onSelect={handleRowSelect}
+              onBulkSelect={bulkSelect}
+              onContextMenu={handleRowContextMenu}
+              onOpen={handleRowOpen}
+              onDragStart={handleDragStart}
+              caseInsensitive={!caseSensitive}
+              highlightTerms={highlightTerms}
+              selectedIndices={selectedIndices}
+              selectedPaths={selectedPaths}
               sortState={sortState}
               onSortToggle={handleSortToggle}
               sortDisabled={sortButtonsDisabled}
@@ -707,8 +828,11 @@ function App() {
           searchDurationMs={durationMs}
           resultCount={resultCount}
           activeTab={activeTab}
-          onTabChange={handleTabChange}
+          onTabChange={setActiveTab}
           onRequestRescan={requestRescan}
+          viewMode={viewMode}
+          iconSize={iconSize}
+          onIconSizeChange={handleSessionIconSizeChange}
         />
       </main>
       <PreferencesOverlay
@@ -718,6 +842,10 @@ function App() {
         onSortThresholdChange={setSortThreshold}
         trayIconEnabled={trayIconEnabled}
         onTrayIconEnabledChange={setTrayIconEnabled}
+        defaultView={defaultViewMode}
+        onDefaultViewChange={handleDefaultViewModeChange}
+        defaultIconSize={defaultIconSize}
+        onDefaultIconSizeChange={handleDefaultIconSizeChange}
       />
       {showFullDiskAccessOverlay && (
         <PermissionOverlay

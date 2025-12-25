@@ -15,7 +15,7 @@ use parking_lot::Mutex;
 use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, SlabNodeMetadata};
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use std::{fs, path::PathBuf, process::Command};
 use tauri::{AppHandle, Manager, State};
 use tracing::{error, info, warn};
 
@@ -57,7 +57,7 @@ pub struct SearchState {
 
     node_info_tx: Sender<NodeInfoRequest>,
 
-    icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
+    icon_viewport_tx: Sender<(u64, Vec<SlabIndex>, f64)>,
     rescan_tx: Sender<()>,
     sorted_view_cache: Mutex<Option<SortedViewCache>>,
     update_window_state_tx: Sender<()>,
@@ -68,7 +68,7 @@ impl SearchState {
         search_tx: Sender<SearchJob>,
         result_rx: Receiver<Result<SearchOutcome>>,
         node_info_tx: Sender<NodeInfoRequest>,
-        icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
+        icon_viewport_tx: Sender<(u64, Vec<SlabIndex>, f64)>,
         rescan_tx: Sender<()>,
         update_window_state_tx: Sender<()>,
     ) -> Self {
@@ -131,6 +131,8 @@ pub struct NodeInfo {
     pub path: String,
     pub metadata: Option<NodeInfoMetadata>,
     pub icon: Option<String>,
+    pub icon_width: Option<f64>,
+    pub icon_height: Option<f64>,
 }
 
 #[derive(Serialize, Default)]
@@ -248,20 +250,28 @@ pub fn get_nodes_info(
         .into_iter()
         .map(|SearchResultNode { path, metadata }| {
             let path = path.to_string_lossy().into_owned();
-            let icon = if include_icons {
-                fs_icon::icon_of_path_ns(&path).map(|data| {
-                    format!(
-                        "data:image/png;base64,{}",
-                        general_purpose::STANDARD.encode(data)
+            let (icon, icon_width, icon_height) = if include_icons {
+                if let Some((data, width, height)) = fs_icon::icon_of_path_ns(&path, 512.0) {
+                    (
+                        Some(format!(
+                            "data:image/png;base64,{}",
+                            general_purpose::STANDARD.encode(data)
+                        )),
+                        Some(width),
+                        Some(height),
                     )
-                })
+                } else {
+                    (None, None, None)
+                }
             } else {
-                None
+                (None, None, None)
             };
             NodeInfo {
                 path,
                 icon,
                 metadata: metadata.as_ref().map(NodeInfoMetadata::from_metadata),
+                icon_width,
+                icon_height,
             }
         })
         .collect()
@@ -291,8 +301,13 @@ pub fn get_sorted_view(
 }
 
 #[tauri::command(async)]
-pub fn update_icon_viewport(id: u64, viewport: Vec<SlabIndex>, state: State<'_, SearchState>) {
-    if let Err(e) = state.icon_viewport_tx.send((id, viewport)) {
+pub fn update_icon_viewport(
+    id: u64,
+    viewport: Vec<SlabIndex>,
+    icon_size: f64,
+    state: State<'_, SearchState>,
+) {
+    if let Err(e) = state.icon_viewport_tx.send((id, viewport, icon_size)) {
         error!("Failed to send icon viewport update: {e:?}");
     }
 }
@@ -369,4 +384,29 @@ pub async fn toggle_main_window(app: AppHandle) {
     } else {
         warn!("Toggle requested but main window is unavailable");
     }
+}
+#[tauri::command]
+pub async fn trash_paths(paths: Vec<String>) -> Result<(), String> {
+    let path_bufs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+    trash::delete_all(path_bufs).map_err(|e| {
+        error!("Failed to trash paths: {e}");
+        e.to_string()
+    })
+}
+
+#[tauri::command]
+pub async fn delete_paths(paths: Vec<String>) -> Result<(), String> {
+    for path in paths {
+        let p = PathBuf::from(path);
+        if p.is_dir() {
+            if let Err(e) = fs::remove_dir_all(&p) {
+                error!("Failed to delete directory {p:?}: {e}");
+                return Err(e.to_string());
+            }
+        } else if let Err(e) = fs::remove_file(&p) {
+            error!("Failed to delete file {p:?}: {e}");
+            return Err(e.to_string());
+        }
+    }
+    Ok(())
 }

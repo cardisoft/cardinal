@@ -82,8 +82,10 @@ export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
     const buildItem = (path: string): QuickLookItemPayload => {
       const selector = `[data-row-path="${escapePathForSelector(path)}"]`;
       const row = document.querySelector<HTMLElement>(selector);
-      const anchor = row?.querySelector<HTMLElement>('.file-icon, .file-icon-placeholder');
-      const iconImage = row?.querySelector<HTMLImageElement>('img.file-icon');
+      const anchor = row?.querySelector<HTMLElement>(
+        '.file-icon, .file-icon-placeholder, .grid-item-icon, .grid-item-icon-placeholder',
+      );
+      const iconImage = row?.querySelector<HTMLImageElement>('img.file-icon, img.grid-item-icon');
       if (!row || !anchor || !iconImage) {
         return { path };
       }

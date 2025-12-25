@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSwitcher from './LanguageSwitcher';
+import { ViewMode, MIN_ICON_SIZE, MAX_ICON_SIZE } from '../constants';
 
 type PreferencesOverlayProps = {
   open: boolean;
@@ -10,6 +11,10 @@ type PreferencesOverlayProps = {
   onSortThresholdChange: (value: number) => void;
   trayIconEnabled: boolean;
   onTrayIconEnabledChange: (enabled: boolean) => void;
+  defaultView: ViewMode;
+  onDefaultViewChange: (mode: ViewMode) => void;
+  defaultIconSize: number;
+  onDefaultIconSizeChange: (size: number) => void;
 };
 
 export function PreferencesOverlay({
@@ -19,6 +24,10 @@ export function PreferencesOverlay({
   onSortThresholdChange,
   trayIconEnabled,
   onTrayIconEnabledChange,
+  defaultView,
+  onDefaultViewChange,
+  defaultIconSize,
+  onDefaultIconSizeChange,
 }: PreferencesOverlayProps): React.JSX.Element | null {
   const { t } = useTranslation();
   const [thresholdInput, setThresholdInput] = useState<string>(() => sortThreshold.toString());
@@ -128,6 +137,45 @@ export function PreferencesOverlay({
               </label>
             </div>
           </div>
+          <div className="preferences-row">
+            <p className="preferences-label">{t('preferences.defaultView.label')}</p>
+            <div className="preferences-control">
+              <div className="segmented-control">
+                <button
+                  type="button"
+                  className={`segmented-control__button ${defaultView === 'list' ? 'is-active' : ''}`}
+                  onClick={() => onDefaultViewChange('list')}
+                >
+                  {t('preferences.defaultView.list')}
+                </button>
+                <button
+                  type="button"
+                  className={`segmented-control__button ${defaultView === 'grid' ? 'is-active' : ''}`}
+                  onClick={() => onDefaultViewChange('grid')}
+                >
+                  {t('preferences.defaultView.grid')}
+                </button>
+              </div>
+            </div>
+          </div>
+          {defaultView === 'grid' && (
+            <div className="preferences-row">
+              <p className="preferences-label">{t('preferences.defaultIconSize.label')}</p>
+              <div className="preferences-control preferences-control--slider">
+                <span className="preferences-slider-value">{defaultIconSize}px</span>
+                <input
+                  type="range"
+                  min={MIN_ICON_SIZE}
+                  max={MAX_ICON_SIZE}
+                  step={1}
+                  value={defaultIconSize}
+                  onChange={(e) => onDefaultIconSizeChange(parseInt(e.target.value, 10))}
+                  className="grid-size-slider"
+                  aria-label={t('preferences.defaultIconSize.label')}
+                />
+              </div>
+            </div>
+          )}
           <div className="preferences-row">
             <div className="preferences-row__details">
               <p className="preferences-label">{t('preferences.sortingLimit.label')}</p>

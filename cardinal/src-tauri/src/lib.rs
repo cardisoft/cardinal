@@ -12,10 +12,10 @@ use background::{
 };
 use cardinal_sdk::EventWatcher;
 use commands::{
-    NodeInfoRequest, SearchJob, SearchState, activate_main_window, close_quicklook, get_app_status,
-    get_nodes_info, get_sorted_view, hide_main_window, open_in_finder, open_path, search,
-    start_logic, toggle_main_window, toggle_quicklook, trigger_rescan, update_icon_viewport,
-    update_quicklook,
+    NodeInfoRequest, SearchJob, SearchState, activate_main_window, close_quicklook, delete_paths,
+    get_app_status, get_nodes_info, get_sorted_view, hide_main_window, open_in_finder, open_path,
+    search, start_logic, toggle_main_window, toggle_quicklook, trash_paths, trigger_rescan,
+    update_icon_viewport, update_quicklook,
 };
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, bounded, unbounded};
 use lifecycle::{
@@ -52,7 +52,7 @@ pub fn run() -> Result<()> {
     let (search_tx, search_rx) = unbounded::<SearchJob>();
     let (result_tx, result_rx) = unbounded::<Result<SearchOutcome>>();
     let (node_info_tx, node_info_rx) = unbounded::<NodeInfoRequest>();
-    let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>)>();
+    let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>, f64)>();
     let (rescan_tx, rescan_rx) = unbounded::<()>();
     let (icon_update_tx, icon_update_rx) = unbounded::<IconPayload>();
     let (update_window_state_tx, update_window_state_rx) = bounded::<()>(1);
@@ -128,6 +128,8 @@ pub fn run() -> Result<()> {
             hide_main_window,
             activate_main_window,
             toggle_main_window,
+            trash_paths,
+            delete_paths,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

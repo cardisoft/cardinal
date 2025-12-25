@@ -39,6 +39,7 @@ tauri-plugin-prevent-default = "4"
 tauri-plugin-macos-permissions = "2.3.0"
 tauri-plugin-window-state = "2"
 once_cell = { version = "1.20", features = ["parking_lot"] }
+trash = "5.2"
 
 cardinal-sdk.path = "../../cardinal-sdk"
 search-cache.path = "../../search-cache"

@@ -10,7 +10,7 @@ import type { IconUpdatePayload, IconUpdateWirePayload } from '../types/ipc';
 type IconUpdateEventPayload = readonly IconUpdateWirePayload[] | null | undefined;
 
 export type DataLoaderCache = Map<number, SearchResultItem>;
-type IconOverrideValue = string | null;
+type IconOverrideValue = { icon: string | null; width?: number; height?: number } | null;
 
 const normalizeIcon = (icon: string | null | undefined): string | undefined => icon ?? undefined;
 
@@ -23,6 +23,8 @@ const fromNodeInfo = (node: NodeInfoResponse): SearchResultItem => {
     mtime: node.mtime ?? metadata?.mtime,
     ctime: node.ctime ?? metadata?.ctime,
     icon: normalizeIcon(node.icon),
+    iconWidth: node.iconWidth ?? undefined,
+    iconHeight: node.iconHeight ?? undefined,
   };
   return base;
 };
@@ -74,6 +76,8 @@ export function useDataLoader(results: SlabIndex[]) {
               normalized.push({
                 slabIndex: toSlabIndex(update.slabIndex),
                 icon: update.icon,
+                width: update.width,
+                height: update.height,
               });
             }
           });
@@ -89,20 +93,34 @@ export function useDataLoader(results: SlabIndex[]) {
               const index = indexMapRef.current.get(update.slabIndex);
               if (index === undefined) return;
 
-              const overrideValue: IconOverrideValue = update.icon ?? null;
+              const overrideValue: IconOverrideValue = {
+                icon: update.icon ?? null,
+                width: update.width,
+                height: update.height,
+              };
               iconOverridesRef.current.set(index, overrideValue);
 
               const current = prev.get(index);
               if (!current) return;
 
-              const nextIcon = normalizeIcon(overrideValue);
-              if (current.icon === nextIcon) return;
+              const nextIcon = normalizeIcon(overrideValue.icon);
+              if (
+                current.icon === nextIcon &&
+                current.iconWidth === overrideValue.width &&
+                current.iconHeight === overrideValue.height
+              )
+                return;
 
               if (nextCache === null) {
                 nextCache = new Map(prev);
               }
 
-              nextCache.set(index, { ...current, icon: nextIcon });
+              nextCache.set(index, {
+                ...current,
+                icon: nextIcon,
+                iconWidth: overrideValue.width,
+                iconHeight: overrideValue.height,
+              });
             });
 
             if (nextCache === null) {
@@ -158,13 +176,28 @@ export function useDataLoader(results: SlabIndex[]) {
         const override = hasOverride ? iconOverridesRef.current.get(originalIndex) : undefined;
 
         const preferredIcon = hasOverride
-          ? normalizeIcon(override)
+          ? normalizeIcon(override?.icon)
           : (existing?.icon ?? normalizedItem.icon);
 
+        const preferredWidth = hasOverride
+          ? override?.width
+          : (existing?.iconWidth ?? normalizedItem.iconWidth);
+
+        const preferredHeight = hasOverride
+          ? override?.height
+          : (existing?.iconHeight ?? normalizedItem.iconHeight);
+
         const mergedItem =
-          preferredIcon === normalizedItem.icon
+          preferredIcon === normalizedItem.icon &&
+          preferredWidth === normalizedItem.iconWidth &&
+          preferredHeight === normalizedItem.iconHeight
             ? normalizedItem
-            : { ...normalizedItem, icon: preferredIcon };
+            : {
+                ...normalizedItem,
+                icon: preferredIcon,
+                iconWidth: preferredWidth,
+                iconHeight: preferredHeight,
+              };
 
         if (nextCache === null) {
           nextCache = new Map(prev);

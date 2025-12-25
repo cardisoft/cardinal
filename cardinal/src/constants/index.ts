@@ -27,6 +27,15 @@ export const calculateInitialColWidths = (windowWidth: number): Record<ColumnKey
 };
 
 export const ROW_HEIGHT = 24;
+export const DEFAULT_ICON_SIZE = 64;
+export const MIN_ICON_SIZE = 64;
+export const MAX_ICON_SIZE = 512;
+export const GRID_SPACING_X = 64;
+export const GRID_SPACING_Y = 112;
+export const GRID_ASPECT_RATIO_MAX = 1.5;
+
+export type ViewMode = 'list' | 'grid';
+
 export const CONTAINER_PADDING = 10;
 // Keep in sync with the CSS variable --virtual-scrollbar-width.
 export const SCROLLBAR_WIDTH = 14;

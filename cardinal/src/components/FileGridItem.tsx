@@ -1,10 +1,10 @@
 import React, { memo, useCallback, DragEvent, useRef } from 'react';
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
-import { MiddleEllipsisHighlight } from './MiddleEllipsisHighlight';
-import { formatKB, formatTimestamp } from '../utils/format';
+import { splitTextWithHighlights, applyMiddleEllipsis } from './MiddleEllipsisHighlight';
 import type { SearchResultItem } from '../types/search';
+import { formatKB } from '../utils/format';
 
-type FileRowProps = {
+type FileGridItemProps = {
   item?: SearchResultItem;
   rowIndex: number;
   style?: CSSProperties;
@@ -18,9 +18,11 @@ type FileRowProps = {
   onDragStart?: (path: string, itemIsSelected: boolean, icon?: string) => void;
   caseInsensitive?: boolean;
   highlightTerms?: readonly string[];
+  iconSize: number;
+  actualItemWidth: number;
 };
 
-export const FileRow = memo(function FileRow({
+export const FileGridItem = memo(function FileGridItem({
   item,
   rowIndex,
   style,
@@ -31,7 +33,9 @@ export const FileRow = memo(function FileRow({
   onDragStart,
   caseInsensitive,
   highlightTerms,
-}: FileRowProps): React.JSX.Element | null {
+  iconSize,
+  actualItemWidth,
+}: FileGridItemProps): React.JSX.Element | null {
   const pendingSelectRef = useRef<{
     isShift: boolean;
     isMeta: boolean;
@@ -44,26 +48,20 @@ export const FileRow = memo(function FileRow({
 
   const path = item.path;
   let filename = '';
-  let directoryPath = '';
 
   if (path) {
     if (path === '/') {
-      directoryPath = '/';
+      filename = '/';
     } else {
-      // Split on either slash to support Windows and POSIX paths.
       const parts = path.split(/[\\/]/);
       filename = parts.pop() || '';
-      directoryPath = parts.join('/');
     }
   }
 
   const metadata = item.metadata;
-  const mtimeSec = metadata?.mtime ?? item.mtime;
-  const ctimeSec = metadata?.ctime ?? item.ctime;
   const sizeBytes = metadata?.size ?? item.size;
-  const sizeText = metadata?.type !== 1 ? formatKB(sizeBytes) : null;
-  const mtimeText = formatTimestamp(mtimeSec);
-  const ctimeText = formatTimestamp(ctimeSec);
+  const isDirectory = metadata?.type === 1;
+  const sizeText = !isDirectory ? formatKB(sizeBytes) : null;
 
   const handleContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -115,7 +113,7 @@ export const FileRow = memo(function FileRow({
   };
 
   const handleDragStart = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
+    (e: React.DragEvent<HTMLDivElement>) => {
       if (!path || !onDragStart) {
         return;
       }
@@ -125,6 +123,8 @@ export const FileRow = memo(function FileRow({
       const dataTransfer = e.dataTransfer;
       if (dataTransfer) {
         dataTransfer.effectAllowed = 'copy';
+        // Note: System-level multi-drag will be handled by the native side via onDragStart.
+        // We set dummy text data to satisfy web-standard DND if necessary.
         dataTransfer.setData('text/plain', path);
       }
 
@@ -133,19 +133,39 @@ export const FileRow = memo(function FileRow({
     [isSelected, item.icon, path, onDragStart],
   );
 
-  const rowClassName = [
-    'row',
-    'columns',
-    rowIndex % 2 === 0 ? 'row-even' : 'row-odd',
-    isSelected ? 'row-selected' : '',
-  ]
+  const itemClassName = ['grid-item', isSelected ? 'grid-item-selected' : '']
     .filter(Boolean)
     .join(' ');
 
+  const highlightedParts = React.useMemo(() => {
+    if (!filename) return [];
+    const parts = splitTextWithHighlights(filename, highlightTerms, { caseInsensitive });
+    // Width of the text area is the actual column width minus local padding
+    const textAreaWidth = actualItemWidth - 16;
+    // 9.5px is an extreme buffer for 11px font width to strictly ensure 2 lines
+    const charsPerLine = Math.floor(textAreaWidth / 9.5);
+    const maxChars = charsPerLine * 2;
+    return applyMiddleEllipsis(parts, maxChars);
+  }, [filename, highlightTerms, caseInsensitive, actualItemWidth]);
+
+  // Use actual dimensions from backend, but ensure they're at least as large as iconSize
+  // This prevents tiny selection boxes while respecting aspect ratios
+  const reportedWidth = item.iconWidth ? item.iconWidth / 2 : iconSize;
+  const reportedHeight = item.iconHeight ? item.iconHeight / 2 : iconSize;
+
+  // Selection box should be at least as large as the display size
+  const boxWidth = Math.max(reportedWidth, iconSize);
+  const boxHeight = Math.max(reportedHeight, iconSize);
   return (
     <div
-      style={style}
-      className={rowClassName}
+      style={
+        {
+          ...style,
+          '--grid-width': `${actualItemWidth}px`,
+          '--icon-size': `${iconSize}px`,
+        } as React.CSSProperties
+      }
+      className={itemClassName}
       data-row-path={path ?? undefined}
       onContextMenu={handleContextMenu}
       onMouseDown={handleMouseDown}
@@ -156,28 +176,39 @@ export const FileRow = memo(function FileRow({
       aria-selected={isSelected}
       title={path}
     >
-      <div className="filename-column">
-        {item.icon ? (
-          <img src={item.icon} alt="icon" className="file-icon" />
-        ) : (
-          <span className="file-icon file-icon-placeholder" aria-hidden="true" />
-        )}
-        <MiddleEllipsisHighlight
-          className="filename-text"
-          text={filename}
-          highlightTerms={highlightTerms}
-          caseInsensitive={caseInsensitive}
-        />
+      <div className="grid-item-icon-container">
+        <div
+          className="grid-item-icon-selection"
+          style={{
+            width: boxWidth,
+            height: boxHeight,
+          }}
+        >
+          {item.icon ? (
+            <img src={item.icon} alt="icon" className="grid-item-icon" />
+          ) : (
+            <div className="grid-item-icon grid-item-icon-placeholder" aria-hidden="true" />
+          )}
+        </div>
       </div>
-      {/* Directory column renders the parent path (the filename column already shows the leaf). */}
-      <span className="path-text" title={directoryPath}>
-        {directoryPath}
-      </span>
-      <span className={`size-text ${!sizeText ? 'muted' : ''}`}>{sizeText || '—'}</span>
-      <span className={`mtime-text ${!mtimeText ? 'muted' : ''}`}>{mtimeText || '—'}</span>
-      <span className={`ctime-text ${!ctimeText ? 'muted' : ''}`}>{ctimeText || '—'}</span>
+      <div className="grid-item-name">
+        <span className="grid-item-name-text">
+          {highlightedParts.map((part, index) =>
+            part.isHighlight ? (
+              <strong key={`${part.text}-${index}`}>{part.text}</strong>
+            ) : (
+              <span key={`${part.text}-${index}`}>{part.text}</span>
+            ),
+          )}
+        </span>
+      </div>
+      {sizeText && (
+        <div className="grid-item-meta">
+          <span>{sizeText}</span>
+        </div>
+      )}
     </div>
   );
 });
 
-FileRow.displayName = 'FileRow';
+FileGridItem.displayName = 'FileGridItem';

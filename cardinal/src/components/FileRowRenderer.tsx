@@ -8,7 +8,7 @@ type FileRowRendererProps = {
   item: SearchResultItem;
   style: CSSProperties;
   isSelected: boolean;
-  selectedPaths: string[];
+  onDragStart: (path: string, itemIsSelected: boolean, icon?: string) => void;
   caseInsensitive: boolean;
   highlightTerms: readonly string[];
   onContextMenu: (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => void;
@@ -24,7 +24,7 @@ export const FileRowRenderer = memo(function FileRowRenderer({
   item,
   style,
   isSelected,
-  selectedPaths,
+  onDragStart,
   caseInsensitive,
   highlightTerms,
   onContextMenu,
@@ -40,7 +40,7 @@ export const FileRowRenderer = memo(function FileRowRenderer({
       onSelect={onSelect}
       onOpen={onOpen}
       isSelected={isSelected}
-      selectedPathsForDrag={selectedPaths}
+      onDragStart={onDragStart}
       caseInsensitive={caseInsensitive}
       highlightTerms={highlightTerms}
     />
