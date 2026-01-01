@@ -3,7 +3,7 @@
 
 use super::{
     prelude::*,
-    support::{SECONDS_PER_DAY, set_file_times, ts_for_date},
+    support::{set_file_times, ts_for_date},
 };
 
 #[test]
@@ -150,8 +150,24 @@ fn boolean_and_intersection() {
     fs::write(tmp.path().join("weekly.txt"), b"x").unwrap();
     let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
     let idx = cache.search("weekly.txt").unwrap()[0];
-    let now = Timestamp::now().as_second();
-    set_file_times(&mut cache, idx, now, now - 2 * SECONDS_PER_DAY); // modified 2 days ago
+    let tz = jiff::tz::TimeZone::system();
+    let zoned_now = Timestamp::now().to_zoned(tz.clone());
+    let today = zoned_now.date();
+    let mut modified_date = today;
+    for _ in 0..2 {
+        if let Ok(prev) = modified_date.yesterday() {
+            if prev.year() == today.year() {
+                modified_date = prev;
+            }
+        }
+    }
+    let modified_ts = tz
+        .to_zoned(modified_date.at(12, 0, 0, 0))
+        .expect("valid local date")
+        .timestamp()
+        .as_second();
+    let now = zoned_now.timestamp().as_second();
+    set_file_times(&mut cache, idx, now, modified_ts);
     let hits = cache.search("dm:pastweek dm:thisyear").unwrap();
     let count = hits
         .iter()
