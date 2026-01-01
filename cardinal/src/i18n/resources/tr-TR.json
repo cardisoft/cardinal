@@ -62,7 +62,8 @@
     },
     "rescan": {
       "disabledHint": "Cardinal hazır olduğunda yeniden tarama kullanılabilir.",
-      "enabledHint": "Dosya sistemini tamamen tara."
+      "enabledHint": "Dosya sistemini tamamen tara.",
+      "errorCountSuffix": " Şu ana kadar {{formatted}} dosya sistemi hatası oluştu."
     },
     "searchLabel": "Arama:",
     "resultsUnavailable": "—",

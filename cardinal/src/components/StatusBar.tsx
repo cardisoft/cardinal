@@ -15,6 +15,7 @@ type StatusBarProps = {
   activeTab?: StatusTabKey;
   onTabChange?: (tab: StatusTabKey) => void;
   onRequestRescan?: () => void;
+  rescanErrorCount?: number;
 };
 
 const TABS: StatusTabKey[] = ['files', 'events'];
@@ -34,6 +35,7 @@ const StatusBar = ({
   activeTab = 'files',
   onTabChange,
   onRequestRescan,
+  rescanErrorCount = 0,
 }: StatusBarProps): React.JSX.Element => {
   const { t } = useTranslation();
   const tabsRef = useRef<HTMLDivElement | null>(null);
@@ -93,6 +95,13 @@ const StatusBar = ({
   const rescanTitle = rescanDisabled
     ? t('statusBar.rescan.disabledHint')
     : t('statusBar.rescan.enabledHint');
+  const rescanTooltip =
+    rescanErrorCount > 0
+      ? `${rescanTitle}\n${t('statusBar.rescan.errorCountSuffix', {
+          count: rescanErrorCount,
+          formatted: rescanErrorCount.toLocaleString(),
+        })}`
+      : rescanTitle;
   const indicatorLabel = t('statusBar.aria.status', { status: lifecycleLabel });
 
   const handleRescanClick = useCallback(() => {
@@ -156,7 +165,7 @@ const StatusBar = ({
             className="status-icon-button status-rescan-button"
             onClick={handleRescanClick}
             disabled={rescanDisabled}
-            title={rescanTitle}
+            title={rescanTooltip}
             aria-label={t('statusBar.aria.rescan')}
           >
             <span className="status-rescan-icon" aria-hidden="true">

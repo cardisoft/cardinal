@@ -62,7 +62,8 @@
     },
     "rescan": {
       "disabledHint": "El reescaneo estará disponible cuando Cardinal esté listo.",
-      "enabledHint": "Iniciar un reescaneo completo del sistema de archivos."
+      "enabledHint": "Iniciar un reescaneo completo del sistema de archivos.",
+      "errorCountSuffix": " Se han producido {{formatted}} errores del sistema de archivos."
     },
     "searchLabel": "Búsqueda:",
     "resultsUnavailable": "—",

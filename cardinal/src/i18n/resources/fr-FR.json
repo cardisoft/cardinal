@@ -62,7 +62,8 @@
     },
     "rescan": {
       "disabledHint": "Le nouveau scan sera disponible lorsque Cardinal sera prêt.",
-      "enabledHint": "Lancer un nouveau scan complet du système de fichiers."
+      "enabledHint": "Lancer un nouveau scan complet du système de fichiers.",
+      "errorCountSuffix": " {{formatted}} erreurs du système de fichiers se sont produites."
     },
     "searchLabel": "Recherche :",
     "resultsUnavailable": "—",

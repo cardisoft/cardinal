@@ -13,6 +13,7 @@ type SearchState = {
   resultsVersion: number;
   scannedFiles: number;
   processedEvents: number;
+  rescanErrors: number;
   currentQuery: string;
   highlightTerms: string[];
   showLoadingUI: boolean;
@@ -34,7 +35,10 @@ type QueueSearchOptions = {
 };
 
 type SearchAction =
-  | { type: 'STATUS_UPDATE'; payload: { scannedFiles: number; processedEvents: number } }
+  | {
+      type: 'STATUS_UPDATE';
+      payload: { scannedFiles: number; processedEvents: number; rescanErrors: number };
+    }
   | { type: 'SEARCH_REQUEST'; payload: { immediate: boolean } }
   | { type: 'SEARCH_LOADING_DELAY' }
   | {
@@ -61,6 +65,7 @@ const initialSearchState: SearchState = {
   resultsVersion: 0,
   scannedFiles: 0,
   processedEvents: 0,
+  rescanErrors: 0,
   currentQuery: '',
   highlightTerms: [],
   showLoadingUI: false,
@@ -91,6 +96,7 @@ function reducer(state: SearchState, action: SearchAction): SearchState {
         ...state,
         scannedFiles: action.payload.scannedFiles,
         processedEvents: action.payload.processedEvents,
+        rescanErrors: action.payload.rescanErrors,
       };
     case 'SEARCH_REQUEST':
       return {
@@ -149,7 +155,11 @@ type UseFileSearchResult = {
   handleSearch: (overrides?: Partial<SearchParams>) => Promise<void>;
   resetSearchQuery: () => void;
   cancelPendingSearches: () => void;
-  handleStatusUpdate: (scannedFiles: number, processedEvents: number) => void;
+  handleStatusUpdate: (
+    scannedFiles: number,
+    processedEvents: number,
+    rescanErrors: number,
+  ) => void;
   setLifecycleState: (status: AppLifecycleStatus) => void;
   requestRescan: () => Promise<void>;
 };
@@ -169,10 +179,11 @@ export function useFileSearch(): UseFileSearchResult {
     patchSearchParams(patch);
   }, []);
 
-  const handleStatusUpdate = useCallback((scannedFiles: number, processedEvents: number) => {
+  const handleStatusUpdate = useCallback(
+    (scannedFiles: number, processedEvents: number, rescanErrors: number) => {
     dispatch({
       type: 'STATUS_UPDATE',
-      payload: { scannedFiles, processedEvents },
+      payload: { scannedFiles, processedEvents, rescanErrors },
     });
   }, []);
 

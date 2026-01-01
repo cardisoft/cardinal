@@ -62,7 +62,8 @@
     },
     "rescan": {
       "disabledHint": "Cardinal तैयार होने पर पुनः स्कैन उपलब्ध होगा.",
-      "enabledHint": "पूरे फ़ाइल सिस्टम का पुनः स्कैन करें."
+      "enabledHint": "पूरे फ़ाइल सिस्टम का पुनः स्कैन करें.",
+      "errorCountSuffix": " फ़ाइल सिस्टम की {{formatted}} त्रुटियाँ हुई हैं।"
     },
     "searchLabel": "खोज:",
     "resultsUnavailable": "—",

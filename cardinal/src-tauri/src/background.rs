@@ -8,6 +8,8 @@ use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
 use cardinal_sdk::{EventFlag, EventWatcher};
 use crossbeam_channel::{Receiver, Sender};
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 use rayon::spawn;
 use search_cache::{
     HandleFSEError, SearchCache, SearchOptions, SearchOutcome, SearchResultNode, SlabIndex,
@@ -16,7 +18,7 @@ use serde::Serialize;
 use std::{
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Emitter};
 use tracing::{error, info};
@@ -26,6 +28,7 @@ use tracing::{error, info};
 pub struct StatusBarUpdate {
     pub scanned_files: usize,
     pub processed_events: usize,
+    pub rescan_errors: usize,
 }
 
 #[derive(Serialize, Clone)]
@@ -46,20 +49,45 @@ pub struct BackgroundLoopChannels {
     pub icon_update_tx: Sender<IconPayload>,
 }
 
-pub fn emit_status_bar_update(
-    app_handle: &AppHandle,
-    scanned_files: usize,
-    processed_events: usize,
-) {
+pub fn reset_status_bar(app_handle: &AppHandle) {
     app_handle
         .emit(
             "status_bar_update",
             StatusBarUpdate {
-                scanned_files,
-                processed_events,
+                scanned_files: 0,
+                processed_events: 0,
+                rescan_errors: 0,
             },
         )
         .unwrap();
+}
+
+pub fn emit_status_bar_update(
+    app_handle: &AppHandle,
+    scanned_files: usize,
+    processed_events: usize,
+    rescan_errors: usize,
+) {
+    static LAST_EMIT: Lazy<Mutex<Instant>> =
+        Lazy::new(|| Mutex::new(Instant::now() - Duration::from_secs(1)));
+
+    {
+        let mut last_emit = LAST_EMIT.lock();
+        if Instant::now().duration_since(*last_emit) < Duration::from_millis(100) {
+            return;
+        }
+        app_handle
+            .emit(
+                "status_bar_update",
+                StatusBarUpdate {
+                    scanned_files,
+                    processed_events,
+                    rescan_errors,
+                },
+            )
+            .unwrap();
+        *last_emit = Instant::now();
+    }
 }
 
 struct EventSnapshot {
@@ -99,6 +127,7 @@ pub fn run_background_event_loop(
     } = channels;
     let mut processed_events = 0usize;
     let mut history_ready = load_app_state() == AppLifecycleState::Ready;
+    let mut rescan_errors = 0usize;
 
     let mut window_is_foreground = true;
     let mut hide_flush_remaining_ticks: u8 = 0;
@@ -199,14 +228,20 @@ pub fn run_background_event_loop(
                     watch_root,
                     fse_latency_secs,
                     &mut history_ready,
-                    &mut processed_events
+                    &mut processed_events,
+                    &mut rescan_errors,
                 );
             }
             recv(event_watcher) -> events => {
                 let events = events.expect("Event stream closed");
                 processed_events += events.len();
 
-                emit_status_bar_update(app_handle, cache.get_total_files(), processed_events);
+                emit_status_bar_update(
+                    app_handle,
+                    cache.get_total_files(),
+                    processed_events,
+                    rescan_errors,
+                );
 
                 let mut snapshots = Vec::with_capacity(events.len());
                 for event in events.iter() {
@@ -226,14 +261,12 @@ pub fn run_background_event_loop(
                 let handle_result = cache.handle_fs_events(events);
                 if let Err(HandleFSEError::Rescan) = handle_result {
                     info!("!!!!!!!!!! Rescan triggered !!!!!!!!");
-                    perform_rescan(
+                    rescan_errors += 1;
+                    emit_status_bar_update(
                         app_handle,
-                        &mut cache,
-                        &mut event_watcher,
-                        watch_root,
-                        fse_latency_secs,
-                        &mut history_ready,
-                        &mut processed_events
+                        cache.get_total_files(),
+                        processed_events,
+                        rescan_errors,
                     );
                 }
 
@@ -253,12 +286,14 @@ fn perform_rescan(
     fse_latency_secs: f64,
     history_ready: &mut bool,
     processed_events: &mut usize,
+    rescan_errors: &mut usize,
 ) {
     *event_watcher = EventWatcher::noop();
     update_app_state(app_handle, AppLifecycleState::Initializing);
-    emit_status_bar_update(app_handle, 0, 0);
     *history_ready = false;
     *processed_events = 0;
+    *rescan_errors = 0;
+    reset_status_bar(app_handle);
 
     let walk_data = cache.walk_data();
     let walking_done = AtomicBool::new(false);
@@ -268,7 +303,7 @@ fn perform_rescan(
                 let dirs = walk_data.num_dirs.load(Ordering::Relaxed);
                 let files = walk_data.num_files.load(Ordering::Relaxed);
                 let total = dirs + files;
-                emit_status_bar_update(app_handle, total, 0);
+                emit_status_bar_update(app_handle, total, 0, *rescan_errors);
                 std::thread::sleep(Duration::from_millis(100));
             }
         });

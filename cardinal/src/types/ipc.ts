@@ -3,6 +3,7 @@ import type { SlabIndex } from './slab';
 export type StatusBarUpdatePayload = {
   scannedFiles: number;
   processedEvents: number;
+  rescanErrors: number;
 };
 
 export type IconUpdateWirePayload = {

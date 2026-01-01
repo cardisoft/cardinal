@@ -87,6 +87,7 @@ function App() {
     resultsVersion,
     scannedFiles,
     processedEvents,
+    rescanErrors,
     currentQuery,
     highlightTerms,
     showLoadingUI,
@@ -303,8 +304,8 @@ function App() {
         if (!isMountedRef.current) return;
         const payload = event.payload;
         if (!payload) return;
-        const { scannedFiles, processedEvents } = payload;
-        handleStatusUpdate(scannedFiles, processedEvents);
+        const { scannedFiles, processedEvents, rescanErrors } = payload;
+        handleStatusUpdate(scannedFiles, processedEvents, rescanErrors);
       });
 
       unlistenLifecycle = await listen<AppLifecycleStatus>('app_lifecycle_state', (event) => {
@@ -318,6 +319,7 @@ function App() {
         if (!isMountedRef.current) return;
         focusSearchInput();
       });
+
     };
 
     void setupListeners();
@@ -709,6 +711,7 @@ function App() {
           activeTab={activeTab}
           onTabChange={handleTabChange}
           onRequestRescan={requestRescan}
+          rescanErrorCount={rescanErrors}
         />
       </main>
       <PreferencesOverlay

@@ -227,7 +227,7 @@ fn run_logic_thread(
     ) {
         Ok(cached) => {
             info!("Loaded existing cache");
-            emit_status_bar_update(app_handle, cached.get_total_files(), 0);
+            emit_status_bar_update(app_handle, cached.get_total_files(), 0, 0);
             cached
         }
         Err(e) => {
@@ -240,7 +240,7 @@ fn run_logic_thread(
                         let dirs = walk_data.num_dirs.load(Ordering::Relaxed);
                         let files = walk_data.num_files.load(Ordering::Relaxed);
                         let total = dirs + files;
-                        emit_status_bar_update(app_handle, total, 0);
+                        emit_status_bar_update(app_handle, total, 0, 0);
                         std::thread::sleep(Duration::from_millis(100));
                     }
                 });
@@ -266,7 +266,7 @@ fn run_logic_thread(
                 return;
             };
 
-            emit_status_bar_update(app_handle, cache.get_total_files(), 0);
+            emit_status_bar_update(app_handle, cache.get_total_files(), 0, 0);
 
             cache
         }
