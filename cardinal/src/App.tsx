@@ -319,7 +319,6 @@ function App() {
         if (!isMountedRef.current) return;
         focusSearchInput();
       });
-
     };
 
     void setupListeners();

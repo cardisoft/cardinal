@@ -155,11 +155,7 @@ type UseFileSearchResult = {
   handleSearch: (overrides?: Partial<SearchParams>) => Promise<void>;
   resetSearchQuery: () => void;
   cancelPendingSearches: () => void;
-  handleStatusUpdate: (
-    scannedFiles: number,
-    processedEvents: number,
-    rescanErrors: number,
-  ) => void;
+  handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
   setLifecycleState: (status: AppLifecycleStatus) => void;
   requestRescan: () => Promise<void>;
 };
@@ -181,11 +177,13 @@ export function useFileSearch(): UseFileSearchResult {
 
   const handleStatusUpdate = useCallback(
     (scannedFiles: number, processedEvents: number, rescanErrors: number) => {
-    dispatch({
-      type: 'STATUS_UPDATE',
-      payload: { scannedFiles, processedEvents, rescanErrors },
-    });
-  }, []);
+      dispatch({
+        type: 'STATUS_UPDATE',
+        payload: { scannedFiles, processedEvents, rescanErrors },
+      });
+    },
+    [],
+  );
 
   const setLifecycleState = useCallback((status: AppLifecycleStatus) => {
     dispatch({ type: 'SET_LIFECYCLE_STATE', payload: { status } });

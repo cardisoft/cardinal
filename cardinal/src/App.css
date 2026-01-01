@@ -1200,7 +1200,6 @@ button:active:not(:disabled) {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   }
 
-
   :root:not([data-theme]) .status-icon-button:hover:not(:disabled),
   :root:not([data-theme]) .status-icon-button:focus-visible:not(:disabled) {
     background: rgba(53, 63, 80, 0.92);
@@ -1257,7 +1256,6 @@ button:active:not(:disabled) {
   color: rgba(226, 232, 240, 0.86);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
-
 
 [data-theme='dark'] .status-icon-button:hover:not(:disabled),
 [data-theme='dark'] .status-icon-button:focus-visible:not(:disabled) {
