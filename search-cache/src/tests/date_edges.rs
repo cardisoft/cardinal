@@ -155,10 +155,10 @@ fn boolean_and_intersection() {
     let today = zoned_now.date();
     let mut modified_date = today;
     for _ in 0..2 {
-        if let Ok(prev) = modified_date.yesterday() {
-            if prev.year() == today.year() {
-                modified_date = prev;
-            }
+        if let Ok(prev) = modified_date.yesterday()
+            && prev.year() == today.year()
+        {
+            modified_date = prev;
         }
     }
     let modified_ts = tz
