@@ -278,6 +278,7 @@ pub fn run_background_event_loop(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn perform_rescan(
     app_handle: &AppHandle,
     cache: &mut SearchCache,
