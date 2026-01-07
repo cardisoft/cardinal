@@ -5,7 +5,7 @@ import type { SlabIndex } from '../types/slab';
 import { toSlabIndexArray } from '../types/slab';
 
 const SORT_THRESHOLD_STORAGE_KEY = 'cardinal.sortThreshold';
-const DEFAULT_SORTABLE_RESULT_THRESHOLD = 20000;
+export const DEFAULT_SORTABLE_RESULT_THRESHOLD = 20000;
 
 const clampSortThreshold = (value: number): number => {
   if (!Number.isFinite(value)) {

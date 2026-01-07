@@ -124,6 +124,8 @@
     "sortingLimit": {
       "label": "Sorting limit"
     },
+    "save": "Save",
+    "reset": "Restore defaults",
     "close": "Close"
   },
   "language": {
@@ -141,5 +143,23 @@
   },
   "tray": {
     "quit": "Quit Cardinal"
+  },
+  "watchRoot": {
+    "label": "Monitor root path",
+    "help": "Changing this will rebuild the index for the new directory.",
+    "errors": {
+      "required": "Please enter a path.",
+      "absolute": "Please enter an absolute path starting with '/' or '~'."
+    },
+    "title": "Choose monitor root path",
+    "description": "Cardinal will index and monitor files under this directory. You can change it later in Preferences.",
+    "action": "Start indexing"
+  },
+  "ignorePaths": {
+    "label": "Ignore paths",
+    "help": "One path per line; ignored paths are skipped during indexing.",
+    "errors": {
+      "absolute": "Each path must start with '/' or '~'."
+    }
   }
 }

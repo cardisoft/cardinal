@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getWatchRootValidation, isPathInputValid } from '../utils/watchRoot';
 import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSwitcher from './LanguageSwitcher';
 
@@ -10,6 +11,11 @@ type PreferencesOverlayProps = {
   onSortThresholdChange: (value: number) => void;
   trayIconEnabled: boolean;
   onTrayIconEnabledChange: (enabled: boolean) => void;
+  watchRoot: string;
+  onWatchConfigChange: (next: { watchRoot: string; ignorePaths: string[] }) => void;
+  ignorePaths: string[];
+  onReset: () => void;
+  themeResetToken: number;
 };
 
 export function PreferencesOverlay({
@@ -19,9 +25,16 @@ export function PreferencesOverlay({
   onSortThresholdChange,
   trayIconEnabled,
   onTrayIconEnabledChange,
+  watchRoot,
+  onWatchConfigChange,
+  ignorePaths,
+  onReset,
+  themeResetToken,
 }: PreferencesOverlayProps): React.JSX.Element | null {
   const { t } = useTranslation();
   const [thresholdInput, setThresholdInput] = useState<string>(() => sortThreshold.toString());
+  const [watchRootInput, setWatchRootInput] = useState<string>(() => watchRoot);
+  const [ignorePathsInput, setIgnorePathsInput] = useState<string>(() => ignorePaths.join('\n'));
 
   useEffect(() => {
     if (!open) {
@@ -31,6 +44,7 @@ export function PreferencesOverlay({
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         onClose();
+        event.preventDefault();
       }
     };
 
@@ -43,7 +57,9 @@ export function PreferencesOverlay({
       return;
     }
     setThresholdInput(sortThreshold.toString());
-  }, [open, sortThreshold]);
+    setWatchRootInput(watchRoot);
+    setIgnorePathsInput(ignorePaths.join('\n'));
+  }, [open, sortThreshold, watchRoot, ignorePaths]);
 
   const commitThreshold = useCallback(() => {
     const numericText = thresholdInput.replace(/[^\d]/g, '');
@@ -68,18 +84,62 @@ export function PreferencesOverlay({
     }
   };
 
-  const handleThresholdBlur = (): void => {
-    commitThreshold();
+  const { errorKey: watchRootErrorKey } = useMemo(
+    () => getWatchRootValidation(watchRootInput),
+    [watchRootInput],
+  );
+  const watchRootErrorMessage = watchRootErrorKey ? t(watchRootErrorKey) : null;
+
+  const commitWatchRoot = useCallback(() => {
+    const trimmed = watchRootInput.trim();
+    if (!getWatchRootValidation(trimmed).isValid) {
+      return;
+    }
+    onWatchConfigChange({ watchRoot: trimmed, ignorePaths });
+    setWatchRootInput(trimmed);
+  }, [ignorePaths, onWatchConfigChange, watchRootInput]);
+
+  const handleWatchRootKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key === 'Escape') {
+      setWatchRootInput(watchRoot);
+    }
   };
 
-  const handleThresholdKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      commitThreshold();
+  const parsedIgnorePaths = useMemo(
+    () =>
+      ignorePathsInput
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0),
+    [ignorePathsInput],
+  );
+  const ignorePathsErrorMessage = useMemo(() => {
+    const invalid = parsedIgnorePaths.find((line) => !isPathInputValid(line));
+    return invalid ? t('ignorePaths.errors.absolute') : null;
+  }, [parsedIgnorePaths, t]);
+
+  const commitIgnorePaths = useCallback(() => {
+    if (ignorePathsErrorMessage) {
+      return;
     }
+    onWatchConfigChange({ watchRoot, ignorePaths: parsedIgnorePaths });
+    setIgnorePathsInput(parsedIgnorePaths.join('\n'));
+  }, [ignorePathsErrorMessage, onWatchConfigChange, parsedIgnorePaths, watchRoot]);
+
+  const handleIgnorePathsKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key === 'Escape') {
-      setThresholdInput(sortThreshold.toString());
+      setIgnorePathsInput(ignorePaths.join('\n'));
     }
+  };
+
+  const handleSave = (): void => {
+    if (watchRootErrorMessage || ignorePathsErrorMessage) {
+      return;
+    }
+    commitThreshold();
+    commitWatchRoot();
+    commitIgnorePaths();
+    onClose();
   };
 
   if (!open) {
@@ -107,7 +167,7 @@ export function PreferencesOverlay({
         <div className="preferences-section">
           <div className="preferences-row">
             <p className="preferences-label">{t('preferences.appearance')}</p>
-            <ThemeSwitcher className="preferences-control" />
+            <ThemeSwitcher className="preferences-control" resetToken={themeResetToken} />
           </div>
           <div className="preferences-row">
             <p className="preferences-label">{t('preferences.language')}</p>
@@ -132,21 +192,90 @@ export function PreferencesOverlay({
             <div className="preferences-row__details">
               <p className="preferences-label">{t('preferences.sortingLimit.label')}</p>
             </div>
-            <div className="preferences-control preferences-control--column">
+            <div className="preferences-control">
               <input
-                className="preferences-number-input"
+                className="preferences-field preferences-number-input"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 value={thresholdInput}
                 onChange={handleThresholdChange}
-                onBlur={handleThresholdBlur}
-                onKeyDown={handleThresholdKeyDown}
                 aria-label={t('preferences.sortingLimit.label')}
               />
             </div>
           </div>
+          <div className="preferences-row">
+            <div className="preferences-row__details">
+              <p className="preferences-label" title={t('watchRoot.help')}>
+                {t('watchRoot.label')}
+              </p>
+            </div>
+            <div className="preferences-control">
+              <input
+                className="preferences-field preferences-number-input"
+                type="text"
+                value={watchRootInput}
+                onChange={(event) => setWatchRootInput(event.target.value)}
+                onKeyDown={handleWatchRootKeyDown}
+                aria-label={t('watchRoot.label')}
+                autoComplete="off"
+                spellCheck={false}
+                style={{ width: 240, textAlign: 'left' }}
+              />
+              {watchRootErrorMessage ? (
+                <p
+                  className="permission-status permission-status--error"
+                  role="status"
+                  aria-live="polite"
+                  style={{ marginBottom: 0 }}
+                >
+                  {watchRootErrorMessage}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <div className="preferences-row">
+            <div className="preferences-row__details">
+              <p className="preferences-label" title={t('ignorePaths.help')}>
+                {t('ignorePaths.label')}
+              </p>
+            </div>
+            <div className="preferences-control">
+              <textarea
+                className="preferences-field preferences-textarea"
+                value={ignorePathsInput}
+                onChange={(event) => setIgnorePathsInput(event.target.value)}
+                onKeyDown={handleIgnorePathsKeyDown}
+                aria-label={t('ignorePaths.label')}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {ignorePathsErrorMessage ? (
+                <p
+                  className="permission-status permission-status--error"
+                  role="status"
+                  aria-live="polite"
+                  style={{ marginBottom: 0 }}
+                >
+                  {ignorePathsErrorMessage}
+                </p>
+              ) : null}
+            </div>
+          </div>
         </div>
+        <footer className="preferences-card__footer">
+          <button
+            className="preferences-save"
+            type="button"
+            onClick={handleSave}
+            disabled={Boolean(watchRootErrorMessage || ignorePathsErrorMessage)}
+          >
+            {t('preferences.save')}
+          </button>
+          <button className="preferences-reset" type="button" onClick={onReset}>
+            {t('preferences.reset')}
+          </button>
+        </footer>
       </div>
     </div>
   );

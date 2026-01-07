@@ -124,6 +124,8 @@
     "sortingLimit": {
       "label": "Limite de ordenação"
     },
+    "save": "Salvar",
+    "reset": "Restaurar padrões",
     "close": "Fechar"
   },
   "language": {
@@ -141,5 +143,23 @@
   },
   "tray": {
     "quit": "Sair do Cardinal"
+  },
+  "watchRoot": {
+    "label": "Caminho raiz de monitoramento",
+    "help": "Alterar isso vai recriar o índice para o novo diretório.",
+    "errors": {
+      "required": "Informe um caminho.",
+      "absolute": "Informe um caminho absoluto que comece com '/' ou '~'."
+    },
+    "title": "Escolher caminho raiz de monitoramento",
+    "description": "O Cardinal vai indexar e monitorar os arquivos neste diretório. Você pode alterar isso depois em Preferências.",
+    "action": "Iniciar indexação"
+  },
+  "ignorePaths": {
+    "label": "Caminhos ignorados",
+    "help": "Um caminho por linha; caminhos ignorados são ignorados durante a indexação.",
+    "errors": {
+      "absolute": "Cada caminho deve começar com '/' ou '~'."
+    }
   }
 }

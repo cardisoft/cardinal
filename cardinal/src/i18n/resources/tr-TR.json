@@ -124,6 +124,8 @@
     "sortingLimit": {
       "label": "Sıralama sınırı"
     },
+    "save": "Kaydet",
+    "reset": "Varsayılanlara döndür",
     "close": "Kapat"
   },
   "language": {
@@ -141,5 +143,23 @@
   },
   "tray": {
     "quit": "Cardinal'den çık"
+  },
+  "watchRoot": {
+    "label": "İzleme kök yolu",
+    "help": "Bunu değiştirmek yeni dizin için indeksi yeniden oluşturur.",
+    "errors": {
+      "required": "Lütfen bir yol girin.",
+      "absolute": "Lütfen '/' veya '~' ile başlayan mutlak bir yol girin."
+    },
+    "title": "İzleme kök yolunu seçin",
+    "description": "Cardinal bu dizin altındaki dosyaları indeksler ve izler. Bunu daha sonra Tercihler'den değiştirebilirsiniz.",
+    "action": "Dizinlemeyi başlat"
+  },
+  "ignorePaths": {
+    "label": "Yok sayılan yollar",
+    "help": "Her satıra bir yol; yok sayılan yollar dizinleme sırasında atlanır.",
+    "errors": {
+      "absolute": "Her yol '/' veya '~' ile başlamalıdır."
+    }
   }
 }

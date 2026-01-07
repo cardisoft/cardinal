@@ -1,18 +1,19 @@
 use crate::{
-    commands::{NodeInfoRequest, SearchJob},
+    commands::{NodeInfoRequest, SearchJob, WatchConfigUpdate},
     lifecycle::{AppLifecycleState, load_app_state, update_app_state},
     search_activity,
     window_controls::is_main_window_foreground,
 };
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
-use cardinal_sdk::{EventFlag, EventWatcher};
+use cardinal_sdk::{EventFlag, EventWatcher, FsEvent};
 use crossbeam_channel::{Receiver, Sender};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rayon::spawn;
 use search_cache::{
     HandleFSEError, SearchCache, SearchOptions, SearchOutcome, SearchResultNode, SlabIndex,
+    WalkData,
 };
 use serde::Serialize;
 use std::{
@@ -46,6 +47,7 @@ pub struct BackgroundLoopChannels {
     pub node_info_rx: Receiver<NodeInfoRequest>,
     pub icon_viewport_rx: Receiver<(u64, Vec<SlabIndex>)>,
     pub rescan_rx: Receiver<()>,
+    pub watch_config_rx: Receiver<WatchConfigUpdate>,
     pub icon_update_tx: Sender<IconPayload>,
 }
 
@@ -90,6 +92,61 @@ pub fn emit_status_bar_update(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn handle_watch_config_update(
+    app_handle: &AppHandle,
+    update: WatchConfigUpdate,
+    cache: &mut SearchCache,
+    event_watcher: &mut EventWatcher,
+    watch_root: &mut String,
+    fse_latency_secs: f64,
+    history_ready: &mut bool,
+    processed_events: &mut usize,
+    rescan_errors: &mut usize,
+) {
+    info!("Received watch config update: {:?}", update);
+    let trimmed_watch_root = update.watch_root.trim();
+    let next_watch_root = if trimmed_watch_root.is_empty() {
+        watch_root.as_str()
+    } else {
+        trimmed_watch_root
+    };
+
+    let next_ignore_paths = update
+        .ignore_paths
+        .into_iter()
+        .map(PathBuf::from)
+        .collect::<Vec<_>>();
+
+    if next_watch_root == watch_root && &next_ignore_paths == cache.ignore_paths() {
+        return;
+    }
+
+    *event_watcher = EventWatcher::noop();
+    update_app_state(app_handle, AppLifecycleState::Initializing);
+    reset_status_bar(app_handle);
+    *history_ready = false;
+    *processed_events = 0;
+    *rescan_errors = 0;
+
+    let Some(next_cache) = build_search_cache(app_handle, next_watch_root, &next_ignore_paths)
+    else {
+        info!("Watch config change cancelled, keeping existing state");
+        return;
+    };
+
+    emit_status_bar_update(app_handle, next_cache.get_total_files(), 0, 0);
+    *cache = next_cache;
+    *watch_root = next_watch_root.to_string();
+    *event_watcher = EventWatcher::spawn(
+        watch_root.to_string(),
+        cache.last_event_id(),
+        fse_latency_secs,
+    )
+    .1;
+    update_app_state(app_handle, AppLifecycleState::Updating);
+}
+
 struct EventSnapshot {
     path: PathBuf,
     event_id: u64,
@@ -106,12 +163,120 @@ struct RecentEvent {
     timestamp: i64,
 }
 
+fn handle_flush_tick(
+    app_handle: &AppHandle,
+    cache: &mut SearchCache,
+    db_path: &Path,
+    hide_flush_remaining_ticks: &mut u8,
+) {
+    if load_app_state() != AppLifecycleState::Ready {
+        return;
+    }
+    let mut flush_search_cache = FlushSearchCache { cache, db_path };
+    let flushed = start_flush_checks(
+        || is_main_window_foreground(app_handle),
+        search_activity::search_idles,
+        &mut flush_search_cache,
+        hide_flush_remaining_ticks,
+    );
+    if flushed {
+        search_activity::note_search_activity();
+    }
+}
+
+fn handle_event_watcher_events(
+    app_handle: &AppHandle,
+    cache: &mut SearchCache,
+    events: Vec<FsEvent>,
+    history_ready: &mut bool,
+    processed_events: &mut usize,
+    rescan_errors: &mut usize,
+) {
+    *processed_events += events.len();
+
+    emit_status_bar_update(
+        app_handle,
+        cache.get_total_files(),
+        *processed_events,
+        *rescan_errors,
+    );
+
+    let mut snapshots = Vec::with_capacity(events.len());
+    for event in events.iter() {
+        if event.flag == EventFlag::HistoryDone {
+            *history_ready = true;
+            update_app_state(app_handle, AppLifecycleState::Ready);
+        } else if *history_ready {
+            snapshots.push(EventSnapshot {
+                path: event.path.clone(),
+                event_id: event.id,
+                flag: event.flag,
+                timestamp: unix_timestamp_now(),
+            });
+        }
+    }
+
+    let handle_result = cache.handle_fs_events(events);
+    if let Err(HandleFSEError::Rescan) = handle_result {
+        info!("!!!!!!!!!! Rescan triggered !!!!!!!!");
+        *rescan_errors += 1;
+        emit_status_bar_update(
+            app_handle,
+            cache.get_total_files(),
+            *processed_events,
+            *rescan_errors,
+        );
+    }
+
+    if *history_ready && !snapshots.is_empty() {
+        forward_new_events(app_handle, &snapshots);
+    }
+}
+
+fn handle_icon_viewport_update(
+    cache: &mut SearchCache,
+    update: (u64, Vec<SlabIndex>),
+    icon_update_tx: &Sender<IconPayload>,
+) {
+    let (_request_id, viewport) = update;
+
+    let nodes = cache.expand_file_nodes(&viewport);
+    let icon_jobs: Vec<_> = viewport
+        .into_iter()
+        .zip(nodes)
+        .map(|(slab_index, SearchResultNode { path, .. })| (slab_index, path))
+        .collect();
+
+    if icon_jobs.is_empty() {
+        return;
+    }
+
+    icon_jobs
+        .into_iter()
+        .map(|(slab_index, path)| (slab_index, path.to_string_lossy().into_owned()))
+        .filter(|(_, path)| !path.contains("OneDrive") && !path.contains("com~apple~CloudDocs"))
+        .for_each(|(slab_index, path)| {
+            let icon_update_tx = icon_update_tx.clone();
+            spawn(move || {
+                if let Some(icon) = fs_icon::icon_of_path_ql(&path).map(|data| {
+                    format!(
+                        "data:image/png;base64,{}",
+                        general_purpose::STANDARD.encode(&data)
+                    )
+                }) {
+                    let _ = icon_update_tx.send(IconPayload { slab_index, icon });
+                }
+            });
+        });
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn run_background_event_loop(
     app_handle: &AppHandle,
     mut cache: SearchCache,
     mut event_watcher: EventWatcher,
     channels: BackgroundLoopChannels,
-    watch_root: &str,
+    mut watch_root: String,
     fse_latency_secs: f64,
     db_path: PathBuf,
 ) {
@@ -123,6 +288,7 @@ pub fn run_background_event_loop(
         node_info_rx,
         icon_viewport_rx,
         rescan_rx,
+        watch_config_rx,
         icon_update_tx,
     } = channels;
     let mut processed_events = 0usize;
@@ -152,22 +318,12 @@ pub fn run_background_event_loop(
                 window_is_foreground = new_foreground;
             }
             recv(flush_ticker) -> _ => {
-                if load_app_state() != AppLifecycleState::Ready {
-                    continue;
-                }
-                let mut flush_search_cache = FlushSearchCache {
-                    cache: &mut cache,
-                    db_path: &db_path,
-                };
-                let flushed = start_flush_checks(
-                    || is_main_window_foreground(app_handle),
-                    search_activity::search_idles,
-                    &mut flush_search_cache,
+                handle_flush_tick(
+                    app_handle,
+                    &mut cache,
+                    &db_path,
                     &mut hide_flush_remaining_ticks,
                 );
-                if flushed {
-                    search_activity::note_search_activity();
-                }
             }
             recv(search_rx) -> job => {
                 let SearchJob {
@@ -189,34 +345,8 @@ pub fn run_background_event_loop(
                 let _ = response_tx.send(node_info_results);
             }
             recv(icon_viewport_rx) -> update => {
-                let (_request_id, viewport) = update.expect("Icon viewport channel closed");
-
-                let nodes = cache.expand_file_nodes(&viewport);
-                let icon_jobs: Vec<_> = viewport
-                    .into_iter()
-                    .zip(nodes.into_iter())
-                    .map(|(slab_index, SearchResultNode { path, .. })| (slab_index, path))
-                    .collect();
-
-                if icon_jobs.is_empty() {
-                    continue;
-                }
-
-                icon_jobs
-                    .into_iter()
-                    .map(|(slab_index, path)| (slab_index, path.to_string_lossy().into_owned()))
-                    .filter(|(_, path)| !path.contains("OneDrive") && !path.contains("com~apple~CloudDocs"))
-                    .for_each(|(slab_index, path)| {
-                        let icon_update_tx = icon_update_tx.clone();
-                        spawn(move || {
-                            if let Some(icon) = fs_icon::icon_of_path_ql(&path).map(|data| format!(
-                                "data:image/png;base64,{}",
-                                general_purpose::STANDARD.encode(&data)
-                            )) {
-                                let _ = icon_update_tx.send(IconPayload { slab_index, icon });
-                            }
-                        });
-                    });
+                let update = update.expect("Icon viewport channel closed");
+                handle_icon_viewport_update(&mut cache, update, &icon_update_tx);
             }
             recv(rescan_rx) -> request => {
                 request.expect("Rescan channel closed");
@@ -225,7 +355,21 @@ pub fn run_background_event_loop(
                     app_handle,
                     &mut cache,
                     &mut event_watcher,
-                    watch_root,
+                    &watch_root,
+                    fse_latency_secs,
+                    &mut history_ready,
+                    &mut processed_events,
+                    &mut rescan_errors,
+                );
+            }
+            recv(watch_config_rx) -> update => {
+                let next_update = update.expect("Watch config channel closed");
+                handle_watch_config_update(
+                    app_handle,
+                    next_update,
+                    &mut cache,
+                    &mut event_watcher,
+                    &mut watch_root,
                     fse_latency_secs,
                     &mut history_ready,
                     &mut processed_events,
@@ -234,48 +378,48 @@ pub fn run_background_event_loop(
             }
             recv(event_watcher) -> events => {
                 let events = events.expect("Event stream closed");
-                processed_events += events.len();
-
-                emit_status_bar_update(
+                handle_event_watcher_events(
                     app_handle,
-                    cache.get_total_files(),
-                    processed_events,
-                    rescan_errors,
+                    &mut cache,
+                    events,
+                    &mut history_ready,
+                    &mut processed_events,
+                    &mut rescan_errors,
                 );
-
-                let mut snapshots = Vec::with_capacity(events.len());
-                for event in events.iter() {
-                    if event.flag == EventFlag::HistoryDone {
-                        history_ready = true;
-                        update_app_state(app_handle, AppLifecycleState::Ready);
-                    } else if history_ready {
-                        snapshots.push(EventSnapshot {
-                            path: event.path.clone(),
-                            event_id: event.id,
-                            flag: event.flag,
-                            timestamp: unix_timestamp_now(),
-                        });
-                    }
-                }
-
-                let handle_result = cache.handle_fs_events(events);
-                if let Err(HandleFSEError::Rescan) = handle_result {
-                    info!("!!!!!!!!!! Rescan triggered !!!!!!!!");
-                    rescan_errors += 1;
-                    emit_status_bar_update(
-                        app_handle,
-                        cache.get_total_files(),
-                        processed_events,
-                        rescan_errors,
-                    );
-                }
-
-                if history_ready && !snapshots.is_empty() {
-                    forward_new_events(app_handle, &snapshots);
-                }
             }
         }
     }
+}
+
+pub(crate) fn build_search_cache(
+    app_handle: &AppHandle,
+    watch_root: &str,
+    ignore_paths: &[PathBuf],
+) -> Option<SearchCache> {
+    let path = PathBuf::from(watch_root);
+    let walk_data = WalkData::new(
+        &path,
+        ignore_paths,
+        false,
+        Some(&crate::lifecycle::APP_QUIT),
+    );
+    let walking_done = AtomicBool::new(false);
+
+    std::thread::scope(|s| {
+        s.spawn(|| {
+            while !walking_done.load(Ordering::Relaxed) {
+                let dirs = walk_data.num_dirs.load(Ordering::Relaxed);
+                let files = walk_data.num_files.load(Ordering::Relaxed);
+                let total = dirs + files;
+                emit_status_bar_update(app_handle, total, 0, 0);
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        });
+        let cache =
+            SearchCache::walk_fs_with_walk_data(&walk_data, Some(&crate::lifecycle::APP_QUIT));
+        walking_done.store(true, Ordering::Relaxed);
+        cache
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -296,9 +440,9 @@ fn perform_rescan(
     *rescan_errors = 0;
     reset_status_bar(app_handle);
 
-    let mut walk_root = PathBuf::new();
-    let mut walk_ignore = Vec::new();
-    let walk_data = cache.walk_data(&mut walk_root, &mut walk_ignore);
+    let mut phantom1 = PathBuf::new();
+    let mut phantom2 = Vec::new();
+    let walk_data = cache.walk_data(&mut phantom1, &mut phantom2);
     let walking_done = AtomicBool::new(false);
     let stopped = std::thread::scope(|s| {
         s.spawn(|| {

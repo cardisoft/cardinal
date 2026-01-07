@@ -1,5 +1,5 @@
 use crate::{
-    LOGIC_START,
+    DEFAULT_SYSTEM_IGNORE_PATH, LOGIC_START, LogicStartConfig,
     lifecycle::load_app_state,
     quicklook::{
         QuickLookItemInput, close_preview_panel, toggle_preview_panel, update_preview_panel,
@@ -10,14 +10,21 @@ use crate::{
 };
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
+use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
 use crossbeam_channel::{Receiver, Sender, bounded};
 use parking_lot::Mutex;
 use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, SlabNodeMetadata};
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use std::{cell::LazyCell, process::Command};
 use tauri::{AppHandle, Manager, State};
 use tracing::{error, info, warn};
+
+#[derive(Debug, Clone)]
+pub struct WatchConfigUpdate {
+    pub watch_root: String,
+    pub ignore_paths: Vec<String>,
+}
 
 #[derive(Debug, Clone, Copy, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -59,6 +66,7 @@ pub struct SearchState {
 
     icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
     rescan_tx: Sender<()>,
+    watch_config_tx: Sender<WatchConfigUpdate>,
     sorted_view_cache: Mutex<Option<SortedViewCache>>,
     update_window_state_tx: Sender<()>,
 }
@@ -70,6 +78,7 @@ impl SearchState {
         node_info_tx: Sender<NodeInfoRequest>,
         icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
         rescan_tx: Sender<()>,
+        watch_config_tx: Sender<WatchConfigUpdate>,
         update_window_state_tx: Sender<()>,
     ) -> Self {
         Self {
@@ -78,6 +87,7 @@ impl SearchState {
             node_info_tx,
             icon_viewport_tx,
             rescan_tx,
+            watch_config_tx,
             sorted_view_cache: Mutex::new(None),
             update_window_state_tx,
         }
@@ -124,6 +134,65 @@ impl SearchState {
         });
         nodes
     }
+}
+
+/// Normalizes user-provided path input into an absolute path string.
+///
+/// Expands a leading `~` component using the current `HOME` directory and rejects
+/// non-absolute paths (including relative paths and unsupported `~user` forms).
+/// Returns `Some` absolute path string when valid, otherwise `None`.
+fn normalize_path_input(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let path = Path::new(trimmed);
+    let mut expanded = PathBuf::new();
+    let home = LazyCell::new(|| {
+        std::env::var_os("HOME").and_then(|h| h.to_string_lossy().into_owned().into())
+    });
+
+    for (index, component) in path.into_iter().enumerate() {
+        if index == 0 && component == "~" {
+            expanded.push(home.as_deref()?);
+        } else {
+            expanded.push(component);
+        }
+    }
+
+    let resolved = expanded.into_string();
+    if resolved.starts_with('/') {
+        Some(resolved)
+    } else {
+        None
+    }
+}
+
+pub(crate) fn normalize_watch_config(
+    watch_root: &str,
+    ignore_paths: Vec<String>,
+    fallback_watch_root: Option<&str>,
+) -> Option<(String, Vec<String>)> {
+    let watch_root = normalize_path_input(watch_root)
+        .or_else(|| fallback_watch_root.and_then(normalize_path_input))?;
+    let mut ignore_paths = ignore_paths
+        .into_iter()
+        .filter_map(|path| {
+            let normalized = normalize_path_input(&path);
+            if normalized.is_none() {
+                warn!("Ignoring invalid ignore path: {path:?}");
+            }
+            normalized
+        })
+        .collect::<Vec<_>>();
+    if !ignore_paths
+        .iter()
+        .any(|path| path == DEFAULT_SYSTEM_IGNORE_PATH)
+    {
+        ignore_paths.push(DEFAULT_SYSTEM_IGNORE_PATH.to_string());
+    }
+    Some((watch_root, ignore_paths))
 }
 
 #[derive(Serialize)]
@@ -309,6 +378,26 @@ pub fn trigger_rescan(state: State<'_, SearchState>) {
     }
 }
 
+#[tauri::command(async)]
+pub fn set_watch_config(
+    watch_root: String,
+    ignore_paths: Vec<String>,
+    state: State<'_, SearchState>,
+) {
+    let Some((watch_root, ignore_paths)) = normalize_watch_config(&watch_root, ignore_paths, None)
+    else {
+        warn!("Ignoring invalid watch_root: {watch_root:?}");
+        return;
+    };
+
+    if let Err(e) = state.watch_config_tx.send(WatchConfigUpdate {
+        watch_root,
+        ignore_paths,
+    }) {
+        error!("Failed to request watch config change: {e:?}");
+    }
+}
+
 #[tauri::command]
 pub async fn open_in_finder(path: String) {
     if let Err(e) = Command::new("open").arg("-R").arg(&path).spawn() {
@@ -324,9 +413,12 @@ pub async fn open_path(path: String) {
 }
 
 #[tauri::command]
-pub async fn start_logic() {
+pub async fn start_logic(watch_root: String, ignore_paths: Vec<String>) {
     if let Some(sender) = LOGIC_START.get() {
-        let _ = sender.send(());
+        let _ = sender.try_send(LogicStartConfig {
+            watch_root,
+            ignore_paths,
+        });
     }
 }
 
@@ -368,5 +460,45 @@ pub async fn toggle_main_window(app: AppHandle) {
         }
     } else {
         warn!("Toggle requested but main window is unavailable");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_rejects_empty_input() {
+        assert_eq!(normalize_path_input(""), None);
+        assert_eq!(normalize_path_input("   "), None);
+    }
+
+    #[test]
+    fn normalize_accepts_absolute_paths() {
+        assert_eq!(normalize_path_input("/"), Some("/".to_string()));
+        assert_eq!(
+            normalize_path_input(" /var/log "),
+            Some("/var/log".to_string())
+        );
+    }
+
+    #[test]
+    fn normalize_expands_tilde_when_home_available() {
+        let Ok(home) = std::env::var("HOME") else {
+            return;
+        };
+        assert_eq!(normalize_path_input("~"), Some(home.clone()));
+        assert_eq!(
+            normalize_path_input("~/Documents"),
+            Some(format!("{home}/Documents"))
+        );
+    }
+
+    #[test]
+    fn normalize_rejects_relative_paths_and_tilde_users() {
+        assert_eq!(normalize_path_input("relative/path"), None);
+        assert_eq!(normalize_path_input("./relative"), None);
+        assert_eq!(normalize_path_input("~someone"), None);
+        assert_eq!(normalize_path_input("~someone/Documents"), None);
     }
 }

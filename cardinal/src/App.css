@@ -938,6 +938,10 @@ button:active:not(:disabled) {
   :root:not([data-theme]) .permission-status {
     color: rgba(226, 232, 240, 0.75);
   }
+
+  :root:not([data-theme]) .permission-status--error {
+    color: var(--color-error, #ff6b6b);
+  }
 }
 
 :root[data-theme='dark'] {
@@ -1019,6 +1023,10 @@ button:active:not(:disabled) {
 
 [data-theme='dark'] .permission-status {
   color: rgba(226, 232, 240, 0.75);
+}
+
+[data-theme='dark'] .permission-status--error {
+  color: var(--color-error, #ff6b6b);
 }
 
 /* === Merged: StatusBar.css === */
@@ -1483,8 +1491,12 @@ button:active:not(:disabled) {
 
 .permission-status {
   margin-bottom: 20px;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   color: var(--color-muted);
+}
+
+.permission-status--error {
+  color: var(--color-error, #dc3545);
 }
 
 .permission-actions {
@@ -1512,11 +1524,14 @@ button:active:not(:disabled) {
 .preferences-card {
   width: 100%;
   max-width: 480px;
+  max-height: calc(100vh - 96px);
   background: var(--color-elevated-bg, var(--color-bg));
   color: var(--color-text);
   border-radius: 16px;
   padding: 24px;
   box-shadow: 0 24px 64px rgba(15, 23, 42, 0.32);
+  display: flex;
+  flex-direction: column;
 }
 
 .preferences-card__header {
@@ -1534,10 +1549,106 @@ button:active:not(:disabled) {
 .preferences-section {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  padding-right: 6px;
+  min-height: 0;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+}
+
+.preferences-section::-webkit-scrollbar {
+  width: 10px;
+}
+
+.preferences-section::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.preferences-section::-webkit-scrollbar-thumb {
+  background: rgba(120, 130, 150, 0.35);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.preferences-section::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 130, 150, 0.55);
+  background-clip: content-box;
+}
+
+.preferences-card__footer {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.preferences-save {
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast, #ffffff);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.preferences-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.preferences-save:disabled:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+.preferences-save:hover {
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.2);
+  transform: translateY(-1px);
+}
+
+.preferences-save:focus-visible {
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.45);
+  outline-offset: 2px;
+}
+
+.preferences-reset {
+  border: 1px solid var(--color-elevated-border, var(--color-border));
+  background: var(--color-elevated-bg);
+  color: var(--color-text);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+
+.preferences-reset:hover {
+  border-color: var(--color-accent);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.preferences-reset:focus-visible {
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.4);
+  outline-offset: 2px;
 }
 
 .preferences-row {
-  height: 48px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -1559,13 +1670,10 @@ button:active:not(:disabled) {
   text-align: right;
 }
 
-.preferences-number-input {
-  width: 140px;
+.preferences-field {
   border: 1px solid var(--color-elevated-border, var(--color-border));
   border-radius: 8px;
   padding: 6px 10px;
-  text-align: center;
-  font-size: 0.95rem;
   color: var(--color-text);
   background: var(--color-elevated-bg);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -1575,7 +1683,22 @@ button:active:not(:disabled) {
   cursor: text;
 }
 
-.preferences-number-input:focus {
+.preferences-number-input {
+  width: 140px;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.preferences-textarea {
+  width: 240px;
+  min-height: 88px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.preferences-field:focus {
   outline: 2px solid rgba(var(--color-accent-rgb), 0.35);
   border-color: var(--color-accent);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);

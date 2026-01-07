@@ -9,6 +9,7 @@ import {
 
 type ThemeSwitcherProps = {
   className?: string;
+  resetToken?: number;
 };
 
 type ThemeOption = {
@@ -23,7 +24,7 @@ const THEME_OPTIONS: ThemeOption[] = [
   { value: 'dark', icon: '🌙', labelKey: 'theme.options.dark' },
 ];
 
-const ThemeSwitcher = ({ className }: ThemeSwitcherProps): React.JSX.Element => {
+const ThemeSwitcher = ({ className, resetToken }: ThemeSwitcherProps): React.JSX.Element => {
   const { t } = useTranslation();
   const [preference, setPreference] = useState<ThemePreference>(() => getStoredThemePreference());
 
@@ -31,6 +32,11 @@ const ThemeSwitcher = ({ className }: ThemeSwitcherProps): React.JSX.Element => 
     persistThemePreference(preference);
     applyThemePreference(preference);
   }, [preference]);
+
+  useEffect(() => {
+    if (resetToken === undefined) return;
+    setPreference(getStoredThemePreference());
+  }, [resetToken]);
 
   const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const nextPreference = event.target.value as ThemePreference;

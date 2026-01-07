@@ -124,6 +124,8 @@
     "sortingLimit": {
       "label": "Limite ordinamento"
     },
+    "save": "Salva",
+    "reset": "Ripristina valori predefiniti",
     "close": "Chiudi"
   },
   "language": {
@@ -141,5 +143,23 @@
   },
   "tray": {
     "quit": "Esci da Cardinal"
+  },
+  "watchRoot": {
+    "label": "Percorso radice di monitoraggio",
+    "help": "La modifica ricostruirà l'indice per la nuova directory.",
+    "errors": {
+      "required": "Inserisci un percorso.",
+      "absolute": "Inserisci un percorso assoluto che inizi con '/' o '~'."
+    },
+    "title": "Scegli il percorso radice di monitoraggio",
+    "description": "Cardinal indicizzerà e monitorerà i file in questa directory. Potrai cambiarlo più tardi nelle Preferenze.",
+    "action": "Avvia indicizzazione"
+  },
+  "ignorePaths": {
+    "label": "Percorsi ignorati",
+    "help": "Un percorso per riga; i percorsi ignorati vengono saltati durante l'indicizzazione.",
+    "errors": {
+      "absolute": "Ogni percorso deve iniziare con '/' o '~'."
+    }
   }
 }

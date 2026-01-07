@@ -20,7 +20,7 @@ import { useContextMenu } from './hooks/useContextMenu';
 import { useFileSearch } from './hooks/useFileSearch';
 import { useEventColumnWidths } from './hooks/useEventColumnWidths';
 import { useRecentFSEvents } from './hooks/useRecentFSEvents';
-import { useRemoteSort } from './hooks/useRemoteSort';
+import { DEFAULT_SORTABLE_RESULT_THRESHOLD, useRemoteSort } from './hooks/useRemoteSort';
 import { useSelection } from './hooks/useSelection';
 import { useQuickLook } from './hooks/useQuickLook';
 import { useSearchHistory } from './hooks/useSearchHistory';
@@ -38,8 +38,13 @@ import { OPEN_PREFERENCES_EVENT } from './constants/appEvents';
 import type { DisplayState } from './components/StateDisplay';
 import { openResultPath } from './utils/openResultPath';
 import { useStableEvent } from './hooks/useStableEvent';
+import { setWatchConfig } from './utils/watchConfig';
 import { getStoredTrayIconEnabled, persistTrayIconEnabled } from './trayIconPreference';
 import { setTrayEnabled } from './tray';
+import { useWatchRoot } from './hooks/useWatchRoot';
+import { useIgnorePaths } from './hooks/useIgnorePaths';
+import { applyThemePreference, persistThemePreference } from './theme';
+import { getDefaultLanguage } from './i18n/config';
 
 type ActiveTab = StatusTabKey;
 
@@ -178,8 +183,12 @@ function App() {
     isChecking: isCheckingFullDiskAccess,
     requestPermission: requestFullDiskAccessPermission,
   } = useFullDiskAccessPermission();
+  const { watchRoot, setWatchRoot, defaultWatchRoot } = useWatchRoot();
+  const logicStartedRef = useRef(false);
+  const { ignorePaths, setIgnorePaths, defaultIgnorePaths } = useIgnorePaths();
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [trayIconEnabled, setTrayIconEnabled] = useState<boolean>(() => getStoredTrayIconEnabled());
+  const [preferencesResetToken, setPreferencesResetToken] = useState(0);
 
   useEffect(() => {
     persistTrayIconEnabled(trayIconEnabled);
@@ -205,8 +214,50 @@ function App() {
       return;
     }
 
-    void invoke('start_logic');
-  }, [fullDiskAccessStatus, isCheckingFullDiskAccess]);
+    if (!watchRoot) {
+      return;
+    }
+    if (logicStartedRef.current) {
+      return;
+    }
+
+    logicStartedRef.current = true;
+    void invoke('start_logic', { watchRoot, ignorePaths });
+  }, [fullDiskAccessStatus, ignorePaths, isCheckingFullDiskAccess, watchRoot]);
+
+  const refreshSearchResults = useCallback(() => {
+    queueSearch(currentQuery, { immediate: true });
+  }, [currentQuery, queueSearch]);
+
+  const applyWatchConfig = useCallback(
+    (nextWatchRoot: string, nextIgnorePaths: string[]) => {
+      setWatchRoot(nextWatchRoot);
+      setIgnorePaths(nextIgnorePaths);
+      if (logicStartedRef.current && nextWatchRoot) {
+        void setWatchConfig({ watchRoot: nextWatchRoot, ignorePaths: nextIgnorePaths });
+      }
+      refreshSearchResults();
+    },
+    [refreshSearchResults, setIgnorePaths, setWatchRoot],
+  );
+
+  const handleWatchConfigChange = useCallback(
+    (next: { watchRoot: string; ignorePaths: string[] }) => {
+      applyWatchConfig(next.watchRoot, next.ignorePaths);
+    },
+    [applyWatchConfig],
+  );
+
+  const handleResetPreferences = useCallback(() => {
+    applyWatchConfig(defaultWatchRoot, defaultIgnorePaths);
+    setSortThreshold(DEFAULT_SORTABLE_RESULT_THRESHOLD);
+    setTrayIconEnabled(false);
+    persistThemePreference('system');
+    applyThemePreference('system');
+    const nextLanguage = getDefaultLanguage();
+    void i18n.changeLanguage(nextLanguage);
+    setPreferencesResetToken((token) => token + 1);
+  }, [applyWatchConfig, defaultIgnorePaths, defaultWatchRoot, i18n, setSortThreshold]);
 
   const focusSearchInput = useCallback(() => {
     requestAnimationFrame(() => {
@@ -720,6 +771,11 @@ function App() {
         onSortThresholdChange={setSortThreshold}
         trayIconEnabled={trayIconEnabled}
         onTrayIconEnabledChange={setTrayIconEnabled}
+        watchRoot={watchRoot ?? defaultWatchRoot}
+        onWatchConfigChange={handleWatchConfigChange}
+        ignorePaths={ignorePaths}
+        onReset={handleResetPreferences}
+        themeResetToken={preferencesResetToken}
       />
       {showFullDiskAccessOverlay && (
         <PermissionOverlay

@@ -195,10 +195,37 @@ impl EventWatcher {
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
-    use crate::utils::current_event_id;
+    use crate::{EventFlag, utils::current_event_id};
     use crossbeam_channel::RecvTimeoutError;
     use std::time::{Duration, Instant};
     use tempfile::tempdir;
+
+    #[test]
+    fn event_watcher_on_non_existent_path() {
+        let (_dev, watcher) = EventWatcher::spawn("/e mm".to_string(), current_event_id(), 0.05);
+        let initial_events = watcher.recv().unwrap();
+        assert!(initial_events.len() == 1);
+        assert!(initial_events[0].flag.contains(EventFlag::HistoryDone));
+
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut received_any = false;
+        while Instant::now() < deadline {
+            match watcher.recv_timeout(Duration::from_millis(200)) {
+                Ok(_batch) => {
+                    received_any = true;
+                    break;
+                }
+                Err(RecvTimeoutError::Timeout) => continue,
+                Err(RecvTimeoutError::Disconnected) => break,
+            }
+        }
+
+        drop(watcher);
+        assert!(
+            !received_any,
+            "event watcher on non-existent path should not deliver events"
+        );
+    }
 
     #[test]
     fn drop_then_respawn_event_watcher_delivers_events() {

@@ -124,6 +124,8 @@
     "sortingLimit": {
       "label": "Sortierlimit"
     },
+    "save": "Speichern",
+    "reset": "Standardwerte wiederherstellen",
     "close": "Schließen"
   },
   "language": {
@@ -141,5 +143,23 @@
   },
   "tray": {
     "quit": "Cardinal beenden"
+  },
+  "watchRoot": {
+    "label": "Überwachungs-Stammverzeichnis",
+    "help": "Eine Änderung erstellt den Index für das neue Verzeichnis neu.",
+    "errors": {
+      "required": "Bitte einen Pfad eingeben.",
+      "absolute": "Bitte einen absoluten Pfad angeben, der mit '/' oder '~' beginnt."
+    },
+    "title": "Überwachungs-Stammverzeichnis wählen",
+    "description": "Cardinal indiziert und überwacht Dateien in diesem Verzeichnis. Sie können es später in den Einstellungen ändern.",
+    "action": "Indexierung starten"
+  },
+  "ignorePaths": {
+    "label": "Pfade ignorieren",
+    "help": "Ein Pfad pro Zeile; ignorierte Pfade werden bei der Indexierung übersprungen.",
+    "errors": {
+      "absolute": "Jeder Pfad muss mit '/' oder '~' beginnen."
+    }
   }
 }

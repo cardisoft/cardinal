@@ -123,6 +123,8 @@
     "sortingLimit": {
       "label": "排序上限"
     },
+    "save": "儲存",
+    "reset": "恢復預設設定",
     "close": "關閉"
   },
   "language": {
@@ -140,5 +142,23 @@
   },
   "tray": {
     "quit": "結束 Cardinal"
+  },
+  "watchRoot": {
+    "label": "監控根路徑",
+    "help": "變更此路徑會為新目錄重新建立索引。",
+    "errors": {
+      "required": "請輸入路徑。",
+      "absolute": "請輸入以「/」或「~」開頭的絕對路徑。"
+    },
+    "title": "選擇監控根路徑",
+    "description": "Cardinal 只會索引並監控該目錄下的檔案。你之後可以在偏好設定中更改。",
+    "action": "開始初始化"
+  },
+  "ignorePaths": {
+    "label": "忽略路徑",
+    "help": "每行一個路徑；這些路徑將在索引時被跳過。",
+    "errors": {
+      "absolute": "每個路徑需以「/」或「~」開頭。"
+    }
   }
 }

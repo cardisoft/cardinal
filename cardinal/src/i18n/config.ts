@@ -207,6 +207,17 @@ const detectInitialLanguage = (): SupportedLanguage => {
   return DEFAULT_LANGUAGE;
 };
 
+export const getDefaultLanguage = (): SupportedLanguage => {
+  if (typeof window === 'undefined') {
+    return DEFAULT_LANGUAGE;
+  }
+  const browserLang = window.navigator.language;
+  if (browserLang) {
+    return normalizeLanguageTag(browserLang);
+  }
+  return DEFAULT_LANGUAGE;
+};
+
 export const __test__ = {
   detectInitialLanguage,
   normalizeBrowserLanguage,

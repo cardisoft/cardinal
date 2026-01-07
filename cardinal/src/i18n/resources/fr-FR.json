@@ -124,6 +124,8 @@
     "sortingLimit": {
       "label": "Limite de tri"
     },
+    "save": "Enregistrer",
+    "reset": "Rétablir les paramètres par défaut",
     "close": "Fermer"
   },
   "language": {
@@ -141,5 +143,23 @@
   },
   "tray": {
     "quit": "Quitter Cardinal"
+  },
+  "watchRoot": {
+    "label": "Chemin racine de surveillance",
+    "help": "Le changement reconstruira l'index pour le nouveau dossier.",
+    "errors": {
+      "required": "Veuillez saisir un chemin.",
+      "absolute": "Veuillez saisir un chemin absolu commençant par '/' ou '~'."
+    },
+    "title": "Choisir le chemin racine de surveillance",
+    "description": "Cardinal indexera et surveillera les fichiers sous ce dossier. Vous pourrez le modifier plus tard dans les Préférences.",
+    "action": "Démarrer l'indexation"
+  },
+  "ignorePaths": {
+    "label": "Chemins ignorés",
+    "help": "Un chemin par ligne ; les chemins ignorés sont exclus de l'indexation.",
+    "errors": {
+      "absolute": "Chaque chemin doit commencer par '/' ou '~'."
+    }
   }
 }

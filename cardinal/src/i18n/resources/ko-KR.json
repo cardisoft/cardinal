@@ -124,6 +124,8 @@
     "sortingLimit": {
       "label": "정렬 한도"
     },
+    "save": "저장",
+    "reset": "기본값으로 복원",
     "close": "닫기"
   },
   "language": {
@@ -141,5 +143,23 @@
   },
   "tray": {
     "quit": "Cardinal 종료"
+  },
+  "watchRoot": {
+    "label": "감시 루트 경로",
+    "help": "변경하면 새 디렉터리에 대해 색인을 다시 만듭니다.",
+    "errors": {
+      "required": "경로를 입력하세요.",
+      "absolute": "'/' 또는 '~'로 시작하는 절대 경로를 입력하세요."
+    },
+    "title": "감시 루트 경로 선택",
+    "description": "Cardinal은 이 디렉터리 아래의 파일을 색인하고 감시합니다. 나중에 환경설정에서 변경할 수 있습니다.",
+    "action": "색인 시작"
+  },
+  "ignorePaths": {
+    "label": "무시할 경로",
+    "help": "한 줄에 하나의 경로; 무시할 경로는 색인 중 건너뜁니다.",
+    "errors": {
+      "absolute": "각 경로는 '/' 또는 '~'로 시작해야 합니다."
+    }
   }
 }

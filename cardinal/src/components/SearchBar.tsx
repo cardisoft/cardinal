@@ -2,7 +2,7 @@ import React from 'react';
 import type { ChangeEvent, FocusEventHandler } from 'react';
 
 type SearchBarProps = {
-  inputRef: React.RefObject<HTMLInputElement>;
+  inputRef: React.Ref<HTMLInputElement>;
   placeholder: string;
   value: string;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;

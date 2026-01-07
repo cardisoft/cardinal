@@ -123,6 +123,8 @@
     "sortingLimit": {
       "label": "排序上限"
     },
+    "save": "保存",
+    "reset": "恢复默认设置",
     "close": "关闭"
   },
   "language": {
@@ -140,5 +142,23 @@
   },
   "tray": {
     "quit": "退出 Cardinal"
+  },
+  "watchRoot": {
+    "label": "监控根路径",
+    "help": "更改该路径会重新构建新目录的索引。",
+    "errors": {
+      "required": "请输入路径。",
+      "absolute": "请输入以“/”或“~”开头的绝对路径。"
+    },
+    "title": "选择监控根路径",
+    "description": "Cardinal 将只索引并监控该目录下的文件。你之后可以在偏好设置中更改。",
+    "action": "开始初始化"
+  },
+  "ignorePaths": {
+    "label": "忽略路径",
+    "help": "每行一个路径；这些目录将不会被索引。",
+    "errors": {
+      "absolute": "每个路径需以“/”或“~”开头。"
+    }
   }
 }

@@ -124,6 +124,8 @@
     "sortingLimit": {
       "label": "Límite de ordenación"
     },
+    "save": "Guardar",
+    "reset": "Restablecer valores predeterminados",
     "close": "Cerrar"
   },
   "language": {
@@ -141,5 +143,23 @@
   },
   "tray": {
     "quit": "Salir de Cardinal"
+  },
+  "watchRoot": {
+    "label": "Ruta raíz de supervisión",
+    "help": "Cambiar esto reconstruirá el índice para el nuevo directorio.",
+    "errors": {
+      "required": "Introduce una ruta.",
+      "absolute": "Introduce una ruta absoluta que empiece por '/' o '~'."
+    },
+    "title": "Elegir ruta raíz de supervisión",
+    "description": "Cardinal indexará y supervisará los archivos bajo este directorio. Puedes cambiarlo más tarde en Preferencias.",
+    "action": "Iniciar indexación"
+  },
+  "ignorePaths": {
+    "label": "Rutas ignoradas",
+    "help": "Una ruta por línea; las rutas ignoradas se omiten durante la indexación.",
+    "errors": {
+      "absolute": "Cada ruta debe empezar por '/' o '~'."
+    }
   }
 }

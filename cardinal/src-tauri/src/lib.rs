@@ -8,27 +8,25 @@ mod window_controls;
 
 use anyhow::{Context, Result};
 use background::{
-    BackgroundLoopChannels, IconPayload, emit_status_bar_update, run_background_event_loop,
+    BackgroundLoopChannels, IconPayload, build_search_cache, emit_status_bar_update,
+    run_background_event_loop,
 };
 use cardinal_sdk::EventWatcher;
 use commands::{
-    NodeInfoRequest, SearchJob, SearchState, activate_main_window, close_quicklook, get_app_status,
-    get_nodes_info, get_sorted_view, hide_main_window, open_in_finder, open_path, search,
-    start_logic, toggle_main_window, toggle_quicklook, trigger_rescan, update_icon_viewport,
-    update_quicklook,
+    NodeInfoRequest, SearchJob, SearchState, WatchConfigUpdate, activate_main_window,
+    close_quicklook, get_app_status, get_nodes_info, get_sorted_view, hide_main_window,
+    normalize_watch_config, open_in_finder, open_path, search, set_watch_config, start_logic,
+    toggle_main_window, toggle_quicklook, trigger_rescan, update_icon_viewport, update_quicklook,
 };
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, bounded, unbounded};
 use lifecycle::{
     APP_QUIT, AppLifecycleState, EXIT_REQUESTED, emit_app_state, load_app_state, update_app_state,
 };
 use once_cell::sync::OnceCell;
-use search_cache::{SearchCache, SearchOutcome, SlabIndex, WalkData};
+use search_cache::{SearchCache, SearchOutcome, SlabIndex};
 use std::{
     path::{Path, PathBuf},
-    sync::{
-        Once,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Once, atomic::Ordering},
     time::Duration,
 };
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
@@ -37,7 +35,15 @@ use tracing_subscriber::EnvFilter;
 use window_controls::{activate_window, hide_window};
 
 static DB_PATH: OnceCell<PathBuf> = OnceCell::new();
-pub(crate) static LOGIC_START: OnceCell<Sender<()>> = OnceCell::new();
+pub(crate) static LOGIC_START: OnceCell<Sender<LogicStartConfig>> = OnceCell::new();
+pub(crate) const DEFAULT_SYSTEM_IGNORE_PATH: &str = "/System/Volumes/Data";
+const FSE_LATENCY_SECS: f64 = 0.1;
+
+#[derive(Debug, Clone)]
+pub(crate) struct LogicStartConfig {
+    pub watch_root: String,
+    pub ignore_paths: Vec<String>,
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> Result<()> {
@@ -54,6 +60,7 @@ pub fn run() -> Result<()> {
     let (node_info_tx, node_info_rx) = unbounded::<NodeInfoRequest>();
     let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>)>();
     let (rescan_tx, rescan_rx) = unbounded::<()>();
+    let (watch_config_tx, watch_config_rx) = unbounded::<WatchConfigUpdate>();
     let (icon_update_tx, icon_update_rx) = unbounded::<IconPayload>();
     let (update_window_state_tx, update_window_state_rx) = bounded::<()>(1);
     let (logic_start_tx, logic_start_rx) = bounded(1);
@@ -110,6 +117,7 @@ pub fn run() -> Result<()> {
             node_info_tx,
             icon_viewport_tx.clone(),
             rescan_tx.clone(),
+            watch_config_tx.clone(),
             update_window_state_tx.clone(),
         ))
         .invoke_handler(tauri::generate_handler![
@@ -119,6 +127,7 @@ pub fn run() -> Result<()> {
             update_icon_viewport,
             get_app_status,
             trigger_rescan,
+            set_watch_config,
             open_in_finder,
             open_path,
             toggle_quicklook,
@@ -144,6 +153,7 @@ pub fn run() -> Result<()> {
         node_info_rx,
         icon_viewport_rx,
         rescan_rx,
+        watch_config_rx,
         icon_update_tx,
         update_window_state_rx,
     };
@@ -163,12 +173,12 @@ pub fn run() -> Result<()> {
 
         let logic_start_rx = logic_start_rx;
         s.spawn(move || {
-            if !wait_for_logic_start(logic_start_rx) {
+            let Some(config) = wait_for_logic_start(logic_start_rx) else {
                 info!("Background thread quitting without Full Disk Access");
                 return;
-            }
+            };
 
-            run_logic_thread(app_handle, db_path, channels);
+            run_logic_thread(app_handle, db_path, channels, config);
         });
 
         app.run(move |app_handle, event| match event {
@@ -213,11 +223,16 @@ fn run_logic_thread(
     app_handle: &tauri::AppHandle,
     db_path: &Path,
     channels: BackgroundLoopChannels,
+    config: LogicStartConfig,
 ) {
-    const WATCH_ROOT: &str = "/";
-    const FSE_LATENCY_SECS: f64 = 0.1;
-    let path = PathBuf::from(WATCH_ROOT);
-    let ignore_paths = vec![PathBuf::from("/System/Volumes/Data")];
+    let Some((watch_root, ignore_paths)) =
+        normalize_watch_config(&config.watch_root, config.ignore_paths, Some("/"))
+    else {
+        warn!("Invalid watch root in start config; skipping background startup");
+        return;
+    };
+    let path = PathBuf::from(&watch_root);
+    let ignore_paths: Vec<_> = ignore_paths.into_iter().map(PathBuf::from).collect();
 
     let mut cache = match SearchCache::try_read_persistent_cache(
         &path,
@@ -232,25 +247,7 @@ fn run_logic_thread(
         }
         Err(e) => {
             info!("Walking filesystem: {:?}", e);
-            let walk_data = WalkData::new(&path, &ignore_paths, false, Some(&APP_QUIT));
-            let walking_done = AtomicBool::new(false);
-            let cache = std::thread::scope(|s| {
-                s.spawn(|| {
-                    while !walking_done.load(Ordering::Relaxed) {
-                        let dirs = walk_data.num_dirs.load(Ordering::Relaxed);
-                        let files = walk_data.num_files.load(Ordering::Relaxed);
-                        let total = dirs + files;
-                        emit_status_bar_update(app_handle, total, 0, 0);
-                        std::thread::sleep(Duration::from_millis(100));
-                    }
-                });
-                let cache = SearchCache::walk_fs_with_walk_data(&walk_data, Some(&APP_QUIT));
-
-                walking_done.store(true, Ordering::Relaxed);
-                cache
-            });
-
-            let Some(cache) = cache else {
+            let Some(cache) = build_search_cache(app_handle, &watch_root, &ignore_paths) else {
                 info!("Walk filesystem cancelled, app quitting");
                 channels
                     .finish_rx
@@ -268,7 +265,7 @@ fn run_logic_thread(
     };
 
     let event_watcher = EventWatcher::spawn(
-        WATCH_ROOT.to_string(),
+        watch_root.to_string(),
         cache.last_event_id(),
         FSE_LATENCY_SECS,
     )
@@ -282,7 +279,7 @@ fn run_logic_thread(
         cache,
         event_watcher,
         channels,
-        WATCH_ROOT,
+        watch_root.to_string(),
         FSE_LATENCY_SECS,
         db_path.to_path_buf(),
     );
@@ -315,22 +312,26 @@ fn flush_cache_to_file_once(finish_tx: &Sender<Sender<Option<SearchCache>>>, db_
     });
 }
 
-fn wait_for_logic_start(rx: Receiver<()>) -> bool {
+fn wait_for_logic_start(rx: Receiver<LogicStartConfig>) -> Option<LogicStartConfig> {
     info!("Waiting for Full Disk Access signal from the frontend");
     loop {
         if APP_QUIT.load(Ordering::Relaxed) {
-            return false;
+            return None;
         }
 
         match rx.recv_timeout(Duration::from_millis(100)) {
-            Ok(()) => {
-                info!("Received Full Disk Access grant, starting background processing");
-                return true;
+            Ok(config) => {
+                info!(
+                    "Received Full Disk Access grant, starting background processing (watch_root={}, ignore_paths={})",
+                    config.watch_root,
+                    config.ignore_paths.len()
+                );
+                return Some(config);
             }
             Err(RecvTimeoutError::Timeout) => continue,
             Err(RecvTimeoutError::Disconnected) => {
                 warn!("Full Disk Access channel disconnected before grant");
-                return false;
+                return None;
             }
         }
     }
