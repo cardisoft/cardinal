@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Menu, MenuItem, PredefinedMenuItem } from '@tauri-apps/api/menu';
 import { TrayIcon, type TrayIconEvent, type TrayIconOptions } from '@tauri-apps/api/tray';
 import i18n from './i18n/config';
+import { QUICK_LAUNCH_SHORTCUT } from './utils/globalShortcuts';
 
 const TRAY_ID = 'cardinal.tray';
 
@@ -21,6 +22,10 @@ export function initializeTray(): Promise<void> {
 }
 
 export async function setTrayEnabled(enabled: boolean): Promise<void> {
+  await invoke('set_tray_activation_policy', { enabled }).catch((error) => {
+    console.error('Failed to update activation policy', error);
+  });
+
   if (enabled) {
     await initializeTray();
     return;
@@ -38,20 +43,29 @@ export async function setTrayEnabled(enabled: boolean): Promise<void> {
 }
 
 async function createTray(): Promise<void> {
+  const openItem = await MenuItem.new({
+    id: 'tray.open',
+    text: i18n.t('tray.open'),
+    accelerator: QUICK_LAUNCH_SHORTCUT,
+    action: () => {
+      void activateMainWindow();
+    },
+  });
+  const menu = await Menu.new({
+    items: [
+      openItem,
+      await PredefinedMenuItem.new({ item: 'Separator' }),
+      await PredefinedMenuItem.new({ item: 'Quit', text: i18n.t('tray.quit') }),
+    ],
+  });
   const options: TrayIconOptions = {
     id: TRAY_ID,
     tooltip: 'Cardinal',
-    action: handleTrayAction,
     icon: (await defaultWindowIcon()) ?? undefined,
+    menu,
   };
 
   trayIcon = await TrayIcon.new(options);
-}
-
-function handleTrayAction(event: TrayIconEvent): void {
-  if (event.type === 'Click' || event.type === 'DoubleClick') {
-    void activateMainWindow();
-  }
 }
 
 async function activateMainWindow(): Promise<void> {

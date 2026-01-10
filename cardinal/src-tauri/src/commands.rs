@@ -17,7 +17,7 @@ use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, Sl
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
 use std::{cell::LazyCell, process::Command};
-use tauri::{AppHandle, Manager, State};
+use tauri::{ActivationPolicy, AppHandle, Manager, State};
 use tracing::{error, info, warn};
 
 #[derive(Debug, Clone)]
@@ -460,6 +460,26 @@ pub async fn toggle_main_window(app: AppHandle) {
         }
     } else {
         warn!("Toggle requested but main window is unavailable");
+    }
+}
+
+#[tauri::command]
+pub async fn set_tray_activation_policy(app: AppHandle, enabled: bool) {
+    let app_handle = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        let policy = if enabled {
+            ActivationPolicy::Accessory
+        } else {
+            ActivationPolicy::Regular
+        };
+        if let Err(e) = app_handle.set_activation_policy(policy) {
+            error!("Failed to set activation policy: {e:?}");
+        }
+        if let Err(e) = app_handle.show() {
+            error!("Failed to show app after activation policy change: {e:?}");
+        }
+    }) {
+        error!("Failed to dispatch activation policy update: {e:?}");
     }
 }
 

@@ -142,6 +142,7 @@
     }
   },
   "tray": {
+    "open": "Ouvrir Cardinal",
     "quit": "Quitter Cardinal"
   },
   "watchRoot": {

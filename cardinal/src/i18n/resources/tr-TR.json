@@ -142,6 +142,7 @@
     }
   },
   "tray": {
+    "open": "Cardinal'i Aç",
     "quit": "Cardinal'den çık"
   },
   "watchRoot": {
