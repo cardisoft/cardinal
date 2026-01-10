@@ -90,15 +90,6 @@ export function PreferencesOverlay({
   );
   const watchRootErrorMessage = watchRootErrorKey ? t(watchRootErrorKey) : null;
 
-  const commitWatchRoot = useCallback(() => {
-    const trimmed = watchRootInput.trim();
-    if (!getWatchRootValidation(trimmed).isValid) {
-      return;
-    }
-    onWatchConfigChange({ watchRoot: trimmed, ignorePaths });
-    setWatchRootInput(trimmed);
-  }, [ignorePaths, onWatchConfigChange, watchRootInput]);
-
   const handleWatchRootKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     if (event.key === 'Escape') {
       setWatchRootInput(watchRoot);
@@ -118,14 +109,6 @@ export function PreferencesOverlay({
     return invalid ? t('ignorePaths.errors.absolute') : null;
   }, [parsedIgnorePaths, t]);
 
-  const commitIgnorePaths = useCallback(() => {
-    if (ignorePathsErrorMessage) {
-      return;
-    }
-    onWatchConfigChange({ watchRoot, ignorePaths: parsedIgnorePaths });
-    setIgnorePathsInput(parsedIgnorePaths.join('\n'));
-  }, [ignorePathsErrorMessage, onWatchConfigChange, parsedIgnorePaths, watchRoot]);
-
   const handleIgnorePathsKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key === 'Escape') {
       setIgnorePathsInput(ignorePaths.join('\n'));
@@ -137,8 +120,10 @@ export function PreferencesOverlay({
       return;
     }
     commitThreshold();
-    commitWatchRoot();
-    commitIgnorePaths();
+    const trimmedWatchRoot = watchRootInput.trim();
+    onWatchConfigChange({ watchRoot: trimmedWatchRoot, ignorePaths: parsedIgnorePaths });
+    setWatchRootInput(trimmedWatchRoot);
+    setIgnorePathsInput(parsedIgnorePaths.join('\n'));
     onClose();
   };
 
