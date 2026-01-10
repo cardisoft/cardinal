@@ -115,7 +115,7 @@ impl SearchCache {
     }
 
     pub fn walk_fs_with_ignore(path: &Path, ignore_paths: &[PathBuf]) -> Self {
-        Self::walk_fs_with_walk_data(&WalkData::new(&path, &ignore_paths, false, None), None)
+        Self::walk_fs_with_walk_data(&WalkData::new(path, ignore_paths, false, None), None)
             .unwrap()
     }
 
@@ -1604,7 +1604,7 @@ mod tests {
         fs::create_dir(root_path.join("subdir1")).expect("Failed to create subdir1");
         fs::File::create(root_path.join("subdir1/file2.txt")).expect("Failed to create file1.txt");
 
-        let mut cache = SearchCache::walk_fs(&root_path);
+        let mut cache = SearchCache::walk_fs(root_path);
 
         // Directory nodes should always carry metadata.
         assert!(cache.file_nodes[cache.file_nodes.root()].metadata.is_some());
@@ -1653,7 +1653,7 @@ mod tests {
         fs::create_dir(root_path.join("subdir1")).expect("Failed to create subdir1");
         fs::File::create(root_path.join("subdir1/file2.txt")).expect("Failed to create file1.txt");
 
-        let mut cache = SearchCache::walk_fs(&root_path);
+        let mut cache = SearchCache::walk_fs(root_path);
         let mut last_event_id = cache.last_event_id();
 
         let new_file_path = root_path.join("event_file.txt");
@@ -1762,7 +1762,7 @@ mod tests {
         fs::create_dir(root_path.join("dir_b")).unwrap();
         fs::File::create(root_path.join("dir_b/file_c.md")).unwrap();
 
-        let mut cache = SearchCache::walk_fs(&root_path);
+        let mut cache = SearchCache::walk_fs(root_path);
 
         // 1. Query for a specific file
         let results1 = query(&mut cache, "file_a.txt");
@@ -1815,7 +1815,7 @@ mod tests {
         fs::create_dir(root_path.join("dir_b")).unwrap();
         fs::File::create(root_path.join("dir_b/file_c.md")).unwrap();
 
-        let mut cache = SearchCache::walk_fs(&root_path);
+        let mut cache = SearchCache::walk_fs(root_path);
 
         // 5. Query matching multiple files (substring)
         let results5 = query(&mut cache, "file_a");
@@ -1845,7 +1845,7 @@ mod tests {
         let root_path = temp_dir.path();
         fs::File::create(root_path.join("some_file.txt")).unwrap(); // Add a file to make cache non-trivial
 
-        let mut cache = SearchCache::walk_fs(&root_path);
+        let mut cache = SearchCache::walk_fs(root_path);
         let root_dir_name = root_path.file_name().unwrap().to_str().unwrap();
 
         let results = query(&mut cache, root_dir_name.to_string());
@@ -2171,7 +2171,7 @@ mod tests {
         fs::File::create(&file_path_walk).unwrap();
         fs::create_dir(&dir_path_walk).unwrap();
 
-        let mut cache = SearchCache::walk_fs(&root_path);
+        let mut cache = SearchCache::walk_fs(root_path);
 
         // Check metadata from initial walk_fs_new
         let results_file_walk = query(&mut cache, "walk_file.txt");
