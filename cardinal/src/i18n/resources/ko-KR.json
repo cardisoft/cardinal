@@ -142,6 +142,7 @@
     }
   },
   "tray": {
+    "open": "Cardinal 열기",
     "quit": "Cardinal 종료"
   },
   "watchRoot": {

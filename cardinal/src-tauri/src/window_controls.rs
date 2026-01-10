@@ -1,5 +1,6 @@
+use crate::commands::SearchState;
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow};
-use tracing::error;
+use tracing::{error, info, warn};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowToggle {
@@ -69,4 +70,41 @@ pub fn is_main_window_foreground(app_handle: &AppHandle) -> bool {
     let minimized = window.is_minimized().unwrap_or(false);
 
     visible && focused && !minimized
+}
+
+pub fn activate_main_window_impl(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        activate_window(&window);
+        info!("Main window activated via command");
+        if let Some(state) = app.try_state::<SearchState>() {
+            let _ = state.update_window_state_tx.try_send(());
+        }
+    } else {
+        warn!("Activate requested but main window is unavailable");
+    }
+}
+
+pub fn hide_main_window_impl(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        hide_window(&window);
+        info!("Main window hidden via command");
+        if let Some(state) = app.try_state::<SearchState>() {
+            let _ = state.update_window_state_tx.try_send(());
+        }
+    }
+}
+
+pub fn toggle_main_window_impl(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        if matches!(toggle_window(&window), WindowToggle::Hidden) {
+            info!("Main window hidden via command");
+        } else {
+            info!("Main window shown via command");
+        }
+        if let Some(state) = app.try_state::<SearchState>() {
+            let _ = state.update_window_state_tx.try_send(());
+        }
+    } else {
+        warn!("Toggle requested but main window is unavailable");
+    }
 }

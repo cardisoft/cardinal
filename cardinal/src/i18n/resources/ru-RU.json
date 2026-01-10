@@ -142,6 +142,7 @@
     }
   },
   "tray": {
+    "open": "Открыть Cardinal",
     "quit": "Выйти из Cardinal"
   },
   "watchRoot": {

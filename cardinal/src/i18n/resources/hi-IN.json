@@ -132,6 +132,7 @@
     }
   },
   "tray": {
+    "open": "Cardinal खोलें",
     "quit": "Cardinal बंद करें"
   },
   "watchRoot": {

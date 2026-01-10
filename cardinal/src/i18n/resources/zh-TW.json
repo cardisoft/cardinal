@@ -141,6 +141,7 @@
     }
   },
   "tray": {
+    "open": "打開 Cardinal",
     "quit": "結束 Cardinal"
   },
   "watchRoot": {

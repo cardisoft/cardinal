@@ -141,6 +141,7 @@
     }
   },
   "tray": {
+    "open": "打开 Cardinal",
     "quit": "退出 Cardinal"
   },
   "watchRoot": {

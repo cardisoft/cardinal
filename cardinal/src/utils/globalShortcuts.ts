@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { register } from '@tauri-apps/plugin-global-shortcut';
 
-const QUICK_LAUNCH_SHORTCUT = 'CommandOrControl+Shift+Space';
+export const QUICK_LAUNCH_SHORTCUT = 'Command+Shift+Space';
 export async function initializeGlobalShortcuts(): Promise<void> {
   try {
     await register(QUICK_LAUNCH_SHORTCUT, (event) => {

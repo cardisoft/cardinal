@@ -6,7 +6,7 @@ use crate::{
     },
     search_activity,
     sort::{SortEntry, SortStatePayload, sort_entries},
-    window_controls::{WindowToggle, activate_window, hide_window, toggle_window},
+    window_controls::{activate_main_window_impl, hide_main_window_impl, toggle_main_window_impl},
 };
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
@@ -17,7 +17,7 @@ use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, Sl
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
 use std::{cell::LazyCell, process::Command};
-use tauri::{AppHandle, Manager, State};
+use tauri::{ActivationPolicy, AppHandle, State};
 use tracing::{error, info, warn};
 
 #[derive(Debug, Clone)]
@@ -68,7 +68,7 @@ pub struct SearchState {
     rescan_tx: Sender<()>,
     watch_config_tx: Sender<WatchConfigUpdate>,
     sorted_view_cache: Mutex<Option<SortedViewCache>>,
-    update_window_state_tx: Sender<()>,
+    pub(crate) update_window_state_tx: Sender<()>,
 }
 
 impl SearchState {
@@ -424,42 +424,34 @@ pub async fn start_logic(watch_root: String, ignore_paths: Vec<String>) {
 
 #[tauri::command]
 pub async fn hide_main_window(app: AppHandle) {
-    if let Some(window) = app.get_webview_window("main")
-        && hide_window(&window)
-    {
-        info!("Main window hidden via command");
-        if let Some(state) = app.try_state::<SearchState>() {
-            let _ = state.update_window_state_tx.try_send(());
-        }
-    }
+    hide_main_window_impl(&app);
 }
 
 #[tauri::command]
 pub async fn activate_main_window(app: AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        activate_window(&window);
-        info!("Main window activated via command");
-        if let Some(state) = app.try_state::<SearchState>() {
-            let _ = state.update_window_state_tx.try_send(());
-        }
-    } else {
-        warn!("Activate requested but main window is unavailable");
-    }
+    activate_main_window_impl(&app);
 }
 
 #[tauri::command]
 pub async fn toggle_main_window(app: AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        if matches!(toggle_window(&window), WindowToggle::Hidden) {
-            info!("Main window hidden via command");
+    toggle_main_window_impl(&app);
+}
+
+#[tauri::command]
+pub async fn set_tray_activation_policy(app: AppHandle, enabled: bool) {
+    let app_handle = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        let policy = if enabled {
+            ActivationPolicy::Accessory
         } else {
-            info!("Main window shown via command");
+            ActivationPolicy::Regular
+        };
+        if let Err(e) = app_handle.set_activation_policy(policy) {
+            error!("Failed to set activation policy: {e:?}");
         }
-        if let Some(state) = app.try_state::<SearchState>() {
-            let _ = state.update_window_state_tx.try_send(());
-        }
-    } else {
-        warn!("Toggle requested but main window is unavailable");
+        activate_main_window_impl(&app_handle);
+    }) {
+        error!("Failed to dispatch activation policy update: {e:?}");
     }
 }
 

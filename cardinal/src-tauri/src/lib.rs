@@ -15,8 +15,9 @@ use cardinal_sdk::EventWatcher;
 use commands::{
     NodeInfoRequest, SearchJob, SearchState, WatchConfigUpdate, activate_main_window,
     close_quicklook, get_app_status, get_nodes_info, get_sorted_view, hide_main_window,
-    normalize_watch_config, open_in_finder, open_path, search, set_watch_config, start_logic,
-    toggle_main_window, toggle_quicklook, trigger_rescan, update_icon_viewport, update_quicklook,
+    normalize_watch_config, open_in_finder, open_path, search, set_tray_activation_policy,
+    set_watch_config, start_logic, toggle_main_window, toggle_quicklook, trigger_rescan,
+    update_icon_viewport, update_quicklook,
 };
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, bounded, unbounded};
 use lifecycle::{
@@ -137,6 +138,7 @@ pub fn run() -> Result<()> {
             hide_main_window,
             activate_main_window,
             toggle_main_window,
+            set_tray_activation_policy,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
