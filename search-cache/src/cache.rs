@@ -20,14 +20,13 @@ use std::{
     time::Instant,
 };
 use thin_vec::ThinVec;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 use typed_num::Num;
 
 pub struct SearchCache {
     pub(crate) file_nodes: FileNodes,
     last_event_id: u64,
     pub(crate) name_index: NameIndex,
-    ignore_paths: Option<Vec<PathBuf>>,
     stop: Option<&'static AtomicBool>,
 }
 
@@ -56,11 +55,15 @@ impl std::fmt::Debug for SearchCache {
 }
 
 impl SearchCache {
+    pub fn ignore_paths(&self) -> &Vec<PathBuf> {
+        self.file_nodes.ignore_paths()
+    }
+
     /// The `path` is the root path of the constructed cache and fsevent watch path.
     pub fn try_read_persistent_cache(
         path: &Path,
         cache_path: &Path,
-        ignore_paths: Option<Vec<PathBuf>>,
+        current_ignore_paths: &Vec<PathBuf>,
         cancel: Option<&'static AtomicBool>,
     ) -> Result<Self> {
         read_cache_from_file(cache_path)
@@ -76,10 +79,23 @@ impl SearchCache {
                     })
                     .map(|()| x)
             })
+            .and_then(|x| {
+                (&x.ignore_paths == current_ignore_paths)
+                    .then_some(())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "Inconsistent ignore paths: expected: {:?}, actual: {:?}",
+                            &current_ignore_paths,
+                            &x.ignore_paths
+                        )
+                    })
+                    .map(|()| x)
+            })
             .map(
                 |PersistentStorage {
                      version: _,
                      path,
+                     ignore_paths,
                      slab_root,
                      slab,
                      name_index,
@@ -87,8 +103,8 @@ impl SearchCache {
                  }| {
                     // name pool construction speed is fast enough that caching it doesn't worth it.
                     let name_index = NameIndex::construct_name_pool(name_index);
-                    let slab = FileNodes::new(path, slab, slab_root);
-                    Self::new(slab, last_event_id, name_index, ignore_paths, cancel)
+                    let slab = FileNodes::new(path, ignore_paths, slab, slab_root);
+                    Self::new(slab, last_event_id, name_index, cancel)
                 },
             )
     }
@@ -98,42 +114,40 @@ impl SearchCache {
         self.file_nodes.len()
     }
 
-    pub fn walk_fs_with_ignore(path: PathBuf, ignore_paths: Vec<PathBuf>) -> Self {
-        let ignore_paths_opt = if ignore_paths.is_empty() {
-            None
-        } else {
-            Some(ignore_paths)
-        };
-        Self::walk_fs_with_walk_data(
-            path,
-            &WalkData::new(ignore_paths_opt.clone(), false, None),
-            ignore_paths_opt,
-            None,
-        )
-        .unwrap()
+    pub fn walk_fs_with_ignore(path: &Path, ignore_paths: &[PathBuf]) -> Self {
+        Self::walk_fs_with_walk_data(&WalkData::new(&path, &ignore_paths, false, None), None)
+            .unwrap()
     }
 
-    pub fn walk_fs(path: PathBuf) -> Self {
-        Self::walk_fs_with_walk_data(path, &WalkData::new(None, false, None), None, None).unwrap()
+    pub fn walk_fs(path: &Path) -> Self {
+        Self::walk_fs_with_walk_data(&WalkData::new(path, &[], false, None), None).unwrap()
     }
 
     /// This function is expected to be called with WalkData which metadata is not fetched.
     /// If cancelled during walking, None is returned.
     pub fn walk_fs_with_walk_data(
-        path: PathBuf,
         walk_data: &WalkData,
-        ignore_paths: Option<Vec<PathBuf>>,
         cancel: Option<&'static AtomicBool>,
     ) -> Option<Self> {
         // Return None if cancelled
         fn walkfs_to_slab(
-            path: &Path,
             walk_data: &WalkData,
         ) -> Option<(SlabIndex, ThinSlab<SlabNode>, NameIndex)> {
             // Build the tree of file names in parallel first (we cannot construct the slab directly
             // because slab nodes reference each other and we prefer to avoid locking).
             let visit_time = Instant::now();
-            let node = walk_it(path, walk_data)?;
+            let node = walk_it(walk_data).unwrap_or_else(|| {
+                warn!("failed to walk path: {:?}", walk_data.root_path);
+                Node {
+                    children: Vec::new(),
+                    name: walk_data
+                        .root_path
+                        .to_string_lossy()
+                        .into_owned()
+                        .into_boxed_str(),
+                    metadata: None,
+                }
+            });
             info!(
                 "Walk data: {:?}, time: {:?}",
                 walk_data,
@@ -156,30 +170,27 @@ impl SearchCache {
         }
 
         let last_event_id = current_event_id();
-        let (slab_root, slab, name_index) = walkfs_to_slab(&path, walk_data)?;
-        let slab = FileNodes::new(path, slab, slab_root);
-        // metadata cache inits later
-        Some(Self::new(
+        let (slab_root, slab, name_index) = walkfs_to_slab(walk_data)?;
+        let slab = FileNodes::new(
+            walk_data.root_path.to_path_buf(),
+            walk_data.ignore_directories.to_vec(),
             slab,
-            last_event_id,
-            name_index,
-            ignore_paths,
-            cancel,
-        ))
+            slab_root,
+        );
+        // metadata cache inits later
+        Some(Self::new(slab, last_event_id, name_index, cancel))
     }
 
     fn new(
         slab: FileNodes,
         last_event_id: u64,
         name_index: NameIndex,
-        ignore_paths: Option<Vec<PathBuf>>,
         cancel: Option<&'static AtomicBool>,
     ) -> Self {
         Self {
             file_nodes: slab,
             last_event_id,
             name_index,
-            ignore_paths,
             stop: cancel,
         }
     }
@@ -357,8 +368,8 @@ impl SearchCache {
             self.remove_node(old_node);
         }
         // For incremental data, we need metadata
-        let walk_data = WalkData::new(self.ignore_paths.clone(), true, self.stop);
-        walk_it(raw_path, &walk_data).map(|node| {
+        let walk_data = WalkData::new(raw_path, self.file_nodes.ignore_paths(), true, self.stop);
+        walk_it(&walk_data).map(|node| {
             let node = self.create_node_slab_update_name_index_and_name_pool(Some(parent), &node);
             // Push the newly created node to the parent's children
             self.file_nodes[parent].add_children(node);
@@ -382,17 +393,18 @@ impl SearchCache {
         Some(self.create_node_chain(path))
     }
 
-    pub fn walk_data(&self) -> WalkData<'static> {
-        WalkData::new(self.ignore_paths.clone(), false, self.stop)
+    pub fn walk_data<'p>(
+        &self,
+        phantom1: &'p mut PathBuf,
+        phantom2: &'p mut Vec<PathBuf>,
+    ) -> WalkData<'p> {
+        *phantom1 = self.file_nodes.path().to_path_buf();
+        *phantom2 = self.file_nodes.ignore_paths().clone();
+        WalkData::new(phantom1, phantom2, false, self.stop)
     }
 
     pub fn rescan_with_walk_data(&mut self, walk_data: &WalkData) -> Option<()> {
-        let Some(new_cache) = Self::walk_fs_with_walk_data(
-            self.file_nodes.path().to_path_buf(),
-            walk_data,
-            self.ignore_paths.clone(),
-            self.stop,
-        ) else {
+        let Some(new_cache) = Self::walk_fs_with_walk_data(walk_data, self.stop) else {
             info!("Rescan cancelled.");
             return None;
         };
@@ -403,9 +415,12 @@ impl SearchCache {
     pub fn rescan(&mut self) {
         // Remove all memory consuming cache early for memory consumption in Self::walk_fs_new.
         let Some(new_cache) = Self::walk_fs_with_walk_data(
-            self.file_nodes.path().to_path_buf(),
-            &WalkData::new(self.ignore_paths.clone(), false, self.stop),
-            self.ignore_paths.clone(),
+            &WalkData::new(
+                self.file_nodes.path(),
+                self.file_nodes.ignore_paths(),
+                false,
+                self.stop,
+            ),
             self.stop,
         ) else {
             info!("Rescan cancelled.");
@@ -442,6 +457,7 @@ impl SearchCache {
             version: Num,
             last_event_id: self.last_event_id,
             path: self.file_nodes.path().to_path_buf(),
+            ignore_paths: self.file_nodes.ignore_paths().clone(),
             slab_root: self.file_nodes.root(),
             name_index,
             slab,
@@ -458,19 +474,19 @@ impl SearchCache {
 
     pub fn flush_to_file(self, cache_path: &Path) -> Result<()> {
         let Self {
-            file_nodes: slab,
+            file_nodes,
             last_event_id,
             name_index,
-            ignore_paths: _,
             stop: _,
         } = self;
-        let (path, slab_root, slab) = slab.into_parts();
+        let (path, ignore_paths, slab_root, slab) = file_nodes.into_parts();
         let name_index = name_index.into_persistent();
         write_cache_to_file(
             cache_path,
             &PersistentStorage {
                 version: Num,
                 path,
+                ignore_paths,
                 slab_root,
                 slab,
                 name_index,
@@ -746,7 +762,10 @@ pub static NAME_POOL: LazyLock<NamePool> = LazyLock::new(NamePool::new);
 mod tests {
     use super::*;
     use crate::query::CONTENT_BUFFER_BYTES;
-    use std::{fs, path::PathBuf};
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+    };
     use tempdir::TempDir;
 
     fn guard_indices(result: Result<SearchOutcome>) -> Vec<SlabIndex> {
@@ -800,7 +819,7 @@ mod tests {
         let root_target = push_child(&mut slab, root_idx, "target.txt");
         let alpha_target = push_child(&mut slab, alpha, "target.txt");
         let beta_target = push_child(&mut slab, beta, "target.txt");
-        let file_nodes = FileNodes::new(PathBuf::from("/virtual/root"), slab, root_idx);
+        let file_nodes = FileNodes::new(PathBuf::from("/virtual/root"), Vec::new(), slab, root_idx);
         (file_nodes, [root_target, alpha_target, beta_target])
     }
 
@@ -817,7 +836,7 @@ mod tests {
         let mut slab = ThinSlab::new();
         let mut name_index = NameIndex::default();
         let root = construct_node_slab_name_index(None, &tree, &mut slab, &mut name_index);
-        let file_nodes = FileNodes::new(PathBuf::from("/virtual/root"), slab, root);
+        let file_nodes = FileNodes::new(PathBuf::from("/virtual/root"), Vec::new(), slab, root);
 
         let shared_entries = name_index.get("shared").expect("shared entries");
         assert_eq!(shared_entries.len(), 3);
@@ -866,9 +885,8 @@ mod tests {
         fs::File::create(root.join("alpha/target.txt")).unwrap();
         fs::File::create(root.join("beta/target.txt")).unwrap();
 
-        let walk_data = WalkData::simple(false);
-        let cache = SearchCache::walk_fs_with_walk_data(root.to_path_buf(), &walk_data, None, None)
-            .expect("walk cache");
+        let walk_data = WalkData::simple(root, false);
+        let cache = SearchCache::walk_fs_with_walk_data(&walk_data, None).expect("walk cache");
 
         let entries = cache
             .name_index
@@ -896,7 +914,7 @@ mod tests {
         fs::File::create(temp_path.join("file1.txt")).expect("Failed to create file");
         fs::File::create(temp_path.join("subdir/file2.txt")).expect("Failed to create file");
 
-        let cache = SearchCache::walk_fs(temp_path.to_path_buf());
+        let cache = SearchCache::walk_fs(temp_path);
 
         assert_eq!(cache.file_nodes.len(), 4);
         assert_eq!(cache.name_index.len(), 4);
@@ -908,7 +926,7 @@ mod tests {
         let temp_dir = TempDir::new("test_events").expect("Failed to create temp directory");
         let temp_path = temp_dir.path();
 
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
 
         assert_eq!(cache.file_nodes.len(), 1);
         assert_eq!(cache.name_index.len(), 1);
@@ -934,7 +952,7 @@ mod tests {
         let temp_path = temp_dir.path();
         fs::File::create(temp_path.join("new_file.txt")).expect("Failed to create file");
 
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
 
         assert_eq!(cache.file_nodes.len(), 2);
         assert_eq!(cache.name_index.len(), 2);
@@ -958,7 +976,7 @@ mod tests {
         let temp_dir = TempDir::new("test_events").expect("Failed to create temp directory");
         let temp_path = temp_dir.path();
 
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
 
         assert_eq!(cache.file_nodes.len(), 1);
         assert_eq!(cache.name_index.len(), 1);
@@ -986,7 +1004,7 @@ mod tests {
         fs::File::create(dir.join("foo123.txt")).unwrap();
         fs::File::create(dir.join("bar.txt")).unwrap();
 
-        let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+        let mut cache = SearchCache::walk_fs(dir);
         let indices = cache.search("regex:foo\\d+").unwrap();
         assert_eq!(indices.len(), 1);
         let nodes = cache.expand_file_nodes(&indices);
@@ -1006,7 +1024,7 @@ mod tests {
         fs::File::create(dir.join("foo.txt")).unwrap();
         fs::File::create(dir.join("bar.txt")).unwrap();
 
-        let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+        let mut cache = SearchCache::walk_fs(dir);
         let token = CancellationToken::new(10);
         let _ = CancellationToken::new(11); // cancel previous token
 
@@ -1028,7 +1046,7 @@ mod tests {
         fs::File::create(dir.join("Alpha.TXT")).unwrap();
         fs::File::create(dir.join("beta.txt")).unwrap();
 
-        let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+        let mut cache = SearchCache::walk_fs(dir);
         let opts = SearchOptions {
             case_insensitive: true,
         };
@@ -1056,7 +1074,7 @@ mod tests {
         fs::File::create(dir.join("alphaTwo.md")).unwrap();
         fs::File::create(dir.join("beta.txt")).unwrap();
 
-        let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+        let mut cache = SearchCache::walk_fs(dir);
 
         let opts = SearchOptions {
             case_insensitive: false,
@@ -1086,7 +1104,7 @@ mod tests {
         fs::write(dir.join("notes.txt"), b"rust memchr finder\nsecond line").unwrap();
         fs::write(dir.join("other.txt"), b"nothing to see here").unwrap();
 
-        let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+        let mut cache = SearchCache::walk_fs(dir);
         let opts = SearchOptions {
             case_insensitive: false,
         };
@@ -1122,7 +1140,7 @@ mod tests {
         payload.extend(std::iter::repeat_n(b'a', 32));
         fs::write(dir.join("large.bin"), &payload).unwrap();
 
-        let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+        let mut cache = SearchCache::walk_fs(dir);
         let opts = SearchOptions {
             case_insensitive: false,
         };
@@ -1144,7 +1162,7 @@ mod tests {
 
         fs::write(dir.join("letters.txt"), b"AaBb").unwrap();
 
-        let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+        let mut cache = SearchCache::walk_fs(dir);
 
         let insensitive = guard_indices(cache.search_with_options(
             "content:a",
@@ -1198,7 +1216,7 @@ mod tests {
         payload.extend(std::iter::repeat_n(b'a', 32));
         fs::write(dir.join("boundary.bin"), &payload).unwrap();
 
-        let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+        let mut cache = SearchCache::walk_fs(dir);
         let indices = guard_indices(cache.search_with_options(
             "content:XYZ",
             SearchOptions {
@@ -1227,7 +1245,7 @@ mod tests {
         payload.extend(std::iter::repeat_n(b'b', 16));
         fs::write(dir.join("long_needle.bin"), &payload).unwrap();
 
-        let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+        let mut cache = SearchCache::walk_fs(dir);
         let query = format!("content:{needle}");
         let indices = guard_indices(cache.search_with_options(
             &query,
@@ -1249,7 +1267,7 @@ mod tests {
     fn test_search_empty_cancelled_returns_none() {
         let temp_dir = TempDir::new("search_empty_cancelled").unwrap();
         fs::File::create(temp_dir.path().join("alpha.txt")).unwrap();
-        let cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let cache = SearchCache::walk_fs(temp_dir.path());
 
         let token = CancellationToken::new(1000);
         let _ = CancellationToken::new(1001);
@@ -1261,7 +1279,7 @@ mod tests {
     fn test_search_with_options_cancelled_returns_none() {
         let temp_dir = TempDir::new("search_with_options_cancelled").unwrap();
         fs::File::create(temp_dir.path().join("file_a.txt")).unwrap();
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
 
         let token = CancellationToken::new(2000);
         let _ = CancellationToken::new(2001);
@@ -1280,7 +1298,7 @@ mod tests {
     fn test_query_files_cancelled_returns_none() {
         let temp_dir = TempDir::new("query_files_cancelled").unwrap();
         fs::File::create(temp_dir.path().join("item.txt")).unwrap();
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
 
         let token = CancellationToken::new(3000);
         let _ = CancellationToken::new(3001);
@@ -1295,7 +1313,7 @@ mod tests {
         let temp_path = temp_dir.path();
         fs::File::create(temp_path.join("new_file.txt")).expect("Failed to create file");
 
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
 
         assert_eq!(cache.file_nodes.len(), 2);
         assert_eq!(cache.name_index.len(), 2);
@@ -1320,7 +1338,8 @@ mod tests {
     #[ignore]
     fn test_handle_fs_event_simulator() {
         let instant = std::time::Instant::now();
-        let mut cache = SearchCache::walk_fs(PathBuf::from("/Library/Developer/CoreSimulator"));
+        let root = Path::new("/Library/Developer/CoreSimulator");
+        let mut cache = SearchCache::walk_fs(root);
         let mut event_id = cache.last_event_id + 1;
         println!(
             "Cache size: {}, process time: {:?}",
@@ -1350,7 +1369,7 @@ mod tests {
     fn test_handle_fs_event_removal_fake() {
         let temp_dir = TempDir::new("test_events").expect("Failed to create temp directory");
         let temp_path = temp_dir.path();
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
 
         assert_eq!(cache.file_nodes.len(), 1);
         assert_eq!(cache.name_index.len(), 1);
@@ -1375,7 +1394,7 @@ mod tests {
     fn test_handle_fs_event_add_and_removal() {
         let temp_dir = TempDir::new("test_events").expect("Failed to create temp directory");
         let temp_path = temp_dir.path();
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
 
         assert_eq!(cache.file_nodes.len(), 1);
         assert_eq!(cache.name_index.len(), 1);
@@ -1412,7 +1431,7 @@ mod tests {
         fs::File::create(temp_path.join("new_file3.txt")).expect("Failed to create file");
         fs::create_dir_all(temp_path.join("src/foo")).expect("Failed to create dir");
         fs::File::create(temp_path.join("src/foo/good.rs")).expect("Failed to create file");
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
 
         assert_eq!(cache.file_nodes.len(), 7);
         assert_eq!(cache.name_index.len(), 7);
@@ -1436,7 +1455,7 @@ mod tests {
     fn test_handle_fs_event_rescan1() {
         let temp_dir = TempDir::new("test_events").expect("Failed to create temp directory");
         let temp_path = temp_dir.path();
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
 
         assert_eq!(cache.file_nodes.len(), 1);
         assert_eq!(cache.name_index.len(), 1);
@@ -1464,7 +1483,7 @@ mod tests {
     fn test_handle_fs_event_rescan_by_modify() {
         let temp_dir = TempDir::new("test_events").expect("Failed to create temp directory");
         let temp_path = temp_dir.path();
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
 
         assert_eq!(cache.file_nodes.len(), 1);
         assert_eq!(cache.name_index.len(), 1);
@@ -1500,7 +1519,7 @@ mod tests {
         fs::File::create(temp_path.join("src/foo.rs")).expect("Failed to create file");
         fs::File::create(temp_path.join("src/lib.rs")).expect("Failed to create file");
         fs::File::create(temp_path.join("src/boo.rs")).expect("Failed to create file");
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
 
         assert_eq!(cache.file_nodes.len(), 11);
         assert_eq!(cache.name_index.len(), 11);
@@ -1543,7 +1562,7 @@ mod tests {
         fs::File::create(temp_path.join("src/foo.rs")).expect("Failed to create file");
         fs::File::create(temp_path.join("src/lib.rs")).expect("Failed to create file");
         fs::File::create(temp_path.join("src/boo.rs")).expect("Failed to create file");
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
 
         assert_eq!(cache.file_nodes.len(), 11);
         assert_eq!(cache.name_index.len(), 11);
@@ -1585,7 +1604,7 @@ mod tests {
         fs::create_dir(root_path.join("subdir1")).expect("Failed to create subdir1");
         fs::File::create(root_path.join("subdir1/file2.txt")).expect("Failed to create file1.txt");
 
-        let mut cache = SearchCache::walk_fs(root_path.to_path_buf());
+        let mut cache = SearchCache::walk_fs(&root_path);
 
         // Directory nodes should always carry metadata.
         assert!(cache.file_nodes[cache.file_nodes.root()].metadata.is_some());
@@ -1634,7 +1653,7 @@ mod tests {
         fs::create_dir(root_path.join("subdir1")).expect("Failed to create subdir1");
         fs::File::create(root_path.join("subdir1/file2.txt")).expect("Failed to create file1.txt");
 
-        let mut cache = SearchCache::walk_fs(root_path.to_path_buf());
+        let mut cache = SearchCache::walk_fs(&root_path);
         let mut last_event_id = cache.last_event_id();
 
         let new_file_path = root_path.join("event_file.txt");
@@ -1743,7 +1762,7 @@ mod tests {
         fs::create_dir(root_path.join("dir_b")).unwrap();
         fs::File::create(root_path.join("dir_b/file_c.md")).unwrap();
 
-        let mut cache = SearchCache::walk_fs(root_path.to_path_buf());
+        let mut cache = SearchCache::walk_fs(&root_path);
 
         // 1. Query for a specific file
         let results1 = query(&mut cache, "file_a.txt");
@@ -1796,7 +1815,7 @@ mod tests {
         fs::create_dir(root_path.join("dir_b")).unwrap();
         fs::File::create(root_path.join("dir_b/file_c.md")).unwrap();
 
-        let mut cache = SearchCache::walk_fs(root_path.to_path_buf());
+        let mut cache = SearchCache::walk_fs(&root_path);
 
         // 5. Query matching multiple files (substring)
         let results5 = query(&mut cache, "file_a");
@@ -1826,7 +1845,7 @@ mod tests {
         let root_path = temp_dir.path();
         fs::File::create(root_path.join("some_file.txt")).unwrap(); // Add a file to make cache non-trivial
 
-        let mut cache = SearchCache::walk_fs(root_path.to_path_buf());
+        let mut cache = SearchCache::walk_fs(&root_path);
         let root_dir_name = root_path.file_name().unwrap().to_str().unwrap();
 
         let results = query(&mut cache, root_dir_name.to_string());
@@ -1846,7 +1865,7 @@ mod tests {
     #[test]
     fn test_query_files_empty_query_string() {
         let temp_dir = TempDir::new("test_query_files_empty_q").unwrap();
-        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+        let mut cache = SearchCache::walk_fs(temp_dir.path());
         // Empty queries match everything.
         let result = cache.query_files("".to_string(), CancellationToken::noop());
         assert!(result.is_ok(), "empty query should succeed");
@@ -1863,7 +1882,7 @@ mod tests {
         fs::create_dir_all(&sub2).unwrap();
         fs::File::create(&file_in_sub2).unwrap();
 
-        let mut cache = SearchCache::walk_fs(root.to_path_buf());
+        let mut cache = SearchCache::walk_fs(root);
 
         // Query for the deep file directly
         let results_deep_file = query(&mut cache, "gamma_file.txt");
@@ -1931,7 +1950,7 @@ mod tests {
             fs::File::create(&full).unwrap();
         }
 
-        let mut cache = SearchCache::walk_fs(root.to_path_buf());
+        let mut cache = SearchCache::walk_fs(root);
         let results = query(&mut cache, "alpha*/mid_shared/goal.txt");
         let mut matched: Vec<_> = results
             .into_iter()
@@ -1966,7 +1985,7 @@ mod tests {
             fs::File::create(&full).unwrap();
         }
 
-        let mut cache = SearchCache::walk_fs(root.to_path_buf());
+        let mut cache = SearchCache::walk_fs(root);
         let results = query(&mut cache, "anchor/mid_re*/goal.txt");
         let mut matched: Vec<_> = results
             .into_iter()
@@ -2005,7 +2024,7 @@ mod tests {
             fs::File::create(&full).unwrap();
         }
 
-        let mut cache = SearchCache::walk_fs(root.to_path_buf());
+        let mut cache = SearchCache::walk_fs(root);
         let results = query(&mut cache, "anchor/mid_release/prefix-target*");
         let mut matched: Vec<_> = results
             .into_iter()
@@ -2037,7 +2056,7 @@ mod tests {
         fs::File::create(root.join("bar.txt")).unwrap();
         fs::File::create(root.join("foobar.txt")).unwrap();
 
-        let mut cache = SearchCache::walk_fs(root.to_path_buf());
+        let mut cache = SearchCache::walk_fs(root);
 
         let results_and = query(&mut cache, "foo bar");
         assert_eq!(results_and.len(), 1);
@@ -2081,7 +2100,7 @@ mod tests {
         fs::File::create(root.join("alpha_dir/file_a.txt")).unwrap();
         fs::File::create(root.join("beta.txt")).unwrap();
 
-        let mut cache = SearchCache::walk_fs(root.to_path_buf());
+        let mut cache = SearchCache::walk_fs(root);
 
         let files = query(&mut cache, "file:beta");
         assert_eq!(files.len(), 1);
@@ -2102,7 +2121,7 @@ mod tests {
         fs::File::create(root.join("top.md")).unwrap();
         fs::File::create(nested.join("child.txt")).unwrap();
 
-        let mut cache = SearchCache::walk_fs(root.to_path_buf());
+        let mut cache = SearchCache::walk_fs(root);
 
         let txt_results = query(&mut cache, "ext:txt");
         let mut txt_paths: Vec<_> = txt_results
@@ -2152,7 +2171,7 @@ mod tests {
         fs::File::create(&file_path_walk).unwrap();
         fs::create_dir(&dir_path_walk).unwrap();
 
-        let mut cache = SearchCache::walk_fs(root_path.to_path_buf());
+        let mut cache = SearchCache::walk_fs(&root_path);
 
         // Check metadata from initial walk_fs_new
         let results_file_walk = query(&mut cache, "walk_file.txt");

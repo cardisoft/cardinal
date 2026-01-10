@@ -6,7 +6,7 @@ fn test_search_empty_returns_all_nodes() {
     let tmp = TempDir::new("search_empty").unwrap();
     fs::File::create(tmp.path().join("a.txt")).unwrap();
     fs::File::create(tmp.path().join("b.txt")).unwrap();
-    let cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let cache = SearchCache::walk_fs(tmp.path());
     let all = cache
         .search_empty(CancellationToken::noop())
         .expect("noop cancellation token should not cancel");
@@ -18,7 +18,7 @@ fn test_node_path_root_and_child() {
     let tmp = TempDir::new("node_path").unwrap();
     fs::create_dir(tmp.path().join("dir1")).unwrap();
     fs::File::create(tmp.path().join("dir1/file_x")).unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let idxs = cache.search("file_x").unwrap();
     assert_eq!(idxs.len(), 1);
     let full = cache.node_path(idxs.into_iter().next().unwrap()).unwrap();
@@ -28,7 +28,7 @@ fn test_node_path_root_and_child() {
 #[test]
 fn test_remove_node_path_nonexistent_returns_none() {
     let tmp = TempDir::new("remove_node_none").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     // remove_node_path is private via crate; exercise via scan removal scenario
     // create then delete file and ensure second scan removal returns None
     let file = tmp.path().join("temp_remove.txt");
@@ -58,7 +58,7 @@ fn test_remove_node_path_nonexistent_returns_none() {
 fn test_expand_file_nodes_fetch_metadata() {
     let tmp = TempDir::new("expand_meta").unwrap();
     fs::write(tmp.path().join("meta.txt"), b"hello world").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let idxs = cache.search("meta.txt").unwrap();
     assert_eq!(idxs.len(), 1);
     // First query_files returns metadata None
@@ -85,10 +85,10 @@ fn test_persistent_roundtrip() {
     let tmp = TempDir::new("persist_round").unwrap();
     fs::write(tmp.path().join("a.bin"), b"data").unwrap();
     let cache_path = tmp.path().join("cache.zstd");
-    let cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let cache = SearchCache::walk_fs(tmp.path());
     let original_total = cache.get_total_files();
     cache.flush_to_file(&cache_path).unwrap();
     let loaded =
-        SearchCache::try_read_persistent_cache(tmp.path(), &cache_path, None, None).unwrap();
+        SearchCache::try_read_persistent_cache(tmp.path(), &cache_path, &Vec::new(), None).unwrap();
     assert_eq!(loaded.get_total_files(), original_total);
 }

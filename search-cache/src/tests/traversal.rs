@@ -18,7 +18,7 @@ fn test_all_subnodes_returns_all_descendants() {
     fs::create_dir(tmp.path().join("src/utils")).unwrap();
     fs::write(tmp.path().join("src/utils/helper.rs"), b"x").unwrap();
 
-    let cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let cache = SearchCache::walk_fs(tmp.path());
 
     // Find src directory index
     let src_path = tmp.path().join("src");
@@ -49,7 +49,7 @@ fn test_all_subnodes_empty_directory() {
     let tmp = TempDir::new("all_subnodes_empty").unwrap();
     fs::create_dir(tmp.path().join("empty")).unwrap();
 
-    let cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let cache = SearchCache::walk_fs(tmp.path());
 
     let empty_path = tmp.path().join("empty");
     let empty_idx = cache
@@ -71,7 +71,7 @@ fn test_all_subnodes_deep_nesting() {
     fs::create_dir_all(&deep_path).unwrap();
     fs::write(deep_path.join("file.txt"), b"x").unwrap();
 
-    let cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let cache = SearchCache::walk_fs(tmp.path());
 
     // Get subnodes from 'a' directory
     let a_path = tmp.path().join("a");
@@ -108,7 +108,7 @@ fn test_all_subnodes_cancellation() {
         fs::write(tmp.path().join(format!("file_{i}.txt")), b"x").unwrap();
     }
 
-    let cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let cache = SearchCache::walk_fs(tmp.path());
 
     let root_idx = cache.file_nodes.root();
 

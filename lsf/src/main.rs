@@ -26,21 +26,17 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
     let path = cli.path;
+    let ignore_paths = vec![PathBuf::from(IGNORE_PATH)];
     let mut cache = if cli.refresh {
         println!("Walking filesystem...");
-        SearchCache::walk_fs_with_ignore(path, vec![PathBuf::from(IGNORE_PATH)])
+        SearchCache::walk_fs_with_ignore(&path, &ignore_paths)
     } else {
         println!("Try reading cache...");
-        SearchCache::try_read_persistent_cache(
-            &path,
-            Path::new(CACHE_PATH),
-            Some(vec![PathBuf::from(IGNORE_PATH)]),
-            None,
-        )
-        .unwrap_or_else(|e| {
-            println!("Failed to read cache: {e:?}. Re-walking filesystem...");
-            SearchCache::walk_fs_with_ignore(path, vec![PathBuf::from(IGNORE_PATH)])
-        })
+        SearchCache::try_read_persistent_cache(&path, Path::new(CACHE_PATH), &ignore_paths, None)
+            .unwrap_or_else(|e| {
+                println!("Failed to read cache: {e:?}. Re-walking filesystem...");
+                SearchCache::walk_fs_with_ignore(&path, &ignore_paths)
+            })
     };
 
     println!("Cache is: {cache:?}");

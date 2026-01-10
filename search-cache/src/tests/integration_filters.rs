@@ -7,7 +7,7 @@ fn test_combined_filters_all_match() {
     fs::write(tmp.path().join("report_small.pdf"), vec![0u8; 1_000]).unwrap();
     fs::write(tmp.path().join("data.csv"), vec![0u8; 100_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("report type:pdf size:>10kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -24,7 +24,7 @@ fn test_complex_boolean_with_filters() {
     fs::write(tmp.path().join("image.jpg"), vec![0u8; 100_000]).unwrap();
     fs::write(tmp.path().join("small_image.jpg"), vec![0u8; 1_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache
         .search("(report OR type:picture) size:>10kb !txt")
@@ -45,7 +45,7 @@ fn test_combined_filters_no_matches() {
     fs::write(tmp.path().join("small.jpg"), vec![0u8; 100]).unwrap();
     fs::write(tmp.path().join("large.txt"), vec![0u8; 100_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Picture that is large (but our picture is small)
     let results = cache.search("type:picture size:>10kb").unwrap();
@@ -60,7 +60,7 @@ fn test_complex_query_with_precedence() {
     fs::write(tmp.path().join("photo_a.jpg"), vec![0u8; 100_000]).unwrap();
     fs::write(tmp.path().join("photo_b.jpg"), vec![0u8; 1_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Test: (report OR photo_a) AND type:picture
     let results = cache.search("report OR photo_a type:picture").unwrap();
@@ -77,7 +77,7 @@ fn test_multiple_filters_intersection_complex() {
     fs::write(tmp.path().join("photos/small.jpg"), vec![0u8; 1_000]).unwrap();
     fs::write(tmp.path().join("document.pdf"), vec![0u8; 100_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let photos_dir = tmp.path().join("photos");
     let results = cache
@@ -97,7 +97,7 @@ fn test_deeply_nested_boolean_with_filters() {
     fs::write(tmp.path().join("c.mp3"), vec![0u8; 100_000]).unwrap();
     fs::write(tmp.path().join("d.mp3"), vec![0u8; 1_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache
         .search("((type:picture OR type:audio) size:>10kb)")
@@ -115,7 +115,7 @@ fn test_complex_or_chain_with_types() {
     fs::write(tmp.path().join("archive.zip"), b"x").unwrap();
     fs::write(tmp.path().join("code.rs"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache
         .search("type:picture OR type:video OR type:audio OR type:doc")
@@ -129,7 +129,7 @@ fn test_combined_filters_empty_intersection() {
     fs::write(tmp.path().join("photo.jpg"), vec![0u8; 100]).unwrap();
     fs::write(tmp.path().join("large.txt"), vec![0u8; 100_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Looking for large pictures, but the picture is small
     let results = cache.search("type:picture size:>10kb").unwrap();
@@ -156,7 +156,7 @@ fn test_complex_real_world_query() {
     .unwrap();
     fs::write(tmp.path().join("old_photo_2023.jpg"), vec![0u8; 500_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Find large vacation photos from 2024
     let results = cache
@@ -175,7 +175,7 @@ fn test_combined_all_filter_types() {
     fs::write(tmp.path().join("photos/vacation.jpg"), vec![0u8; 100_000]).unwrap();
     fs::write(tmp.path().join("photos/small.jpg"), vec![0u8; 1_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let photos_dir = tmp.path().join("photos");
     let results = cache
@@ -197,7 +197,7 @@ fn test_stress_many_filters_combined() {
     )
     .unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let media_dir = tmp.path().join("media");
     let results = cache
@@ -236,7 +236,7 @@ fn test_final_integration_comprehensive() {
     .unwrap();
     fs::write(tmp.path().join("Code/main.rs"), vec![0u8; 10_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Test 1: Find large documents
     let docs = cache.search("type:doc size:>100kb").unwrap();
@@ -264,7 +264,7 @@ fn test_nosubfolders_keeps_only_direct_files() {
     fs::create_dir(projects.join("Nested")).unwrap();
     fs::write(projects.join("Nested/deep.txt"), b"deep").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let results = cache
         .search(&format!("nosubfolders:{}", projects.display()))
         .unwrap();
@@ -289,7 +289,7 @@ fn test_nosubfolders_only_filters_target_tree() {
     fs::write(projects.join("Nested/report.txt"), b"deep report").unwrap();
     fs::write(tmp.path().join("report.txt"), b"global report").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let query = format!("report nosubfolders:{}", projects.display());
     let paths: Vec<_> = cache
         .search(&query)

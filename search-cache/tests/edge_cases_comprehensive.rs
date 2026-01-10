@@ -24,7 +24,7 @@ fn build_test_cache(files: &[&str]) -> (SearchCache, PathBuf) {
         std::fs::File::create(full).unwrap();
     }
 
-    let cache = SearchCache::walk_fs(root_path.clone());
+    let cache = SearchCache::walk_fs(&root_path);
     (cache, root_path)
 }
 
@@ -35,7 +35,7 @@ fn test_empty_cache() {
     std::mem::forget(temp_dir);
 
     // Create cache with no files (just root directory)
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Search for anything should return empty or small result
     let result = cache.query_files("test".to_string(), CancellationToken::noop());
@@ -85,13 +85,8 @@ fn test_cancellation_with_stop_flag() {
     }
 
     let stop = Box::leak(Box::new(AtomicBool::new(false)));
-    let mut cache = SearchCache::walk_fs_with_walk_data(
-        root_path.clone(),
-        &fswalk::WalkData::new(None, false, Some(stop)),
-        None,
-        Some(stop),
-    )
-    .unwrap();
+    let walk_data = fswalk::WalkData::new(&root_path, &[], false, Some(stop));
+    let mut cache = SearchCache::walk_fs_with_walk_data(&walk_data, Some(stop)).unwrap();
 
     // Set stop flag during search, then create new token to cancel previous
     stop.store(true, Ordering::SeqCst);
@@ -557,7 +552,7 @@ fn test_size_filter_edge_cases() {
     std::fs::write(root_path.join("medium.txt"), vec![b'a'; 1024]).unwrap();
     std::fs::write(root_path.join("large.txt"), vec![b'a'; 1024 * 1024]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Test exact size 0
     let result = cache

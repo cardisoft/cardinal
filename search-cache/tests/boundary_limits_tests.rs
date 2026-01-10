@@ -18,7 +18,7 @@ fn test_large_file_count() {
         std::fs::File::create(root_path.join(filename)).unwrap();
     }
 
-    let cache = SearchCache::walk_fs(root_path.clone());
+    let cache = SearchCache::walk_fs(&root_path);
     let total = cache.get_total_files();
     assert!(total >= 10_000, "Should index at least 10,000 files");
 
@@ -47,7 +47,7 @@ fn test_maximum_filename_length() {
 
     // This might fail on some filesystems, handle gracefully
     if std::fs::File::create(&long_file).is_ok() {
-        let mut cache = SearchCache::walk_fs(root_path.clone());
+        let mut cache = SearchCache::walk_fs(&root_path);
 
         let result = cache
             .query_files(long_name, CancellationToken::noop())
@@ -76,7 +76,7 @@ fn test_very_deep_directory_nesting() {
     if std::fs::create_dir_all(&current_path).is_ok() {
         std::fs::File::create(current_path.join("deep_file.txt")).unwrap();
 
-        let mut cache = SearchCache::walk_fs(root_path.clone());
+        let mut cache = SearchCache::walk_fs(&root_path);
 
         let result = cache
             .query_files("deep_file".to_string(), CancellationToken::noop())
@@ -99,7 +99,7 @@ fn test_many_files_same_name_different_dirs() {
         std::fs::File::create(dir.join("duplicate.txt")).unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     let result = cache
         .query_files("duplicate.txt".to_string(), CancellationToken::noop())
@@ -125,7 +125,7 @@ fn test_name_index_with_many_unique_names() {
         std::fs::File::create(root_path.join(filename)).unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Search for a specific unique name
     let result = cache
@@ -154,7 +154,7 @@ fn test_empty_directory_structures() {
         std::fs::create_dir(&dir).unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Search for directories
     let result = cache
@@ -186,7 +186,7 @@ fn test_mixed_file_and_directory_counts() {
         }
     }
 
-    let cache = SearchCache::walk_fs(root_path.clone());
+    let cache = SearchCache::walk_fs(&root_path);
     let total = cache.get_total_files();
     // Should count files + directories + nested files
     assert!(total >= 750, "Should count all files and directories");
@@ -203,7 +203,7 @@ fn test_slab_index_sequential_allocation() {
         std::fs::File::create(root_path.join(format!("file_{i}.txt"))).unwrap();
     }
 
-    let cache = SearchCache::walk_fs(root_path.clone());
+    let cache = SearchCache::walk_fs(&root_path);
 
     // Verify we can get slab indices
     let mut cache_mut = cache;
@@ -233,7 +233,7 @@ fn test_query_complexity_boolean_operations() {
         std::fs::File::create(root_path.join(file)).unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Very complex query with nested boolean operations
     let complex_query = "(alpha | beta) gamma ! delta";
@@ -254,7 +254,7 @@ fn test_extremely_long_query_string() {
 
     std::fs::File::create(root_path.join("test.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Create extremely long OR query
     let mut long_query = String::new();
@@ -286,7 +286,7 @@ fn test_many_extensions_filter() {
         }
     }
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Query with many extensions
     let ext_query = "ext:txt;rs;md;toml;json;yaml;xml;html;css;js";
@@ -313,7 +313,7 @@ fn test_zero_byte_files() {
         std::fs::File::create(root_path.join(format!("empty_{i}.txt"))).unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Search should work on empty files
     let result = cache
@@ -344,7 +344,7 @@ fn test_special_filenames_dot_files() {
         std::fs::File::create(root_path.join(file)).unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Search for hidden files
     let result = cache
@@ -377,7 +377,7 @@ fn test_path_with_consecutive_dots() {
         }
     }
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Search should handle these gracefully
     let result = cache.query_files("file".to_string(), CancellationToken::noop());
@@ -396,7 +396,7 @@ fn test_directory_and_file_same_prefix() {
     std::fs::create_dir(&test_dir).unwrap();
     std::fs::File::create(test_dir.join("nested.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Search for "test" should find both
     let result = cache
@@ -421,7 +421,7 @@ fn test_cancel_large_search_operation() {
         std::fs::File::create(root_path.join(format!("file_{i:05}.txt"))).unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Create cancellation token and cancel it
     let token_v1 = CancellationToken::new(1);
@@ -446,7 +446,7 @@ fn test_metadata_filter_on_large_set() {
         std::fs::write(root_path.join(format!("file_{i}.txt")), content).unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Filter by size range
     let result = cache
@@ -485,7 +485,7 @@ fn test_unicode_in_paths() {
         }
     }
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Try to search for unicode content
     let result = cache.query_files("测试".to_string(), CancellationToken::noop());

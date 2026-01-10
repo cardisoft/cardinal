@@ -6,7 +6,7 @@ fn test_type_and_macro_filters() {
     fs::write(tmp.path().join("photo.png"), b"x").unwrap();
     fs::write(tmp.path().join("song.mp3"), b"x").unwrap();
     fs::write(tmp.path().join("notes.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let pictures = cache.search("type:picture").unwrap();
     assert_eq!(pictures.len(), 1);
@@ -30,7 +30,7 @@ fn test_audio_macro_with_argument_behaves_like_and() {
     fs::write(tmp.path().join("song_beats.mp3"), b"x").unwrap();
     fs::write(tmp.path().join("song_other.mp3"), b"x").unwrap();
     fs::write(tmp.path().join("notes.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("audio:beats").unwrap();
     assert_eq!(results.len(), 1);
@@ -44,7 +44,7 @@ fn test_type_filter_respects_parent_base() {
     fs::create_dir(tmp.path().join("media")).unwrap();
     fs::write(tmp.path().join("media/keep.jpg"), b"x").unwrap();
     fs::write(tmp.path().join("skip.jpg"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let keep_idx = cache.search("keep.jpg").unwrap()[0];
     let skip_idx = cache.search("skip.jpg").unwrap()[0];
@@ -99,7 +99,7 @@ fn test_type_picture_comprehensive() {
     fs::write(tmp.path().join("document.txt"), b"x").unwrap();
     fs::write(tmp.path().join("video.mp4"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let pictures = cache.search("type:picture").unwrap();
     assert_eq!(pictures.len(), 18, "Should match all 18 image formats");
@@ -144,7 +144,7 @@ fn test_type_video_comprehensive() {
     fs::write(tmp.path().join("audio.mp3"), b"x").unwrap();
     fs::write(tmp.path().join("doc.pdf"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let videos = cache.search("type:video").unwrap();
     assert_eq!(videos.len(), 15);
@@ -177,7 +177,7 @@ fn test_type_audio_comprehensive() {
     fs::write(tmp.path().join("video.mp4"), b"x").unwrap();
     fs::write(tmp.path().join("text.txt"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let audio = cache.search("type:audio").unwrap();
     assert_eq!(audio.len(), 11);
@@ -212,7 +212,7 @@ fn test_type_document_comprehensive() {
     fs::write(tmp.path().join("image.png"), b"x").unwrap();
     fs::write(tmp.path().join("code.rs"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let docs = cache.search("type:doc").unwrap();
     assert_eq!(docs.len(), 10);
@@ -242,7 +242,7 @@ fn test_type_presentation_comprehensive() {
     fs::write(tmp.path().join("opendoc.odp"), b"x").unwrap();
     fs::write(tmp.path().join("document.txt"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let pres = cache.search("type:presentation").unwrap();
     assert_eq!(pres.len(), 4);
@@ -267,7 +267,7 @@ fn test_type_spreadsheet_comprehensive() {
     fs::write(tmp.path().join("opendoc.ods"), b"x").unwrap();
     fs::write(tmp.path().join("text.txt"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let sheets = cache.search("type:spreadsheet").unwrap();
     assert_eq!(sheets.len(), 5);
@@ -296,7 +296,7 @@ fn test_type_pdf_filter() {
     fs::write(tmp.path().join("guide.pdf"), b"x").unwrap();
     fs::write(tmp.path().join("doc.docx"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let pdfs = cache.search("type:pdf").unwrap();
     assert_eq!(pdfs.len(), 3);
@@ -319,7 +319,7 @@ fn test_type_archive_comprehensive() {
     fs::write(tmp.path().join("macos.dmg"), b"x").unwrap();
     fs::write(tmp.path().join("text.txt"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let archives = cache.search("type:archive").unwrap();
     assert_eq!(archives.len(), 12);
@@ -398,7 +398,7 @@ fn test_type_code_comprehensive() {
     fs::write(tmp.path().join("doc.txt"), b"x").unwrap();
     fs::write(tmp.path().join("image.png"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let code = cache.search("type:code").unwrap();
     // The test creates 47 code files + Cargo.toml = 48 total
@@ -430,7 +430,7 @@ fn test_type_executable_comprehensive() {
     fs::write(tmp.path().join("macos.pkg"), b"x").unwrap();
     fs::write(tmp.path().join("text.txt"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let exe = cache.search("type:exe").unwrap();
     assert_eq!(exe.len(), 14);
@@ -466,7 +466,7 @@ fn test_type_file_folder_filters() {
     fs::create_dir(tmp.path().join("folder2")).unwrap();
     fs::write(tmp.path().join("folder1/nested.txt"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let files = cache.search("type:file").unwrap();
     assert_eq!(files.len(), 3, "Should match only files");
@@ -492,7 +492,7 @@ fn test_type_file_folder_filters() {
 fn test_type_filter_unknown_category_error() {
     let tmp = TempDir::new("type_unknown").unwrap();
     fs::write(tmp.path().join("file.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let result = cache.search("type:unknowncategory");
     assert!(result.is_err());
@@ -508,7 +508,7 @@ fn test_type_filter_unknown_category_error() {
 fn test_type_filter_empty_argument_error() {
     let tmp = TempDir::new("type_empty").unwrap();
     fs::write(tmp.path().join("file.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let result = cache.search("type:");
     assert!(result.is_err());
@@ -524,7 +524,7 @@ fn test_type_filter_empty_argument_error() {
 fn test_audio_macro_no_arguments() {
     let tmp = TempDir::new("audio_macro").unwrap();
     fs::write(tmp.path().join("song.mp3"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let result = cache.search("audio:");
     assert!(result.is_ok());
@@ -535,7 +535,7 @@ fn test_audio_macro_no_arguments() {
 fn test_video_macro_no_arguments() {
     let tmp = TempDir::new("video_macro").unwrap();
     fs::write(tmp.path().join("clip.mp4"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let result = cache.search("video:");
     assert!(result.is_ok());
@@ -546,7 +546,7 @@ fn test_video_macro_no_arguments() {
 fn test_doc_macro_no_arguments() {
     let tmp = TempDir::new("doc_macro").unwrap();
     fs::write(tmp.path().join("note.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let result = cache.search("doc:");
     assert!(result.is_ok());
@@ -557,7 +557,7 @@ fn test_doc_macro_no_arguments() {
 fn test_exe_macro_no_arguments() {
     let tmp = TempDir::new("exe_macro").unwrap();
     fs::write(tmp.path().join("app.exe"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let result = cache.search("exe:");
     assert!(result.is_ok());
@@ -572,7 +572,7 @@ fn test_type_filter_combined_with_name_search() {
     fs::write(tmp.path().join("summary.pdf"), b"x").unwrap();
     fs::write(tmp.path().join("image.png"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("report type:doc").unwrap();
     assert_eq!(results.len(), 2);
@@ -592,7 +592,7 @@ fn test_type_filter_with_or_operator() {
     fs::write(tmp.path().join("clip.mp4"), b"x").unwrap();
     fs::write(tmp.path().join("doc.pdf"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:audio OR type:video").unwrap();
     assert_eq!(results.len(), 2);
@@ -612,7 +612,7 @@ fn test_type_filter_with_not_operator() {
     fs::write(tmp.path().join("song.mp3"), b"x").unwrap();
     fs::write(tmp.path().join("doc.txt"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("!type:picture").unwrap();
     assert!(results.len() >= 2);
@@ -634,7 +634,7 @@ fn test_type_filter_multiple_extensions_same_category() {
     fs::write(tmp.path().join("animation.gif"), b"x").unwrap();
     fs::write(tmp.path().join("web.webp"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:picture").unwrap();
     assert_eq!(results.len(), 4);
@@ -647,7 +647,7 @@ fn test_size_combined_with_type_filter() {
     fs::write(tmp.path().join("small.png"), vec![0u8; 1_000]).unwrap();
     fs::write(tmp.path().join("large.mp3"), vec![0u8; 50_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:picture size:>10kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -665,7 +665,7 @@ fn test_type_and_size_complex_query() {
     fs::write(tmp.path().join("large_video.mp4"), vec![0u8; 50_000]).unwrap();
     fs::write(tmp.path().join("document.pdf"), vec![0u8; 50_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Pictures over 10KB
     let results = cache.search("type:picture size:>10kb").unwrap();
@@ -694,7 +694,7 @@ fn test_multiple_type_filters_with_or() {
     fs::write(tmp.path().join("photo.jpg"), b"x").unwrap();
     fs::write(tmp.path().join("doc.pdf"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache
         .search("type:audio OR type:video OR type:picture")
@@ -719,7 +719,7 @@ fn test_type_filter_with_parent_filter() {
     fs::write(tmp.path().join("videos/photo.jpg"), b"x").unwrap();
     fs::write(tmp.path().join("videos/clip.mp4"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let images_dir = tmp.path().join("images");
     let results = cache
@@ -741,7 +741,7 @@ fn test_type_filter_with_infolder_filter() {
     fs::write(tmp.path().join("media/photos/pic2.png"), b"x").unwrap();
     fs::write(tmp.path().join("doc.txt"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let media_dir = tmp.path().join("media");
     let results = cache
@@ -755,7 +755,7 @@ fn test_type_filter_empty_result() {
     let tmp = TempDir::new("type_empty_result").unwrap();
     fs::write(tmp.path().join("doc.txt"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:audio").unwrap();
     assert_eq!(results.len(), 0);
@@ -770,7 +770,7 @@ fn test_audio_macro_with_all_extensions() {
         fs::write(tmp.path().join(format!("audio.{ext}")), b"x").unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("audio:").unwrap();
     assert_eq!(results.len(), 11);
@@ -786,7 +786,7 @@ fn test_video_macro_with_all_extensions() {
         fs::write(tmp.path().join(format!("video.{ext}")), b"x").unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("video:").unwrap();
     assert_eq!(results.len(), 15);
@@ -801,7 +801,7 @@ fn test_doc_macro_with_all_extensions() {
         fs::write(tmp.path().join(format!("document.{ext}")), b"x").unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("doc:").unwrap();
     assert_eq!(results.len(), 10);
@@ -817,7 +817,7 @@ fn test_exe_macro_with_all_extensions() {
         fs::write(tmp.path().join(format!("program.{ext}")), b"x").unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("exe:").unwrap();
     assert_eq!(results.len(), 14);
@@ -828,7 +828,7 @@ fn test_type_categories_overlap() {
     let tmp = TempDir::new("type_overlap").unwrap();
     fs::write(tmp.path().join("document.pdf"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // PDF is in both doc and pdf categories
     let doc_results = cache.search("type:doc").unwrap();
@@ -846,7 +846,7 @@ fn test_nested_directory_type_filter() {
     fs::write(tmp.path().join("a/b/photo.png"), b"x").unwrap();
     fs::write(tmp.path().join("a/b/c/photo.gif"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:picture").unwrap();
     assert_eq!(results.len(), 3);
@@ -859,7 +859,7 @@ fn test_wildcard_with_type_filter() {
     fs::write(tmp.path().join("family_photo.png"), b"x").unwrap();
     fs::write(tmp.path().join("work_doc.pdf"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("*photo* type:picture").unwrap();
     assert_eq!(results.len(), 2);
@@ -872,7 +872,7 @@ fn test_type_filter_files_without_extensions() {
     fs::write(tmp.path().join("Makefile"), b"x").unwrap();
     fs::write(tmp.path().join("photo.jpg"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:picture").unwrap();
     assert_eq!(
@@ -890,7 +890,7 @@ fn test_type_filter_mixed_case_extensions() {
     fs::write(tmp.path().join("photo3.jPg"), b"x").unwrap();
     fs::write(tmp.path().join("photo4.jpg"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:picture").unwrap();
     assert_eq!(results.len(), 4, "Should handle all case variations");
@@ -901,7 +901,7 @@ fn test_multiple_type_filters_intersection() {
     let tmp = TempDir::new("multi_type_intersect").unwrap();
     fs::write(tmp.path().join("file.jpg"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // A file can't be both audio and video, so intersection should be empty
     let results = cache.search("type:audio type:video").unwrap();
@@ -913,7 +913,7 @@ fn test_type_filter_uppercase_category_names() {
     let tmp = TempDir::new("type_uppercase").unwrap();
     fs::write(tmp.path().join("photo.jpg"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:PICTURE").unwrap();
     assert_eq!(results.len(), 1);
@@ -928,7 +928,7 @@ fn test_type_code_with_dot_prefixed_files() {
     fs::write(tmp.path().join(".gitignore"), b"x").unwrap();
     fs::write(tmp.path().join("main.rs"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:code").unwrap();
     assert_eq!(results.len(), 1, "Should match main.rs");
@@ -941,7 +941,7 @@ fn test_type_archive_with_nested_structure() {
     fs::write(tmp.path().join("archive.zip"), b"x").unwrap();
     fs::write(tmp.path().join("backups/backup.tar.gz"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:archive").unwrap();
     // Note: .tar.gz might be recognized as .gz extension
@@ -961,7 +961,7 @@ fn test_type_executable_cross_platform() {
     fs::write(tmp.path().join("Calculator.app"), b"x").unwrap();
     fs::write(tmp.path().join("installer.pkg"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:executable").unwrap();
     assert_eq!(results.len(), 6);
@@ -973,7 +973,7 @@ fn test_type_spreadsheet_csv_special_case() {
     fs::write(tmp.path().join("data.csv"), b"x").unwrap();
     fs::write(tmp.path().join("sheet.xlsx"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:spreadsheet").unwrap();
     assert_eq!(results.len(), 2, "CSV should be included in spreadsheets");
@@ -988,7 +988,7 @@ fn test_type_filter_performance_many_files() {
         fs::write(tmp.path().join(format!("file_{i}.{ext}")), b"x").unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:picture").unwrap();
     assert!(!results.is_empty());
@@ -1000,7 +1000,7 @@ fn test_type_with_extension_that_matches_multiple_categories() {
     // PDF is in multiple categories potentially
     fs::write(tmp.path().join("document.pdf"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let doc = cache.search("type:doc").unwrap();
     assert!(!doc.is_empty());
@@ -1016,7 +1016,7 @@ fn test_type_filter_with_multiple_dots_in_filename() {
     fs::write(tmp.path().join("backup.tar.bz2"), b"x").unwrap();
     fs::write(tmp.path().join("file.min.js"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Should match based on final extension
     let archives = cache.search("type:archive").unwrap();
@@ -1037,7 +1037,7 @@ fn test_type_filter_all_picture_formats() {
         fs::write(tmp.path().join(format!("image.{ext}")), b"x").unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:picture").unwrap();
     assert_eq!(results.len(), picture_exts.len());
@@ -1054,7 +1054,7 @@ fn test_type_filter_all_video_formats() {
         fs::write(tmp.path().join(format!("video.{ext}")), b"x").unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:video").unwrap();
     assert_eq!(results.len(), video_exts.len());
@@ -1070,7 +1070,7 @@ fn test_type_filter_all_audio_formats() {
         fs::write(tmp.path().join(format!("audio.{ext}")), b"x").unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:audio").unwrap();
     assert_eq!(results.len(), audio_exts.len());
@@ -1086,7 +1086,7 @@ fn test_type_filter_all_archive_formats() {
         fs::write(tmp.path().join(format!("archive.{ext}")), b"x").unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:archive").unwrap();
     assert_eq!(results.len(), archive_exts.len());
@@ -1117,7 +1117,7 @@ fn test_type_code_comprehensive_languages() {
     fs::write(tmp.path().join("config.json"), b"x").unwrap();
     fs::write(tmp.path().join("data.yaml"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:code").unwrap();
     assert_eq!(results.len(), 13);
@@ -1131,7 +1131,7 @@ fn test_type_with_uncommon_extensions() {
     fs::write(tmp.path().join("audio.opus"), b"x").unwrap();
     fs::write(tmp.path().join("archive.zst"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let pictures = cache.search("type:picture").unwrap();
     assert_eq!(pictures.len(), 1);
@@ -1150,7 +1150,7 @@ fn test_type_filter_special_characters_in_names() {
     fs::write(tmp.path().join("song [remix].mp3"), b"x").unwrap();
     fs::write(tmp.path().join("doc & notes.pdf"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let pictures = cache.search("type:picture").unwrap();
     assert_eq!(pictures.len(), 1);
@@ -1167,7 +1167,7 @@ fn test_type_macros_accept_arguments_as_filters() {
     let tmp = TempDir::new("macro_with_args").unwrap();
     fs::write(tmp.path().join("file_match.mp3"), b"x").unwrap();
     fs::write(tmp.path().join("file_skip.mp3"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("audio:match").unwrap();
     assert_eq!(results.len(), 1);
@@ -1182,7 +1182,7 @@ fn test_type_filter_with_wildcard_name() {
     fs::write(tmp.path().join("photo_002.jpg"), b"x").unwrap();
     fs::write(tmp.path().join("image_003.jpg"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("photo* type:picture").unwrap();
     assert_eq!(results.len(), 2);
@@ -1199,7 +1199,7 @@ fn test_type_filter_mixed_categories() {
     fs::write(tmp.path().join("f.exe"), b"x").unwrap();
     fs::write(tmp.path().join("g.rs"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let picture = cache.search("type:picture").unwrap();
     assert_eq!(picture.len(), 1);
@@ -1230,7 +1230,7 @@ fn test_type_filter_negation_complex() {
     fs::write(tmp.path().join("video.mp4"), b"x").unwrap();
     fs::write(tmp.path().join("doc.txt"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("!type:picture !type:video").unwrap();
     let has_image = results.iter().any(|&i| {
@@ -1256,7 +1256,7 @@ fn test_type_and_size_with_grouping() {
     fs::write(tmp.path().join("large_video.mp4"), vec![0u8; 100_000]).unwrap();
     fs::write(tmp.path().join("small_video.mp4"), vec![0u8; 1_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache
         .search("(type:picture OR type:video) size:>10kb")
@@ -1271,7 +1271,7 @@ fn test_multiple_ext_and_type_filter() {
     fs::write(tmp.path().join("graphic.png"), b"x").unwrap();
     fs::write(tmp.path().join("document.txt"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // ext: and type: should intersect
     let results = cache.search("ext:jpg;png type:picture").unwrap();
@@ -1285,7 +1285,7 @@ fn test_type_filter_unicode_filenames() {
     fs::write(tmp.path().join("音乐.mp3"), b"x").unwrap();
     fs::write(tmp.path().join("文档.pdf"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let pictures = cache.search("type:picture").unwrap();
     assert_eq!(pictures.len(), 1);
@@ -1302,7 +1302,7 @@ fn test_type_folder_with_size_error() {
     let tmp = TempDir::new("type_folder_size").unwrap();
     fs::create_dir(tmp.path().join("folder")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // size: only applies to files, so folders should be excluded
     let results = cache.search("type:folder size:>0").unwrap();
@@ -1315,7 +1315,7 @@ fn test_type_file_basic() {
     fs::write(tmp.path().join("file.txt"), b"x").unwrap();
     fs::create_dir(tmp.path().join("folder")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:file").unwrap();
     assert_eq!(results.len(), 1);
@@ -1330,7 +1330,7 @@ fn test_type_with_hidden_files() {
     fs::write(tmp.path().join(".hidden.jpg"), b"x").unwrap();
     fs::write(tmp.path().join("visible.jpg"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:picture").unwrap();
     assert_eq!(results.len(), 2, "Should match hidden files too");
@@ -1341,7 +1341,7 @@ fn test_type_all_alternate_names() {
     let tmp = TempDir::new("type_alt_names").unwrap();
     fs::write(tmp.path().join("image.jpg"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Test all alternate names for pictures
     assert_eq!(cache.search("type:picture").unwrap().len(), 1);
@@ -1357,7 +1357,7 @@ fn test_type_with_repeated_filters() {
     let tmp = TempDir::new("type_repeated").unwrap();
     fs::write(tmp.path().join("photo.jpg"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Same type filter repeated should still work
     let results = cache.search("type:picture type:picture").unwrap();
@@ -1371,7 +1371,7 @@ fn test_type_extensions_case_normalization() {
     fs::write(tmp.path().join("photo2.JpG"), b"x").unwrap();
     fs::write(tmp.path().join("photo3.jpg"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:picture").unwrap();
     assert_eq!(
@@ -1387,7 +1387,7 @@ fn test_type_empty_extension() {
     fs::write(tmp.path().join("file."), b"x").unwrap();
     fs::write(tmp.path().join("normal.jpg"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:picture").unwrap();
     assert_eq!(
@@ -1404,7 +1404,7 @@ fn test_type_multiple_extensions_in_filename() {
     fs::write(tmp.path().join("backup.tar.bz2"), b"x").unwrap();
     fs::write(tmp.path().join("data.json.backup"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Should match based on final extension
     let gz = cache.search("type:archive").unwrap();
@@ -1417,7 +1417,7 @@ fn test_type_and_ext_filter_conflict() {
     fs::write(tmp.path().join("photo.jpg"), b"x").unwrap();
     fs::write(tmp.path().join("document.pdf"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // type:picture AND ext:pdf should give empty result
     let results = cache.search("type:picture ext:pdf").unwrap();
@@ -1432,7 +1432,7 @@ fn test_type_code_config_files() {
     fs::write(tmp.path().join("Cargo.toml"), b"x").unwrap();
     fs::write(tmp.path().join("setup.ini"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:code").unwrap();
     assert_eq!(
@@ -1450,7 +1450,7 @@ fn test_type_presentation_all_formats() {
     fs::write(tmp.path().join("keynote.key"), b"x").unwrap();
     fs::write(tmp.path().join("present.odp"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:presentation").unwrap();
     assert_eq!(results.len(), 4);
@@ -1461,7 +1461,7 @@ fn test_type_macros_case_insensitive() {
     let tmp = TempDir::new("macro_case").unwrap();
     fs::write(tmp.path().join("song.mp3"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let lower = cache.search("audio:").unwrap();
     assert_eq!(lower.len(), 1);
@@ -1479,7 +1479,7 @@ fn test_type_file_and_folder_together() {
     fs::write(tmp.path().join("file.txt"), b"x").unwrap();
     fs::create_dir(tmp.path().join("folder")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // file OR folder should return both
     let results = cache.search("type:file OR type:folder").unwrap();
@@ -1493,7 +1493,7 @@ fn test_type_with_no_extension_edge_case() {
     fs::write(tmp.path().join("README"), b"x").unwrap();
     fs::write(tmp.path().join("LICENSE"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // These files have no extensions, so type filters shouldn't match them
     let results = cache.search("type:doc").unwrap();
@@ -1511,7 +1511,7 @@ fn test_type_picture_raw_formats() {
     fs::write(tmp.path().join("olympus.orf"), b"x").unwrap();
     fs::write(tmp.path().join("fuji.raf"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:picture").unwrap();
     assert_eq!(results.len(), 4, "RAW formats should be recognized");
@@ -1523,7 +1523,7 @@ fn test_type_video_mobile_formats() {
     fs::write(tmp.path().join("video.3gp"), b"x").unwrap();
     fs::write(tmp.path().join("video.3g2"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:video").unwrap();
     assert_eq!(results.len(), 2);
@@ -1538,7 +1538,7 @@ fn test_type_spreadsheet_all_variants() {
     fs::write(tmp.path().join("apple.numbers"), b"x").unwrap();
     fs::write(tmp.path().join("open.ods"), b"x").unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("type:spreadsheet").unwrap();
     assert_eq!(results.len(), 5);

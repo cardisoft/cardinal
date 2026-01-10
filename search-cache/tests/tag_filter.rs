@@ -3,10 +3,7 @@
 use plist::{Value, to_writer_binary};
 use search_cache::{SearchCache, SearchOptions, SlabIndex};
 use search_cancel::CancellationToken;
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 use tempdir::TempDir;
 use xattr::set;
 
@@ -36,7 +33,7 @@ fn tag_filter_requires_value() {
     fs::write(dir.join("file.txt"), b"dummy").unwrap();
     write_tags(&dir.join("file.txt"), &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let result = cache.search_with_options(
         r#"tag:"""#,
         SearchOptions::default(),
@@ -64,7 +61,7 @@ fn tag_filter_matches_case_insensitive() {
     fs::write(&second, b"dummy").unwrap();
     write_tags(&second, &["Archive"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:project",
         SearchOptions {
@@ -90,7 +87,7 @@ fn tag_filter_matches_substring() {
     fs::write(&second, b"dummy").unwrap();
     write_tags(&second, &["Archive"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Alpha",
         SearchOptions {
@@ -116,7 +113,7 @@ fn tag_filter_accepts_semicolon_list_matches_any() {
     fs::write(&second, b"dummy").unwrap();
     write_tags(&second, &["Important"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Alpha;Important",
         SearchOptions::default(),
@@ -138,7 +135,7 @@ fn tag_filter_case_sensitive_exact_match() {
     fs::write(&second, b"dummy").unwrap();
     write_tags(&second, &["project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project",
         SearchOptions {
@@ -168,7 +165,7 @@ fn tag_filter_case_insensitive_matches_both() {
     fs::write(&third, b"dummy").unwrap();
     write_tags(&third, &["PROJECT"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:project",
         SearchOptions {
@@ -188,7 +185,7 @@ fn tag_filter_substring_at_start() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Important-Task"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Import",
         SearchOptions::default(),
@@ -206,7 +203,7 @@ fn tag_filter_substring_at_end() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Important-Task"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Task",
         SearchOptions::default(),
@@ -224,7 +221,7 @@ fn tag_filter_substring_in_middle() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project-Alpha-2024"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Alpha",
         SearchOptions::default(),
@@ -250,7 +247,7 @@ fn tag_filter_multiple_tags_and_logic() {
     fs::write(&third, b"dummy").unwrap();
     write_tags(&third, &["Important"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project tag:Important",
         SearchOptions::default(),
@@ -274,7 +271,7 @@ fn tag_filter_three_tags_and_logic() {
     fs::write(&second, b"dummy").unwrap();
     write_tags(&second, &["Project", "Important"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project tag:Important tag:Urgent",
         SearchOptions::default(),
@@ -302,7 +299,7 @@ fn tag_filter_or_logic() {
     fs::write(&third, b"dummy").unwrap();
     write_tags(&third, &["Archive"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project | tag:Important",
         SearchOptions::default(),
@@ -331,7 +328,7 @@ fn tag_filter_with_not_operator() {
     let fourth = dir.join("fourth.txt");
     fs::write(&fourth, b"dummy").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "!tag:Archive",
         SearchOptions::default(),
@@ -350,7 +347,7 @@ fn tag_filter_empty_tag_argument() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let result =
         cache.search_with_options("tag:", SearchOptions::default(), CancellationToken::noop());
     assert!(result.is_err());
@@ -371,7 +368,7 @@ fn tag_filter_whitespace_only_argument() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let result = cache.search_with_options(
         "tag:   ",
         SearchOptions::default(),
@@ -395,7 +392,7 @@ fn tag_filter_quoted_with_whitespace() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project Alpha"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         r#"tag:"Project Alpha""#,
         SearchOptions::default(),
@@ -413,7 +410,7 @@ fn tag_filter_no_match() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Nonexistent",
         SearchOptions::default(),
@@ -430,7 +427,7 @@ fn tag_filter_file_with_no_tags() {
     let first = dir.join("first.txt");
     fs::write(&first, b"dummy").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project",
         SearchOptions::default(),
@@ -448,7 +445,7 @@ fn tag_filter_file_with_multiple_tags() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project", "Important", "Urgent", "Q4"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Important",
         SearchOptions::default(),
@@ -466,7 +463,7 @@ fn tag_filter_unicode_tag_name() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["项目", "重要"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:项目",
         SearchOptions::default(),
@@ -484,7 +481,7 @@ fn tag_filter_emoji_in_tag() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["🔴Important", "⭐Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:🔴",
         SearchOptions::default(),
@@ -502,7 +499,7 @@ fn tag_filter_special_characters() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project-2024", "To-Do", "Work/Personal"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project-2024",
         SearchOptions::default(),
@@ -520,7 +517,7 @@ fn tag_filter_with_hyphen() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Work-In-Progress"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Work-In-Progress",
         SearchOptions::default(),
@@ -538,7 +535,7 @@ fn tag_filter_with_numbers() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Q4-2024", "Priority1"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:2024",
         SearchOptions::default(),
@@ -560,7 +557,7 @@ fn tag_filter_combined_with_word_search() {
     fs::write(&second, b"dummy").unwrap();
     write_tags(&second, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project report",
         SearchOptions::default(),
@@ -584,7 +581,7 @@ fn tag_filter_combined_with_ext_filter() {
     fs::write(&second, b"dummy").unwrap();
     write_tags(&second, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project ext:txt",
         SearchOptions::default(),
@@ -608,7 +605,7 @@ fn tag_filter_combined_with_type_filter() {
     fs::create_dir(&second).unwrap();
     write_tags(&second, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project type:file",
         SearchOptions::default(),
@@ -636,7 +633,7 @@ fn tag_filter_nested_boolean_logic() {
     fs::write(&third, b"dummy").unwrap();
     write_tags(&third, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "(tag:Project | tag:Archive) tag:Important",
         SearchOptions::default(),
@@ -654,7 +651,7 @@ fn tag_filter_quoted_tag_name() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Q4 Report"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         r#"tag:"Q4 Report""#,
         SearchOptions::default(),
@@ -672,7 +669,7 @@ fn tag_filter_partial_quoted_match() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Q4 Report 2024"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         r#"tag:"Q4 Report""#,
         SearchOptions::default(),
@@ -693,7 +690,7 @@ fn tag_filter_tags_on_directory() {
     let file = subdir.join("file.txt");
     fs::write(&file, b"dummy").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Important",
         SearchOptions::default(),
@@ -721,7 +718,7 @@ fn tag_filter_mixed_files_and_directories() {
     fs::write(&file2, b"dummy").unwrap();
     write_tags(&file2, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project",
         SearchOptions::default(),
@@ -743,7 +740,7 @@ fn tag_filter_with_wildcard_in_filename() {
     fs::write(&second, b"dummy").unwrap();
     write_tags(&second, &["Archive"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project report-*.txt",
         SearchOptions::default(),
@@ -763,7 +760,7 @@ fn tag_filter_single_character_tag() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["A", "B"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:A",
         SearchOptions::default(),
@@ -775,7 +772,7 @@ fn tag_filter_single_character_tag() {
 #[test]
 #[ignore = "This test is slow and should be run manually when needed"]
 fn tag_mdfind_speed() {
-    let mut cache = SearchCache::walk_fs(PathBuf::from("/"));
+    let mut cache = SearchCache::walk_fs(Path::new("/"));
     let now = std::time::Instant::now();
     guard_indices(cache.search_with_options(
         "tag:A",
@@ -798,7 +795,7 @@ fn tag_filter_very_long_tag_name() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &[long_tag]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         &format!("tag:{long_tag}"),
         SearchOptions::default(),
@@ -820,7 +817,7 @@ fn tag_filter_case_sensitive_substring() {
     fs::write(&second, b"dummy").unwrap();
     write_tags(&second, &["projectalpha"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Alpha",
         SearchOptions {
@@ -842,7 +839,7 @@ fn tag_filter_duplicate_tag_filters_and() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project tag:Project",
         SearchOptions::default(),
@@ -860,7 +857,7 @@ fn tag_filter_mixed_case_in_query() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:PrOjEcT",
         SearchOptions {
@@ -886,7 +883,7 @@ fn tag_filter_performance_many_files() {
         }
     }
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project",
         SearchOptions::default(),
@@ -904,7 +901,7 @@ fn tag_filter_list_with_empty_items() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // List with empty items should be filtered out
     let result = cache.search_with_options(
         "tag:Project;;Important",
@@ -924,7 +921,7 @@ fn tag_filter_list_with_whitespace_items() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // Parser treats "tag: Project ; Important " with spaces around semicolons as bare argument
     // containing the whole string including semicolons
     let indices = guard_indices(cache.search_with_options(
@@ -945,7 +942,7 @@ fn tag_filter_list_all_empty_items() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let result = cache.search_with_options(
         "tag: ; ; ",
         SearchOptions::default(),
@@ -969,7 +966,7 @@ fn tag_filter_list_duplicate_tags() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project;Project;Project",
         SearchOptions::default(),
@@ -988,7 +985,7 @@ fn tag_filter_list_case_insensitive_duplicates() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project;project;PROJECT",
         SearchOptions {
@@ -1011,7 +1008,7 @@ fn tag_filter_list_very_long() {
         write_tags(&file, &[&format!("Tag{i}")]);
     }
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // Create a list with 50 tags
     let tag_list: String = (0..50)
         .map(|i| format!("Tag{i}"))
@@ -1036,7 +1033,7 @@ fn tag_filter_list_with_single_item() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // Semicolon is a delimiter in the parser, so 'tag:Project;' becomes 'tag:Project'
     // as a bare argument (the trailing semicolon is not part of the value)
     let indices = guard_indices(cache.search_with_options(
@@ -1056,7 +1053,7 @@ fn tag_filter_range_syntax_rejected() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let result = cache.search_with_options(
         "tag:1..10",
         SearchOptions::default(),
@@ -1080,7 +1077,7 @@ fn tag_filter_comparison_syntax_rejected() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let result = cache.search_with_options(
         "tag:>5",
         SearchOptions::default(),
@@ -1099,7 +1096,7 @@ fn tag_filter_forbidden_char_single_quote() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let _result = cache.search_with_options(
         "tag:Project'Alpha",
         SearchOptions::default(),
@@ -1126,7 +1123,7 @@ fn tag_filter_forbidden_char_backslash() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let _result = cache.search_with_options(
         "type:file tag:Project\\Alpha",
         SearchOptions::default(),
@@ -1144,7 +1141,7 @@ fn tag_filter_forbidden_char_asterisk() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let _result = cache.search_with_options(
         "type:file tag:Project*",
         SearchOptions::default(),
@@ -1162,7 +1159,7 @@ fn tag_filter_list_with_forbidden_char_in_one_item() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let _result = cache.search_with_options(
         "type:file tag:ValidTag;Invalid'Tag",
         SearchOptions::default(),
@@ -1187,7 +1184,7 @@ fn tag_filter_combines_with_folder_filter() {
     fs::write(&file2, b"dummy").unwrap();
     write_tags(&file2, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         &format!("tag:Project parent:{}", subdir.display()),
         SearchOptions::default(),
@@ -1211,7 +1208,7 @@ fn tag_filter_partial_match_at_word_boundary() {
     fs::write(&second, b"dummy").unwrap();
     write_tags(&second, &["Teamwork"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:work",
         SearchOptions {
@@ -1232,7 +1229,7 @@ fn tag_filter_empty_list_after_normalization() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let result = cache.search_with_options(
         "tag: ; ; ; ",
         SearchOptions::default(),
@@ -1256,7 +1253,7 @@ fn tag_filter_list_case_sensitive_no_match() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project;Important",
         SearchOptions {
@@ -1277,7 +1274,7 @@ fn tag_filter_list_case_insensitive_match() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project;Important",
         SearchOptions {
@@ -1305,7 +1302,7 @@ fn tag_filter_three_way_or_with_list() {
     fs::write(&third, b"dummy").unwrap();
     write_tags(&third, &["Gamma"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Alpha;Beta;Gamma",
         SearchOptions::default(),
@@ -1331,7 +1328,7 @@ fn tag_filter_list_combined_with_and_logic() {
     fs::write(&third, b"dummy").unwrap();
     write_tags(&third, &["Important"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // List for OR: (Project OR Archive) AND Important
     let indices = guard_indices(cache.search_with_options(
         "tag:Project;Archive tag:Important",
@@ -1359,7 +1356,7 @@ fn tag_filter_deeply_nested_subdirectory() {
     fs::write(&file, b"dummy").unwrap();
     write_tags(&file, &["DeepTag"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:DeepTag",
         SearchOptions::default(),
@@ -1382,7 +1379,7 @@ fn tag_filter_symlink_with_tags() {
     let link = dir.join("link.txt");
     symlink(&target, &link).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:TargetTag",
         SearchOptions::default(),
@@ -1405,7 +1402,7 @@ fn tag_filter_with_size_filter() {
     fs::write(&large, [0u8; 1024]).unwrap();
     write_tags(&large, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project size:<100",
         SearchOptions::default(),
@@ -1425,7 +1422,7 @@ fn tag_filter_with_date_filter() {
     fs::write(&file, b"dummy").unwrap();
     write_tags(&file, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project dm:today",
         SearchOptions::default(),
@@ -1448,7 +1445,7 @@ fn tag_filter_list_with_content_search() {
     fs::write(&second, b"goodbye world").unwrap();
     write_tags(&second, &["Important"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project;Important content:hello",
         SearchOptions::default(),
@@ -1475,7 +1472,7 @@ fn tag_filter_small_base_uses_metadata() {
         }
     }
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // With small base, should use metadata path (read xattr for each file)
     let indices = guard_indices(cache.search_with_options(
         "tag:Even",
@@ -1501,7 +1498,7 @@ fn tag_filter_with_explicit_base() {
     fs::write(&file2, b"dummy").unwrap();
     write_tags(&file2, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // First narrow to subdir, then apply tag filter
     let indices = guard_indices(cache.search_with_options(
         &format!("infolder:{} tag:Project", subdir.display()),
@@ -1529,7 +1526,7 @@ fn tag_filter_no_base_matches_all_tagged_files() {
     fs::write(&file2, b"dummy").unwrap();
     write_tags(&file2, &["Global"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // No base, should search entire index
     let indices = guard_indices(cache.search_with_options(
         "tag:Global",
@@ -1556,7 +1553,7 @@ fn tag_filter_handles_corrupted_xattr() {
     )
     .unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Project",
         SearchOptions::default(),
@@ -1579,7 +1576,7 @@ fn tag_filter_exact_tag_name_no_substring() {
     fs::write(&second, b"dummy").unwrap();
     write_tags(&second, &["Project"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Proj",
         SearchOptions::default(),
@@ -1606,7 +1603,7 @@ fn tag_filter_list_matches_any_not_all() {
     fs::write(&third, b"dummy").unwrap();
     write_tags(&third, &["Gamma"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Alpha;Beta",
         SearchOptions::default(),
@@ -1633,7 +1630,7 @@ fn tag_filter_combined_list_and_separate_filters() {
     fs::write(&third, b"dummy").unwrap();
     write_tags(&third, &["Gamma"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // (Alpha OR Beta) AND Common
     let indices = guard_indices(cache.search_with_options(
         "tag:Alpha;Beta tag:Common",
@@ -1663,7 +1660,7 @@ fn tag_filter_negation_with_list() {
     let fourth = dir.join("fourth.txt");
     fs::write(&fourth, b"dummy").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // NOT (Alpha OR Beta) - should match Gamma and untagged
     let indices = guard_indices(cache.search_with_options(
         "!tag:Alpha;Beta type:file",
@@ -1683,7 +1680,7 @@ fn tag_filter_handles_special_filesystem_chars() {
     fs::write(&file, b"dummy").unwrap();
     write_tags(&file, &["Tag/With/Slash", "Tag:With:Colon"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Slash",
         SearchOptions::default(),
@@ -1701,7 +1698,7 @@ fn tag_filter_leading_trailing_whitespace_in_list() {
     fs::write(&first, b"dummy").unwrap();
     write_tags(&first, &["Alpha"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // Use compact semicolon without spaces to get list parsing
     let indices = guard_indices(cache.search_with_options(
         "tag:Alpha;Beta",
@@ -1733,7 +1730,7 @@ fn tag_filter_or_operator_with_lists() {
     fs::write(&fourth, b"dummy").unwrap();
     write_tags(&fourth, &["Delta"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // (Alpha OR Beta) OR (Gamma OR Delta) - should match all
     let indices = guard_indices(cache.search_with_options(
         "tag:Alpha;Beta | tag:Gamma;Delta",
@@ -1752,7 +1749,7 @@ fn tag_filter_number_only_tag() {
     fs::write(&file, b"dummy").unwrap();
     write_tags(&file, &["2024", "123"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:2024",
         SearchOptions::default(),
@@ -1770,7 +1767,7 @@ fn tag_filter_dot_in_tag_name() {
     fs::write(&file, b"dummy").unwrap();
     write_tags(&file, &["v1.0.0", "config.prod"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:v1.0.0",
         SearchOptions::default(),
@@ -1788,7 +1785,7 @@ fn tag_filter_parentheses_in_tag_name() {
     fs::write(&file, b"dummy").unwrap();
     write_tags(&file, &["Project (2024)", "Todo (urgent)"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:2024",
         SearchOptions::default(),
@@ -1806,7 +1803,7 @@ fn tag_filter_brackets_in_tag_name() {
     fs::write(&file, b"dummy").unwrap();
     write_tags(&file, &["[Important]", "Status[Active]"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Important",
         SearchOptions::default(),
@@ -1824,7 +1821,7 @@ fn tag_filter_ampersand_in_tag_name() {
     fs::write(&file, b"dummy").unwrap();
     write_tags(&file, &["R&D", "Design & Development"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:R&D",
         SearchOptions::default(),
@@ -1842,7 +1839,7 @@ fn tag_filter_percent_in_tag_name() {
     fs::write(&file, b"dummy").unwrap();
     write_tags(&file, &["100%", "50% Complete"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:100%",
         SearchOptions::default(),
@@ -1860,7 +1857,7 @@ fn tag_filter_at_sign_in_tag_name() {
     fs::write(&file, b"dummy").unwrap();
     write_tags(&file, &["@important", "Contact@Work"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:@important",
         SearchOptions::default(),
@@ -1878,7 +1875,7 @@ fn tag_filter_hash_in_tag_name() {
     fs::write(&file, b"dummy").unwrap();
     write_tags(&file, &["#important", "Issue#123"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:#important",
         SearchOptions::default(),
@@ -1896,7 +1893,7 @@ fn tag_filter_plus_in_tag_name() {
     fs::write(&file, b"dummy").unwrap();
     write_tags(&file, &["C++", "Priority+"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:C++",
         SearchOptions::default(),
@@ -1914,7 +1911,7 @@ fn tag_filter_equals_in_tag_name() {
     fs::write(&file, b"dummy").unwrap();
     write_tags(&file, &["Status=Active", "Priority=High"]);
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "tag:Status=Active",
         SearchOptions::default(),
@@ -1935,7 +1932,7 @@ fn tag_filter_list_with_100_items() {
         write_tags(&file, &[&format!("Tag{i}")]);
     }
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // Create list with all 100 tags
     let tag_list = (0..100)
         .map(|i| format!("Tag{i}"))

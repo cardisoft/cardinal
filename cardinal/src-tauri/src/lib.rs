@@ -219,12 +219,9 @@ fn run_logic_thread(
     let path = PathBuf::from(WATCH_ROOT);
     let ignore_paths = vec![PathBuf::from("/System/Volumes/Data")];
 
-    let mut cache = match SearchCache::try_read_persistent_cache(
-        &path,
-        db_path,
-        Some(ignore_paths.clone()),
-        Some(&APP_QUIT),
-    ) {
+    let mut cache =
+        match SearchCache::try_read_persistent_cache(&path, db_path, &ignore_paths, Some(&APP_QUIT))
+        {
         Ok(cached) => {
             info!("Loaded existing cache");
             emit_status_bar_update(app_handle, cached.get_total_files(), 0, 0);
@@ -232,7 +229,7 @@ fn run_logic_thread(
         }
         Err(e) => {
             info!("Walking filesystem: {:?}", e);
-            let walk_data = WalkData::new(Some(ignore_paths.clone()), false, Some(&APP_QUIT));
+            let walk_data = WalkData::new(&path, &ignore_paths, false, Some(&APP_QUIT));
             let walking_done = AtomicBool::new(false);
             let cache = std::thread::scope(|s| {
                 s.spawn(|| {
@@ -244,12 +241,7 @@ fn run_logic_thread(
                         std::thread::sleep(Duration::from_millis(100));
                     }
                 });
-                let cache = SearchCache::walk_fs_with_walk_data(
-                    path.clone(),
-                    &walk_data,
-                    Some(ignore_paths.clone()),
-                    Some(&APP_QUIT),
-                );
+                let cache = SearchCache::walk_fs_with_walk_data(&walk_data, Some(&APP_QUIT));
 
                 walking_done.store(true, Ordering::Relaxed);
                 cache

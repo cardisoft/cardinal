@@ -9,7 +9,7 @@ fn test_date_filters_cover_keywords_and_ranges() {
     fs::write(tmp.path().join("recent.txt"), b"x").unwrap();
     fs::write(tmp.path().join("old.txt"), b"x").unwrap();
     fs::write(tmp.path().join("very_old.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let recent_idx = cache.search("recent.txt").unwrap()[0];
     let old_idx = cache.search("old.txt").unwrap()[0];
@@ -51,7 +51,7 @@ fn date_filter_reuses_existing_and_base() {
     let tmp = TempDir::new("date_filter_base").unwrap();
     fs::write(tmp.path().join("keep.txt"), b"x").unwrap();
     fs::write(tmp.path().join("skip.bin"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let keep_idx = cache.search("keep.txt").unwrap()[0];
     let skip_idx = cache.search("skip.bin").unwrap()[0];

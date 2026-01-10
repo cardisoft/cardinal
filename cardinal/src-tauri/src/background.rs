@@ -296,7 +296,9 @@ fn perform_rescan(
     *rescan_errors = 0;
     reset_status_bar(app_handle);
 
-    let walk_data = cache.walk_data();
+    let mut walk_root = PathBuf::new();
+    let mut walk_ignore = Vec::new();
+    let walk_data = cache.walk_data(&mut walk_root, &mut walk_ignore);
     let walking_done = AtomicBool::new(false);
     let stopped = std::thread::scope(|s| {
         s.spawn(|| {

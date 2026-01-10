@@ -20,7 +20,7 @@ fn build_initial_cache(files: &[&str]) -> (SearchCache, PathBuf) {
         std::fs::File::create(full).unwrap();
     }
 
-    let cache = SearchCache::walk_fs(root_path.clone());
+    let cache = SearchCache::walk_fs(&root_path);
     (cache, root_path)
 }
 
@@ -455,7 +455,8 @@ fn test_events_for_ignored_paths() {
     let ignored_dir = root_path.join("ignored");
     std::fs::create_dir(&ignored_dir).unwrap();
 
-    let mut cache = SearchCache::walk_fs_with_ignore(root_path.clone(), vec![ignored_dir.clone()]);
+    let ignore_paths = vec![ignored_dir.clone()];
+    let mut cache = SearchCache::walk_fs_with_ignore(&root_path, &ignore_paths);
 
     // Create file in ignored directory
     let ignored_file = ignored_dir.join("should_not_index.txt");

@@ -19,7 +19,7 @@ fn single_segment_wildcard_complex_pattern_case_sensitive() {
     fs::File::create(dir.join("bar_alpha.txt")).unwrap();
     fs::File::create(dir.join("Foo_ALPHA_Bar.TXT")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -40,7 +40,7 @@ fn single_segment_wildcard_complex_pattern_case_insensitive() {
     fs::File::create(dir.join("foobar_bar.txt")).unwrap();
     fs::File::create(dir.join("FooBar_bar.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: true,
     };
@@ -63,7 +63,7 @@ fn leading_wildcard_matches_suffix() {
     fs::File::create(dir.join("beta.txt")).unwrap();
     fs::File::create(dir.join("alpha.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -83,7 +83,7 @@ fn trailing_wildcard_matches_prefix() {
     fs::File::create(dir.join("alpha.txt")).unwrap();
     fs::File::create(dir.join("gamma_alpha.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -104,7 +104,7 @@ fn question_mark_single_character() {
     fs::File::create(dir.join("file2.txt")).unwrap();
     fs::File::create(dir.join("file10.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -125,7 +125,7 @@ fn star_only_matches_all_files() {
     fs::File::create(dir.join("two.txt")).unwrap();
     fs::File::create(dir.join("three.log")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -153,7 +153,7 @@ fn multi_segment_wildcard_intersection_case_sensitive() {
     fs::File::create(dir.join("alpha.txt")).unwrap();
     fs::File::create(dir.join("beta.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -181,7 +181,7 @@ fn multi_segment_wildcard_intersection_case_insensitive() {
     fs::File::create(dir.join("alpha_beta.txt")).unwrap();
     fs::File::create(dir.join("alphaGamma_beta.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: true,
     };
@@ -208,7 +208,7 @@ fn complex_mixed_wildcards_and_question_mark() {
     fs::File::create(dir.join("a_b_cx.txt")).unwrap();
     fs::File::create(dir.join("abYYc.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };

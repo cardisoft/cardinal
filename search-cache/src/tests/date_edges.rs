@@ -12,7 +12,7 @@ fn explicit_range_instead_of_open_range() {
     fs::write(tmp.path().join("a.txt"), b"x").unwrap();
     fs::write(tmp.path().join("b.txt"), b"x").unwrap();
     fs::write(tmp.path().join("c.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let a = cache.search("a.txt").unwrap()[0];
     let b = cache.search("b.txt").unwrap()[0];
     let c = cache.search("c.txt").unwrap()[0];
@@ -57,7 +57,7 @@ fn explicit_range_instead_of_open_range() {
 fn leap_day_query() {
     let tmp = TempDir::new("leap_day").unwrap();
     fs::write(tmp.path().join("leap.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let leap = cache.search("leap.txt").unwrap()[0];
     set_file_times(
         &mut cache,
@@ -76,7 +76,7 @@ fn dual_format_distinct_dates() {
     let tmp = TempDir::new("dual_formats").unwrap();
     fs::write(tmp.path().join("fmt_dd_mm.txt"), b"x").unwrap();
     fs::write(tmp.path().join("fmt_mm_dd.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let dd_idx = cache.search("fmt_dd_mm.txt").unwrap()[0];
     let mm_idx = cache.search("fmt_mm_dd.txt").unwrap()[0];
     // 02-03-2024 -> 2 Mar 2024; 03-02-2024 -> 3 Feb 2024
@@ -119,7 +119,7 @@ fn boolean_or_between_dm_and_dc() {
     let tmp = TempDir::new("boolean_dm_dc").unwrap();
     fs::write(tmp.path().join("created.txt"), b"x").unwrap();
     fs::write(tmp.path().join("modified.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let created_idx = cache.search("created.txt").unwrap()[0];
     let modified_idx = cache.search("modified.txt").unwrap()[0];
     let zoned_now = Timestamp::now().to_zoned(jiff::tz::TimeZone::system());
@@ -148,7 +148,7 @@ fn boolean_or_between_dm_and_dc() {
 fn boolean_and_intersection() {
     let tmp = TempDir::new("boolean_and_intersection").unwrap();
     fs::write(tmp.path().join("weekly.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let idx = cache.search("weekly.txt").unwrap()[0];
     let tz = jiff::tz::TimeZone::system();
     let zoned_now = Timestamp::now().to_zoned(tz.clone());
@@ -180,7 +180,7 @@ fn boolean_and_intersection() {
 fn single_point_range_equivalence() {
     let tmp = TempDir::new("single_point_range").unwrap();
     fs::write(tmp.path().join("point.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let idx = cache.search("point.txt").unwrap()[0];
     set_file_times(
         &mut cache,

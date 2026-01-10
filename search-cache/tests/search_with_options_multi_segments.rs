@@ -20,7 +20,7 @@ fn and_space_multi_segments_basic() {
     fs::File::create(dir.join("alpha.txt")).unwrap();
     fs::File::create(dir.join("beta.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -45,7 +45,7 @@ fn or_operator_multi_segments() {
     fs::File::create(dir.join("gamma_delta.txt")).unwrap();
     fs::File::create(dir.join("epsilon.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -65,7 +65,7 @@ fn not_operator_excludes_segment() {
     fs::File::create(dir.join("alpha_gamma.txt")).unwrap();
     fs::File::create(dir.join("alpha_delta.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -86,7 +86,7 @@ fn mixed_and_or_precedence() {
     fs::File::create(dir.join("beta_gamma.txt")).unwrap();
     fs::File::create(dir.join("gamma_delta.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -117,7 +117,7 @@ fn multi_segments_with_wildcards() {
     fs::File::create(dir.join("alphaZ_beta.txt")).unwrap();
     fs::File::create(dir.join("gamma_beta.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -142,7 +142,7 @@ fn multi_segments_case_insensitive() {
     fs::File::create(dir.join("ALPHA_beta.md")).unwrap();
     fs::File::create(dir.join("gamma_alpha.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: true,
     };
@@ -170,7 +170,7 @@ fn regex_plus_plain_segment() {
     fs::File::create(dir.join("alphaXYZ_beta.txt")).unwrap();
     fs::File::create(dir.join("alpha999_gamma.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -193,7 +193,7 @@ fn filter_and_terms_multi_segments() {
     fs::File::create(dir.join("alpha_beta.md")).unwrap();
     fs::File::create(dir.join("alpha_gamma.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -217,7 +217,7 @@ fn not_with_filter_multi_segments() {
     fs::File::create(dir.join("alpha_beta.rs")).unwrap();
     fs::File::create(dir.join("alpha_gamma.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -242,7 +242,7 @@ fn chained_not_and_or_segments() {
     fs::File::create(dir.join("delta_gamma.txt")).unwrap();
     fs::File::create(dir.join("alpha_delta.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -272,7 +272,7 @@ fn wildcard_suffix_segment_matches_ending() {
     fs::create_dir_all(dir.join("boo/bar")).unwrap();
     fs::create_dir_all(dir.join("foz/bar")).unwrap(); // should not match *oo
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // Pattern *oo/bar => first segment ends with 'oo'
     let indices = guard_indices(cache.search_with_options(
         "*oo/bar",
@@ -299,7 +299,7 @@ fn wildcard_prefix_segment_does_not_match_non_prefix() {
     fs::create_dir_all(dir.join("oofoo/bar")).unwrap();
     fs::create_dir_all(dir.join("oof/bar")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // Pattern oo*/bar => segment starts with 'oo'
     let indices = guard_indices(cache.search_with_options(
         "oo*/bar",
@@ -330,7 +330,7 @@ fn double_sided_wildcard_segment_matches_internal() {
     fs::create_dir_all(dir.join("fo/bar")).unwrap(); // star can be empty
     fs::create_dir_all(dir.join("f/bar")).unwrap(); // missing trailing o
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "f*o/bar",
         SearchOptions::default(),
@@ -360,7 +360,7 @@ fn single_char_wildcard_prefix_segment() {
     fs::create_dir_all(dir.join("boo/bar")).unwrap();
     fs::create_dir_all(dir.join("bboo/bar")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // ?oo/bar => exactly one leading char plus 'oo'
     let indices = guard_indices(cache.search_with_options(
         "?oo/bar",
@@ -387,7 +387,7 @@ fn single_char_wildcard_suffix_segment() {
     fs::create_dir_all(dir.join("oo/bar")).unwrap();
     fs::create_dir_all(dir.join("ooba/bar")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // oo?/bar => prefix 'oo' plus exactly one extra char
     let indices = guard_indices(cache.search_with_options(
         "oo?/bar",
@@ -416,7 +416,7 @@ fn star_does_not_cross_directory_boundary() {
     fs::create_dir_all(dir.join("foobaz/bar")).unwrap(); // single segment variant
     fs::create_dir_all(dir.join("foo/baz_extra/bar")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // Pattern foo/baz*/bar should only expand within same segment "baz" variations, not merge segments
     let indices = guard_indices(cache.search_with_options(
         "foo/baz*/bar",
@@ -448,7 +448,7 @@ fn partial_file_name_wildcard_extensions() {
     fs::File::create(dir.join("readme1.md")).unwrap();
     fs::File::create(dir.join("xreadme.md")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -473,7 +473,7 @@ fn partial_file_name_leading_wildcard() {
     fs::File::create(dir.join("xreadme.md")).unwrap();
     fs::File::create(dir.join("pre_readme.md")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -494,7 +494,7 @@ fn partial_segment_hyphen_boundary_variants() {
     fs::create_dir_all(dir.join("src/libcore/mod")).unwrap();
     fs::create_dir_all(dir.join("src/libXcore/mod")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     // Pattern lib*core should match lib-core and libcore but not libXcore (if * doesn't skip internal capital boundary) — assume inclusive of all.
     let indices = guard_indices(cache.search_with_options(
         "src/lib*core/mod",
@@ -520,7 +520,7 @@ fn case_insensitive_partial_segment_variants() {
     fs::create_dir_all(dir.join("foobar/baz")).unwrap();
     fs::create_dir_all(dir.join("FOOBAR/baz")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: true,
     };
@@ -542,7 +542,7 @@ fn partial_unicode_segment_wildcard() {
     fs::create_dir_all(dir.join("Cafe/docs")).unwrap();
     fs::create_dir_all(dir.join("caféteria/docs")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let opts = SearchOptions {
         case_insensitive: true,
     };

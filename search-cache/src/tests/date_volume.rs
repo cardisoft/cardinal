@@ -76,7 +76,7 @@ fn segment_1_date_keyword_basic() {
     {
         fs::write(tmp.path().join(name), b"x").unwrap();
     }
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let today_idx = cache.search("today_a.txt").unwrap()[0];
     let yest_idx = cache.search("yesterday_b.txt").unwrap()[0];
     let week_idx = cache.search("week_c.txt").unwrap()[0];
@@ -202,7 +202,7 @@ fn segment_1b_lastweek_calendar_regression() {
     ] {
         fs::write(tmp.path().join(name), b"x").unwrap();
     }
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let edge_idx = cache.search("lastweek_edge.txt").unwrap()[0];
     let mid_idx = cache.search("lastweek_mid.txt").unwrap()[0];
     let older_idx = cache.search("older_than_lastweek.txt").unwrap()[0];
@@ -248,7 +248,7 @@ fn segment_2_month_year_keywords() {
     let tmp = TempDir::new("seg2_month_year").unwrap();
     fs::write(tmp.path().join("jan_file.txt"), b"x").unwrap();
     fs::write(tmp.path().join("last_year_file.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let jan_idx = cache.search("jan_file.txt").unwrap()[0];
     let last_year_idx = cache.search("last_year_file.txt").unwrap()[0];
     let now = Timestamp::now().to_zoned(TimeZone::system());
@@ -292,7 +292,7 @@ fn segment_3_comparisons_single_date() {
     fs::write(tmp.path().join("early.txt"), b"x").unwrap();
     fs::write(tmp.path().join("mid.txt"), b"x").unwrap();
     fs::write(tmp.path().join("late.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let early = cache.search("early.txt").unwrap()[0];
     let mid = cache.search("mid.txt").unwrap()[0];
     let late = cache.search("late.txt").unwrap()[0];
@@ -334,7 +334,7 @@ fn segment_4_not_equal() {
     fs::write(tmp.path().join("match.txt"), b"x").unwrap();
     fs::write(tmp.path().join("before.txt"), b"x").unwrap();
     fs::write(tmp.path().join("after.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let match_idx = cache.search("match.txt").unwrap()[0];
     let before_idx = cache.search("before.txt").unwrap()[0];
     let after_idx = cache.search("after.txt").unwrap()[0];
@@ -366,7 +366,7 @@ fn segment_5_range_queries() {
     for name in ["d1.txt", "d2.txt", "d3.txt", "d4.txt"].iter() {
         fs::write(tmp.path().join(name), b"x").unwrap();
     }
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let d1 = cache.search("d1.txt").unwrap()[0];
     let d2 = cache.search("d2.txt").unwrap()[0];
     let d3 = cache.search("d3.txt").unwrap()[0];
@@ -391,7 +391,7 @@ fn segment_5_range_queries() {
 fn segment_6_format_variants() {
     let tmp = TempDir::new("seg6_formats").unwrap();
     fs::write(tmp.path().join("ambiguous.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let idx = cache.search("ambiguous.txt").unwrap()[0];
     set_file_times(&mut cache, idx, ts(2024, 2, 3), ts(2024, 2, 3)); // Feb 3
     let hyphen = cache.search("dm:2024-02-03").unwrap();
@@ -408,7 +408,7 @@ fn segment_6_format_variants() {
 fn segment_7_metadata_population() {
     let tmp = TempDir::new("seg7_meta").unwrap();
     fs::write(tmp.path().join("file_meta.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let idx = cache.search("file_meta.txt").unwrap()[0];
     // initial walk sets file metadata to None
     assert!(cache.file_nodes[idx].metadata.is_none());
@@ -424,7 +424,7 @@ fn segment_7_metadata_population() {
 fn segment_8_created_vs_modified() {
     let tmp = TempDir::new("seg8_created_modified").unwrap();
     fs::write(tmp.path().join("both.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let idx = cache.search("both.txt").unwrap()[0];
     let created = ts(2024, 9, 1);
     let modified = ts(2024, 9, 15);
@@ -443,7 +443,7 @@ fn segment_8_created_vs_modified() {
 // Error conditions (invalid, reversed range, empty value) should result in parse/eval errors.
 #[test]
 fn segment_9_error_conditions() {
-    let mut cache = SearchCache::walk_fs(TempDir::new("seg9_errors").unwrap().path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(TempDir::new("seg9_errors").unwrap().path());
     // reversed range
     let reversed = cache.search("dm:2024-10-10-2024-09-10");
     assert!(reversed.is_err(), "reversed date range should error");
@@ -462,7 +462,7 @@ fn segment_10_stress_queries() {
     for i in 0..50 {
         fs::write(tmp.path().join(format!("f{i}.txt")), b"x").unwrap();
     }
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     // assign timestamps in a spread across 50 days
     let base = ts(2024, 1, 1);
     for i in 0..50 {
@@ -508,7 +508,7 @@ fn segment_11_created_keyword_filters() {
     ] {
         fs::write(tmp.path().join(name), b"x").unwrap();
     }
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let today_idx = cache.search("created_today.txt").unwrap()[0];
     let lastweek_idx = cache.search("created_lastweek.txt").unwrap()[0];
     let month_idx = cache.search("created_month.txt").unwrap()[0];

@@ -20,7 +20,7 @@ fn build_cache_with_files(files: &[(&str, &[u8])]) -> (SearchCache, PathBuf) {
         std::fs::write(full_path, content).unwrap();
     }
 
-    let cache = SearchCache::walk_fs(root_path.clone());
+    let cache = SearchCache::walk_fs(&root_path);
     (cache, root_path)
 }
 
@@ -135,7 +135,7 @@ fn test_file_type_filter_file() {
     std::fs::create_dir(root_path.join("directory")).unwrap();
     std::fs::File::create(root_path.join("another.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Filter only files
     let result = cache
@@ -156,7 +156,7 @@ fn test_folder_type_filter() {
     std::fs::create_dir(root_path.join("dir2")).unwrap();
     std::fs::File::create(root_path.join("file.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Filter only folders
     let result = cache
@@ -177,7 +177,7 @@ fn test_combined_size_and_type_filter() {
     std::fs::write(root_path.join("large.txt"), vec![b'b'; 10000]).unwrap();
     std::fs::create_dir(root_path.join("dir")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Files larger than 1000 bytes
     let result = cache
@@ -240,7 +240,7 @@ fn test_date_modified_filter_recent() {
     std::thread::sleep(Duration::from_millis(100));
     std::fs::File::create(root_path.join("newer.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Query for files modified today
     let result = cache
@@ -259,7 +259,7 @@ fn test_date_created_filter() {
 
     std::fs::File::create(root_path.join("created_today.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Query for files created today
     let result = cache
@@ -279,7 +279,7 @@ fn test_metadata_lazy_loading() {
     std::fs::write(root_path.join("test.txt"), vec![b'a'; 1000]).unwrap();
 
     // Initial walk doesn't fetch metadata
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // First size query should trigger metadata fetch
     let result = cache
@@ -366,7 +366,7 @@ fn test_type_macro_filters() {
         std::fs::File::create(root_path.join(file)).unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Test video macro
     let result = cache
@@ -422,7 +422,7 @@ fn test_metadata_for_inaccessible_files() {
     let test_file = root_path.join("test.txt");
     std::fs::File::create(&test_file).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Delete file after cache is built
     std::fs::remove_file(&test_file).unwrap();
@@ -440,7 +440,7 @@ fn test_date_filter_with_ranges() {
 
     std::fs::File::create(root_path.join("file.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Date range query (specific dates would depend on implementation)
     let result = cache.query_files("dm:2020..2030".to_string(), CancellationToken::noop());
@@ -458,7 +458,7 @@ fn test_combined_metadata_filters() {
     std::fs::write(root_path.join("large.txt"), vec![b'b'; 10000]).unwrap();
     std::fs::create_dir(root_path.join("dir")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root_path.clone());
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Multiple filters: file type, extension, size, date
     let result = cache
@@ -508,7 +508,7 @@ fn test_metadata_total_files_accuracy() {
         std::fs::File::create(root_path.join(format!("file_{i}.txt"))).unwrap();
     }
 
-    let cache = SearchCache::walk_fs(root_path.clone());
+    let cache = SearchCache::walk_fs(&root_path);
     let total = cache.get_total_files();
 
     // Should count files (not including root directory)

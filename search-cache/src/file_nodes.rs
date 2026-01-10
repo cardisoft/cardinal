@@ -8,13 +8,24 @@ use std::{
 #[derive(Debug)]
 pub struct FileNodes {
     path: PathBuf,
+    ignore_paths: Vec<PathBuf>,
     slab: ThinSlab<SlabNode>,
     root: SlabIndex,
 }
 
 impl FileNodes {
-    pub(crate) fn new(path: PathBuf, slab: ThinSlab<SlabNode>, root: SlabIndex) -> Self {
-        Self { path, slab, root }
+    pub(crate) fn new(
+        path: PathBuf,
+        ignore_paths: Vec<PathBuf>,
+        slab: ThinSlab<SlabNode>,
+        root: SlabIndex,
+    ) -> Self {
+        Self {
+            path,
+            ignore_paths,
+            slab,
+            root,
+        }
     }
 
     pub(crate) fn root(&self) -> SlabIndex {
@@ -40,6 +51,10 @@ impl FileNodes {
         &self.path
     }
 
+    pub(crate) fn ignore_paths(&self) -> &Vec<PathBuf> {
+        &self.ignore_paths
+    }
+
     pub(crate) fn take_slab(&mut self) -> ThinSlab<SlabNode> {
         std::mem::take(&mut self.slab)
     }
@@ -48,9 +63,14 @@ impl FileNodes {
         self.slab = slab;
     }
 
-    pub(crate) fn into_parts(self) -> (PathBuf, SlabIndex, ThinSlab<SlabNode>) {
-        let Self { path, slab, root } = self;
-        (path, root, slab)
+    pub(crate) fn into_parts(self) -> (PathBuf, Vec<PathBuf>, SlabIndex, ThinSlab<SlabNode>) {
+        let Self {
+            path,
+            ignore_paths,
+            slab,
+            root,
+        } = self;
+        (path, ignore_paths, root, slab)
     }
 }
 

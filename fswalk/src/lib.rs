@@ -86,24 +86,27 @@ pub struct WalkData<'w> {
     pub num_dirs: AtomicUsize,
     /// Cancellation will be checked periodically.
     cancel: Option<&'w AtomicBool>,
-    ignore_directories: Option<Vec<PathBuf>>,
+    pub root_path: &'w Path,
+    pub ignore_directories: &'w [PathBuf],
     /// If set, metadata will be collected for each file node(folder node will get free metadata).
     need_metadata: bool,
 }
 
 impl<'w> WalkData<'w> {
-    pub const fn simple(need_metadata: bool) -> Self {
+    pub const fn simple(root_path: &'w Path, need_metadata: bool) -> Self {
         Self {
             num_files: AtomicUsize::new(0),
             num_dirs: AtomicUsize::new(0),
             cancel: None,
-            ignore_directories: None,
+            root_path,
+            ignore_directories: &[],
             need_metadata,
         }
     }
 
     pub fn new(
-        ignore_directories: Option<Vec<PathBuf>>,
+        root_path: &'w Path,
+        ignore_directories: &'w [PathBuf],
         need_metadata: bool,
         cancel: Option<&'w AtomicBool>,
     ) -> Self {
@@ -111,21 +114,19 @@ impl<'w> WalkData<'w> {
             num_files: AtomicUsize::new(0),
             num_dirs: AtomicUsize::new(0),
             cancel,
+            root_path,
             ignore_directories,
             need_metadata,
         }
     }
 
     fn should_ignore(&self, path: &Path) -> bool {
-        self.ignore_directories
-            .as_ref()
-            .map(|paths| paths.iter().any(|ignore| ignore == path))
-            .unwrap_or(false)
+        self.ignore_directories.iter().any(|ignore| ignore == path)
     }
 }
 
-pub fn walk_it(dir: &Path, walk_data: &WalkData) -> Option<Node> {
-    walk(dir, walk_data)
+pub fn walk_it(walk_data: &WalkData) -> Option<Node> {
+    walk(walk_data.root_path, walk_data)
 }
 
 fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
@@ -255,8 +256,8 @@ mod tests {
         fs::create_dir(root.join("dir_a")).unwrap();
         fs::File::create(root.join("file_a.txt")).unwrap();
         fs::File::create(root.join("dir_a/file_b.log")).unwrap();
-        let walk_data = WalkData::simple(false);
-        let node = walk_it(root, &walk_data).unwrap();
+        let walk_data = WalkData::simple(root, false);
+        let node = walk_it(&walk_data).unwrap();
         assert_eq!(&*node.name, root.file_name().unwrap().to_str().unwrap());
         // Root + dir + 2 files
         let mut counts = (0, 0);
@@ -303,8 +304,8 @@ mod tests {
         fs::File::create(root.join("file_alpha.txt")).unwrap();
         fs::File::create(root.join("file_gamma.txt")).unwrap();
 
-        let walk_data = WalkData::simple(false);
-        let node = walk_it(root, &walk_data).expect("walked tree");
+        let walk_data = WalkData::simple(root, false);
+        let node = walk_it(&walk_data).expect("walked tree");
 
         let observed: Vec<&str> = node.children.iter().map(|child| &*child.name).collect();
         let expected = vec![
@@ -343,8 +344,8 @@ mod tests {
         let tmp = TempDir::new("fswalk_meta").unwrap();
         let root = tmp.path();
         fs::File::create(root.join("meta_file.txt")).unwrap();
-        let walk_data = WalkData::simple(true);
-        let node = walk_it(root, &walk_data).unwrap();
+        let walk_data = WalkData::simple(root, true);
+        let node = walk_it(&walk_data).unwrap();
         fn find<'a>(node: &'a Node, name: &str) -> Option<&'a Node> {
             if &*node.name == name {
                 return Some(node);
@@ -371,8 +372,8 @@ mod tests {
         fs::File::create(root.join("real_dir/file.txt")).unwrap();
         #[cfg(unix)]
         std::os::unix::fs::symlink(root.join("real_dir"), root.join("link_dir")).unwrap();
-        let walk_data = WalkData::simple(true);
-        let node = walk_it(root, &walk_data).unwrap();
+        let walk_data = WalkData::simple(root, true);
+        let node = walk_it(&walk_data).unwrap();
         // Ensure link_dir exists as a file system entry but not traversed (should be a file node with no children)
         fn get_child<'a>(n: &'a Node, name: &str) -> Option<&'a Node> {
             n.children.iter().find(|c| &*c.name == name)
@@ -400,8 +401,8 @@ mod tests {
             let mut f = fs::File::create(root.join(format!("f{i}.txt"))).unwrap();
             writeln!(f, "hello {i}").unwrap();
         }
-        let walk_data = WalkData::simple(false);
-        let node = walk_it(root, &walk_data).unwrap();
+        let walk_data = WalkData::simple(root, false);
+        let node = walk_it(&walk_data).unwrap();
         // Expect 1 (root) + 50 file children
         assert_eq!(
             node.children.len(),
@@ -414,14 +415,11 @@ mod tests {
     #[ignore]
     fn test_search_root() {
         let done = AtomicBool::new(false);
-        let walk_data = WalkData::new(
-            Some(vec![PathBuf::from("/System/Volumes/Data")]),
-            false,
-            None,
-        );
+        let path = [PathBuf::from("/System/Volumes/Data")];
+        let walk_data = WalkData::new(Path::new("/"), &path, false, None);
         std::thread::scope(|s| {
             s.spawn(|| {
-                let node = walk_it(Path::new("/"), &walk_data).unwrap();
+                let node = walk_it(&walk_data).unwrap();
                 println!("root has {} children", node.children.len());
                 done.store(true, Ordering::Relaxed);
             });
@@ -440,18 +438,16 @@ mod tests {
     #[ignore]
     fn test_search_simulator() {
         let done = AtomicBool::new(false);
+        let ignore = vec![PathBuf::from("/System/Volumes/Data")];
         let walk_data = WalkData::new(
-            Some(vec![PathBuf::from("/System/Volumes/Data")]),
+            Path::new("/Library/Developer/CoreSimulator/Volumes/iOS_23A343"),
+            &ignore,
             true,
             None,
         );
         std::thread::scope(|s| {
             s.spawn(|| {
-                let node = walk_it(
-                    Path::new("/Library/Developer/CoreSimulator/Volumes/iOS_23A343"),
-                    &walk_data,
-                )
-                .unwrap();
+                let node = walk_it(&walk_data).unwrap();
                 println!("sim has {} children", node.children.len());
                 done.store(true, Ordering::Relaxed);
             });
@@ -470,14 +466,11 @@ mod tests {
     fn test_search_cancel() {
         let cancel = AtomicBool::new(false);
         let done = AtomicBool::new(false);
-        let walk_data = WalkData::new(
-            Some(vec![PathBuf::from("/System/Volumes/Data")]),
-            false,
-            Some(&cancel),
-        );
+        let ignore = vec![PathBuf::from("/System/Volumes/Data")];
+        let walk_data = WalkData::new(Path::new("/"), &ignore, false, Some(&cancel));
         std::thread::scope(|s| {
             s.spawn(|| {
-                let node = walk_it(Path::new("/"), &walk_data);
+                let node = walk_it(&walk_data);
                 done.store(true, Ordering::Relaxed);
                 assert!(node.is_none(), "expected walk to be cancelled");
             });

@@ -45,7 +45,7 @@ fn build_nested_cache() -> (SearchCache, PathBuf) {
         std::fs::File::create(full).unwrap();
     }
 
-    let cache = SearchCache::walk_fs(root_path.clone());
+    let cache = SearchCache::walk_fs(&root_path);
     (cache, root_path)
 }
 
@@ -226,7 +226,7 @@ fn test_infolder_filter_empty_directory() {
     let empty_dir = root_path.join("empty");
     std::fs::create_dir_all(&empty_dir).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root_path);
+    let mut cache = SearchCache::walk_fs(&root_path);
 
     // Test infolder on empty directory
     let query = format!("infolder:{}", empty_dir.display());

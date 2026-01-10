@@ -27,7 +27,7 @@ fn leading_slash_anchors_to_root_segment() {
     fs::File::create(root.join("foo/bar/baz.txt")).unwrap();
     fs::File::create(root.join("other/foo/bar/baz.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -54,7 +54,7 @@ fn trailing_slash_requires_exact_last_segment() {
     fs::create_dir_all(root.join("legacy_docs/guide")).unwrap();
     fs::create_dir_all(root.join("docs/guide_extra")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -75,7 +75,7 @@ fn no_leading_slash_matches_suffix_segment() {
     fs::create_dir_all(root.join("dirfoo/bar")).unwrap();
     fs::create_dir_all(root.join("foo/barn")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "foo/bar",
         SearchOptions::default(),
@@ -95,7 +95,7 @@ fn case_insensitive_segments_match_variants() {
     fs::create_dir_all(root.join("Foo/Bar/Baz")).unwrap();
     fs::create_dir_all(root.join("FOO/BAR/Bazooka")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: true,
     };
@@ -116,7 +116,7 @@ fn mixed_prefix_suffix_segments_for_files() {
     fs::File::create(root.join("datafoo/report.txt")).unwrap();
     fs::File::create(root.join("foo/report_final.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -160,7 +160,7 @@ fn trailing_slash_deep_exact_directory() {
     fs::create_dir_all(root.join("a/b/c/d_extra")).unwrap();
     fs::create_dir_all(root.join("a/b/cX/d")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -193,7 +193,7 @@ fn leading_slash_with_wildcard_in_first_segment() {
     fs::create_dir_all(root.join("other/fooA/bar/baz")).unwrap();
     fs::create_dir_all(root.join("fooA/bar/qux")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     // Wildcard applies to first segment; expectation: directories whose first segment contains pattern prefix 'foo'.
     let indices = guard_indices(cache.search_with_options(
         "/foo*/bar/baz/",
@@ -218,7 +218,7 @@ fn mixed_case_segments_case_sensitive_behavior() {
     fs::create_dir_all(root.join("b/foo/bar/baz")).unwrap();
     fs::create_dir_all(root.join("c/FOO/BAR/BAZ")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -246,7 +246,7 @@ fn mixed_case_segments_case_insensitive_behavior() {
     fs::create_dir_all(root.join("FOO/BAR/BAZ")).unwrap();
     fs::create_dir_all(root.join("foo/bar/Bazooka")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: true,
     };
@@ -275,7 +275,7 @@ fn wildcard_last_segment_multiple_extensions() {
     fs::File::create(root.join("a/docs/guide/readme_final.md")).unwrap();
     fs::File::create(root.join("b/docs/guide/README.MD")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -310,7 +310,7 @@ fn wildcard_last_segment_multiple_extensions_case_insensitive() {
     fs::File::create(root.join("b/docs/guide/readme.md")).unwrap();
     fs::File::create(root.join("c/docs/guide/readmeX.md")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: true,
     };
@@ -335,7 +335,7 @@ fn middle_segment_wildcard_variants() {
     fs::create_dir_all(root.join("pkg-gamma/docs/v1")).unwrap();
     fs::create_dir_all(root.join("pkg-alpha/docs/v2")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "pkg-*/docs/v1/",
         SearchOptions::default(),
@@ -362,7 +362,7 @@ fn overlapping_prefix_directories() {
     fs::File::create(root.join("application/config.json")).unwrap();
     fs::File::create(root.join("appveyor/config.json")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     // Query uses a slash to combine directory + file name.
     let indices = guard_indices(cache.search_with_options(
         "app/config.json",
@@ -386,7 +386,7 @@ fn globstar_middle_segment_matches_descendants() {
     fs::File::create(root.join("foo/nested/bar.txt")).unwrap();
     fs::File::create(root.join("foo/nested/deeper/bar.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "foo/**/bar.txt",
         SearchOptions::default(),
@@ -411,7 +411,7 @@ fn globstar_trailing_segment_includes_all_descendants() {
         .and_then(|_| fs::File::create(root.join("foo/sub/layer/deep.txt")))
         .unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "foo/**",
         SearchOptions::default(),
@@ -435,7 +435,7 @@ fn standalone_globstar_matches_entire_tree() {
         .and_then(|_| fs::File::create(root.join("gamma/file_b.txt")))
         .unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "**",
         SearchOptions::default(),
@@ -455,7 +455,7 @@ fn globstar_matches_nested_hidden_directory_rs_files() {
     fs::File::create(root.join("dir/.cargo/index/emm.rs")).unwrap();
     fs::File::create(root.join("dir/.cargo/index/skip.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         ".cargo/**/*.rs",
         SearchOptions::default(),
@@ -488,7 +488,7 @@ fn multiple_globstars_collapse_to_expected_scope() {
     fs::File::create(root.join("aa/module/lib.txt")).unwrap();
     fs::File::create(root.join("bb/aa/lib.c")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "aa/**/**/*.c",
         SearchOptions::default(),
@@ -519,7 +519,7 @@ fn redundant_globstars_match_entire_tree() {
     fs::File::create(root.join("x/y/z/file.rs")).unwrap();
     fs::File::create(root.join("docs/readme.md")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "**/**/**",
         SearchOptions::default(),
@@ -547,7 +547,7 @@ fn globstar_with_question_mark_preserves_length_constraints() {
     fs::File::create(root.join("pkg-alpha/lib1.rs")).unwrap();
     fs::File::create(root.join("pkg-beta/libAA.rs")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "**/lib??.rs",
         SearchOptions::default(),
@@ -574,7 +574,7 @@ fn globstar_case_sensitive_vs_insensitive_variants() {
     fs::File::create(root.join("AA/Deep/FILE.TXT")).unwrap();
     fs::File::create(root.join("aa/Deep/file.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let sensitive = guard_indices(cache.search_with_options(
         "aa/**/file.txt",
         SearchOptions::default(),
@@ -609,7 +609,7 @@ fn globstar_case_sensitive_exact_match() {
     fs::File::create(root.join("AA/Deep/FILE.TXT")).unwrap();
     fs::File::create(root.join("aa/Deep/file.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "AA/**/FILE.TXT",
         SearchOptions::default(),
@@ -636,7 +636,7 @@ fn leading_globstar_matches_any_suffix() {
     fs::File::create(root.join("gamma/delta/report.log")).unwrap();
     fs::File::create(root.join("alpha/report.log")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "**/report.log",
         SearchOptions::default(),
@@ -659,7 +659,7 @@ fn wildcard_segment_followed_by_trailing_globstar() {
     fs::File::create(root.join("client-lib/tests/test.rs")).unwrap();
     fs::File::create(root.join("server-app/src/ignore.rs")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "client*/**",
         SearchOptions::default(),
@@ -693,7 +693,7 @@ fn globstar_question_mark_segment_and_trailing_globstar() {
     fs::File::create(root.join("pkg-b/libA/src/main.rs")).unwrap();
     fs::File::create(root.join("pkg-c/libAB/src/main.rs")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "**/lib?/src/**",
         SearchOptions::default(),
@@ -722,7 +722,7 @@ fn wildcard_question_mark_inside_segment() {
     fs::File::create(root.join("lib-a2.tar.gz")).unwrap();
     fs::File::create(root.join("lib-a10.tar.gz")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "lib-a?.tar.gz",
         SearchOptions::default(),
@@ -746,7 +746,7 @@ fn multi_level_mixed_wildcards_and_trailing_slash() {
     fs::create_dir_all(root.join("services/api-v2/internal")).unwrap();
     fs::create_dir_all(root.join("services/api-v1/internal_extra")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "services/api-v*/internal/",
         SearchOptions::default(),
@@ -780,7 +780,7 @@ fn path_query_with_dot_segments_and_files() {
     fs::File::create(root.join("config.d/profiles/dev.yaml")).unwrap();
     fs::File::create(root.join("config.d/profiles/dev.json")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "config.d/profiles/dev.yaml",
         SearchOptions::default(),
@@ -809,7 +809,7 @@ fn unicode_path_segments_case_insensitive() {
     fs::create_dir_all(root.join("CAFÉ/文件")).unwrap();
     fs::File::create(root.join("CAFÉ/文件/notes.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: true,
     };
@@ -835,7 +835,7 @@ fn unicode_path_segments_case_sensitive() {
     fs::create_dir_all(root.join("CAFÉ/文件")).unwrap();
     fs::File::create(root.join("CAFÉ/文件/notes.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -863,7 +863,7 @@ fn deep_multiple_wildcards_varied_segments() {
     fs::File::create(root.join("src/lib/util/mod.rs")).unwrap();
     fs::File::create(root.join("src/lib-core/extra/mod.rs")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "src/lib*/core/mod.rs",
         SearchOptions::default(),
@@ -889,7 +889,7 @@ fn file_match_with_intermediate_prefix_overlap() {
     fs::File::create(root.join("client/app/index.html")).unwrap();
     fs::File::create(root.join("client/application/index.html")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "client/app/index.html",
         SearchOptions::default(),
@@ -910,7 +910,7 @@ fn star_only_directory_inclusion() {
     fs::File::create(root.join("two/b.txt")).unwrap();
     fs::File::create(root.join("three/c.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "*",
         SearchOptions::default(),
@@ -934,7 +934,7 @@ fn question_mark_in_directory_segment_boundaries() {
     fs::File::create(root.join("dirB/file.txt")).unwrap();
     fs::File::create(root.join("dirAA/file.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "dir?/file.txt",
         SearchOptions::default(),
@@ -959,7 +959,7 @@ fn multiple_question_marks_segment() {
     fs::File::create(root.join("log-1.txt")).unwrap();
     fs::File::create(root.join("log-12345.txt")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let indices = guard_indices(cache.search_with_options(
         "log-????.txt",
         SearchOptions::default(),
@@ -982,7 +982,7 @@ fn mixed_star_and_question_mark_segment() {
     fs::File::create(root.join("pkg-alpha-v10.rs")).unwrap();
     fs::File::create(root.join("pkg-alpha-vX.rs")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     // Pattern: pkg-alpha-v?.rs -> one character version.
     let indices_short = guard_indices(cache.search_with_options(
         "pkg-alpha-v?.rs",
@@ -1015,7 +1015,7 @@ fn case_sensitive_exact_segment_casing() {
     fs::create_dir_all(root.join("b/Src/Lib/Core")).unwrap();
     fs::create_dir_all(root.join("c/SRC/LIB/Core")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     // Case sensitive: only exact lower-case path should be returned for lower-case query.
     let opts = SearchOptions {
         case_insensitive: false,
@@ -1045,7 +1045,7 @@ fn case_insensitive_directory_variants() {
     fs::create_dir_all(root.join("b/Src/Lib/Core")).unwrap();
     fs::create_dir_all(root.join("c/SRC/LIB/Core")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: true,
     };
@@ -1072,7 +1072,7 @@ fn mixed_wildcard_case_sensitive_file_variants() {
     fs::File::create(root.join("b/app/config/README.MD")).unwrap();
     fs::File::create(root.join("a/app/config/readme_final.md")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -1108,7 +1108,7 @@ fn mixed_wildcard_case_insensitive_file_variants() {
     fs::File::create(root.join("a/app/config/readme.md")).unwrap();
     fs::File::create(root.join("b/app/config/README.MD")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: true,
     };
@@ -1136,7 +1136,7 @@ fn case_sensitive_file_exact_match_variants() {
     fs::File::create(root.join("guide/README.md")).unwrap();
     fs::File::create(root.join("guide/readme.md")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: false,
     };
@@ -1161,7 +1161,7 @@ fn case_insensitive_file_exact_match_variants() {
     fs::File::create(root.join("guide/README.md")).unwrap();
     fs::File::create(root.join("guide/readme.md")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(root.to_path_buf());
+    let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
         case_insensitive: true,
     };

@@ -44,7 +44,7 @@ fn build_cache() -> SearchCache {
         }
         std::fs::File::create(full).unwrap();
     }
-    SearchCache::walk_fs(root_path)
+    SearchCache::walk_fs(&root_path)
 }
 
 fn run(cache: &mut SearchCache, q: &str) -> usize {

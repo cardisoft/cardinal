@@ -20,7 +20,7 @@ fn content_filter_rejects_empty_needle() {
     let dir = temp_dir.path();
     fs::write(dir.join("file.txt"), b"content").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let result = cache.search_with_options(
         r#"content:"""#,
         SearchOptions {
@@ -45,7 +45,7 @@ fn content_filter_single_byte_exact_match() {
     fs::write(dir.join("lower.txt"), b"abcdefg").unwrap();
     fs::write(dir.join("upper.txt"), b"ABCDEFG").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     // Case sensitive: only lowercase 'a' should match
     let indices = guard_indices(cache.search_with_options(
@@ -81,7 +81,7 @@ fn content_filter_single_byte_case_insensitive() {
     fs::write(dir.join("upper.txt"), b"ABCDEFG").unwrap();
     fs::write(dir.join("none.txt"), b"xyz123").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     // Case insensitive: both 'a' and 'A' should match
     let indices = guard_indices(cache.search_with_options(
@@ -118,7 +118,7 @@ fn content_filter_needle_spans_exact_buffer_boundary() {
     payload.extend(vec![b'y'; 100]);
     fs::write(dir.join("exact.bin"), &payload).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:BOUNDARY",
         SearchOptions {
@@ -144,7 +144,7 @@ fn content_filter_needle_spans_three_chunks() {
     payload.extend(vec![b'b'; 100]);
     fs::write(dir.join("three_chunks.bin"), &payload).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:LONGNEEDLE",
         SearchOptions {
@@ -169,7 +169,7 @@ fn content_filter_needle_exceeds_buffer_size() {
     payload.extend(vec![b'z'; 50]);
     fs::write(dir.join("long_needle.bin"), &payload).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let query = format!("content:{needle}");
     let indices = guard_indices(cache.search_with_options(
         &query,
@@ -193,7 +193,7 @@ fn content_filter_needle_equals_overlap_size() {
     payload.extend(vec![b'y'; 10]);
     fs::write(dir.join("overlap.bin"), &payload).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:AB",
         SearchOptions {
@@ -212,7 +212,7 @@ fn content_filter_file_smaller_than_buffer() {
 
     fs::write(dir.join("tiny.txt"), b"small content here").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:content",
         SearchOptions {
@@ -231,7 +231,7 @@ fn content_filter_empty_file_returns_no_match() {
 
     fs::write(dir.join("empty.txt"), b"").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:anything",
         SearchOptions {
@@ -250,7 +250,7 @@ fn content_filter_needle_at_file_start() {
 
     fs::write(dir.join("start.txt"), b"STARTrest of content").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:START",
         SearchOptions {
@@ -269,7 +269,7 @@ fn content_filter_needle_at_file_end() {
 
     fs::write(dir.join("end.txt"), b"content before END").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:END",
         SearchOptions {
@@ -288,7 +288,7 @@ fn content_filter_multiple_occurrences_in_file() {
 
     fs::write(dir.join("multi.txt"), b"foo bar foo baz foo").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:foo",
         SearchOptions {
@@ -310,7 +310,7 @@ fn content_filter_binary_with_null_bytes() {
     binary.extend_from_slice(&[0u8, 255u8, 128u8]);
     fs::write(dir.join("binary.bin"), &binary).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:TARGET",
         SearchOptions {
@@ -329,7 +329,7 @@ fn content_filter_utf8_multibyte_characters() {
 
     fs::write(dir.join("utf8.txt"), "Hello 世界 Rust 🦀".as_bytes()).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     // Search for Chinese characters
     let indices = guard_indices(cache.search_with_options(
@@ -364,7 +364,7 @@ fn content_filter_utf8_split_across_boundary() {
     payload.extend(vec![b'b'; 100]);
     fs::write(dir.join("utf8_boundary.txt"), &payload).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:世界",
         SearchOptions {
@@ -387,7 +387,7 @@ fn content_filter_special_characters() {
     )
     .unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     // Special symbols (use quotes to preserve the content)
     let indices = guard_indices(cache.search_with_options(
@@ -419,7 +419,7 @@ fn content_filter_ignores_directories() {
     fs::create_dir(dir.join("subdir")).unwrap();
     fs::write(dir.join("subdir/file.txt"), b"content").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:content",
         SearchOptions {
@@ -444,7 +444,7 @@ fn content_filter_combined_with_extension() {
     fs::write(dir.join("match.md"), b"Bearer token").unwrap();
     fs::write(dir.join("nomatch.txt"), b"no token").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     // Search for .txt files containing "Bearer"
     let indices = guard_indices(cache.search_with_options(
@@ -482,7 +482,7 @@ fn content_filter_combined_with_infolder() {
     fs::write(dir.join("target/match.txt"), b"secret key").unwrap();
     fs::write(dir.join("other/nomatch.txt"), b"secret key").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     let target_path = dir.join("target").to_str().unwrap().to_string();
     let query = format!("infolder:{target_path} content:\"secret key\"");
@@ -507,7 +507,7 @@ fn content_filter_combined_with_size() {
     fs::write(dir.join("small.txt"), b"test").unwrap(); // 4 bytes
     fs::write(dir.join("large.txt"), vec![b't'; 2000]).unwrap(); // 2000 bytes
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     // Search for files > 1KB containing 't'
     let indices = guard_indices(cache.search_with_options(
@@ -531,7 +531,7 @@ fn content_filter_with_not_operator() {
     fs::write(dir.join("has_secret.txt"), b"secret key").unwrap();
     fs::write(dir.join("no_secret.txt"), b"public data").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     // Search for .txt files that don't contain "secret"
     let indices = guard_indices(cache.search_with_options(
@@ -556,7 +556,7 @@ fn content_filter_with_or_operator() {
     fs::write(dir.join("fixme.txt"), b"FIXME: urgent").unwrap();
     fs::write(dir.join("clean.txt"), b"all good").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     // Search for files containing either TODO or FIXME
     let indices = guard_indices(cache.search_with_options(
@@ -584,7 +584,7 @@ fn content_filter_respects_cancellation() {
         fs::write(dir.join(format!("large{i}.bin")), content).unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     // Create a cancelled token
     let token = CancellationToken::new(999);
@@ -623,7 +623,7 @@ fn content_filter_handles_unreadable_file() {
     perms.set_mode(0o000);
     fs::set_permissions(&unreadable, perms).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:secret",
         SearchOptions {
@@ -651,7 +651,7 @@ fn content_filter_regex_special_chars_treated_literally() {
 
     fs::write(dir.join("regex.txt"), b"file.* [test]+ (group)? ^start$").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     // These should be treated as literal strings, not regex
     let indices = guard_indices(cache.search_with_options(
@@ -694,7 +694,7 @@ fn content_filter_handles_long_lines() {
     content.extend(vec![b'b'; 1000]);
     fs::write(dir.join("long_line.txt"), content).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:NEEDLE",
         SearchOptions {
@@ -713,7 +713,7 @@ fn content_filter_whitespace_in_needle() {
 
     fs::write(dir.join("whitespace.txt"), b"line one word three   spaced").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     // Search with space (use quotes to preserve the space)
     let indices = guard_indices(cache.search_with_options(
@@ -744,7 +744,7 @@ fn content_filter_case_insensitive_mixed_case() {
 
     fs::write(dir.join("mixed.txt"), b"ThIsIsMiXeDCaSe").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     // All variations should match case-insensitively (using quoted strings)
     for needle in ["thisismixedcase", "THISISMIXEDCASE", "ThIsIsMiXeDCaSe"] {
@@ -770,7 +770,7 @@ fn content_filter_file_exact_buffer_size() {
     content.extend(vec![b'y'; 4]); // Total = CONTENT_BUFFER_BYTES
     fs::write(dir.join("exact.bin"), &content).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:TARGET",
         SearchOptions {
@@ -790,7 +790,7 @@ fn content_filter_no_false_positive_at_eof() {
     // File ends with partial match of needle
     fs::write(dir.join("partial.txt"), b"data ends with TARG").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:TARGET",
         SearchOptions {
@@ -809,7 +809,7 @@ fn content_filter_repeated_pattern_in_needle() {
 
     fs::write(dir.join("repeat.txt"), b"aaaaaaBBBBBBaaaaaa").unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:aaaaaa",
         SearchOptions {
@@ -839,7 +839,7 @@ fn content_filter_all_ascii_printable() {
     let ascii: Vec<u8> = (32..127).collect();
     fs::write(dir.join("ascii.txt"), &ascii).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
 
     // Test finding a substring
     let indices = guard_indices(cache.search_with_options(
@@ -861,7 +861,7 @@ fn content_filter_high_bytes() {
     let content: Vec<u8> = vec![0x80, 0x90, 0xFF, b'A', b'B', 0xFE, 0xFD];
     fs::write(dir.join("high.bin"), &content).unwrap();
 
-    let mut cache = SearchCache::walk_fs(dir.to_path_buf());
+    let mut cache = SearchCache::walk_fs(dir);
     let indices = guard_indices(cache.search_with_options(
         "content:AB",
         SearchOptions {

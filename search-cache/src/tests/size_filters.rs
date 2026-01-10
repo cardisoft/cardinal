@@ -5,7 +5,7 @@ fn test_size_filters() {
     let tmp = TempDir::new("query_size_filters").unwrap();
     fs::write(tmp.path().join("tiny.bin"), vec![0u8; 512]).unwrap();
     fs::write(tmp.path().join("medium.bin"), vec![0u8; 50_000]).unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let larger = cache.search("size:>1kb").unwrap();
     assert_eq!(larger.len(), 1);
@@ -27,7 +27,7 @@ fn test_size_filters() {
 fn test_size_filter_persists_metadata_on_nodes() {
     let tmp = TempDir::new("query_size_cache").unwrap();
     fs::write(tmp.path().join("cache.bin"), vec![0u8; 2048]).unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:>1kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -45,7 +45,7 @@ fn test_size_filter_respects_parent_base() {
     fs::write(tmp.path().join("folder/keep.bin"), vec![0u8; 4096]).unwrap();
     fs::write(tmp.path().join("skip.bin"), vec![0u8; 8192]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let folder = tmp.path().join("folder");
     let keep_idx = cache.search("keep.bin").unwrap()[0];
     let skip_idx = cache.search("skip.bin").unwrap()[0];
@@ -76,7 +76,7 @@ fn test_size_filter_respects_infolder_base() {
     fs::write(tmp.path().join("media/nested/keep.bin"), vec![0u8; 4096]).unwrap();
     fs::write(tmp.path().join("skip.bin"), vec![0u8; 8192]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
     let keep_idx = cache.search("keep.bin").unwrap()[0];
     let skip_idx = cache.search("skip.bin").unwrap()[0];
     assert!(cache.file_nodes[skip_idx].metadata.is_none());
@@ -109,7 +109,7 @@ fn test_size_comparison_operators() {
     fs::write(tmp.path().join("medium.bin"), vec![0u8; 5000]).unwrap();
     fs::write(tmp.path().join("large.bin"), vec![0u8; 15000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Greater than
     let gt = cache.search("size:>1kb").unwrap();
@@ -142,7 +142,7 @@ fn test_size_units_bytes() {
     fs::write(tmp.path().join("100b.bin"), vec![0u8; 100]).unwrap();
     fs::write(tmp.path().join("500b.bin"), vec![0u8; 500]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:>200").unwrap();
     assert_eq!(results.len(), 1);
@@ -164,7 +164,7 @@ fn test_size_units_kilobytes() {
     fs::write(tmp.path().join("two_kb.bin"), vec![0u8; 2048]).unwrap();
     fs::write(tmp.path().join("five_kb.bin"), vec![0u8; 5120]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let k = cache.search("size:>1k").unwrap();
     assert_eq!(k.len(), 2);
@@ -188,7 +188,7 @@ fn test_size_units_megabytes() {
     fs::write(tmp.path().join("half_mb.bin"), vec![0u8; 512 * 1024]).unwrap();
     fs::write(tmp.path().join("two_mb.bin"), vec![0u8; 2 * 1024 * 1024]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let m = cache.search("size:>1m").unwrap();
     assert_eq!(m.len(), 1);
@@ -212,7 +212,7 @@ fn test_size_units_gigabytes() {
     // For testing purposes, we'll use smaller values and adjust the query
     fs::write(tmp.path().join("small.bin"), vec![0u8; 100]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Test that the unit is recognized (size will be less than 1GB)
     let g = cache.search("size:<1g").unwrap();
@@ -236,7 +236,7 @@ fn test_size_units_terabytes() {
     let tmp = TempDir::new("size_terabytes").unwrap();
     fs::write(tmp.path().join("small.bin"), vec![0u8; 100]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let t = cache.search("size:<1t").unwrap();
     assert!(!t.is_empty());
@@ -259,7 +259,7 @@ fn test_size_units_petabytes() {
     let tmp = TempDir::new("size_petabytes").unwrap();
     fs::write(tmp.path().join("small.bin"), vec![0u8; 100]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let p = cache.search("size:<1p").unwrap();
     assert!(!p.is_empty());
@@ -283,7 +283,7 @@ fn test_size_decimal_values() {
     fs::write(tmp.path().join("1500b.bin"), vec![0u8; 1500]).unwrap();
     fs::write(tmp.path().join("2500b.bin"), vec![0u8; 2500]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:>1.5kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -303,7 +303,7 @@ fn test_size_range_both_bounds() {
     fs::write(tmp.path().join("2500b.bin"), vec![0u8; 2500]).unwrap();
     fs::write(tmp.path().join("5000b.bin"), vec![0u8; 5000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:1kb..3kb").unwrap();
     assert_eq!(results.len(), 2);
@@ -323,7 +323,7 @@ fn test_size_range_open_start() {
     fs::write(tmp.path().join("1500b.bin"), vec![0u8; 1500]).unwrap();
     fs::write(tmp.path().join("2500b.bin"), vec![0u8; 2500]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:..2kb").unwrap();
     assert_eq!(results.len(), 2);
@@ -343,7 +343,7 @@ fn test_size_range_open_end() {
     fs::write(tmp.path().join("1500b.bin"), vec![0u8; 1500]).unwrap();
     fs::write(tmp.path().join("2500b.bin"), vec![0u8; 2500]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:1kb..").unwrap();
     assert_eq!(results.len(), 2);
@@ -362,7 +362,7 @@ fn test_size_keyword_empty() {
     fs::write(tmp.path().join("empty.bin"), vec![]).unwrap();
     fs::write(tmp.path().join("nonempty.bin"), vec![0u8; 100]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:empty").unwrap();
     assert_eq!(results.len(), 1);
@@ -378,7 +378,7 @@ fn test_size_keyword_tiny() {
     fs::write(tmp.path().join("tiny2.bin"), vec![0u8; 5000]).unwrap();
     fs::write(tmp.path().join("medium.bin"), vec![0u8; 50000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:tiny").unwrap();
     assert_eq!(results.len(), 2);
@@ -391,7 +391,7 @@ fn test_size_keyword_small() {
     fs::write(tmp.path().join("small2.bin"), vec![0u8; 50_000]).unwrap();
     fs::write(tmp.path().join("large.bin"), vec![0u8; 200_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:small").unwrap();
     assert_eq!(results.len(), 2);
@@ -404,7 +404,7 @@ fn test_size_keyword_medium() {
     fs::write(tmp.path().join("medium.bin"), vec![0u8; 500_000]).unwrap();
     fs::write(tmp.path().join("large.bin"), vec![0u8; 2_000_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:medium").unwrap();
     assert_eq!(results.len(), 1);
@@ -420,7 +420,7 @@ fn test_size_keyword_large() {
     fs::write(tmp.path().join("large.bin"), vec![0u8; 5_000_000]).unwrap();
     fs::write(tmp.path().join("huge.bin"), vec![0u8; 50_000_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:large").unwrap();
     assert_eq!(results.len(), 1);
@@ -435,7 +435,7 @@ fn test_size_keyword_huge() {
     fs::write(tmp.path().join("large.bin"), vec![0u8; 10_000_000]).unwrap();
     fs::write(tmp.path().join("huge.bin"), vec![0u8; 100_000_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:huge").unwrap();
     assert_eq!(results.len(), 1);
@@ -450,7 +450,7 @@ fn test_size_keyword_gigantic() {
     fs::write(tmp.path().join("huge.bin"), vec![0u8; 100_000_000]).unwrap();
     fs::write(tmp.path().join("gigantic.bin"), vec![0u8; 200_000_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:gigantic").unwrap();
     assert_eq!(results.len(), 1);
@@ -465,7 +465,7 @@ fn test_size_keyword_giant() {
     fs::write(tmp.path().join("huge.bin"), vec![0u8; 100_000_000]).unwrap();
     fs::write(tmp.path().join("giant.bin"), vec![0u8; 200_000_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:giant").unwrap();
     assert_eq!(results.len(), 1);
@@ -479,7 +479,7 @@ fn test_size_keyword_case_insensitive() {
     let tmp = TempDir::new("size_keyword_case").unwrap();
     fs::write(tmp.path().join("tiny.bin"), vec![0u8; 100]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let lower = cache.search("size:tiny").unwrap();
     assert_eq!(lower.len(), 1);
@@ -497,7 +497,7 @@ fn test_size_filter_excludes_directories() {
     fs::write(tmp.path().join("file.bin"), vec![0u8; 1000]).unwrap();
     fs::create_dir(tmp.path().join("folder")).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:>500").unwrap();
     assert_eq!(results.len(), 1);
@@ -513,7 +513,7 @@ fn test_size_combined_with_name_search() {
     fs::write(tmp.path().join("report.txt"), vec![0u8; 500]).unwrap();
     fs::write(tmp.path().join("data.bin"), vec![0u8; 2000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("report size:>1kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -529,7 +529,7 @@ fn test_size_combined_with_ext_filter() {
     fs::write(tmp.path().join("small.txt"), vec![0u8; 500]).unwrap();
     fs::write(tmp.path().join("large.bin"), vec![0u8; 2000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("ext:txt size:>1kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -545,7 +545,7 @@ fn test_size_with_or_operator() {
     fs::write(tmp.path().join("medium.bin"), vec![0u8; 5000]).unwrap();
     fs::write(tmp.path().join("gigantic.bin"), vec![0u8; 200_000_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:tiny OR size:gigantic").unwrap();
     assert!(results.len() >= 2, "Should match at least 2 files");
@@ -564,7 +564,7 @@ fn test_size_with_not_operator() {
     fs::write(tmp.path().join("tiny.bin"), vec![0u8; 100]).unwrap();
     fs::write(tmp.path().join("medium.bin"), vec![0u8; 5000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("!size:tiny").unwrap();
     let has_tiny = results.iter().any(|&i| {
@@ -580,7 +580,7 @@ fn test_size_with_not_operator() {
 fn test_size_error_empty_value() {
     let tmp = TempDir::new("size_error_empty").unwrap();
     fs::write(tmp.path().join("file.bin"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let result = cache.search("size:");
     assert!(result.is_err());
@@ -591,7 +591,7 @@ fn test_size_error_empty_value() {
 fn test_size_error_invalid_number() {
     let tmp = TempDir::new("size_error_number").unwrap();
     fs::write(tmp.path().join("file.bin"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let result = cache.search("size:notanumber");
     assert!(result.is_err());
@@ -601,7 +601,7 @@ fn test_size_error_invalid_number() {
 fn test_size_error_unknown_unit() {
     let tmp = TempDir::new("size_error_unit").unwrap();
     fs::write(tmp.path().join("file.bin"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let result = cache.search("size:100zb");
     assert!(result.is_err());
@@ -617,7 +617,7 @@ fn test_size_error_unknown_unit() {
 fn test_size_error_keyword_with_comparison() {
     let tmp = TempDir::new("size_error_keyword_comp").unwrap();
     fs::write(tmp.path().join("file.bin"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let result = cache.search("size:>tiny");
     assert!(result.is_err());
@@ -633,7 +633,7 @@ fn test_size_error_keyword_with_comparison() {
 fn test_size_range_inverted_bounds_error() {
     let tmp = TempDir::new("size_range_inverted").unwrap();
     fs::write(tmp.path().join("file.bin"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let result = cache.search("size:10kb..1kb");
     assert!(result.is_err());
@@ -651,7 +651,7 @@ fn test_size_bare_value_equals_comparison() {
     fs::write(tmp.path().join("exact.bin"), vec![0u8; 1024]).unwrap();
     fs::write(tmp.path().join("other.bin"), vec![0u8; 2048]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:1kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -666,7 +666,7 @@ fn test_size_zero_bytes() {
     fs::write(tmp.path().join("empty.bin"), vec![]).unwrap();
     fs::write(tmp.path().join("nonempty.bin"), vec![0u8; 1]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:0").unwrap();
     assert_eq!(results.len(), 1);
@@ -680,7 +680,7 @@ fn test_size_very_large_numbers() {
     let tmp = TempDir::new("size_large_num").unwrap();
     fs::write(tmp.path().join("small.bin"), vec![0u8; 100]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Test that very large numbers don't cause panics
     let results = cache.search("size:<999999gb").unwrap();
@@ -693,7 +693,7 @@ fn test_size_fractional_precision() {
     fs::write(tmp.path().join("file1.bin"), vec![0u8; 1536]).unwrap(); // 1.5 KB
     fs::write(tmp.path().join("file2.bin"), vec![0u8; 2048]).unwrap(); // 2 KB
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:>1.4kb").unwrap();
     assert_eq!(results.len(), 2);
@@ -711,7 +711,7 @@ fn test_size_filter_with_parent_filter() {
     fs::write(tmp.path().join("large/file2.bin"), vec![0u8; 500]).unwrap();
     fs::write(tmp.path().join("small/file3.bin"), vec![0u8; 500]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let large_dir = tmp.path().join("large");
     let results = cache
@@ -733,7 +733,7 @@ fn test_size_filter_with_infolder_filter() {
     fs::write(tmp.path().join("data/small.bin"), vec![0u8; 500]).unwrap();
     fs::write(tmp.path().join("other.bin"), vec![0u8; 10_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let data_dir = tmp.path().join("data");
     let results = cache
@@ -750,7 +750,7 @@ fn test_multiple_size_ranges_with_or() {
     fs::write(tmp.path().join("medium.bin"), vec![0u8; 5_000]).unwrap();
     fs::write(tmp.path().join("large.bin"), vec![0u8; 50_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:..500 OR size:>10kb").unwrap();
     assert_eq!(results.len(), 2);
@@ -768,7 +768,7 @@ fn test_size_filter_empty_result() {
     let tmp = TempDir::new("size_empty_result").unwrap();
     fs::write(tmp.path().join("small.bin"), vec![0u8; 100]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:>1mb").unwrap();
     assert_eq!(results.len(), 0);
@@ -779,7 +779,7 @@ fn test_size_with_whitespace() {
     let tmp = TempDir::new("size_whitespace").unwrap();
     fs::write(tmp.path().join("file.bin"), vec![0u8; 2048]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Test basic size query (whitespace after operator might not be supported)
     let results = cache.search("size:>1kb").unwrap();
@@ -791,7 +791,7 @@ fn test_size_boundary_conditions() {
     let tmp = TempDir::new("size_boundary").unwrap();
     fs::write(tmp.path().join("exactly_1kb.bin"), vec![0u8; 1024]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let gt = cache.search("size:>1kb").unwrap();
     assert_eq!(gt.len(), 0);
@@ -816,7 +816,7 @@ fn test_size_with_regex_filter() {
     fs::write(tmp.path().join("Report_2023.pdf"), vec![0u8; 500]).unwrap();
     fs::write(tmp.path().join("Data_2024.csv"), vec![0u8; 10_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("regex:^Report.* size:>5kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -836,7 +836,7 @@ fn test_size_filter_symlinks() {
         symlink(tmp.path().join("target.bin"), tmp.path().join("link.bin")).unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Size filter should handle symlinks gracefully
     let results = cache.search("size:>1kb").unwrap();
@@ -850,7 +850,7 @@ fn test_size_filter_very_small_files() {
     fs::write(tmp.path().join("2bytes.bin"), vec![0u8; 2]).unwrap();
     fs::write(tmp.path().join("empty.bin"), vec![]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:>=1").unwrap();
     assert_eq!(results.len(), 2);
@@ -865,7 +865,7 @@ fn test_size_filter_with_quoted_phrases() {
     fs::write(tmp.path().join("my report.pdf"), vec![0u8; 10_000]).unwrap();
     fs::write(tmp.path().join("other.txt"), vec![0u8; 10_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("\"my report\" size:>5kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -879,7 +879,7 @@ fn test_size_unit_case_insensitive() {
     let tmp = TempDir::new("size_unit_case").unwrap();
     fs::write(tmp.path().join("file.bin"), vec![0u8; 2048]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let lower = cache.search("size:>1kb").unwrap();
     assert_eq!(lower.len(), 1);
@@ -901,7 +901,7 @@ fn test_size_range_inclusive_bounds() {
     fs::write(tmp.path().join("2kb.bin"), vec![0u8; 2048]).unwrap();
     fs::write(tmp.path().join("3kb.bin"), vec![0u8; 3072]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:1kb..3kb").unwrap();
     assert_eq!(results.len(), 3, "Range should include both bounds");
@@ -914,7 +914,7 @@ fn test_size_with_multiple_and_conditions() {
     fs::write(tmp.path().join("data.csv"), vec![0u8; 5_000]).unwrap();
     fs::write(tmp.path().join("small.txt"), vec![0u8; 100]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("report size:>1kb ext:pdf").unwrap();
     assert_eq!(results.len(), 1);
@@ -927,7 +927,7 @@ fn test_size_comparison_with_equal_files() {
     fs::write(tmp.path().join("file2.bin"), vec![0u8; 1000]).unwrap();
     fs::write(tmp.path().join("file3.bin"), vec![0u8; 1000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:=1000").unwrap();
     assert_eq!(results.len(), 3);
@@ -941,7 +941,7 @@ fn test_size_filter_performance_many_files() {
         fs::write(tmp.path().join(format!("file_{i}.bin")), vec![0u8; size]).unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:>5kb").unwrap();
     assert!(!results.is_empty());
@@ -951,7 +951,7 @@ fn test_size_filter_performance_many_files() {
 fn test_size_double_range_error() {
     let tmp = TempDir::new("size_double_range").unwrap();
     fs::write(tmp.path().join("file.bin"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // This should parse as a range with start "1kb..2kb" and no end, which is invalid
     // Actually, the parser might reject this, so let's just verify it doesn't crash
@@ -964,7 +964,7 @@ fn test_size_double_range_error() {
 fn test_size_negative_number_error() {
     let tmp = TempDir::new("size_negative").unwrap();
     fs::write(tmp.path().join("file.bin"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let result = cache.search("size:-100");
     // This should either error or be parsed as something else
@@ -977,7 +977,7 @@ fn test_size_range_single_point() {
     fs::write(tmp.path().join("exact.bin"), vec![0u8; 1024]).unwrap();
     fs::write(tmp.path().join("other.bin"), vec![0u8; 2048]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:1kb..1kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -995,7 +995,7 @@ fn test_size_keywords_boundaries() {
     fs::write(tmp.path().join("50mb.bin"), vec![0u8; 50 * 1024 * 1024]).unwrap(); // huge: 16MB+1..128MB
     fs::write(tmp.path().join("200mb.bin"), vec![0u8; 200 * 1024 * 1024]).unwrap(); // gigantic: >128MB
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let empty = cache.search("size:empty").unwrap();
     assert_eq!(empty.len(), 1, "Should match empty file");
@@ -1029,7 +1029,7 @@ fn test_size_with_floating_point_edge_cases() {
     let tmp = TempDir::new("size_float_edge").unwrap();
     fs::write(tmp.path().join("file.bin"), vec![0u8; 1536]).unwrap(); // 1.5 KB
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:1.5kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -1049,7 +1049,7 @@ fn test_size_with_all_comparison_operators_on_same_file() {
     let tmp = TempDir::new("size_all_ops").unwrap();
     fs::write(tmp.path().join("1kb.bin"), vec![0u8; 1024]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     assert_eq!(cache.search("size:>1023").unwrap().len(), 1);
     assert_eq!(cache.search("size:>=1024").unwrap().len(), 1);
@@ -1065,7 +1065,7 @@ fn test_size_range_with_different_units() {
     let tmp = TempDir::new("size_range_units").unwrap();
     fs::write(tmp.path().join("file.bin"), vec![0u8; 1_500_000]).unwrap(); // ~1.43 MB
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:1mb..2mb").unwrap();
     assert_eq!(results.len(), 1);
@@ -1083,7 +1083,7 @@ fn test_size_with_name_containing_numbers() {
     fs::write(tmp.path().join("file123.bin"), vec![0u8; 5000]).unwrap();
     fs::write(tmp.path().join("456file.bin"), vec![0u8; 5000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("123 size:>1kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -1100,7 +1100,7 @@ fn test_size_filter_with_many_size_variants() {
         fs::write(tmp.path().join(format!("file_{i}.bin")), vec![0u8; size]).unwrap();
     }
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:>20kb").unwrap();
     assert!(!results.is_empty());
@@ -1114,7 +1114,7 @@ fn test_size_extreme_values() {
     let tmp = TempDir::new("size_extreme").unwrap();
     fs::write(tmp.path().join("file.bin"), vec![0u8; 100]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Test very large size queries
     let results = cache.search("size:<1000pb").unwrap();
@@ -1136,7 +1136,7 @@ fn test_size_with_all_keywords() {
     fs::write(tmp.path().join("huge.bin"), vec![0u8; 50_000_000]).unwrap();
     fs::write(tmp.path().join("gigantic.bin"), vec![0u8; 200_000_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     assert!(!cache.search("size:empty").unwrap().is_empty());
     assert!(!cache.search("size:tiny").unwrap().is_empty());
@@ -1154,7 +1154,7 @@ fn test_size_negation_complex() {
     fs::write(tmp.path().join("small.bin"), vec![0u8; 100]).unwrap();
     fs::write(tmp.path().join("large.bin"), vec![0u8; 100_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("!size:>10kb").unwrap();
     let has_large = results.iter().any(|&i| {
@@ -1171,7 +1171,7 @@ fn test_size_with_very_precise_decimal() {
     let tmp = TempDir::new("size_precise_decimal").unwrap();
     fs::write(tmp.path().join("file.bin"), vec![0u8; 1536]).unwrap(); // 1.5 KB exactly
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:1.5kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -1188,7 +1188,7 @@ fn test_size_with_unicode_in_filename() {
     let tmp = TempDir::new("size_unicode").unwrap();
     fs::write(tmp.path().join("文件.bin"), vec![0u8; 5000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:>1kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -1199,7 +1199,7 @@ fn test_size_range_overlap() {
     let tmp = TempDir::new("size_range_overlap").unwrap();
     fs::write(tmp.path().join("file.bin"), vec![0u8; 5000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results1 = cache.search("size:1kb..10kb").unwrap();
     assert_eq!(results1.len(), 1);
@@ -1216,7 +1216,7 @@ fn test_size_comparison_chain() {
     let tmp = TempDir::new("size_comp_chain").unwrap();
     fs::write(tmp.path().join("file.bin"), vec![0u8; 5000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Combining multiple size constraints
     let results = cache.search("size:>1kb size:<10kb").unwrap();
@@ -1228,7 +1228,7 @@ fn test_size_with_repeated_filters() {
     let tmp = TempDir::new("size_repeated").unwrap();
     fs::write(tmp.path().join("file.bin"), vec![0u8; 5000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Multiple size filters should intersect
     let results = cache.search("size:>1kb size:>2kb size:>3kb").unwrap();
@@ -1244,7 +1244,7 @@ fn test_size_zero_with_comparison_operators() {
     fs::write(tmp.path().join("empty.bin"), vec![]).unwrap();
     fs::write(tmp.path().join("nonempty.bin"), vec![0u8; 1]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let gt_zero = cache.search("size:>0").unwrap();
     assert_eq!(gt_zero.len(), 1);
@@ -1263,7 +1263,7 @@ fn test_size_zero_with_comparison_operators() {
 fn test_size_scientific_notation_not_supported() {
     let tmp = TempDir::new("size_scientific").unwrap();
     fs::write(tmp.path().join("file.bin"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Scientific notation should fail to parse
     let result = cache.search("size:1e6");
@@ -1277,7 +1277,7 @@ fn test_size_range_only_start() {
     fs::write(tmp.path().join("small.bin"), vec![0u8; 500]).unwrap();
     fs::write(tmp.path().join("large.bin"), vec![0u8; 50_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:1kb..").unwrap();
     assert_eq!(results.len(), 1);
@@ -1292,7 +1292,7 @@ fn test_size_range_only_end() {
     fs::write(tmp.path().join("small.bin"), vec![0u8; 500]).unwrap();
     fs::write(tmp.path().join("large.bin"), vec![0u8; 50_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:..10kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -1305,7 +1305,7 @@ fn test_size_range_only_end() {
 fn test_size_keyword_with_spaces() {
     let tmp = TempDir::new("size_keyword_space").unwrap();
     fs::write(tmp.path().join("file.bin"), vec![0u8; 100]).unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Test that spaces are trimmed
     let result = cache.search("size: tiny ");
@@ -1320,7 +1320,7 @@ fn test_size_multiple_ranges_or() {
     fs::write(tmp.path().join("medium.bin"), vec![0u8; 5000]).unwrap();
     fs::write(tmp.path().join("large.bin"), vec![0u8; 100_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:..500 OR size:50kb..").unwrap();
     assert_eq!(results.len(), 2);
@@ -1333,7 +1333,7 @@ fn test_size_boundary_exact_1024() {
     fs::write(tmp.path().join("1024.bin"), vec![0u8; 1024]).unwrap();
     fs::write(tmp.path().join("1025.bin"), vec![0u8; 1025]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let lt = cache.search("size:<1kb").unwrap();
     assert_eq!(lt.len(), 1);
@@ -1353,7 +1353,7 @@ fn test_size_with_path_filter_complex() {
     fs::write(tmp.path().join("large_files/file.bin"), vec![0u8; 100_000]).unwrap();
     fs::write(tmp.path().join("small_files/file.bin"), vec![0u8; 100]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let large_dir = tmp.path().join("large_files");
     let results = cache
@@ -1369,7 +1369,7 @@ fn test_size_with_path_filter_complex() {
 fn test_size_overflow_protection() {
     let tmp = TempDir::new("size_overflow").unwrap();
     fs::write(tmp.path().join("file.bin"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Very large number that might overflow
     let result = cache.search("size:<99999999999999gb");
@@ -1381,7 +1381,7 @@ fn test_size_with_leading_zeros() {
     let tmp = TempDir::new("size_leading_zeros").unwrap();
     fs::write(tmp.path().join("file.bin"), vec![0u8; 1024]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:01kb").unwrap();
     assert_eq!(results.len(), 1);
@@ -1395,7 +1395,7 @@ fn test_size_with_mixed_units_in_range() {
     let tmp = TempDir::new("size_mixed_units").unwrap();
     fs::write(tmp.path().join("file.bin"), vec![0u8; 1_500_000]).unwrap(); // ~1.43 MB
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:1000kb..2mb").unwrap();
     assert_eq!(results.len(), 1);
@@ -1411,7 +1411,7 @@ fn test_size_keyword_boundaries_precise() {
     fs::write(tmp.path().join("tiny_max.bin"), vec![0u8; 10 * 1024]).unwrap(); // 10 KB - in tiny
     fs::write(tmp.path().join("small_min.bin"), vec![0u8; 10 * 1024 + 1]).unwrap(); // 10 KB + 1 - in small
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let tiny = cache.search("size:tiny").unwrap();
     assert_eq!(tiny.len(), 1); // tiny_max.bin
@@ -1424,7 +1424,7 @@ fn test_size_keyword_boundaries_precise() {
 fn test_size_range_with_keywords_error() {
     let tmp = TempDir::new("size_range_keyword").unwrap();
     fs::write(tmp.path().join("file.bin"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Keywords in ranges might not be supported
     let result = cache.search("size:tiny..large");
@@ -1439,7 +1439,7 @@ fn test_regression_type_and_size_intersection() {
     fs::write(tmp.path().join("b.jpg"), vec![0u8; 1_000]).unwrap();
     fs::write(tmp.path().join("c.mp3"), vec![0u8; 100_000]).unwrap();
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     // Should intersect properly
     let results = cache.search("type:picture size:>10kb").unwrap();
@@ -1454,7 +1454,7 @@ fn test_size_decimal_rounding() {
     let tmp = TempDir::new("size_rounding").unwrap();
     fs::write(tmp.path().join("file.bin"), vec![0u8; 1536]).unwrap(); // 1.5 KB
 
-    let mut cache = SearchCache::walk_fs(tmp.path().to_path_buf());
+    let mut cache = SearchCache::walk_fs(tmp.path());
 
     let results = cache.search("size:1.5kb").unwrap();
     assert_eq!(results.len(), 1);

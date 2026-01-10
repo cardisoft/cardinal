@@ -12,7 +12,7 @@ use std::{
 use tracing::info;
 use typed_num::Num;
 
-const LSF_VERSION: i64 = 2;
+const LSF_VERSION: i64 = 3;
 
 #[derive(Serialize, Deserialize)]
 pub struct PersistentStorage {
@@ -21,6 +21,8 @@ pub struct PersistentStorage {
     pub last_event_id: u64,
     /// Root file path of the cache
     pub path: PathBuf,
+    /// Ignore paths
+    pub ignore_paths: Vec<PathBuf>,
     /// Root index of the slab
     pub slab_root: SlabIndex,
     pub slab: ThinSlab<SlabNode>,
