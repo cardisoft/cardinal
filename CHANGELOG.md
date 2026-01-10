@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.19 — 2026-01-10
+- Add watch roots and ignore paths to settings.
+- Avoid unnecessary rescan on FSEvent::Rescan.
+- Handle Enter key in search input.
+
 ## 0.1.18 — 2025-12-15
 - Add option for tray icon and defaults to disable
 - Persistent cache when idle or enter background.
