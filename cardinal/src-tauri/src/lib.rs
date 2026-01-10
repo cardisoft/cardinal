@@ -219,9 +219,12 @@ fn run_logic_thread(
     let path = PathBuf::from(WATCH_ROOT);
     let ignore_paths = vec![PathBuf::from("/System/Volumes/Data")];
 
-    let mut cache =
-        match SearchCache::try_read_persistent_cache(&path, db_path, &ignore_paths, Some(&APP_QUIT))
-        {
+    let mut cache = match SearchCache::try_read_persistent_cache(
+        &path,
+        db_path,
+        &ignore_paths,
+        Some(&APP_QUIT),
+    ) {
         Ok(cached) => {
             info!("Loaded existing cache");
             emit_status_bar_update(app_handle, cached.get_total_files(), 0, 0);

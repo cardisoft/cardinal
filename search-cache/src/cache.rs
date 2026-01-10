@@ -115,8 +115,7 @@ impl SearchCache {
     }
 
     pub fn walk_fs_with_ignore(path: &Path, ignore_paths: &[PathBuf]) -> Self {
-        Self::walk_fs_with_walk_data(&WalkData::new(path, ignore_paths, false, None), None)
-            .unwrap()
+        Self::walk_fs_with_walk_data(&WalkData::new(path, ignore_paths, false, None), None).unwrap()
     }
 
     pub fn walk_fs(path: &Path) -> Self {
