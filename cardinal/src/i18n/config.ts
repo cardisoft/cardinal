@@ -183,6 +183,9 @@ export const normalizeLanguageTag = (lng: string): SupportedLanguage =>
   normalizeBrowserLanguage(lng);
 
 export const getBrowserLanguage = (): SupportedLanguage => {
+  if (typeof window === 'undefined') {
+    return DEFAULT_LANGUAGE;
+  }
   const browserLang = window.navigator.language;
   return browserLang ? normalizeLanguageTag(browserLang) : DEFAULT_LANGUAGE;
 };
