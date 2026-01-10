@@ -44,7 +44,7 @@ import { setTrayEnabled } from './tray';
 import { useWatchRoot } from './hooks/useWatchRoot';
 import { useIgnorePaths } from './hooks/useIgnorePaths';
 import { applyThemePreference, persistThemePreference } from './theme';
-import { getDefaultLanguage } from './i18n/config';
+import { getBrowserLanguage } from './i18n/config';
 
 type ActiveTab = StatusTabKey;
 
@@ -254,7 +254,7 @@ function App() {
     setTrayIconEnabled(false);
     persistThemePreference('system');
     applyThemePreference('system');
-    const nextLanguage = getDefaultLanguage();
+    const nextLanguage = getBrowserLanguage();
     void i18n.changeLanguage(nextLanguage);
     setPreferencesResetToken((token) => token + 1);
   }, [applyWatchConfig, defaultIgnorePaths, defaultWatchRoot, i18n, setSortThreshold]);
