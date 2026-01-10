@@ -15,6 +15,8 @@ UI -> Tauri commands -> background thread
 [icon_viewport_tx]     visible slab indices for QuickLook icon prefetch
 [icon_update_tx]       pushes base64 PNG icons back to UI (event: icon_update)
 [rescan_tx]            manual rescan requests
+[watch_config_tx]      watch root + ignore-path updates
+[update_window_state_rx] window focus/visibility changes for idle flush
 [finish_tx/finalizer]  flush cache once on exit
 ```
 
@@ -29,6 +31,9 @@ loop select! {
   node_info_rx     => cache.expand_file_nodes   -> respond via NodeInfoRequest.response_tx
   icon_viewport_rx => spawn QuickLook jobs; send IconPayload via icon_update_tx
   rescan_rx        => perform_rescan(...)
+  watch_config_rx  => rebuild cache + watcher for new root/ignore paths
+  window_state_rx  => recompute foreground state for idle flush
+  flush_ticker     => periodic idle/hide cache flush
   event_watcher    => handle_fs_events; maybe trigger rescan; forward new events to UI
 }
 ```

@@ -13,6 +13,7 @@ This chapter documents the Tauri commands exposed to the frontend.
 | `get_sorted_view(results, sort)` | Sort a slice of slab indices on the backend so the UI can render column sorts without moving data client-side | remote sort controls |
 | `update_icon_viewport(id, viewport)` | Notify backend of visible rows for Quick Look icon prefetch | `useIconViewport` |
 | `trigger_rescan()` | Force a full rescan and reset lifecycle state | status bar / settings |
+| `set_watch_config(watch_root, ignore_paths)` | Update watch root + ignore list, rebuilding cache when they change | settings |
 
 ---
 
@@ -43,7 +44,7 @@ This chapter documents the Tauri commands exposed to the frontend.
 | `activate_main_window()` | Show + focus | menu |
 | `toggle_main_window()` | Toggle visibility and emit `quick_launch` | global shortcut |
 | `get_app_status()` | Read lifecycle state | startup |
-| `start_logic()` | Unblocks logic thread once permissions/UI are ready | startup |
+| `start_logic(watch_root, ignore_paths)` | Unblocks logic thread once permissions/UI are ready | startup |
 
 ---
 
