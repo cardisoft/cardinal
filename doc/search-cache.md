@@ -68,8 +68,8 @@ In combination, these choices roughly halve the memory footprint of the slab com
 ---
 
 ## Lifecycle
-1. **Initial build** (`walk_fs*`): `fswalk::walk_it` produces a tree of `Node` with metadata; we then allocate a slab and `NameIndex` in one pass (`construct_node_slab_name_index`). The last FSEvent ID at build time is recorded for incremental updates.
-2. **Persistence**: `persistent::{write_cache_to_file, read_cache_from_file}` snapshot `{ path, slab_root, slab, name_index, last_event_id }`. `NamePool` is *not* persisted; it is reconstructed from `name_index` on load because interning is fast.
+1. **Initial build** (`walk_fs*`): `fswalk::walk_it` produces a tree of `Node` with names only (file metadata is not collected during the initial walk); we then allocate a slab and `NameIndex` in one pass (`construct_node_slab_name_index`). The last FSEvent ID at build time is recorded for incremental updates.
+2. **Persistence**: `persistent::{write_cache_to_file, read_cache_from_file}` snapshot `{ path, ignore_paths, slab_root, slab, name_index, last_event_id }`. `NamePool` is *not* persisted; it is reconstructed from `name_index` on load because interning is fast.
 3. **Incremental updates**:
    - FSEvents come from `cardinal_sdk::EventWatcher` with `FsEvent { path, flag, id }`.
    - Adds/removes/renames call into `scan_path_recursive` (re-walk subtree) or `remove_node_path`.
@@ -100,7 +100,7 @@ UI query string
 ```
 
 - Cancellation uses `search-cancel::CancellationToken` (versioned per request). When cancelled, `nodes` becomes `None`.
-- Empty query uses `NameIndex::all_indices` to return every node in path order with cancellation checks.
+- Empty query uses `NameIndex::all_indices` to return every node in name order, with per-name indices ordered by full path and cancellation checks.
 
 ---
 
@@ -108,7 +108,7 @@ UI query string
 - Metadata is compacted into `SlabNodeMetadataCompact` for memory density (see above).
 - `type_and_size` (`StateTypeSize`) encodes state, type, and size together and exposes helpers to classify node type (file/dir/other) and obtain sizes.
 - Initial full scans are run without per-file metadata (`WalkData::new(..., need_metadata = false, ...)`) to avoid slow `lstat` calls on APFS; the cache lazily populates metadata when filters (size/date/type) require it.
-- `metadata_cache` and `ensure_metadata` handle this lazy loading, updating `SlabNodeMetadataCompact` in-place the first time a node’s metadata is needed.
+- `ensure_metadata` handles this lazy loading, updating `SlabNodeMetadataCompact` in-place the first time a node’s metadata is needed.
 
 ---
 

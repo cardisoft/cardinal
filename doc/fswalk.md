@@ -43,12 +43,13 @@ Example tree:
 - `num_files: AtomicUsize` — total files visited.
 - `num_dirs: AtomicUsize` — total directories visited.
 - `cancel: Option<&'w AtomicBool>` — optional cancellation flag.
-- `ignore_directories: Option<Vec<PathBuf>>` — directories to skip.
+- `root_path: &'w Path` — root directory for the walk.
+- `ignore_directories: &'w [PathBuf]` — directories to skip.
 - `need_metadata: bool` — whether to gather per-file `Metadata`.
 
 Constructors:
-- `WalkData::simple(need_metadata)` — minimal config, no ignore list or cancellation.
-- `WalkData::new(ignore_directories, need_metadata, cancel)` — full control.
+- `WalkData::simple(root_path, need_metadata)` — minimal config, no ignore list or cancellation.
+- `WalkData::new(root_path, ignore_directories, need_metadata, cancel)` — full control.
 
 `SearchCache` uses `WalkData` to drive progress bars, cancellation, and ignore lists.
 
@@ -56,7 +57,7 @@ Constructors:
 
 ## Traversal algorithm
 
-Entry point: `walk_it(dir: &Path, walk_data: &WalkData) -> Option<Node>`.
+Entry point: `walk_it(walk_data: &WalkData) -> Option<Node>`.
 
 High-level steps:
 1. Check `ignore_directories`; abort traversal under ignored roots.

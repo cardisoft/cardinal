@@ -7,12 +7,13 @@ This chapter maps the React-side components and hooks to the IPC layer.
 ## Search execution
 ```
 Search input change
-  -> debounce -> invoke('search', { query, options, version })
+  -> debounce (unless immediate) -> invoke('search', { query, options, version })
   -> receive { results: SlabIndex[], highlights }
   -> store results in state and pass to <VirtualList>
 ```
 
 - Each `search` call carries a `version` used to build a `CancellationToken`.
+- The UI can trigger immediate searches (initial load and Enter key) to bypass debounce.
 - When a new query starts, older tokens are considered cancelled inside the engine; loops exit early and the Tauri command returns an empty `results` list for those searches.
 - Independently, the React hook uses its own `searchVersionRef` to ignore any `search` responses whose `version` does not match the latest request.
 

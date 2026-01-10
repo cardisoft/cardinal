@@ -6,7 +6,7 @@ This chapter describes Cardinal’s lifecycle states and how they are surfaced t
 
 ## States
 - **Initializing**: initial scan or rebuilding; UI should expect partial data.
-- **Updating**: rescan in progress after the app has become Ready at least once.
+- **Updating**: background loop is live after a scan/rebuild and is waiting for the FSEvents history boundary (HistoryDone) before marking Ready.
 - **Ready**: steady state; FSEvents-driven incremental updates.
 
 Implementation: `cardinal/src-tauri/src/lifecycle.rs`

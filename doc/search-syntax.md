@@ -144,9 +144,9 @@ ext:png;jpg travel|vacation
 | --------------- | --------------------------------------------------------- | ------------------------------------------------- |
 | `parent:`       | Direct children of the given folder only                  | `parent:/Users/demo/Documents ext:md`            |
 | `infolder:`     | Any descendant of the given folder (recursive)           | `infolder:/Users/demo/Projects report draft`     |
-| `nosubfolders:` | Files in a folder but not in any of its subfolders       | `nosubfolders:/Users/demo/Projects ext:log`      |
+| `nosubfolders:` | Folder itself plus direct file children (no subfolders)  | `nosubfolders:/Users/demo/Projects ext:log`      |
 
-These filters take an absolute path as their argument.
+These filters take an absolute path as their argument; a leading `~` is expanded to the user home directory.
 
 ### 4.4 Type filter: `type:`
 
@@ -236,7 +236,7 @@ dm:>=2024/01/01               # modified from 2024-01-01 onwards
 
 ### 4.8 Regex filter: `regex:`
 
-`regex:` treats the rest of the token as a regular expression applied to the filename (within the path). It uses Rust’s `regex` engine.
+`regex:` treats the rest of the token as a regular expression applied to a path component (file or folder name).
 
 Examples:
 ```text
@@ -268,7 +268,7 @@ Content matching is done in streaming fashion over the file; multi-byte sequence
 
 ### 4.10 Tag filter: `tag:`
 
-Filters by Finder tags (macOS). Cardinal fetches tags on demand from the file’s metadata (no caching) and matches the needle against each tag name.
+Filters by Finder tags (macOS). Cardinal fetches tags on demand from the file’s metadata (no caching), and for large result sets it uses `mdfind` to narrow candidates before applying tag matching.
 
 - Accepts one or more tags separated by `;` (logical OR): `tag:ProjectA;ProjectB`.
 - Chain multiple `tag:` filters (logical AND) for multi-tag matches: `tag:Project tag:Important`.
