@@ -31,8 +31,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 base64 = "0.22"
 rayon = "1.10"
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", features = ["NSString", "NSURL"] }
-objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSWindow", "NSPanel", "NSResponder"] }
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSString", "NSURL"] }
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSPasteboard", "NSPanel", "NSResponder", "NSWindow"] }
 objc2-quick-look-ui = "0.3"
 parking_lot = "0.12"
 tauri-plugin-prevent-default = "4"

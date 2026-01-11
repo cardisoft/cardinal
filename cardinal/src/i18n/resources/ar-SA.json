@@ -40,8 +40,9 @@
     "openItem": "فتح",
     "quickLook": "معاينة سريعة",
     "revealInFinder": "إظهار في Finder",
-    "copyPath": "نسخ المسار",
     "copyFilename": "نسخ اسم الملف",
+    "copyFile": "نسخ ملف",
+    "copyFiles": "نسخ الملفات",
     "resetColumnWidths": "إعادة تعيين عرض الأعمدة"
   },
   "statusBar": {

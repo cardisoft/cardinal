@@ -8,10 +8,16 @@ use crate::{
     sort::{SortEntry, SortStatePayload, sort_entries},
     window_controls::{activate_main_window_impl, hide_main_window_impl, toggle_main_window_impl},
 };
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
 use crossbeam_channel::{Receiver, Sender, bounded};
+use objc2::{
+    rc::{Retained, autoreleasepool},
+    runtime::ProtocolObject,
+};
+use objc2_app_kit::{NSPasteboard, NSPasteboardItem, NSPasteboardTypeString, NSPasteboardWriting};
+use objc2_foundation::{NSArray, NSString, NSURL};
 use parking_lot::Mutex;
 use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, SlabNodeMetadata};
 use search_cancel::CancellationToken;
@@ -453,6 +459,47 @@ pub async fn set_tray_activation_policy(app: AppHandle, enabled: bool) {
     }) {
         error!("Failed to dispatch activation policy update: {e:?}");
     }
+}
+
+#[tauri::command]
+pub async fn copy_files_to_clipboard(paths: Vec<String>) {
+    if paths.is_empty() {
+        return;
+    }
+
+    if let Err(err) = copy_files_to_clipboard_impl(paths) {
+        error!("Failed to copy files to clipboard: {err:?}");
+    }
+}
+
+fn copy_files_to_clipboard_impl(paths: Vec<String>) -> Result<()> {
+    autoreleasepool(|_| unsafe {
+        let pasteboard = NSPasteboard::generalPasteboard();
+        pasteboard.clearContents();
+
+        let urls: Vec<Retained<NSURL>> = paths
+            .iter()
+            .map(|path| NSURL::fileURLWithPath(&NSString::from_str(path)))
+            .collect();
+
+        let path_strings = NSPasteboardItem::new();
+        {
+            let ns_path = NSString::from_str(&paths.join(" "));
+            path_strings.setString_forType(&ns_path, NSPasteboardTypeString);
+        }
+
+        let objects: Vec<&ProtocolObject<dyn NSPasteboardWriting>> = urls
+            .iter()
+            .map(|url| ProtocolObject::from_ref(&**url))
+            .chain(Some(ProtocolObject::from_ref(&*path_strings)))
+            .collect();
+        let array = NSArray::from_slice(&objects);
+        if pasteboard.writeObjects(&array) {
+            Ok(())
+        } else {
+            Err(anyhow!("NSPasteboard.writeObjects failed"))
+        }
+    })
 }
 
 #[cfg(test)]

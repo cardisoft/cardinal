@@ -14,6 +14,7 @@ type UseContextMenuResult = {
 export function useContextMenu(
   autoFitColumns: (() => void) | null = null,
   onQuickLookRequest?: () => void | Promise<void>,
+  getSelectedPaths?: () => string[],
 ): UseContextMenuResult {
   const { t } = useTranslation();
 
@@ -26,6 +27,8 @@ export function useContextMenu(
       const segments = path.split(/[\\/]/).filter(Boolean);
       const filename = segments.length > 0 ? segments[segments.length - 1] : path;
 
+      const selectedCount = getSelectedPaths?.().filter(Boolean).length ?? 0;
+      const copyLabel = selectedCount > 1 ? t('contextMenu.copyFiles') : t('contextMenu.copyFile');
       const items: MenuItemOptions[] = [
         {
           id: 'context_menu.open_item',
@@ -44,22 +47,24 @@ export function useContextMenu(
           },
         },
         {
-          id: 'context_menu.copy_path',
-          text: t('contextMenu.copyPath'),
-          accelerator: 'Cmd+C',
-          action: () => {
-            if (navigator?.clipboard?.writeText) {
-              void navigator.clipboard.writeText(path);
-            }
-          },
-        },
-        {
           id: 'context_menu.copy_filename',
           text: t('contextMenu.copyFilename'),
           action: () => {
             if (navigator?.clipboard?.writeText) {
               void navigator.clipboard.writeText(filename);
             }
+          },
+        },
+        {
+          id: 'context_menu.copy_files',
+          text: copyLabel,
+          accelerator: 'Cmd+C',
+          action: () => {
+            const selected = getSelectedPaths?.().filter(Boolean);
+            const targetPaths = selected && selected.length > 0 ? selected : [path];
+            void invoke('copy_files_to_clipboard', { paths: targetPaths }).catch((error) => {
+              console.error('Failed to copy files to clipboard', error);
+            });
           },
         },
       ];
@@ -79,7 +84,7 @@ export function useContextMenu(
 
       return items;
     },
-    [onQuickLookRequest, t],
+    [getSelectedPaths, onQuickLookRequest, t],
   );
 
   const buildHeaderMenuItems = useCallback((): MenuItemOptions[] => {
