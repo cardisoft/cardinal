@@ -1,6 +1,6 @@
 [package]
 name = "cardinal"
-version = "0.1.19"
+version = "0.1.20"
 description = "Cardinal is a cross platform file searching tool"
 authors = ["ldm2993593805@163.com"]
 edition = "2024"

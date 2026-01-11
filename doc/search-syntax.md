@@ -138,12 +138,12 @@ ext:pdf briefing parent:/Users/demo/Reports
 ext:png;jpg travel|vacation
 ```
 
-### 4.3 Folder scope: `parent:`, `infolder:`, `nosubfolders:`
+### 4.3 Folder scope: `parent:`, `infolder:` / `in:`, `nosubfolders:`
 
 | Filter          | Meaning                                                   | Example                                           |
 | --------------- | --------------------------------------------------------- | ------------------------------------------------- |
 | `parent:`       | Direct children of the given folder only                  | `parent:/Users/demo/Documents ext:md`            |
-| `infolder:`     | Any descendant of the given folder (recursive)           | `infolder:/Users/demo/Projects report draft`     |
+| `infolder:`/`in:` | Any descendant of the given folder (recursive)          | `in:/Users/demo/Projects report draft`           |
 | `nosubfolders:` | Folder itself plus direct file children (no subfolders)  | `nosubfolders:/Users/demo/Projects ext:log`      |
 
 These filters take an absolute path as their argument; a leading `~` is expanded to the user home directory.
@@ -266,7 +266,7 @@ type:doc content:"Q4 budget"
 
 Content matching is done in streaming fashion over the file; multi-byte sequences can span buffer boundaries.
 
-### 4.10 Tag filter: `tag:`
+### 4.10 Tag filter: `tag:` / `t:`
 
 Filters by Finder tags (macOS). Cardinal fetches tags on demand from the file’s metadata (no caching), and for large result sets it uses `mdfind` to narrow candidates before applying tag matching.
 
@@ -278,6 +278,7 @@ Filters by Finder tags (macOS). Cardinal fetches tags on demand from the file’
 Examples:
 ```text
 tag:Important
+t:Urgent
 tag:ProjectA;ProjectB report
 tag:Project tag:Archive report
 infolder:/Users/demo/Documents tag:"Q4"
