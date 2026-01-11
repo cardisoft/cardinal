@@ -295,7 +295,7 @@ function App() {
         return true;
       }
 
-      if (key === 'c' && selectedPaths) {
+      if (key === 'c') {
         event.preventDefault();
         void invoke('copy_files_to_clipboard', { paths: selectedPaths }).catch((error) => {
           console.error('Failed to copy files to clipboard', error);
