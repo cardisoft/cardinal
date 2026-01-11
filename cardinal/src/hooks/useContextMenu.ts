@@ -28,8 +28,7 @@ export function useContextMenu(
       const filename = segments.length > 0 ? segments[segments.length - 1] : path;
 
       const selectedCount = getSelectedPaths?.().filter(Boolean).length ?? 0;
-      const copyLabel =
-        selectedCount > 1 ? t('contextMenu.copyFiles') : t('contextMenu.copyFile');
+      const copyLabel = selectedCount > 1 ? t('contextMenu.copyFiles') : t('contextMenu.copyFile');
       const items: MenuItemOptions[] = [
         {
           id: 'context_menu.open_item',
