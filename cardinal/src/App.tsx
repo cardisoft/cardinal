@@ -170,7 +170,9 @@ function App() {
   const {
     showContextMenu: showFilesContextMenu,
     showHeaderContextMenu: showFilesHeaderContextMenu,
-  } = useContextMenu(autoFitColumns, toggleQuickLook);
+  } = useContextMenu(autoFitColumns, toggleQuickLook, () =>
+    activeTab === 'files' ? selectedPaths : [],
+  );
 
   const {
     showContextMenu: showEventsContextMenu,
@@ -293,13 +295,11 @@ function App() {
         return true;
       }
 
-      if (key === 'c' && currentPath) {
+      if (key === 'c' && selectedPaths) {
         event.preventDefault();
-        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-          navigator.clipboard.writeText(currentPath).catch((error) => {
-            console.error('Failed to copy file path', error);
-          });
-        }
+        void invoke('copy_files_to_clipboard', { paths: selectedPaths }).catch((error) => {
+          console.error('Failed to copy files to clipboard', error);
+        });
         return true;
       }
 

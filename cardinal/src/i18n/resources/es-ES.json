@@ -40,8 +40,9 @@
     "openItem": "Abrir",
     "quickLook": "Vista rápida",
     "revealInFinder": "Mostrar en Finder",
-    "copyPath": "Copiar ruta",
     "copyFilename": "Copiar nombre de archivo",
+    "copyFile": "Copiar archivo",
+    "copyFiles": "Copiar archivos",
     "resetColumnWidths": "Restablecer ancho de columnas"
   },
   "statusBar": {

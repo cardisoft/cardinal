@@ -40,8 +40,9 @@
     "openItem": "Open",
     "quickLook": "QuickLook",
     "revealInFinder": "Reveal in Finder",
-    "copyPath": "Copy Path",
     "copyFilename": "Copy Filename",
+    "copyFile": "Copy File",
+    "copyFiles": "Copy Files",
     "resetColumnWidths": "Reset Column Widths"
   },
   "statusBar": {
