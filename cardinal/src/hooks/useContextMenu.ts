@@ -24,18 +24,19 @@ export function useContextMenu(
         return [];
       }
 
-      const segments = path.split(/[\\/]/).filter(Boolean);
-      const filename = segments.length > 0 ? segments[segments.length - 1] : path;
-
-      const selectedCount = getSelectedPaths?.().filter(Boolean).length ?? 0;
-      const copyLabel = selectedCount > 1 ? t('contextMenu.copyFiles') : t('contextMenu.copyFile');
+      const selected = getSelectedPaths?.().filter(Boolean);
+      const targetPaths = selected && selected.length > 0 ? selected : [path];
+      const copyLabel =
+        targetPaths.length > 1 ? t('contextMenu.copyFiles') : t('contextMenu.copyFile');
+      const copyFilenameLabel =
+        targetPaths.length > 1 ? t('contextMenu.copyFilenames') : t('contextMenu.copyFilename');
       const items: MenuItemOptions[] = [
         {
           id: 'context_menu.open_item',
           text: t('contextMenu.openItem'),
           accelerator: 'Cmd+O',
           action: () => {
-            openResultPath(path);
+            targetPaths.forEach((itemPath) => openResultPath(itemPath));
           },
         },
         {
@@ -43,15 +44,23 @@ export function useContextMenu(
           text: t('contextMenu.revealInFinder'),
           accelerator: 'Cmd+R',
           action: () => {
-            void invoke('open_in_finder', { path });
+            targetPaths.forEach((itemPath) => {
+              void invoke('open_in_finder', { path: itemPath });
+            });
           },
         },
         {
           id: 'context_menu.copy_filename',
-          text: t('contextMenu.copyFilename'),
+          text: copyFilenameLabel,
           action: () => {
             if (navigator?.clipboard?.writeText) {
-              void navigator.clipboard.writeText(filename);
+              const filenames = targetPaths
+                .map((itemPath) => {
+                  const segments = itemPath.split(/[\\/]/).filter(Boolean);
+                  return segments.length > 0 ? segments[segments.length - 1] : itemPath;
+                })
+                .join(' ');
+              void navigator.clipboard.writeText(filenames);
             }
           },
         },
@@ -60,8 +69,6 @@ export function useContextMenu(
           text: copyLabel,
           accelerator: 'Cmd+C',
           action: () => {
-            const selected = getSelectedPaths?.().filter(Boolean);
-            const targetPaths = selected && selected.length > 0 ? selected : [path];
             void invoke('copy_files_to_clipboard', { paths: targetPaths }).catch((error) => {
               console.error('Failed to copy files to clipboard', error);
             });

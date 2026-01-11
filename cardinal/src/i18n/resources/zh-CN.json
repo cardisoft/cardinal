@@ -41,6 +41,7 @@
     "quickLook": "快速查看",
     "revealInFinder": "在 Finder 中显示",
     "copyFilename": "复制文件名",
+    "copyFilenames": "复制文件名",
     "copyFile": "复制文件",
     "copyFiles": "复制文件",
     "resetColumnWidths": "重置列宽"

@@ -41,6 +41,7 @@
     "quickLook": "Aperçu rapide",
     "revealInFinder": "Afficher dans Finder",
     "copyFilename": "Copier le nom de fichier",
+    "copyFilenames": "Copier les noms de fichier",
     "copyFile": "Copier le fichier",
     "copyFiles": "Copier les fichiers",
     "resetColumnWidths": "Réinitialiser la largeur des colonnes"

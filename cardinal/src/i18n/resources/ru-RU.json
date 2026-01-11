@@ -41,6 +41,7 @@
     "quickLook": "Быстрый просмотр",
     "revealInFinder": "Показать в Finder",
     "copyFilename": "Копировать имя файла",
+    "copyFilenames": "Копировать имена файлов",
     "copyFile": "Копировать файл",
     "copyFiles": "Копировать файлы",
     "resetColumnWidths": "Сбросить ширину столбцов"
