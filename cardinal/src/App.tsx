@@ -283,19 +283,21 @@ function App() {
         return false;
       }
 
-      if (key === 'r' && currentPath) {
+      if (key === 'r' && selectedPaths.length > 0) {
         event.preventDefault();
-        void invoke('open_in_finder', { path: currentPath });
+        selectedPaths.forEach((path) => {
+          void invoke('open_in_finder', { path });
+        });
         return true;
       }
 
-      if (key === 'o' && currentPath) {
+      if (key === 'o' && selectedPaths.length > 0) {
         event.preventDefault();
-        openResultPath(currentPath);
+        selectedPaths.forEach((path) => openResultPath(path));
         return true;
       }
 
-      if (key === 'c') {
+      if (key === 'c' && selectedPaths.length > 0) {
         event.preventDefault();
         void invoke('copy_files_to_clipboard', { paths: selectedPaths }).catch((error) => {
           console.error('Failed to copy files to clipboard', error);
