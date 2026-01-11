@@ -61,6 +61,20 @@ fn tag_filter_has_bare_argument() {
 }
 
 #[test]
+fn tag_filter_shorthand_aliases() {
+    let expr = parse_ok("t:Project");
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_raw(&expr, "Project");
+}
+
+#[test]
+fn infolder_filter_shorthand_alias() {
+    let expr = parse_ok("in:/Users/demo");
+    filter_is_kind(&expr, &FilterKind::InFolder);
+    filter_arg_raw(&expr, "/Users/demo");
+}
+
+#[test]
 fn tag_filter_trailing_semicolon_is_singleton_list() {
     let expr = parse_ok("tag:Orange;");
     filter_is_kind(&expr, &FilterKind::Tag);
