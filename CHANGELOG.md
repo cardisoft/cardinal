@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.20 — 2026-01-11
+- Improve context menu for multiple selections.
+- Add copy file(s) to clipboard support.
+- Add shorthand aliases for `tag` and `infolder` filters.
+- Hide the dock icon when the tray icon is enabled.
+
 ## 0.1.19 — 2026-01-10
 - Add watch roots and ignore paths to settings.
 - Avoid unnecessary rescan on FSEvent::Rescan.
