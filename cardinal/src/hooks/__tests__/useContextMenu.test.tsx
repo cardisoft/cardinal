@@ -5,21 +5,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../../i18n/config';
 import { useContextMenu } from '../useContextMenu';
 
-const popupMock = vi.fn().mockResolvedValue(undefined);
-const menuNewMock = vi.fn().mockResolvedValue({ popup: popupMock });
-const invokeMock = vi.fn().mockResolvedValue(undefined);
+const mocks = vi.hoisted(() => ({
+  popupMock: vi.fn().mockResolvedValue(undefined),
+  menuNewMock: vi.fn(),
+  invokeMock: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('@tauri-apps/api/menu', () => ({
-  Menu: { new: menuNewMock },
+  Menu: {
+    new: mocks.menuNewMock,
+  },
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: invokeMock,
+  invoke: mocks.invokeMock,
 }));
 
 vi.mock('../../utils/openResultPath', () => ({
   openResultPath: vi.fn(),
 }));
+
+mocks.menuNewMock.mockResolvedValue({ popup: mocks.popupMock });
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <I18nextProvider i18n={i18n}>{children}</I18nextProvider>
@@ -33,9 +39,9 @@ const createEvent = () =>
 
 describe('useContextMenu', () => {
   beforeEach(async () => {
-    menuNewMock.mockClear();
-    popupMock.mockClear();
-    invokeMock.mockClear();
+    mocks.menuNewMock.mockClear();
+    mocks.popupMock.mockClear();
+    mocks.invokeMock.mockClear();
     await i18n.changeLanguage('en-US');
   });
 
@@ -48,10 +54,10 @@ describe('useContextMenu', () => {
     result.current.showContextMenu(createEvent(), '/a');
 
     await waitFor(() => {
-      expect(menuNewMock).toHaveBeenCalled();
+      expect(mocks.menuNewMock).toHaveBeenCalled();
     });
 
-    const items = menuNewMock.mock.calls[0][0].items as Array<{
+    const items = mocks.menuNewMock.mock.calls[0][0].items as Array<{
       id: string;
       text?: string;
       accelerator?: string;
@@ -70,10 +76,10 @@ describe('useContextMenu', () => {
     result.current.showContextMenu(createEvent(), '/a');
 
     await waitFor(() => {
-      expect(menuNewMock).toHaveBeenCalled();
+      expect(mocks.menuNewMock).toHaveBeenCalled();
     });
 
-    const items = menuNewMock.mock.calls[0][0].items as Array<{
+    const items = mocks.menuNewMock.mock.calls[0][0].items as Array<{
       id: string;
       text?: string;
       accelerator?: string;
@@ -97,10 +103,10 @@ describe('useContextMenu', () => {
     result.current.showContextMenu(createEvent(), '/a');
 
     await waitFor(() => {
-      expect(menuNewMock).toHaveBeenCalled();
+      expect(mocks.menuNewMock).toHaveBeenCalled();
     });
 
-    const items = menuNewMock.mock.calls[0][0].items as Array<{
+    const items = mocks.menuNewMock.mock.calls[0][0].items as Array<{
       id: string;
       action?: () => void;
     }>;
