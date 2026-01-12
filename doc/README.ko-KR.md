@@ -36,7 +36,7 @@ Cardinal은 기존의 부분 문자열/접두사 매칭 위에 Everything과 호
 - `report draft` – 공백은 `AND`로 동작하므로 두 토큰을 모두 포함한 파일만 표시됩니다.
 - `*.pdf briefing` – 이름에 “briefing”이 포함된 PDF 결과만 필터링합니다.
 - `*.zip size:>100MB` – 100MB보다 큰 ZIP 파일을 찾습니다.
-- `infolder:/Users demo !.psd` – 검색 루트를 `/Users`로 제한하고, 이름에 `demo`가 있지만 `.psd`는 제외합니다.
+- `in:/Users demo !.psd` – 검색 루트를 `/Users`로 제한하고, 이름에 `demo`가 있지만 `.psd`는 제외합니다.
 - `tag:ProjectA;ProjectB` – Finder 태그(macOS)를 매칭합니다; `;`는 `OR` 역할을 합니다.
 - `*.md content:"Bearer "` – 문자열 `Bearer `를 포함한 Markdown만 표시합니다.
 - `"Application Support"` – 따옴표로 정확한 구문을 검색합니다.

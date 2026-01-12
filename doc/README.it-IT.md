@@ -36,7 +36,7 @@ Cardinal ora affianca alla classica corrispondenza per sottostringa/prefisso una
 - `report draft` – lo spazio funge da `AND`, quindi vedi solo i file i cui nomi contengono entrambi i token.
 - `*.pdf briefing` – filtra i risultati PDF il cui nome include “briefing”.
 - `*.zip size:>100MB` – cerca file ZIP più grandi di 100MB.
-- `infolder:/Users demo !.psd` – limita la radice di ricerca a `/Users`, poi cerca file con `demo` nel nome escludendo `.psd`.
+- `in:/Users demo !.psd` – limita la radice di ricerca a `/Users`, poi cerca file con `demo` nel nome escludendo `.psd`.
 - `tag:ProjectA;ProjectB` – corrisponde alle etichette del Finder (macOS); `;` agisce come `OR`.
 - `*.md content:"Bearer "` – mostra solo i Markdown che contengono la stringa `Bearer `.
 - `"Application Support"` – usa le virgolette per frasi esatte.

@@ -260,7 +260,7 @@ Examples:
 ```text
 *.md content:"Bearer "
 ext:md content:"API key"
-infolder:/Users/demo/Projects content:deadline
+in:/Users/demo/Projects content:deadline
 type:doc content:"Q4 budget"
 ```
 
@@ -281,7 +281,7 @@ tag:Important
 t:Urgent
 tag:ProjectA;ProjectB report
 tag:Project tag:Archive report
-infolder:/Users/demo/Documents tag:"Q4"
+in:/Users/demo/Documents tag:"Q4"
 ```
 
 ---
@@ -303,7 +303,7 @@ type:picture vacation
 ext:png;jpg travel|vacation
 
 #  Recent log files inside a project tree
-infolder:/Users/demo/Projects ext:log dm:pastweek
+in:/Users/demo/Projects ext:log dm:pastweek
 
 #  Shell scripts directly under Scripts folder
 parent:/Users/demo/Scripts *.sh
@@ -315,7 +315,7 @@ parent:/Users/demo/Scripts *.sh
 regex:^README\\.md$ parent:/Users/demo
 
 #  Exclude PSDs anywhere under /Users
-infolder:/Users demo!.psd
+in:/Users demo!.psd
 ```
 
 Use this page as the authoritative list of operators and filters that the engine implements today; additional Everything features (like access/run dates or attribute-based filters) are parsed at the syntax level but currently rejected during evaluation.
