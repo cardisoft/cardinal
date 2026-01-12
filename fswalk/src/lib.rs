@@ -126,28 +126,45 @@ impl<'w> WalkData<'w> {
 }
 
 pub fn walk_it(walk_data: &WalkData) -> Option<Node> {
-    walk(walk_data.root_path, walk_data)
+    walk(walk_data.root_path, walk_data).map(|node_tree| {
+        if let Some(parent) = walk_data.root_path.parent() {
+            let mut path = PathBuf::from(parent);
+            let mut node = Node {
+                children: vec![node_tree],
+                name: path
+                    .iter()
+                    .last()
+                    .expect("at least one parent segment in root path")
+                    .to_string_lossy()
+                    .into_owned()
+                    .into_boxed_str(),
+                metadata: metadata_of_path(&path).map(NodeMetadata::from),
+            };
+            while path.pop() {
+                node = Node {
+                    children: vec![node],
+                    name: path
+                        .iter()
+                        .last()
+                        .expect("at least one parent segment in root path")
+                        .to_string_lossy()
+                        .into_owned()
+                        .into_boxed_str(),
+                    metadata: metadata_of_path(&path).map(NodeMetadata::from),
+                };
+            }
+            node
+        } else {
+            node_tree
+        }
+    })
 }
 
 fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
     if walk_data.should_ignore(path) {
         return None;
     }
-    // doesn't traverse symlink
-    let metadata = match path.symlink_metadata() {
-        Ok(metadata) => Some(metadata),
-        // If it's not found, we definitely don't want it.
-        Err(e) if e.kind() == ErrorKind::NotFound => return None,
-        // If it's permission denied or something, we still want to insert it into the tree.
-        Err(e) => {
-            if handle_error_and_retry(&e) {
-                // doesn't traverse symlink
-                path.symlink_metadata().ok()
-            } else {
-                None
-            }
-        }
-    };
+    let metadata = metadata_of_path(path);
     let children = if metadata.as_ref().map(|x| x.is_dir()).unwrap_or_default() {
         walk_data.num_dirs.fetch_add(1, Ordering::Relaxed);
         let read_dir = fs::read_dir(path);
@@ -236,6 +253,24 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
 
 fn handle_error_and_retry(failed: &Error) -> bool {
     failed.kind() == std::io::ErrorKind::Interrupted
+}
+
+fn metadata_of_path(path: &Path) -> Option<Metadata> {
+    // doesn't traverse symlink
+    match path.symlink_metadata() {
+        Ok(metadata) => Some(metadata),
+        // If it's not found, we definitely don't want it.
+        Err(e) if e.kind() == ErrorKind::NotFound => None,
+        // If it's permission denied or something, we still want to insert it into the tree.
+        Err(e) => {
+            if handle_error_and_retry(&e) {
+                // doesn't traverse symlink
+                path.symlink_metadata().ok()
+            } else {
+                None
+            }
+        }
+    }
 }
 
 #[cfg(test)]
