@@ -30,6 +30,8 @@ export function useContextMenu(
         targetPaths.length > 1 ? t('contextMenu.copyFiles') : t('contextMenu.copyFile');
       const copyFilenameLabel =
         targetPaths.length > 1 ? t('contextMenu.copyFilenames') : t('contextMenu.copyFilename');
+      const copyPathLabel =
+        targetPaths.length > 1 ? t('contextMenu.copyPaths') : t('contextMenu.copyPath');
       const items: MenuItemOptions[] = [
         {
           id: 'context_menu.open_item',
@@ -61,6 +63,16 @@ export function useContextMenu(
                 })
                 .join(' ');
               void navigator.clipboard.writeText(filenames);
+            }
+          },
+        },
+        {
+          id: 'context_menu.copy_paths',
+          text: copyPathLabel,
+          accelerator: 'Cmd+Shift+C',
+          action: () => {
+            if (navigator?.clipboard?.writeText) {
+              void navigator.clipboard.writeText(targetPaths.join('\n'));
             }
           },
         },

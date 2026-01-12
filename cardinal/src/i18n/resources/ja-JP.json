@@ -40,10 +40,12 @@
     "openItem": "開く",
     "quickLook": "クイックルック",
     "revealInFinder": "Finder で表示",
-    "copyFilename": "ファイル名をコピー",
-    "copyFilenames": "ファイル名をコピー",
     "copyFile": "ファイルをコピー",
     "copyFiles": "ファイルをコピー",
+    "copyFilename": "ファイル名をコピー",
+    "copyFilenames": "ファイル名をコピー",
+    "copyPath": "パスをコピー",
+    "copyPaths": "パスをコピー",
     "resetColumnWidths": "列幅をリセット"
   },
   "statusBar": {

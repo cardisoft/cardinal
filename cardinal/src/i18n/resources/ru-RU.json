@@ -40,10 +40,12 @@
     "openItem": "Открыть",
     "quickLook": "Быстрый просмотр",
     "revealInFinder": "Показать в Finder",
-    "copyFilename": "Копировать имя файла",
-    "copyFilenames": "Копировать имена файлов",
     "copyFile": "Копировать файл",
     "copyFiles": "Копировать файлы",
+    "copyFilename": "Копировать имя файла",
+    "copyFilenames": "Копировать имена файлов",
+    "copyPath": "Копировать путь",
+    "copyPaths": "Копировать пути",
     "resetColumnWidths": "Сбросить ширину столбцов"
   },
   "statusBar": {

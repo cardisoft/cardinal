@@ -40,10 +40,12 @@
     "openItem": "Aç",
     "quickLook": "Hızlı Bakış",
     "revealInFinder": "Finder'da göster",
-    "copyFilename": "Dosya adını kopyala",
-    "copyFilenames": "Dosya adlarını kopyala",
     "copyFile": "Dosyayı kopyala",
     "copyFiles": "Dosyaları kopyala",
+    "copyFilename": "Dosya adını kopyala",
+    "copyFilenames": "Dosya adlarını kopyala",
+    "copyPath": "Yolu kopyala",
+    "copyPaths": "Yolları kopyala",
     "resetColumnWidths": "Sütun genişliklerini sıfırla"
   },
   "statusBar": {

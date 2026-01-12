@@ -40,10 +40,12 @@
     "openItem": "खोलें",
     "quickLook": "त्वरित पूर्वावलोकन",
     "revealInFinder": "Finder में दिखाएँ",
-    "copyFilename": "फ़ाइल नाम कॉपी करें",
-    "copyFilenames": "फ़ाइल नाम कॉपी करें",
     "copyFile": "फ़ाइल कॉपी करें",
     "copyFiles": "फ़ाइलें कॉपी करें",
+    "copyFilename": "फ़ाइल नाम कॉपी करें",
+    "copyFilenames": "फ़ाइल नाम कॉपी करें",
+    "copyPath": "पथ कॉपी करें",
+    "copyPaths": "पथ कॉपी करें",
     "resetColumnWidths": "कॉलम चौड़ाई रीसेट करें"
   },
   "statusBar": {

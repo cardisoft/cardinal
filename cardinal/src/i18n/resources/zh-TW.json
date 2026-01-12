@@ -40,10 +40,12 @@
     "openItem": "打開",
     "quickLook": "快速檢視",
     "revealInFinder": "在 Finder 中顯示",
-    "copyFilename": "複製檔名",
-    "copyFilenames": "複製檔名",
     "copyFile": "複製檔案",
     "copyFiles": "複製檔案",
+    "copyFilename": "複製檔名",
+    "copyFilenames": "複製檔名",
+    "copyPath": "複製路徑",
+    "copyPaths": "複製路徑",
     "resetColumnWidths": "重設欄寬"
   },
   "statusBar": {
