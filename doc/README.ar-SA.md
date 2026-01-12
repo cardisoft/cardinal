@@ -36,7 +36,7 @@ brew install --cask cardinal-search
 - `report draft` – المسافة تعمل كـ `AND`، لذا ستظهر الملفات التي تحتوي أسماؤها على كلا الرمزين.
 - `*.pdf briefing` – تصفية نتائج PDF التي يتضمن اسمها “briefing”.
 - `*.zip size:>100MB` – البحث عن ملفات ZIP أكبر من 100MB.
-- `infolder:/Users demo !.psd` – حصر جذر البحث في `/Users` ثم البحث عن `demo` مع استثناء `.psd`.
+- `in:/Users demo !.psd` – حصر جذر البحث في `/Users` ثم البحث عن `demo` مع استثناء `.psd`.
 - `tag:ProjectA;ProjectB` – مطابقة وسوم Finder (macOS)؛ حيث يعمل `;` كـ `OR`.
 - `*.md content:"Bearer "` – تصفية ملفات Markdown التي تحتوي السلسلة `Bearer `.
 - `"Application Support"` – استخدم علامات الاقتباس للعبارات الدقيقة.

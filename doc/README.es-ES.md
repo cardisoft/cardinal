@@ -36,7 +36,7 @@ Cardinal ahora incorpora una capa de sintaxis compatible con Everything sobre la
 - `report draft` – el espacio actúa como `AND`, solo verás archivos cuyos nombres contengan ambos términos.
 - `*.pdf briefing` – limita los resultados a PDF cuyo nombre incluya “briefing”.
 - `*.zip size:>100MB` – busca archivos ZIP de más de 100MB.
-- `infolder:/Users demo !.psd` – restringe la raíz de búsqueda a `/Users`, luego busca archivos cuyo nombre contenga `demo` pero excluya `.psd`.
+- `in:/Users demo !.psd` – restringe la raíz de búsqueda a `/Users`, luego busca archivos cuyo nombre contenga `demo` pero excluya `.psd`.
 - `tag:ProjectA;ProjectB` – filtra por etiquetas de Finder (macOS); `;` actúa como `OR`.
 - `*.md content:"Bearer "` – muestra solo los Markdown que contengan la cadena `Bearer `.
 - `"Application Support"` – usa comillas para coincidir frases exactas.

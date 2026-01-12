@@ -36,7 +36,7 @@ Cardinal अब क्लासिक substring/prefix मैचिंग के
 - `report draft` – स्पेस `AND` की तरह काम करता है, इसलिए केवल वे फ़ाइलें दिखेंगी जिनके नाम में दोनों टोकन हों।
 - `*.pdf briefing` – नाम में “briefing” वाले PDF परिणाम फ़िल्टर करें।
 - `*.zip size:>100MB` – 100MB से बड़े ZIP फ़ाइलें खोजें।
-- `infolder:/Users demo !.psd` – खोज रूट को `/Users` तक सीमित करें, फिर `demo` शामिल करें लेकिन `.psd` को बाहर रखें।
+- `in:/Users demo !.psd` – खोज रूट को `/Users` तक सीमित करें, फिर `demo` शामिल करें लेकिन `.psd` को बाहर रखें।
 - `tag:ProjectA;ProjectB` – Finder टैग (macOS) मैच करें; `;` `OR` की तरह काम करता है।
 - `*.md content:"Bearer "` – `Bearer ` स्ट्रिंग शामिल करने वाली Markdown फ़ाइलें फ़िल्टर करें।
 - `"Application Support"` – सटीक वाक्यांशों के लिए quotes का उपयोग करें।

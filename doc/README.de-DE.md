@@ -36,7 +36,7 @@ Cardinal unterstützt jetzt eine Everything-kompatible Syntaxschicht zusätzlich
 - `report draft` – Leerzeichen wirkt als `AND`, du siehst nur Dateien, deren Namen beide Tokens enthalten.
 - `*.pdf briefing` – filtert auf PDF-Ergebnisse, deren Namen „briefing“ enthalten.
 - `*.zip size:>100MB` – sucht ZIP-Dateien größer als 100MB.
-- `infolder:/Users demo !.psd` – begrenzt die Suchwurzel auf `/Users` und sucht nach `demo`, schließt aber `.psd` aus.
+- `in:/Users demo !.psd` – begrenzt die Suchwurzel auf `/Users` und sucht nach `demo`, schließt aber `.psd` aus.
 - `tag:ProjectA;ProjectB` – matcht Finder-Tags (macOS); `;` wirkt als `OR`.
 - `*.md content:"Bearer "` – filtert auf Markdown-Dateien, die die Zeichenkette `Bearer ` enthalten.
 - `"Application Support"` – Anführungszeichen für exakte Phrasen.

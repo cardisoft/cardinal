@@ -36,7 +36,7 @@ Cardinal artık klasik alt dize/ön ek eşleştirmesinin üzerine Everything uyu
 - `report draft` – boşluk `AND` gibi davranır; yalnızca adında her iki belirteci de içeren dosyaları görürsünüz.
 - `*.pdf briefing` – adında “briefing” geçen PDF sonuçlarını filtreler.
 - `*.zip size:>100MB` – 100MB’den büyük ZIP dosyalarını arar.
-- `infolder:/Users demo !.psd` – arama kökünü `/Users` ile sınırlar; ardından adında `demo` olanları bulur ama `.psd`’yi hariç tutar.
+- `in:/Users demo !.psd` – arama kökünü `/Users` ile sınırlar; ardından adında `demo` olanları bulur ama `.psd`’yi hariç tutar.
 - `tag:ProjectA;ProjectB` – Finder etiketlerini (macOS) eşleştirir; `;` `OR` gibi çalışır.
 - `*.md content:"Bearer "` – `Bearer ` dizgesini içeren Markdown dosyalarını filtreler.
 - `"Application Support"` – tam ifadeler için tırnak kullanın.

@@ -36,7 +36,7 @@ Cardinal підтримує Everything-сумісний синтаксичний
 - `report draft` – пробіл працює як `AND`, тож ви бачите лише файли, що містять обидва токени.
 - `*.pdf briefing` – відфільтровує PDF, у назві яких є «briefing».
 - `*.zip size:>100MB` – шукає ZIP-файли більші за 100MB.
-- `infolder:/Users demo !.psd` – обмежує корінь пошуку `/Users`, потім шукає `demo`, але виключає `.psd`.
+- `in:/Users demo !.psd` – обмежує корінь пошуку `/Users`, потім шукає `demo`, але виключає `.psd`.
 - `tag:ProjectA;ProjectB` – відповідає тегам Finder (macOS); `;` працює як `OR`.
 - `*.md content:"Bearer "` – фільтрує Markdown, що містять рядок `Bearer `.
 - `"Application Support"` – беріть точні фрази в лапки.

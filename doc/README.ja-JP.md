@@ -36,7 +36,7 @@ Cardinal は従来の部分一致/プレフィックス一致に加えて、Ever
 - `report draft` – スペースは `AND` として動作し、両方のトークンを含むファイルだけが表示されます。
 - `*.pdf briefing` – 名前に “briefing” を含む PDF だけに絞り込みます。
 - `*.zip size:>100MB` – 100MB を超える ZIP ファイルを検索します。
-- `infolder:/Users demo !.psd` – 検索ルートを `/Users` に制限し、名前に `demo` を含み `.psd` を除外します。
+- `in:/Users demo !.psd` – 検索ルートを `/Users` に制限し、名前に `demo` を含み `.psd` を除外します。
 - `tag:ProjectA;ProjectB` – Finder タグ(macOS) でフィルターします。`;` は `OR` として機能します。
 - `*.md content:"Bearer "` – 文字列 `Bearer ` を含む Markdown だけを表示します。
 - `"Application Support"` – 正確なフレーズは引用符で囲みます。

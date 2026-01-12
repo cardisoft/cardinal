@@ -36,7 +36,7 @@ Cardinal теперь поддерживает совместимую с Everyth
 - `report draft` – пробел работает как `AND`, поэтому отображаются только файлы, имена которых содержат оба токена.
 - `*.pdf briefing` – отфильтруйте PDF, в имени которых есть “briefing”.
 - `*.zip size:>100MB` – ищите ZIP-файлы размером более 100MB.
-- `infolder:/Users demo !.psd` – ограничьте корень поиска `/Users`, затем ищите файлы с `demo` в имени, исключая `.psd`.
+- `in:/Users demo !.psd` – ограничьте корень поиска `/Users`, затем ищите файлы с `demo` в имени, исключая `.psd`.
 - `tag:ProjectA;ProjectB` – фильтр по тегам Finder (macOS); `;` работает как `OR`.
 - `*.md content:"Bearer "` – показывать только Markdown, содержащие строку `Bearer `.
 - `"Application Support"` – берите точные фразы в кавычки.
