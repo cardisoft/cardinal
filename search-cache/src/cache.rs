@@ -755,6 +755,7 @@ pub static NAME_POOL: LazyLock<NamePool> = LazyLock::new(NamePool::new);
 mod tests {
     use super::*;
     use crate::query::CONTENT_BUFFER_BYTES;
+    use fswalk::NodeFileType;
     use std::{
         fs,
         path::{Component, Path, PathBuf},
@@ -804,6 +805,20 @@ mod tests {
         ));
         slab[parent].children.push(idx);
         idx
+    }
+
+    fn find_node_index(cache: &SearchCache, path: &Path) -> SlabIndex {
+        let path = path.strip_prefix("/").expect("absolute path");
+        let mut current = cache.file_nodes.root();
+        for name in path {
+            let name = name.to_string_lossy();
+            current = *cache.file_nodes[current]
+                .children
+                .iter()
+                .find(|&&idx| cache.file_nodes[idx].name() == name.as_ref())
+                .expect("node should exist");
+        }
+        current
     }
 
     fn manual_target_tree_file_nodes() -> (FileNodes, [SlabIndex; 3]) {
@@ -917,6 +932,108 @@ mod tests {
 
         assert_eq!(cache.file_nodes.len(), 4 + depth(temp_path));
         assert_eq!(cache.name_index.len(), 4 + depth(temp_path));
+    }
+
+    #[test]
+    fn create_node_chain_existing_path_is_idempotent() {
+        let temp_dir = TempDir::new("create_node_chain_existing_path_is_idempotent")
+            .expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("alpha/beta")).expect("Failed to create directories");
+
+        let mut cache = SearchCache::walk_fs(root);
+        let target = root.join("alpha/beta");
+        let before = cache.file_nodes.len();
+        let first = cache.create_node_chain(&target);
+        let after_first = cache.file_nodes.len();
+        let second = cache.create_node_chain(&target);
+
+        assert_eq!(first, second, "existing path should return stable index");
+        assert_eq!(before, after_first, "existing path should not add nodes");
+        assert_eq!(
+            cache.file_nodes.node_path(first).expect("node path exists"),
+            target
+        );
+    }
+
+    #[test]
+    fn create_node_chain_creates_missing_tail_with_unaccessible_metadata() {
+        let temp_dir = TempDir::new("create_node_chain_creates_missing_tail")
+            .expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("existing")).expect("Failed to create directories");
+
+        let mut cache = SearchCache::walk_fs(root);
+        let target = root.join("existing/missing/leaf");
+        let before = cache.file_nodes.len();
+        let index = cache.create_node_chain(&target);
+        let after = cache.file_nodes.len();
+
+        assert_eq!(after, before + 2, "missing tail should add two nodes");
+        assert_eq!(
+            cache.file_nodes.node_path(index).expect("node path exists"),
+            target
+        );
+
+        let existing_index = find_node_index(&cache, &root.join("existing"));
+        let missing_index = find_node_index(&cache, &root.join("existing/missing"));
+        let leaf_index = find_node_index(&cache, &target);
+
+        assert_eq!(cache.file_nodes[existing_index].state(), State::Some);
+        assert_eq!(cache.file_nodes[missing_index].state(), State::Unaccessible);
+        assert_eq!(cache.file_nodes[leaf_index].state(), State::Unaccessible);
+
+        let missing_entries = cache
+            .name_index
+            .get("missing")
+            .expect("missing entry should exist");
+        assert!(missing_entries.iter().any(|&idx| idx == missing_index));
+        let leaf_entries = cache
+            .name_index
+            .get("leaf")
+            .expect("leaf entry should exist");
+        assert!(leaf_entries.iter().any(|&idx| idx == leaf_index));
+    }
+
+    #[test]
+    fn create_node_chain_existing_file_metadata_is_unchanged() {
+        let temp_dir = TempDir::new("create_node_chain_existing_file_metadata")
+            .expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("dir")).expect("Failed to create directories");
+        fs::File::create(root.join("dir/file.txt")).expect("Failed to create file");
+
+        let mut cache = SearchCache::walk_fs(root);
+        let target = root.join("dir/file.txt");
+        let index = cache.create_node_chain(&target);
+
+        assert_eq!(cache.file_nodes[index].state(), State::None);
+        assert_eq!(cache.file_nodes[index].file_type_hint(), NodeFileType::File);
+    }
+
+    #[test]
+    fn create_node_chain_root_returns_root() {
+        let temp_dir = TempDir::new("create_node_chain_root_returns_root")
+            .expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        let mut cache = SearchCache::walk_fs(root);
+        let before = cache.file_nodes.len();
+
+        let index = cache.create_node_chain(Path::new("/"));
+
+        assert_eq!(index, cache.file_nodes.root());
+        assert_eq!(cache.file_nodes.len(), before);
+    }
+
+    #[test]
+    #[should_panic(expected = "create_node_chain only accepts absolute path")]
+    fn create_node_chain_rejects_relative_paths() {
+        let temp_dir = TempDir::new("create_node_chain_rejects_relative_paths")
+            .expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        let mut cache = SearchCache::walk_fs(root);
+
+        let _ = cache.create_node_chain(Path::new("relative/path"));
     }
 
     #[test]
