@@ -140,15 +140,11 @@ fn mixed_prefix_suffix_segments_for_files() {
 // --- Additional multi path segment coverage below ---
 // Goal: expand variety of slash + wildcard + case + overlap behaviors.
 
-fn normalize(
-    cache: &mut SearchCache,
-    indices: &[SlabIndex],
-    root: &std::path::Path,
-) -> Vec<String> {
+fn normalize(cache: &mut SearchCache, indices: &[SlabIndex]) -> Vec<String> {
     cache
         .expand_file_nodes(indices)
         .into_iter()
-        .map(|node| node.path.strip_prefix(root).unwrap().display().to_string())
+        .map(|node| node.path.to_string_lossy().into_owned())
         .collect()
 }
 
@@ -166,7 +162,7 @@ fn trailing_slash_deep_exact_directory() {
     };
     let indices =
         guard_indices(cache.search_with_options("a/b/c/d/", opts, CancellationToken::noop()));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     println!("wildcard_last_segment_multiple_extensions names={names:?}");
     println!("mixed_case_segments_case_sensitive_behavior names={names:?}");
     // Only the exact directory "a/b/c/d" should appear; variants excluded.
@@ -200,7 +196,7 @@ fn leading_slash_with_wildcard_in_first_segment() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // We accept matches from both root and nested paths (as earlier leading slash tests showed broader matching).
     assert!(names.iter().any(|n| n.ends_with("fooA/bar/baz")));
     assert!(names.iter().any(|n| n.ends_with("fooB/bar/baz")));
@@ -224,7 +220,7 @@ fn mixed_case_segments_case_sensitive_behavior() {
     };
     let indices =
         guard_indices(cache.search_with_options("foo/bar/baz/", opts, CancellationToken::noop()));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // Strict lowercase expected; mixed/uppercase variants should be excluded when case-sensitive
     assert!(
         names.iter().any(|n| n.ends_with("foo/bar/baz")),
@@ -252,7 +248,7 @@ fn mixed_case_segments_case_insensitive_behavior() {
     };
     let indices =
         guard_indices(cache.search_with_options("/foo/bar/baz/", opts, CancellationToken::noop()));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // Only baz directory (exact trailing slash) variants should appear; Bazooka excluded.
     assert!(
         names.iter().any(|n| n.ends_with("Foo/Bar/Baz"))
@@ -284,7 +280,7 @@ fn wildcard_last_segment_multiple_extensions() {
         opts,
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // Expect the two base names; basename 'readme_final' should NOT match this pattern; uppercase README excluded.
     assert!(names.iter().any(|n| n.ends_with("readme.md")));
     assert!(names.iter().any(|n| n.ends_with("readme.txt")));
@@ -319,7 +315,7 @@ fn wildcard_last_segment_multiple_extensions_case_insensitive() {
         opts,
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     println!("wildcard_last_segment_multiple_extensions_case_insensitive names={names:?}");
     // Case-insensitive should pick README.MD; wildcard picks readmeX.md also.
     assert!(names.iter().any(|n| n.ends_with("README.MD")));
@@ -341,7 +337,7 @@ fn middle_segment_wildcard_variants() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(names.iter().any(|n| n.ends_with("pkg-alpha/docs/v1")));
     assert!(names.iter().any(|n| n.ends_with("pkg-beta/docs/v1")));
     assert!(names.iter().any(|n| n.ends_with("pkg-gamma/docs/v1")));
@@ -369,7 +365,7 @@ fn overlapping_prefix_directories() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // Expect app/config.json present; application/appveyor may appear if first segment treated as substring - we allow presence but enforce primary target.
     assert!(names.iter().any(|n| n.ends_with("app/config.json")));
 }
@@ -392,7 +388,7 @@ fn globstar_middle_segment_matches_descendants() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(names.iter().any(|n| n.ends_with("foo/bar.txt")));
     assert!(names.iter().any(|n| n.ends_with("foo/nested/bar.txt")));
     assert!(
@@ -417,8 +413,8 @@ fn globstar_trailing_segment_includes_all_descendants() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
-    assert!(names.iter().any(|n| n == "foo"));
+    let names = normalize(&mut cache, &indices);
+    assert!(names.iter().any(|n| n.ends_with("foo")));
     assert!(names.iter().any(|n| n.ends_with("foo/sub")));
     assert!(names.iter().any(|n| n.ends_with("foo/sub/layer")));
     assert!(names.iter().any(|n| n.ends_with("foo/file.txt")));
@@ -441,7 +437,7 @@ fn standalone_globstar_matches_entire_tree() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(names.iter().any(|n| n.ends_with("alpha")));
     assert!(names.iter().any(|n| n.ends_with("alpha/beta/file_a.txt")));
     assert!(names.iter().any(|n| n.ends_with("gamma/file_b.txt")));
@@ -461,7 +457,7 @@ fn globstar_matches_nested_hidden_directory_rs_files() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(
         names
             .iter()
@@ -494,7 +490,7 @@ fn multiple_globstars_collapse_to_expected_scope() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(names.iter().any(|n| n.ends_with("aa/module/lib.c")));
     assert!(
         names.iter().any(|n| n.ends_with("aa/src/module/lib.c")),
@@ -525,7 +521,7 @@ fn redundant_globstars_match_entire_tree() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(
         names.iter().any(|n| n.ends_with("x/y/z/file.rs")),
         "deep descendant visible"
@@ -553,7 +549,7 @@ fn globstar_with_question_mark_preserves_length_constraints() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(
         names.iter().any(|n| n.ends_with("pkg-alpha/lib01.rs"))
             && names.iter().any(|n| n.ends_with("pkg-beta/libAA.rs")),
@@ -580,7 +576,7 @@ fn globstar_case_sensitive_vs_insensitive_variants() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let sensitive_names = normalize(&mut cache, &sensitive, root);
+    let sensitive_names = normalize(&mut cache, &sensitive);
     assert!(
         sensitive_names.is_empty(),
         "case-sensitive search with mismatched casing should yield no results"
@@ -591,7 +587,7 @@ fn globstar_case_sensitive_vs_insensitive_variants() {
     };
     let insensitive =
         guard_indices(cache.search_with_options("aa/**/file.txt", opts, CancellationToken::noop()));
-    let insensitive_names = normalize(&mut cache, &insensitive, root);
+    let insensitive_names = normalize(&mut cache, &insensitive);
     assert!(
         insensitive_names
             .iter()
@@ -615,7 +611,7 @@ fn globstar_case_sensitive_exact_match() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(
         names.iter().any(|n| n.ends_with("AA/Deep/FILE.TXT")),
         "exact case should match when search is case sensitive"
@@ -642,7 +638,7 @@ fn leading_globstar_matches_any_suffix() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(names.iter().any(|n| n.ends_with("alpha/beta/report.log")));
     assert!(names.iter().any(|n| n.ends_with("gamma/delta/report.log")));
     assert!(names.iter().any(|n| n.ends_with("alpha/report.log")));
@@ -665,7 +661,7 @@ fn wildcard_segment_followed_by_trailing_globstar() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(names.iter().any(|n| n.ends_with("client-app/src")));
     assert!(names.iter().any(|n| n.ends_with("client-app/src/main.rs")));
     assert!(names.iter().any(|n| n.ends_with("client-lib/tests")));
@@ -699,7 +695,7 @@ fn globstar_question_mark_segment_and_trailing_globstar() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(
         names.iter().any(|n| n.ends_with("pkg-a/lib1/src/main.rs")),
         "lib1 matches ?"
@@ -728,7 +724,7 @@ fn wildcard_question_mark_inside_segment() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // Single ? should match a1/a2 only (not a10 if segmentation respects single-char semantics).
     assert!(names.iter().any(|n| n.ends_with("lib-a1.tar.gz")));
     assert!(names.iter().any(|n| n.ends_with("lib-a2.tar.gz")));
@@ -752,7 +748,7 @@ fn multi_level_mixed_wildcards_and_trailing_slash() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // internal directories for v1 and v2 included; internal_extra excluded by trailing slash exactness.
     assert!(
         names
@@ -786,7 +782,7 @@ fn path_query_with_dot_segments_and_files() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(
         names
             .iter()
@@ -818,7 +814,7 @@ fn unicode_path_segments_case_insensitive() {
         opts,
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // Both case variants should be matched.
     assert!(
         names.iter().any(|n| n.ends_with("Café/文件/notes.txt"))
@@ -844,7 +840,7 @@ fn unicode_path_segments_case_sensitive() {
         opts,
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // Depending on segmentation, lowercase query should match the mixed-case variant or none; ensure uppercase variant absent.
     assert!(
         !names.iter().any(|n| n.ends_with("CAFÉ/文件/notes.txt")),
@@ -869,7 +865,7 @@ fn deep_multiple_wildcards_varied_segments() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // Expect src/lib/core/mod.rs; src/lib-core/extra does not end with /core/mod.rs
     assert!(names.iter().any(|n| n.ends_with("src/lib/core/mod.rs")));
     assert!(!names.iter().any(|n| n.ends_with("src/lib/util/mod.rs")));
@@ -895,7 +891,7 @@ fn file_match_with_intermediate_prefix_overlap() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(names.iter().any(|n| n.ends_with("client/app/index.html")));
 }
 
@@ -916,11 +912,11 @@ fn star_only_directory_inclusion() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // At least each top-level directory should be represented among matches.
-    assert!(names.iter().any(|n| n == "one"));
-    assert!(names.iter().any(|n| n == "two"));
-    assert!(names.iter().any(|n| n == "three"));
+    assert!(names.iter().any(|n| n.ends_with("/one")));
+    assert!(names.iter().any(|n| n.ends_with("/two")));
+    assert!(names.iter().any(|n| n.ends_with("/three")));
 }
 
 #[test]
@@ -940,7 +936,7 @@ fn question_mark_in_directory_segment_boundaries() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // Single ? should match dirA and dirB only.
     assert!(names.iter().any(|n| n.ends_with("dirA/file.txt")));
     assert!(names.iter().any(|n| n.ends_with("dirB/file.txt")));
@@ -965,7 +961,7 @@ fn multiple_question_marks_segment() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // Four ? characters => exactly four digits.
     assert!(names.iter().any(|n| n.ends_with("log-1234.txt")));
     assert!(!names.iter().any(|n| n.ends_with("log-12.txt")));
@@ -989,7 +985,7 @@ fn mixed_star_and_question_mark_segment() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names_short = normalize(&mut cache, &indices_short, root);
+    let names_short = normalize(&mut cache, &indices_short);
     assert!(names_short.iter().any(|n| n.ends_with("pkg-alpha-v1.rs")));
     assert!(names_short.iter().any(|n| n.ends_with("pkg-alpha-v2.rs")));
     assert!(!names_short.iter().any(|n| n.ends_with("pkg-alpha-v10.rs")));
@@ -1000,7 +996,7 @@ fn mixed_star_and_question_mark_segment() {
         SearchOptions::default(),
         CancellationToken::noop(),
     ));
-    let names_any = normalize(&mut cache, &indices_any, root);
+    let names_any = normalize(&mut cache, &indices_any);
     assert!(names_any.iter().any(|n| n.ends_with("pkg-alpha-v10.rs")));
     assert!(names_any.iter().any(|n| n.ends_with("pkg-alpha-vX.rs")));
 }
@@ -1022,7 +1018,7 @@ fn case_sensitive_exact_segment_casing() {
     };
     let indices =
         guard_indices(cache.search_with_options("src/lib/core/", opts, CancellationToken::noop()));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(
         names.iter().any(|n| n.ends_with("src/lib/core")),
         "exact lowercase path expected"
@@ -1051,7 +1047,7 @@ fn case_insensitive_directory_variants() {
     };
     let indices =
         guard_indices(cache.search_with_options("/src/lib/core/", opts, CancellationToken::noop()));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     assert!(
         !names.is_empty(),
         "at least one variant should match case-insensitive"
@@ -1081,7 +1077,7 @@ fn mixed_wildcard_case_sensitive_file_variants() {
         opts,
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     println!("mixed_wildcard_case_sensitive_file_variants names={names:?}");
     assert!(
         names.iter().any(|n| n.ends_with("app/config/readme.md")),
@@ -1117,7 +1113,7 @@ fn mixed_wildcard_case_insensitive_file_variants() {
         opts,
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     println!("mixed_wildcard_case_insensitive_file_variants names={names:?}");
     // Case-insensitive should collect lowercase and uppercase filename variants (across different parents).
     assert!(names.iter().any(|n| n.ends_with("app/config/readme.md")));
@@ -1145,7 +1141,7 @@ fn case_sensitive_file_exact_match_variants() {
         opts,
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // Only the exact cased file should match.
     assert!(names.iter().any(|n| n.ends_with("guide/ReadMe.md")));
     assert!(!names.iter().any(|n| n.ends_with("guide/README.md")));
@@ -1170,7 +1166,7 @@ fn case_insensitive_file_exact_match_variants() {
         opts,
         CancellationToken::noop(),
     ));
-    let names = normalize(&mut cache, &indices, root);
+    let names = normalize(&mut cache, &indices);
     // All case variants may surface; ensure at least one and all contain readme.md ignoring case.
     assert!(!names.is_empty());
     for n in &names {

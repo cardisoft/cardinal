@@ -333,7 +333,15 @@ fn tag_filter_with_not_operator() {
         "!tag:Archive",
         SearchOptions::default(),
         CancellationToken::noop(),
-    ));
+    ))
+    .into_iter()
+    .filter(|index| {
+        cache
+            .node_path(*index)
+            .map(|path| path.starts_with(dir))
+            .unwrap_or_default()
+    })
+    .collect::<Vec<_>>();
     // Should match: first.txt (Project), second.txt (Important), fourth.txt (no tags), and the temp dir itself
     assert_eq!(indices.len(), 4);
 }

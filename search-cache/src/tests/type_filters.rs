@@ -471,20 +471,70 @@ fn test_type_file_folder_filters() {
     let files = cache.search("type:file").unwrap();
     assert_eq!(files.len(), 3, "Should match only files");
 
-    let files_alt = cache.search("type:files").unwrap();
+    let files_alt = cache
+        .search("type:files")
+        .unwrap()
+        .into_iter()
+        .filter(|&i| {
+            cache
+                .node_path(i)
+                .map(|p| p.starts_with(tmp.path()))
+                .unwrap_or_default()
+        })
+        .collect::<Vec<_>>();
     assert_eq!(files_alt.len(), 3);
 
-    let folders = cache.search("type:folder").unwrap();
-    // Should match folder1, folder2, and the root directory
+    let folders = cache
+        .search("type:folder")
+        .unwrap()
+        .into_iter()
+        .filter(|&i| {
+            cache
+                .node_path(i)
+                .map(|p| p.starts_with(tmp.path()))
+                .unwrap_or_default()
+        })
+        .collect::<Vec<_>>();
+    // Should match folder1, folder2, and the full root path chain.
     assert_eq!(folders.len(), 3);
 
-    let folders_alt = cache.search("type:folders").unwrap();
+    let folders_alt = cache
+        .search("type:folders")
+        .unwrap()
+        .into_iter()
+        .filter(|&i| {
+            cache
+                .node_path(i)
+                .map(|p| p.starts_with(tmp.path()))
+                .unwrap_or_default()
+        })
+        .collect::<Vec<_>>();
     assert_eq!(folders_alt.len(), 3);
 
-    let dirs = cache.search("type:dir").unwrap();
+    let dirs = cache
+        .search("type:dir")
+        .unwrap()
+        .into_iter()
+        .filter(|&i| {
+            cache
+                .node_path(i)
+                .map(|p| p.starts_with(tmp.path()))
+                .unwrap_or_default()
+        })
+        .collect::<Vec<_>>();
     assert_eq!(dirs.len(), 3);
 
-    let directory = cache.search("type:directory").unwrap();
+    let directory = cache
+        .search("type:directory")
+        .unwrap()
+        .into_iter()
+        .filter(|&i| {
+            cache
+                .node_path(i)
+                .map(|p| p.starts_with(tmp.path()))
+                .unwrap_or_default()
+        })
+        .collect::<Vec<_>>();
     assert_eq!(directory.len(), 3);
 }
 

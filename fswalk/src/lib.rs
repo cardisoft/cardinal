@@ -125,29 +125,50 @@ impl<'w> WalkData<'w> {
     }
 }
 
-pub fn walk_it(walk_data: &WalkData) -> Option<Node> {
+pub fn walk_it_without_root_chain(walk_data: &WalkData) -> Option<Node> {
     walk(walk_data.root_path, walk_data)
+}
+
+pub fn walk_it(walk_data: &WalkData) -> Option<Node> {
+    walk(walk_data.root_path, walk_data).map(|node_tree| {
+        if let Some(parent) = walk_data.root_path.parent() {
+            let mut path = PathBuf::from(parent);
+            let mut node = Node {
+                children: vec![node_tree],
+                name: path
+                    .iter()
+                    .next_back()
+                    .expect("at least one parent segment in root path")
+                    .to_string_lossy()
+                    .into_owned()
+                    .into_boxed_str(),
+                metadata: metadata_of_path(&path).map(NodeMetadata::from),
+            };
+            while path.pop() {
+                node = Node {
+                    children: vec![node],
+                    name: path
+                        .iter()
+                        .next_back()
+                        .expect("at least one parent segment in root path")
+                        .to_string_lossy()
+                        .into_owned()
+                        .into_boxed_str(),
+                    metadata: metadata_of_path(&path).map(NodeMetadata::from),
+                };
+            }
+            node
+        } else {
+            node_tree
+        }
+    })
 }
 
 fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
     if walk_data.should_ignore(path) {
         return None;
     }
-    // doesn't traverse symlink
-    let metadata = match path.symlink_metadata() {
-        Ok(metadata) => Some(metadata),
-        // If it's not found, we definitely don't want it.
-        Err(e) if e.kind() == ErrorKind::NotFound => return None,
-        // If it's permission denied or something, we still want to insert it into the tree.
-        Err(e) => {
-            if handle_error_and_retry(&e) {
-                // doesn't traverse symlink
-                path.symlink_metadata().ok()
-            } else {
-                None
-            }
-        }
-    };
+    let metadata = metadata_of_path(path);
     let children = if metadata.as_ref().map(|x| x.is_dir()).unwrap_or_default() {
         walk_data.num_dirs.fetch_add(1, Ordering::Relaxed);
         let read_dir = fs::read_dir(path);
@@ -238,16 +259,55 @@ fn handle_error_and_retry(failed: &Error) -> bool {
     failed.kind() == std::io::ErrorKind::Interrupted
 }
 
+fn metadata_of_path(path: &Path) -> Option<Metadata> {
+    // doesn't traverse symlink
+    match path.symlink_metadata() {
+        Ok(metadata) => Some(metadata),
+        // If it's not found, we definitely don't want it.
+        Err(e) if e.kind() == ErrorKind::NotFound => None,
+        // If it's permission denied or something, we still want to insert it into the tree.
+        Err(e) => {
+            if handle_error_and_retry(&e) {
+                // doesn't traverse symlink
+                path.symlink_metadata().ok()
+            } else {
+                None
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::{
         fs,
         io::Write,
-        path::{Path, PathBuf},
+        path::{Component, Path, PathBuf},
         time::{Duration, Instant},
     };
     use tempdir::TempDir;
+
+    fn node_for_path<'a>(node: &'a Node, path: &Path) -> &'a Node {
+        let mut current = node;
+        for component in path.components() {
+            match component {
+                Component::RootDir => {
+                    assert_eq!(&*current.name, "/");
+                }
+                Component::Normal(name) => {
+                    let name = name.to_string_lossy();
+                    current = current
+                        .children
+                        .iter()
+                        .find(|child| *child.name == name)
+                        .unwrap_or_else(|| panic!("missing path segment: {name}"));
+                }
+                _ => {}
+            }
+        }
+        current
+    }
 
     #[test]
     fn test_walk_simple_tree_without_metadata() {
@@ -258,7 +318,11 @@ mod tests {
         fs::File::create(root.join("dir_a/file_b.log")).unwrap();
         let walk_data = WalkData::simple(root, false);
         let node = walk_it(&walk_data).unwrap();
-        assert_eq!(&*node.name, root.file_name().unwrap().to_str().unwrap());
+        let root_node = node_for_path(&node, root);
+        assert_eq!(
+            &*root_node.name,
+            root.file_name().unwrap().to_str().unwrap()
+        );
         // Root + dir + 2 files
         let mut counts = (0, 0);
         fn traverse(n: &Node, counts: &mut (usize, usize)) {
@@ -271,7 +335,7 @@ mod tests {
                 traverse(c, counts);
             }
         }
-        traverse(&node, &mut counts);
+        traverse(root_node, &mut counts);
         assert_eq!(counts.0 + counts.1, 4);
         // Metadata for files should be None (walk_data.need_metadata = false)
         fn assert_no_file_metadata(n: &Node) {
@@ -291,7 +355,7 @@ mod tests {
                 }
             }
         }
-        assert_no_file_metadata(&node);
+        assert_no_file_metadata(root_node);
     }
 
     #[test]
@@ -306,8 +370,13 @@ mod tests {
 
         let walk_data = WalkData::simple(root, false);
         let node = walk_it(&walk_data).expect("walked tree");
+        let root_node = node_for_path(&node, root);
 
-        let observed: Vec<&str> = node.children.iter().map(|child| &*child.name).collect();
+        let observed: Vec<&str> = root_node
+            .children
+            .iter()
+            .map(|child| &*child.name)
+            .collect();
         let expected = vec![
             "dir_alpha",
             "dir_beta",
@@ -330,7 +399,7 @@ mod tests {
         }
 
         let mut preorder = Vec::new();
-        collect_paths(&node, Path::new(""), &mut preorder);
+        collect_paths(root_node, Path::new(""), &mut preorder);
         let mut sorted = preorder.clone();
         sorted.sort();
         assert_eq!(
@@ -346,6 +415,7 @@ mod tests {
         fs::File::create(root.join("meta_file.txt")).unwrap();
         let walk_data = WalkData::simple(root, true);
         let node = walk_it(&walk_data).unwrap();
+        let root_node = node_for_path(&node, root);
         fn find<'a>(node: &'a Node, name: &str) -> Option<&'a Node> {
             if &*node.name == name {
                 return Some(node);
@@ -357,7 +427,7 @@ mod tests {
             }
             None
         }
-        let file_node = find(&node, "meta_file.txt").unwrap();
+        let file_node = find(root_node, "meta_file.txt").unwrap();
         assert!(matches!(
             file_node.metadata.map(|m| m.r#type),
             Some(NodeFileType::File)
@@ -374,11 +444,12 @@ mod tests {
         std::os::unix::fs::symlink(root.join("real_dir"), root.join("link_dir")).unwrap();
         let walk_data = WalkData::simple(root, true);
         let node = walk_it(&walk_data).unwrap();
+        let root_node = node_for_path(&node, root);
         // Ensure link_dir exists as a file system entry but not traversed (should be a file node with no children)
         fn get_child<'a>(n: &'a Node, name: &str) -> Option<&'a Node> {
             n.children.iter().find(|c| &*c.name == name)
         }
-        let link = get_child(&node, "link_dir").unwrap();
+        let link = get_child(root_node, "link_dir").unwrap();
         assert!(
             link.children.is_empty(),
             "symlink directory should not be traversed"
@@ -403,9 +474,10 @@ mod tests {
         }
         let walk_data = WalkData::simple(root, false);
         let node = walk_it(&walk_data).unwrap();
+        let root_node = node_for_path(&node, root);
         // Expect 1 (root) + 50 file children
         assert_eq!(
-            node.children.len(),
+            root_node.children.len(),
             50,
             "expected 50 files directly under root"
         );

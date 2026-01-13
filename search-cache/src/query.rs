@@ -494,7 +494,7 @@ impl SearchCache {
         base: Option<Vec<SlabIndex>>,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
-        let Some(target) = self.node_index_for_raw_path(Path::new(&argument.raw)) else {
+        let Some(target) = self.node_index_for_path(Path::new(&argument.raw)) else {
             bail!(
                 "Parent filter {:?} is not found in file system",
                 argument.raw
@@ -517,7 +517,7 @@ impl SearchCache {
         base: Option<Vec<SlabIndex>>,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
-        let Some(target) = self.node_index_for_raw_path(Path::new(&argument.raw)) else {
+        let Some(target) = self.node_index_for_path(Path::new(&argument.raw)) else {
             bail!(
                 "Parent filter {:?} is not found in file system",
                 argument.raw
@@ -542,7 +542,7 @@ impl SearchCache {
         base: Option<Vec<SlabIndex>>,
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
-        let Some(target) = self.node_index_for_raw_path(Path::new(&argument.raw)) else {
+        let Some(target) = self.node_index_for_path(Path::new(&argument.raw)) else {
             bail!(
                 "nosubfolders filter {:?} is not found in file system",
                 argument.raw
@@ -801,7 +801,7 @@ impl SearchCache {
             let spotlight_indices: Vec<SlabIndex> =
                 search_tags_using_mdfind(needles, options.case_insensitive)?
                     .into_iter()
-                    .filter_map(|path| self.node_index_for_raw_path(&path))
+                    .filter_map(|path| self.node_index_for_path(&path))
                     .collect();
 
             match base {

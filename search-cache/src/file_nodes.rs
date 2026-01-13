@@ -40,9 +40,9 @@ impl FileNodes {
             current = parent;
         }
         Some(
-            self.path
-                .iter()
-                .chain(segments.iter().rev().map(OsStr::new))
+            std::iter::once("/")
+                .chain(segments.into_iter().rev())
+                .map(OsStr::new)
                 .collect(),
         )
     }
