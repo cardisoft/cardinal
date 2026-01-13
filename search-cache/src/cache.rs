@@ -1121,22 +1121,13 @@ mod tests {
         assert_eq!(root_name, "/", "root node should be named '/'");
 
         // Traverse down to verify the chain is complete
-        let mut path_segments = root.components().filter_map(|c| match c {
-            std::path::Component::Normal(name) => Some(name.to_string_lossy().to_string()),
-            _ => None,
-        });
-
         let mut current_index = root_index;
-        while let Some(segment) = path_segments.next() {
+        for segment in root.strip_prefix("/").unwrap() {
             let found = cache.file_nodes[current_index]
                 .children
                 .iter()
                 .find(|&&child_idx| cache.file_nodes[child_idx].name() == segment);
-            assert!(
-                found.is_some(),
-                "should find segment '{}' in parent chain",
-                segment
-            );
+            assert!(found.is_some(), "should find segment in parent chain",);
             current_index = *found.unwrap();
         }
     }
