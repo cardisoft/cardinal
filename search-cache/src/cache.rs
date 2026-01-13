@@ -8,7 +8,7 @@ use crate::{
 use anyhow::{Context, Result, anyhow};
 use cardinal_sdk::{EventFlag, FsEvent, ScanType, current_event_id};
 use cardinal_syntax::{optimize_query, parse_query};
-use fswalk::{Node, NodeMetadata, WalkData, walk_it};
+use fswalk::{Node, NodeMetadata, WalkData, walk_it, walk_it_without_root_chain};
 use hashbrown::HashSet;
 use namepool::NamePool;
 use search_cancel::CancellationToken;
@@ -225,13 +225,13 @@ impl SearchCache {
         self.file_nodes.node_path(index)
     }
 
-    /// Locate the slab index for a path relative to the watch root.
-    pub fn node_index_for_relative_path(&self, relative: &Path) -> Option<SlabIndex> {
+    /// Locate the slab index for an absolute path when it belongs to the watch root.
+    pub fn node_index_for_path(&self, path: &Path) -> Option<SlabIndex> {
+        let Ok(path) = path.strip_prefix("/") else {
+            return None;
+        };
         let mut current = self.file_nodes.root();
-        if relative.as_os_str().is_empty() {
-            return Some(current);
-        }
-        for segment in relative.components().map(|component| component.as_os_str()) {
+        for segment in path {
             let next = self.file_nodes[current]
                 .children
                 .iter()
@@ -246,12 +246,6 @@ impl SearchCache {
             current = next;
         }
         Some(current)
-    }
-
-    /// Locate the slab index for an absolute path when it belongs to the watch root.
-    pub fn node_index_for_raw_path(&self, raw_path: &Path) -> Option<SlabIndex> {
-        let relative = raw_path.strip_prefix(self.file_nodes.path()).ok()?;
-        self.node_index_for_relative_path(relative)
     }
 
     /// Get all subnode indices of a given node index(including itself).
@@ -291,8 +285,11 @@ impl SearchCache {
 
     /// Removes a node by path and its children recursively.
     fn remove_node_path(&mut self, path: &Path) -> Option<SlabIndex> {
+        let Ok(path) = path.strip_prefix("/") else {
+            return None;
+        };
         let mut current = self.file_nodes.root();
-        for name in path.components().map(|x| x.as_os_str()) {
+        for name in path {
             if let Some(&index) = self.file_nodes[current]
                 .children
                 .iter()
@@ -307,11 +304,14 @@ impl SearchCache {
         Some(current)
     }
 
-    // Blindly try create node chain, it doesn't check if the path is really exist on disk.
+    // Create node chain of specific path
     fn create_node_chain(&mut self, path: &Path) -> SlabIndex {
+        let path = path
+            .strip_prefix("/")
+            .expect("create_node_chain only accepts absolute path");
         let mut current = self.file_nodes.root();
-        let mut current_path = self.file_nodes.path().to_path_buf();
-        for name in path.components().map(|x| x.as_os_str()) {
+        let mut current_path = PathBuf::from("/");
+        for name in path {
             current_path.push(name);
             current = if let Some(&index) = self.file_nodes[current]
                 .children
@@ -344,12 +344,9 @@ impl SearchCache {
     // `Self::scan_path_recursive`function returns index of the constructed node(with metadata provided).
     // - If path is not under the watch root, None is returned.
     // - Procedure contains metadata fetching, if metadata fetching failed, None is returned.
-    fn scan_path_recursive(&mut self, raw_path: &Path) -> Option<SlabIndex> {
+    fn scan_path_recursive(&mut self, path: &Path) -> Option<SlabIndex> {
         // Ensure path is under the watch root
-        let Ok(path) = raw_path.strip_prefix(self.file_nodes.path()) else {
-            return None;
-        };
-        if raw_path.symlink_metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
+        if path.symlink_metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
             self.remove_node_path(path);
             return None;
         };
@@ -367,8 +364,8 @@ impl SearchCache {
             self.remove_node(old_node);
         }
         // For incremental data, we need metadata
-        let walk_data = WalkData::new(raw_path, self.file_nodes.ignore_paths(), true, self.stop);
-        walk_it(&walk_data).map(|node| {
+        let walk_data = WalkData::new(path, self.file_nodes.ignore_paths(), true, self.stop);
+        walk_it_without_root_chain(&walk_data).map(|node| {
             let node = self.create_node_slab_update_name_index_and_name_pool(Some(parent), &node);
             // Push the newly created node to the parent's children
             self.file_nodes[parent].add_children(node);
@@ -380,12 +377,9 @@ impl SearchCache {
     // - If path is not under the watch root, None is returned.
     // - Procedure contains metadata fetching, if metadata fetching failed, None is returned.
     #[allow(dead_code)]
-    fn scan_path_nonrecursive(&mut self, raw_path: &Path) -> Option<SlabIndex> {
+    fn scan_path_nonrecursive(&mut self, path: &Path) -> Option<SlabIndex> {
         // Ensure path is under the watch root
-        let Ok(path) = raw_path.strip_prefix(self.file_nodes.path()) else {
-            return None;
-        };
-        if raw_path.symlink_metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
+        if path.symlink_metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
             self.remove_node_path(path);
             return None;
         };
@@ -763,9 +757,15 @@ mod tests {
     use crate::query::CONTENT_BUFFER_BYTES;
     use std::{
         fs,
-        path::{Path, PathBuf},
+        path::{Component, Path, PathBuf},
     };
     use tempdir::TempDir;
+
+    fn depth(path: &Path) -> usize {
+        path.components()
+            .filter(|c| matches!(c, Component::Normal(_)))
+            .count()
+    }
 
     fn guard_indices(result: Result<SearchOutcome>) -> Vec<SlabIndex> {
         result
@@ -915,8 +915,8 @@ mod tests {
 
         let cache = SearchCache::walk_fs(temp_path);
 
-        assert_eq!(cache.file_nodes.len(), 4);
-        assert_eq!(cache.name_index.len(), 4);
+        assert_eq!(cache.file_nodes.len(), 4 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 4 + depth(temp_path));
     }
 
     #[test]
@@ -927,8 +927,8 @@ mod tests {
 
         let mut cache = SearchCache::walk_fs(temp_dir.path());
 
-        assert_eq!(cache.file_nodes.len(), 1);
-        assert_eq!(cache.name_index.len(), 1);
+        assert_eq!(cache.file_nodes.len(), 1 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 1 + depth(temp_path));
 
         fs::File::create(temp_path.join("new_file.txt")).expect("Failed to create file");
 
@@ -940,8 +940,8 @@ mod tests {
 
         cache.handle_fs_events(mock_events).unwrap();
 
-        assert_eq!(cache.file_nodes.len(), 2);
-        assert_eq!(cache.name_index.len(), 2);
+        assert_eq!(cache.file_nodes.len(), 2 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 2 + depth(temp_path));
         assert_eq!(cache.search("new_file.txt").unwrap().len(), 1);
     }
 
@@ -953,8 +953,8 @@ mod tests {
 
         let mut cache = SearchCache::walk_fs(temp_dir.path());
 
-        assert_eq!(cache.file_nodes.len(), 2);
-        assert_eq!(cache.name_index.len(), 2);
+        assert_eq!(cache.file_nodes.len(), 2 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 2 + depth(temp_path));
 
         let mock_events = vec![FsEvent {
             path: temp_path.join("new_file.txt"),
@@ -964,8 +964,8 @@ mod tests {
 
         cache.handle_fs_events(mock_events).unwrap();
 
-        assert_eq!(cache.file_nodes.len(), 2);
-        assert_eq!(cache.name_index.len(), 2);
+        assert_eq!(cache.file_nodes.len(), 2 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 2 + depth(temp_path));
         assert_eq!(cache.search("new_file.txt").unwrap().len(), 1);
     }
 
@@ -977,8 +977,8 @@ mod tests {
 
         let mut cache = SearchCache::walk_fs(temp_dir.path());
 
-        assert_eq!(cache.file_nodes.len(), 1);
-        assert_eq!(cache.name_index.len(), 1);
+        assert_eq!(cache.file_nodes.len(), 1 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 1 + depth(temp_path));
 
         fs::File::create(temp_path.join("new_file.txt")).expect("Failed to create file");
 
@@ -990,8 +990,8 @@ mod tests {
 
         cache.handle_fs_events(mock_events).unwrap();
 
-        assert_eq!(cache.file_nodes.len(), 2);
-        assert_eq!(cache.name_index.len(), 2);
+        assert_eq!(cache.file_nodes.len(), 2 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 2 + depth(temp_path));
         assert_eq!(cache.search("new_file.txt").unwrap().len(), 1);
     }
 
@@ -1314,8 +1314,8 @@ mod tests {
 
         let mut cache = SearchCache::walk_fs(temp_dir.path());
 
-        assert_eq!(cache.file_nodes.len(), 2);
-        assert_eq!(cache.name_index.len(), 2);
+        assert_eq!(cache.file_nodes.len(), 2 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 2 + depth(temp_path));
 
         fs::remove_file(temp_path.join("new_file.txt")).expect("Failed to remove file");
 
@@ -1328,8 +1328,8 @@ mod tests {
         cache.handle_fs_events(mock_events).unwrap();
 
         // Though the file in fsevents removed, we should still preserve it since it exists on disk.
-        assert_eq!(cache.file_nodes.len(), 1);
-        assert_eq!(cache.name_index.len(), 1);
+        assert_eq!(cache.file_nodes.len(), 1 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 1 + depth(temp_path));
         assert_eq!(cache.search("new_file.txt").unwrap().len(), 0);
     }
 
@@ -1370,8 +1370,8 @@ mod tests {
         let temp_path = temp_dir.path();
         let mut cache = SearchCache::walk_fs(temp_dir.path());
 
-        assert_eq!(cache.file_nodes.len(), 1);
-        assert_eq!(cache.name_index.len(), 1);
+        assert_eq!(cache.file_nodes.len(), 1 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 1 + depth(temp_path));
 
         fs::File::create(temp_path.join("new_file.txt")).expect("Failed to create file");
 
@@ -1384,8 +1384,8 @@ mod tests {
         cache.handle_fs_events(mock_events).unwrap();
 
         // Though the file in fsevents removed, we should still preserve it since it exists on disk.
-        assert_eq!(cache.file_nodes.len(), 2);
-        assert_eq!(cache.name_index.len(), 2);
+        assert_eq!(cache.file_nodes.len(), 2 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 2 + depth(temp_path));
         assert_eq!(cache.search("new_file.txt").unwrap().len(), 1);
     }
 
@@ -1395,8 +1395,8 @@ mod tests {
         let temp_path = temp_dir.path();
         let mut cache = SearchCache::walk_fs(temp_dir.path());
 
-        assert_eq!(cache.file_nodes.len(), 1);
-        assert_eq!(cache.name_index.len(), 1);
+        assert_eq!(cache.file_nodes.len(), 1 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 1 + depth(temp_path));
 
         fs::File::create(temp_path.join("new_file.txt")).expect("Failed to create file");
 
@@ -1416,8 +1416,8 @@ mod tests {
         cache.handle_fs_events(mock_events).unwrap();
 
         // Though the file in fsevents removed, we should still preserve it since it exists on disk.
-        assert_eq!(cache.file_nodes.len(), 2);
-        assert_eq!(cache.name_index.len(), 2);
+        assert_eq!(cache.file_nodes.len(), 2 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 2 + depth(temp_path));
         assert_eq!(cache.search("new_file.txt").unwrap().len(), 1);
     }
 
@@ -1432,8 +1432,8 @@ mod tests {
         fs::File::create(temp_path.join("src/foo/good.rs")).expect("Failed to create file");
         let mut cache = SearchCache::walk_fs(temp_dir.path());
 
-        assert_eq!(cache.file_nodes.len(), 7);
-        assert_eq!(cache.name_index.len(), 7);
+        assert_eq!(cache.file_nodes.len(), 7 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 7 + depth(temp_path));
 
         let mock_events = vec![FsEvent {
             path: temp_path.to_path_buf(),
@@ -1443,8 +1443,8 @@ mod tests {
 
         cache.handle_fs_events(mock_events).unwrap_err();
 
-        assert_eq!(cache.file_nodes.len(), 7);
-        assert_eq!(cache.name_index.len(), 7);
+        assert_eq!(cache.file_nodes.len(), 7 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 7 + depth(temp_path));
         assert_eq!(cache.search("new_file").unwrap().len(), 3);
         assert_eq!(cache.search("good.rs").unwrap().len(), 1);
         assert_eq!(cache.search("foo").unwrap().len(), 1);
@@ -1456,8 +1456,8 @@ mod tests {
         let temp_path = temp_dir.path();
         let mut cache = SearchCache::walk_fs(temp_dir.path());
 
-        assert_eq!(cache.file_nodes.len(), 1);
-        assert_eq!(cache.name_index.len(), 1);
+        assert_eq!(cache.file_nodes.len(), 1 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 1 + depth(temp_path));
 
         fs::File::create(temp_path.join("new_file.txt")).expect("Failed to create file");
         fs::File::create(temp_path.join("new_file2.txt")).expect("Failed to create file");
@@ -1474,8 +1474,8 @@ mod tests {
         cache.handle_fs_events(mock_events).unwrap_err();
 
         // Rescan is required
-        assert_eq!(cache.file_nodes.len(), 1);
-        assert_eq!(cache.name_index.len(), 1);
+        assert_eq!(cache.file_nodes.len(), 1 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 1 + depth(temp_path));
     }
 
     #[test]
@@ -1484,8 +1484,8 @@ mod tests {
         let temp_path = temp_dir.path();
         let mut cache = SearchCache::walk_fs(temp_dir.path());
 
-        assert_eq!(cache.file_nodes.len(), 1);
-        assert_eq!(cache.name_index.len(), 1);
+        assert_eq!(cache.file_nodes.len(), 1 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 1 + depth(temp_path));
 
         fs::File::create(temp_path.join("new_file.txt")).expect("Failed to create file");
         fs::File::create(temp_path.join("new_file2.txt")).expect("Failed to create file");
@@ -1501,8 +1501,8 @@ mod tests {
 
         cache.handle_fs_events(mock_events).unwrap_err();
 
-        assert_eq!(cache.file_nodes.len(), 1);
-        assert_eq!(cache.name_index.len(), 1);
+        assert_eq!(cache.file_nodes.len(), 1 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 1 + depth(temp_path));
     }
 
     #[test]
@@ -1520,8 +1520,8 @@ mod tests {
         fs::File::create(temp_path.join("src/boo.rs")).expect("Failed to create file");
         let mut cache = SearchCache::walk_fs(temp_dir.path());
 
-        assert_eq!(cache.file_nodes.len(), 11);
-        assert_eq!(cache.name_index.len(), 11);
+        assert_eq!(cache.file_nodes.len(), 11 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 11 + depth(temp_path));
         assert_eq!(cache.search("src").unwrap().len(), 1);
         assert_eq!(cache.search("new_file").unwrap().len(), 3);
         assert_eq!(cache.search("good.rs").unwrap().len(), 1);
@@ -1539,8 +1539,8 @@ mod tests {
 
         cache.handle_fs_events(mock_events).unwrap();
 
-        assert_eq!(cache.file_nodes.len(), 5);
-        assert_eq!(cache.name_index.len(), 5);
+        assert_eq!(cache.file_nodes.len(), 5 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 5 + depth(temp_path));
         assert_eq!(cache.search("src").unwrap().len(), 0);
         assert_eq!(cache.search("new_file").unwrap().len(), 3);
         assert_eq!(cache.search("good.rs").unwrap().len(), 0);
@@ -1563,8 +1563,8 @@ mod tests {
         fs::File::create(temp_path.join("src/boo.rs")).expect("Failed to create file");
         let mut cache = SearchCache::walk_fs(temp_dir.path());
 
-        assert_eq!(cache.file_nodes.len(), 11);
-        assert_eq!(cache.name_index.len(), 11);
+        assert_eq!(cache.file_nodes.len(), 11 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 11 + depth(temp_path));
         assert_eq!(cache.search("src").unwrap().len(), 1);
         assert_eq!(cache.search("new_file").unwrap().len(), 3);
         assert_eq!(cache.search("good.rs").unwrap().len(), 1);
@@ -1582,8 +1582,8 @@ mod tests {
 
         cache.handle_fs_events(mock_events).unwrap();
 
-        assert_eq!(cache.file_nodes.len(), 9);
-        assert_eq!(cache.name_index.len(), 9);
+        assert_eq!(cache.file_nodes.len(), 9 + depth(temp_path));
+        assert_eq!(cache.name_index.len(), 9 + depth(temp_path));
         assert_eq!(cache.search("src").unwrap().len(), 1);
         assert_eq!(cache.search("new_file").unwrap().len(), 3);
         assert_eq!(cache.search("good.rs").unwrap().len(), 0);

@@ -23,7 +23,7 @@ fn test_all_subnodes_returns_all_descendants() {
     // Find src directory index
     let src_path = tmp.path().join("src");
     let src_idx = cache
-        .node_index_for_raw_path(&src_path)
+        .node_index_for_path(&src_path)
         .expect("src directory should exist");
 
     // Get all subnodes
@@ -53,7 +53,7 @@ fn test_all_subnodes_empty_directory() {
 
     let empty_path = tmp.path().join("empty");
     let empty_idx = cache
-        .node_index_for_raw_path(&empty_path)
+        .node_index_for_path(&empty_path)
         .expect("empty directory should exist");
 
     let subnodes = cache
@@ -76,7 +76,7 @@ fn test_all_subnodes_deep_nesting() {
     // Get subnodes from 'a' directory
     let a_path = tmp.path().join("a");
     let a_idx = cache
-        .node_index_for_raw_path(&a_path)
+        .node_index_for_path(&a_path)
         .expect("a directory should exist");
 
     let subnodes = cache

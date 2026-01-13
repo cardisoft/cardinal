@@ -1,6 +1,7 @@
 use fswalk::{NodeFileType, WalkData, walk_it};
 use std::{
     fs,
+    path::{Component, Path},
     sync::atomic::{AtomicBool, Ordering},
 };
 use tempdir::TempDir;
@@ -23,6 +24,27 @@ fn build_deep_fixture(root: &std::path::Path) {
     fs::write(root.join("keep_b.log"), b"b").unwrap();
 }
 
+fn node_for_path<'a>(node: &'a fswalk::Node, path: &Path) -> &'a fswalk::Node {
+    let mut current = node;
+    for component in path.components() {
+        match component {
+            Component::RootDir => {
+                assert_eq!(&*current.name, "/");
+            }
+            Component::Normal(name) => {
+                let name = name.to_string_lossy();
+                current = current
+                    .children
+                    .iter()
+                    .find(|child| *child.name == name)
+                    .unwrap_or_else(|| panic!("missing path segment: {name}"));
+            }
+            _ => {}
+        }
+    }
+    current
+}
+
 #[test]
 fn ignores_directories_and_collects_metadata() {
     let tmp = TempDir::new("fswalk_deep").unwrap();
@@ -30,6 +52,7 @@ fn ignores_directories_and_collects_metadata() {
     let ignore = vec![tmp.path().join("skip_dir")];
     let walk_data = WalkData::new(tmp.path(), &ignore, true, None);
     let tree = walk_it(&walk_data).expect("root node");
+    let tree = node_for_path(&tree, tmp.path());
 
     // Ensure skip_dir absent
     assert!(!tree.children.iter().any(|c| &*c.name == "skip_dir"));
@@ -60,7 +83,7 @@ fn ignores_directories_and_collects_metadata() {
             }
         }
     }
-    assert_meta(&tree);
+    assert_meta(tree);
 }
 
 #[test]
