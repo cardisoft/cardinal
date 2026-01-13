@@ -1036,6 +1036,445 @@ mod tests {
         let _ = cache.create_node_chain(Path::new("relative/path"));
     }
 
+    // --- New comprehensive tests for recent changes ---
+
+    #[test]
+    fn node_index_for_path_with_absolute_paths() {
+        let temp_dir =
+            TempDir::new("node_index_for_path_absolute").expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("alpha/beta/gamma")).expect("Failed to create directories");
+        fs::File::create(root.join("alpha/beta/file.txt")).expect("Failed to create file");
+
+        let cache = SearchCache::walk_fs(root);
+
+        // Test retrieval with absolute paths
+        let alpha_index = cache.node_index_for_path(&root.join("alpha"));
+        assert!(alpha_index.is_some(), "should find alpha directory");
+
+        let beta_index = cache.node_index_for_path(&root.join("alpha/beta"));
+        assert!(beta_index.is_some(), "should find alpha/beta directory");
+
+        let file_index = cache.node_index_for_path(&root.join("alpha/beta/file.txt"));
+        assert!(file_index.is_some(), "should find file.txt");
+
+        let nonexistent = cache.node_index_for_path(&root.join("alpha/nonexistent"));
+        assert!(nonexistent.is_none(), "should not find nonexistent path");
+    }
+
+    #[test]
+    fn node_index_for_path_with_relative_path_fails() {
+        let temp_dir =
+            TempDir::new("node_index_for_path_relative").expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("dir")).expect("Failed to create directory");
+
+        let cache = SearchCache::walk_fs(root);
+
+        // Relative paths should not be found
+        let result = cache.node_index_for_path(Path::new("dir"));
+        assert!(result.is_none(), "relative paths should not match");
+    }
+
+    #[test]
+    fn node_path_returns_absolute_paths() {
+        let temp_dir = TempDir::new("node_path_absolute").expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("folder/subfolder")).expect("Failed to create directories");
+        fs::File::create(root.join("folder/file.txt")).expect("Failed to create file");
+
+        let cache = SearchCache::walk_fs(root);
+
+        let folder_index = cache
+            .node_index_for_path(&root.join("folder"))
+            .expect("folder should exist");
+        let folder_path = cache
+            .node_path(folder_index)
+            .expect("should get folder path");
+        assert!(
+            folder_path.is_absolute(),
+            "returned path should be absolute"
+        );
+        assert_eq!(folder_path, root.join("folder"));
+
+        let file_index = cache
+            .node_index_for_path(&root.join("folder/file.txt"))
+            .expect("file should exist");
+        let file_path = cache.node_path(file_index).expect("should get file path");
+        assert!(file_path.is_absolute(), "returned path should be absolute");
+        assert_eq!(file_path, root.join("folder/file.txt"));
+    }
+
+    #[test]
+    fn walk_it_creates_full_parent_chain() {
+        let temp_dir =
+            TempDir::new("walk_it_parent_chain").expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("deep/nested/structure"))
+            .expect("Failed to create directories");
+
+        let cache = SearchCache::walk_fs(root);
+
+        // Verify root node exists at the filesystem root
+        let root_index = cache.file_nodes.root();
+        let root_name = cache.file_nodes[root_index].name();
+        assert_eq!(root_name, "/", "root node should be named '/'");
+
+        // Traverse down to verify the chain is complete
+        let mut path_segments = root.components().filter_map(|c| match c {
+            std::path::Component::Normal(name) => Some(name.to_string_lossy().to_string()),
+            _ => None,
+        });
+
+        let mut current_index = root_index;
+        while let Some(segment) = path_segments.next() {
+            let found = cache.file_nodes[current_index]
+                .children
+                .iter()
+                .find(|&&child_idx| cache.file_nodes[child_idx].name() == segment);
+            assert!(
+                found.is_some(),
+                "should find segment '{}' in parent chain",
+                segment
+            );
+            current_index = *found.unwrap();
+        }
+    }
+
+    #[test]
+    fn walk_it_deep_path_has_all_ancestors() {
+        let temp_dir =
+            TempDir::new("walk_it_deep_ancestors").expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("a/b/c/d/e")).expect("Failed to create directories");
+
+        let cache = SearchCache::walk_fs(root);
+
+        // Find the deepest node
+        let e_index = cache
+            .node_index_for_path(&root.join("a/b/c/d/e"))
+            .expect("deepest node should exist");
+
+        // Verify we can navigate all the way back to root
+        let mut current = e_index;
+        let mut visited = vec![];
+
+        // Traverse upwards to collect all ancestors
+        loop {
+            visited.push(current);
+            if current == cache.file_nodes.root() {
+                break;
+            }
+            let parent = cache.file_nodes[current].parent();
+            if let Some(p) = parent {
+                current = p;
+            } else {
+                panic!("Node should have parent until reaching root");
+            }
+        }
+
+        // Should have at least: /, <temp_dir_segments...>, a, b, c, d, e
+        assert!(
+            visited.len() >= 6,
+            "should have visited at least 6 ancestors (including self)"
+        );
+    }
+
+    #[test]
+    fn remove_node_path_with_absolute_paths() {
+        let temp_dir =
+            TempDir::new("remove_node_absolute").expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("to_remove/child")).expect("Failed to create directories");
+        fs::File::create(root.join("to_remove/file.txt")).expect("Failed to create file");
+
+        let mut cache = SearchCache::walk_fs(root);
+
+        let before_count = cache.file_nodes.len();
+        let target_path = root.join("to_remove");
+
+        // Verify node exists before removal
+        assert!(cache.node_index_for_path(&target_path).is_some());
+
+        // Remove the node
+        let removed = cache.remove_node_path(&target_path);
+        assert!(removed.is_some(), "should return removed node index");
+
+        let after_count = cache.file_nodes.len();
+        assert!(
+            after_count < before_count,
+            "node count should decrease after removal"
+        );
+
+        // Verify node no longer exists
+        assert!(cache.node_index_for_path(&target_path).is_none());
+        assert!(
+            cache
+                .node_index_for_path(&target_path.join("child"))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn create_node_chain_with_deep_missing_ancestors() {
+        let temp_dir = TempDir::new("create_node_chain_deep_missing")
+            .expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("exists")).expect("Failed to create directory");
+
+        let mut cache = SearchCache::walk_fs(root);
+        let before = cache.file_nodes.len();
+
+        // Create chain for a deeply nested path that doesn't exist on disk
+        let target = root.join("exists/missing1/missing2/missing3/leaf");
+        let index = cache.create_node_chain(&target);
+        let after = cache.file_nodes.len();
+
+        // Should add 4 new nodes: missing1, missing2, missing3, leaf
+        assert_eq!(after, before + 4, "should add 4 missing nodes");
+
+        // Verify path is correct
+        assert_eq!(
+            cache.node_path(index).expect("node path should exist"),
+            target
+        );
+
+        // Verify all intermediate nodes are marked as unaccessible
+        let missing1_index = cache
+            .node_index_for_path(&root.join("exists/missing1"))
+            .expect("missing1 should exist");
+        assert_eq!(
+            cache.file_nodes[missing1_index].state(),
+            State::Unaccessible
+        );
+    }
+
+    #[test]
+    fn create_node_chain_preserves_existing_metadata() {
+        let temp_dir = TempDir::new("create_node_chain_preserves_metadata")
+            .expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("dir")).expect("Failed to create directory");
+        fs::File::create(root.join("dir/existing.txt")).expect("Failed to create file");
+
+        let mut cache = SearchCache::walk_fs(root);
+
+        // Get the original metadata state
+        let existing_index = cache
+            .node_index_for_path(&root.join("dir/existing.txt"))
+            .expect("file should exist");
+        let original_state = cache.file_nodes[existing_index].state();
+        let original_type = cache.file_nodes[existing_index].file_type_hint();
+
+        // Call create_node_chain on the existing path
+        let new_index = cache.create_node_chain(&root.join("dir/existing.txt"));
+
+        // Should return the same index
+        assert_eq!(new_index, existing_index);
+
+        // Metadata should be unchanged
+        assert_eq!(cache.file_nodes[new_index].state(), original_state);
+        assert_eq!(cache.file_nodes[new_index].file_type_hint(), original_type);
+    }
+
+    #[test]
+    fn scan_path_recursive_with_absolute_path() {
+        let temp_dir =
+            TempDir::new("scan_path_recursive_absolute").expect("Failed to create temp directory");
+        let root = temp_dir.path();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let initial_count = cache.file_nodes.len();
+
+        // Create new content after initial walk
+        fs::create_dir_all(root.join("new_dir/sub")).expect("Failed to create directories");
+        fs::File::create(root.join("new_dir/file.txt")).expect("Failed to create file");
+
+        // Scan the new path with absolute path
+        let result = cache.scan_path_recursive(&root.join("new_dir"));
+        assert!(result.is_some(), "should successfully scan new directory");
+
+        let after_count = cache.file_nodes.len();
+        assert!(
+            after_count > initial_count,
+            "should have added nodes from scan"
+        );
+
+        // Verify the new nodes are accessible
+        assert!(cache.node_index_for_path(&root.join("new_dir")).is_some());
+        assert!(
+            cache
+                .node_index_for_path(&root.join("new_dir/sub"))
+                .is_some()
+        );
+        assert!(
+            cache
+                .node_index_for_path(&root.join("new_dir/file.txt"))
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn scan_path_recursive_handles_nonexistent_file() {
+        let temp_dir =
+            TempDir::new("scan_path_nonexistent").expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("existing")).expect("Failed to create directory");
+
+        let mut cache = SearchCache::walk_fs(root);
+
+        // Try to scan a path that doesn't exist
+        let result = cache.scan_path_recursive(&root.join("existing/nonexistent.txt"));
+        assert!(result.is_none(), "should return None for nonexistent path");
+    }
+
+    #[test]
+    fn path_handling_with_unicode_characters() {
+        let temp_dir = TempDir::new("path_unicode").expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("文件夹/子目录")).expect("Failed to create directories");
+        fs::File::create(root.join("文件夹/文件.txt")).expect("Failed to create file");
+
+        let cache = SearchCache::walk_fs(root);
+
+        // Verify Unicode paths work correctly
+        let folder_index = cache.node_index_for_path(&root.join("文件夹"));
+        assert!(folder_index.is_some(), "should find Unicode folder");
+
+        let file_index = cache.node_index_for_path(&root.join("文件夹/文件.txt"));
+        assert!(file_index.is_some(), "should find Unicode file");
+
+        // Verify path reconstruction
+        let file_path = cache
+            .node_path(file_index.unwrap())
+            .expect("should get file path");
+        assert_eq!(file_path, root.join("文件夹/文件.txt"));
+    }
+
+    #[test]
+    fn path_handling_with_special_characters() {
+        let temp_dir = TempDir::new("path_special").expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("dir with spaces/sub-dir"))
+            .expect("Failed to create directories");
+        fs::File::create(root.join("dir with spaces/file (1).txt")).expect("Failed to create file");
+
+        let cache = SearchCache::walk_fs(root);
+
+        // Verify paths with spaces and special chars work
+        let dir_index = cache.node_index_for_path(&root.join("dir with spaces"));
+        assert!(dir_index.is_some(), "should find directory with spaces");
+
+        let file_index = cache.node_index_for_path(&root.join("dir with spaces/file (1).txt"));
+        assert!(
+            file_index.is_some(),
+            "should find file with special characters"
+        );
+    }
+
+    #[test]
+    fn walk_it_without_root_chain_comparison() {
+        let temp_dir =
+            TempDir::new("walk_without_root_chain").expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("test_dir")).expect("Failed to create directory");
+
+        let walk_data = WalkData::simple(root, true);
+
+        // Test walk_it_without_root_chain
+        let tree_without_chain = walk_it_without_root_chain(&walk_data).expect("walk succeeded");
+        assert_eq!(
+            &*tree_without_chain.name,
+            root.file_name().unwrap().to_str().unwrap(),
+            "root node should match directory name"
+        );
+
+        // Test walk_it (with root chain)
+        let tree_with_chain = walk_it(&walk_data).expect("walk succeeded");
+        assert_eq!(
+            &*tree_with_chain.name, "/",
+            "root of chain should be filesystem root"
+        );
+
+        // Navigate down the chain to find the actual root directory
+        let root_name = root.file_name().unwrap().to_str().unwrap();
+
+        // Traverse to find the target directory in the chain
+        let mut found_root = false;
+        fn find_in_tree<'a>(node: &'a Node, name: &str) -> Option<&'a Node> {
+            if &*node.name == name {
+                return Some(node);
+            }
+            for child in &node.children {
+                if let Some(found) = find_in_tree(child, name) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+
+        if let Some(target_node) = find_in_tree(&tree_with_chain, root_name) {
+            found_root = true;
+            // This node should have same structure as tree_without_chain
+            assert_eq!(&*target_node.name, &*tree_without_chain.name);
+        }
+
+        assert!(found_root, "should find target directory in parent chain");
+    }
+
+    #[test]
+    fn node_path_edge_cases() {
+        let temp_dir = TempDir::new("node_path_edge").expect("Failed to create temp directory");
+        let root = temp_dir.path();
+
+        let cache = SearchCache::walk_fs(root);
+
+        // Test root node path
+        let root_index = cache.file_nodes.root();
+        let root_path = cache.node_path(root_index);
+        assert!(root_path.is_some(), "root should have a path");
+        assert_eq!(
+            root_path.unwrap(),
+            PathBuf::from("/"),
+            "root path should be '/'"
+        );
+    }
+
+    #[test]
+    fn create_node_chain_intermediate_nodes_have_correct_parents() {
+        let temp_dir =
+            TempDir::new("create_node_chain_parents").expect("Failed to create temp directory");
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("a")).expect("Failed to create directory");
+
+        let mut cache = SearchCache::walk_fs(root);
+
+        // Create a chain with multiple missing levels
+        let target = root.join("a/b/c/d");
+        cache.create_node_chain(&target);
+
+        // Verify parent relationships
+        let d_index = cache.node_index_for_path(&target).expect("d should exist");
+        let c_index = cache
+            .node_index_for_path(&root.join("a/b/c"))
+            .expect("c should exist");
+        let b_index = cache
+            .node_index_for_path(&root.join("a/b"))
+            .expect("b should exist");
+
+        // Check parent pointers
+        assert_eq!(
+            cache.file_nodes[d_index].parent(),
+            Some(c_index),
+            "d's parent should be c"
+        );
+        assert_eq!(
+            cache.file_nodes[c_index].parent(),
+            Some(b_index),
+            "c's parent should be b"
+        );
+    }
+
     #[test]
     fn test_handle_fs_event_add() {
         // Create a temporary directory.
