@@ -533,6 +533,10 @@ button:active:not(:disabled) {
   cursor: pointer;
 }
 
+.sort-button:active:not(:disabled) {
+  background-color: transparent !important;
+}
+
 .sort-button:disabled {
   opacity: 0.75;
   cursor: default;
