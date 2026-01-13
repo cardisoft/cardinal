@@ -12,7 +12,7 @@ use std::{
 use tracing::info;
 use typed_num::Num;
 
-const LSF_VERSION: i64 = 3;
+const LSF_VERSION: i64 = 4;
 
 #[derive(Serialize, Deserialize)]
 pub struct PersistentStorage {
