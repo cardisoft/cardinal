@@ -254,7 +254,16 @@ fn handle_icon_viewport_update(
     icon_jobs
         .into_iter()
         .map(|(slab_index, path)| (slab_index, path.to_string_lossy().into_owned()))
-        .filter(|(_, path)| !path.contains("OneDrive") && !path.contains("com~apple~CloudDocs"))
+        .filter(|(_, path)| {
+            // OneDrive
+            // iCloud Drive
+            // Google Drive
+            // Dropbox
+            !path.contains("OneDrive")
+                && !path.contains("com~apple~CloudDocs")
+                && !path.contains("Google Drive")
+                && !path.contains("Dropbox")
+        })
         .for_each(|(slab_index, path)| {
             let icon_update_tx = icon_update_tx.clone();
             spawn(move || {
