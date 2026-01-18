@@ -67,7 +67,7 @@
     "rescan": {
       "disabledHint": "A varredura fica disponível quando o Cardinal estiver pronto.",
       "enabledHint": "Iniciar uma varredura completa do sistema de arquivos.",
-      "errorCountSuffix": " Ocorreram {{formatted}} erros do sistema de arquivos."
+      "errorCountSuffix": " Ocorreram {{formatted}} erros do sistema de arquivos, uma nova varredura é sugerida."
     },
     "searchLabel": "Busca:",
     "resultsUnavailable": "—",

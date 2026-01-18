@@ -67,7 +67,7 @@
     "rescan": {
       "disabledHint": "Cardinal이 준비되면 다시 스캔할 수 있습니다.",
       "enabledHint": "파일 시스템을 전체 스캔합니다.",
-      "errorCountSuffix": " 파일 시스템 오류가 {{formatted}}회 발생했습니다."
+      "errorCountSuffix": " 파일 시스템 오류가 {{formatted}}회 발생했습니다. 재스캔을 권장합니다."
     },
     "searchLabel": "검색:",
     "resultsUnavailable": "—",

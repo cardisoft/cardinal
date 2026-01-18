@@ -67,7 +67,7 @@
     "rescan": {
       "disabledHint": "Повторное сканирование станет доступно, когда Cardinal будет готов.",
       "enabledHint": "Запустить полное сканирование файловой системы.",
-      "errorCountSuffix": " Произошло {{formatted}} ошибок файловой системы."
+      "errorCountSuffix": " Произошло {{formatted}} ошибок файловой системы, рекомендуется повторное сканирование."
     },
     "searchLabel": "Поиск:",
     "resultsUnavailable": "—",

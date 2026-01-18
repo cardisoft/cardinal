@@ -67,7 +67,7 @@
     "rescan": {
       "disabledHint": "Cardinal 就緒後即可重新掃描。",
       "enabledHint": "觸發一次完整的檔案系統重新掃描。",
-      "errorCountSuffix": " 已出現{{formatted}}次檔案系統錯誤。"
+      "errorCountSuffix": " 已出現{{formatted}}次檔案系統錯誤，建議重新掃描。"
     },
     "searchLabel": "搜尋：",
     "resultsUnavailable": "—",
