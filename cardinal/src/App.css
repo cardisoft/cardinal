@@ -58,6 +58,7 @@
   --cell-hpad: 0.4rem;
 }
 
+/* Grey out selected rows in the files panel when the window loses focus. */
 :root[data-window-focused='false'] {
   --row-selected-bg: var(--row-selected-bg-inactive);
   --row-selected-hover-bg: var(--row-selected-hover-bg-inactive);
