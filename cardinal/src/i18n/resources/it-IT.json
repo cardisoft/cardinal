@@ -67,7 +67,7 @@
     "rescan": {
       "disabledHint": "La nuova scansione sarà disponibile quando Cardinal è pronto.",
       "enabledHint": "Avvia una scansione completa del file system.",
-      "errorCountSuffix": " Si sono verificati {{formatted}} errori del file system."
+      "errorCountSuffix": " Si sono verificati {{formatted}} errori del file system, è consigliata una nuova scansione."
     },
     "searchLabel": "Ricerca:",
     "resultsUnavailable": "—",

@@ -67,7 +67,7 @@
     "rescan": {
       "disabledHint": "Rescan becomes available once Cardinal is ready.",
       "enabledHint": "Trigger a full filesystem rescan.",
-      "errorCountSuffix": " {{formatted}} filesystem errors have occurred."
+      "errorCountSuffix": " {{formatted}} filesystem errors have occurred, rescan is suggested."
     },
     "searchLabel": "Search:",
     "resultsUnavailable": "—",

@@ -67,7 +67,7 @@
     "rescan": {
       "disabledHint": "Cardinal の準備が整うと再スキャンを利用できます。",
       "enabledHint": "ファイルシステム全体の再スキャンを実行します。",
-      "errorCountSuffix": " これまでにファイルシステムエラーが{{formatted}}回発生しています。"
+      "errorCountSuffix": " これまでにファイルシステムエラーが{{formatted}}回発生しています。再スキャンを推奨します。"
     },
     "searchLabel": "検索:",
     "resultsUnavailable": "—",

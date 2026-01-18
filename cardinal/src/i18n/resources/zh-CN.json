@@ -67,7 +67,7 @@
     "rescan": {
       "disabledHint": "Cardinal 准备就绪后即可重新扫描。",
       "enabledHint": "触发一次完整的文件系统重新扫描。",
-      "errorCountSuffix": " 已出现{{formatted}}次文件系统错误。"
+      "errorCountSuffix": " 已出现{{formatted}}次文件系统错误，建议重新扫描。"
     },
     "searchLabel": "搜索：",
     "resultsUnavailable": "—",

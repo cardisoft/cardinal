@@ -67,7 +67,7 @@
     "rescan": {
       "disabledHint": "سيصبح الفحص متاحًا عندما يصبح Cardinal جاهزًا.",
       "enabledHint": "ابدأ فحصًا كاملاً لنظام الملفات.",
-      "errorCountSuffix": " حدثت {{formatted}} أخطاء في نظام الملفات."
+      "errorCountSuffix": " حدثت {{formatted}} أخطاء في نظام الملفات، يُنصح بإعادة الفحص."
     },
     "searchLabel": "بحث:",
     "resultsUnavailable": "—",

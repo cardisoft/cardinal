@@ -67,7 +67,7 @@
     "rescan": {
       "disabledHint": "Der erneute Scan ist verfügbar, sobald Cardinal bereit ist.",
       "enabledHint": "Einen vollständigen Scan des Dateisystems starten.",
-      "errorCountSuffix": " Es sind {{formatted}} Dateisystemfehler aufgetreten."
+      "errorCountSuffix": " Es sind {{formatted}} Dateisystemfehler aufgetreten, ein erneuter Scan wird empfohlen."
     },
     "searchLabel": "Suche:",
     "resultsUnavailable": "—",
