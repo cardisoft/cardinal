@@ -31,6 +31,8 @@ import type { FSEventsPanelHandle } from './components/FSEventsPanel';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { primaryMonitor, getCurrentWindow } from '@tauri-apps/api/window';
+import type { DragDropEvent } from '@tauri-apps/api/window';
+import type { Event as TauriEvent } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
 import { useFullDiskAccessPermission } from './hooks/useFullDiskAccessPermission';
@@ -569,6 +571,44 @@ function App() {
     },
     [activeTab, handleHistoryNavigation, queueSearch, updateHistoryFromInput],
   );
+
+  const handleWindowDragDrop = useStableEvent((event: TauriEvent<DragDropEvent>) => {
+    const payload = event.payload;
+    if (payload.type !== 'drop') {
+      return;
+    }
+    const nextValue = payload.paths[0]?.trim();
+    if (!nextValue) {
+      return;
+    }
+    const query = `"${nextValue}"`;
+    if (activeTab === 'events') {
+      setEventFilterQuery(query);
+      return;
+    }
+    queueSearch(query, {
+      immediate: true,
+      onSearchCommitted: updateHistoryFromInput,
+    });
+  });
+
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null;
+    getCurrentWindow()
+      .onDragDropEvent(handleWindowDragDrop)
+      .then((unsubscribe) => {
+        unlisten = unsubscribe;
+      })
+      .catch((error) => {
+        console.error('Failed to register drag-drop listener', error);
+      });
+
+    return () => {
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, [handleWindowDragDrop]);
 
   const handleHorizontalSync = useCallback((scrollLeft: number) => {
     // VirtualList drives the scroll position; mirror it onto the sticky header for alignment
