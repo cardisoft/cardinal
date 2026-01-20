@@ -12,7 +12,7 @@ use std::{
 use tracing::info;
 use typed_num::Num;
 
-const LSF_VERSION: i64 = 4;
+const LSF_VERSION: i64 = 5;
 
 #[derive(Serialize, Deserialize)]
 pub struct PersistentStorage {
@@ -27,6 +27,8 @@ pub struct PersistentStorage {
     pub slab_root: SlabIndex,
     pub slab: ThinSlab<SlabNode>,
     pub name_index: BTreeMap<Box<str>, SortedSlabIndices>,
+    /// The number of rescans emitted before this snapshot.
+    pub rescan_count: u64,
 }
 
 pub fn read_cache_from_file(path: &Path) -> Result<PersistentStorage> {

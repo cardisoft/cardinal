@@ -102,7 +102,6 @@ fn handle_watch_config_update(
     fse_latency_secs: f64,
     history_ready: &mut bool,
     processed_events: &mut usize,
-    rescan_errors: &mut usize,
 ) {
     info!("Received watch config update: {:?}", update);
     let trimmed_watch_root = update.watch_root.trim();
@@ -127,7 +126,6 @@ fn handle_watch_config_update(
     reset_status_bar(app_handle);
     *history_ready = false;
     *processed_events = 0;
-    *rescan_errors = 0;
 
     let Some(next_cache) = build_search_cache(app_handle, next_watch_root, &next_ignore_paths)
     else {
@@ -190,7 +188,6 @@ fn handle_event_watcher_events(
     events: Vec<FsEvent>,
     history_ready: &mut bool,
     processed_events: &mut usize,
-    rescan_errors: &mut usize,
 ) {
     *processed_events += events.len();
 
@@ -198,7 +195,7 @@ fn handle_event_watcher_events(
         app_handle,
         cache.get_total_files(),
         *processed_events,
-        *rescan_errors,
+        cache.rescan_count() as usize,
     );
 
     let mut snapshots = Vec::with_capacity(events.len());
@@ -219,12 +216,11 @@ fn handle_event_watcher_events(
     let handle_result = cache.handle_fs_events(events);
     if let Err(HandleFSEError::Rescan) = handle_result {
         info!("!!!!!!!!!! Rescan triggered !!!!!!!!");
-        *rescan_errors += 1;
         emit_status_bar_update(
             app_handle,
             cache.get_total_files(),
             *processed_events,
-            *rescan_errors,
+            cache.rescan_count() as usize,
         );
     }
 
@@ -302,7 +298,6 @@ pub fn run_background_event_loop(
     } = channels;
     let mut processed_events = 0usize;
     let mut history_ready = load_app_state() == AppLifecycleState::Ready;
-    let mut rescan_errors = 0usize;
 
     let mut window_is_foreground = true;
     let mut hide_flush_remaining_ticks: u8 = 0;
@@ -368,7 +363,6 @@ pub fn run_background_event_loop(
                     fse_latency_secs,
                     &mut history_ready,
                     &mut processed_events,
-                    &mut rescan_errors,
                 );
             }
             recv(watch_config_rx) -> update => {
@@ -382,7 +376,6 @@ pub fn run_background_event_loop(
                     fse_latency_secs,
                     &mut history_ready,
                     &mut processed_events,
-                    &mut rescan_errors,
                 );
             }
             recv(event_watcher) -> events => {
@@ -393,7 +386,6 @@ pub fn run_background_event_loop(
                     events,
                     &mut history_ready,
                     &mut processed_events,
-                    &mut rescan_errors,
                 );
             }
         }
@@ -440,13 +432,11 @@ fn perform_rescan(
     fse_latency_secs: f64,
     history_ready: &mut bool,
     processed_events: &mut usize,
-    rescan_errors: &mut usize,
 ) {
     *event_watcher = EventWatcher::noop();
     update_app_state(app_handle, AppLifecycleState::Initializing);
     *history_ready = false;
     *processed_events = 0;
-    *rescan_errors = 0;
     reset_status_bar(app_handle);
 
     let mut phantom1 = PathBuf::new();
@@ -459,7 +449,7 @@ fn perform_rescan(
                 let dirs = walk_data.num_dirs.load(Ordering::Relaxed);
                 let files = walk_data.num_files.load(Ordering::Relaxed);
                 let total = dirs + files;
-                emit_status_bar_update(app_handle, total, 0, *rescan_errors);
+                emit_status_bar_update(app_handle, total, 0, 0);
                 std::thread::sleep(Duration::from_millis(100));
             }
         });
