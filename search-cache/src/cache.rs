@@ -26,6 +26,7 @@ use typed_num::Num;
 pub struct SearchCache {
     pub(crate) file_nodes: FileNodes,
     last_event_id: u64,
+    rescan_count: u64,
     pub(crate) name_index: NameIndex,
     stop: Option<&'static AtomicBool>,
 }
@@ -47,6 +48,7 @@ impl std::fmt::Debug for SearchCache {
         f.debug_struct("SearchCache")
             .field("path", &self.file_nodes.path())
             .field("last_event_id", &self.last_event_id)
+            .field("rescan_count", &self.rescan_count)
             .field("slab_root", &self.file_nodes.root())
             .field("slab.len()", &self.file_nodes.len())
             .field("name_index.len()", &self.name_index.len())
@@ -100,11 +102,12 @@ impl SearchCache {
                      slab,
                      name_index,
                      last_event_id,
+                     rescan_count,
                  }| {
                     // name pool construction speed is fast enough that caching it doesn't worth it.
                     let name_index = NameIndex::construct_name_pool(name_index);
                     let slab = FileNodes::new(path, ignore_paths, slab, slab_root);
-                    Self::new(slab, last_event_id, name_index, cancel)
+                    Self::new(slab, last_event_id, rescan_count, name_index, cancel)
                 },
             )
     }
@@ -177,18 +180,20 @@ impl SearchCache {
             slab_root,
         );
         // metadata cache inits later
-        Some(Self::new(slab, last_event_id, name_index, cancel))
+        Some(Self::new(slab, last_event_id, 0, name_index, cancel))
     }
 
     fn new(
         slab: FileNodes,
         last_event_id: u64,
+        rescan_count: u64,
         name_index: NameIndex,
         cancel: Option<&'static AtomicBool>,
     ) -> Self {
         Self {
             file_nodes: slab,
             last_event_id,
+            rescan_count,
             name_index,
             stop: cancel,
         }
@@ -449,6 +454,7 @@ impl SearchCache {
         let storage = PersistentStorage {
             version: Num,
             last_event_id: self.last_event_id,
+            rescan_count: self.rescan_count,
             path: self.file_nodes.path().to_path_buf(),
             ignore_paths: self.file_nodes.ignore_paths().clone(),
             slab_root: self.file_nodes.root(),
@@ -469,6 +475,7 @@ impl SearchCache {
         let Self {
             file_nodes,
             last_event_id,
+            rescan_count,
             name_index,
             stop: _,
         } = self;
@@ -484,6 +491,7 @@ impl SearchCache {
                 slab,
                 name_index,
                 last_event_id,
+                rescan_count,
             },
         )
         .context("Write cache to file failed.")
@@ -500,6 +508,10 @@ impl SearchCache {
 
     pub fn last_event_id(&mut self) -> u64 {
         self.last_event_id
+    }
+
+    pub fn rescan_count(&self) -> u64 {
+        self.rescan_count
     }
 
     /// Note that this function doesn't fetch metadata(even if it's not cahced) for the nodes.
@@ -580,6 +592,7 @@ impl SearchCache {
                 false
             }
         }) {
+            self.rescan_count = self.rescan_count.saturating_add(1);
             return Err(HandleFSEError::Rescan);
         }
         for scan_path in scan_paths(events) {
