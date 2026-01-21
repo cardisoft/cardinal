@@ -22,11 +22,14 @@ const baseProps = {
   open: true,
   onClose: vi.fn(),
   sortThreshold: 200,
+  defaultSortThreshold: 100,
   onSortThresholdChange: vi.fn(),
   trayIconEnabled: false,
   onTrayIconEnabledChange: vi.fn(),
   watchRoot: '/old/root',
+  defaultWatchRoot: '/default/root',
   ignorePaths: ['/ignore/a', '/ignore/b'],
+  defaultIgnorePaths: ['/default/ignore'],
   onReset: vi.fn(),
   themeResetToken: 0,
 };
@@ -60,5 +63,21 @@ describe('PreferencesOverlay', () => {
       watchRoot: baseProps.watchRoot,
       ignorePaths: ['/tmp/one', '/tmp/two'],
     });
+  });
+
+  it('resets inputs to defaults before invoking onReset', () => {
+    const onReset = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onReset={onReset} />);
+
+    fireEvent.click(screen.getByText('preferences.reset'));
+
+    expect(screen.getByLabelText('preferences.sortingLimit.label')).toHaveValue(
+      String(baseProps.defaultSortThreshold),
+    );
+    expect(screen.getByLabelText('watchRoot.label')).toHaveValue(baseProps.defaultWatchRoot);
+    expect(screen.getByLabelText('ignorePaths.label')).toHaveValue(
+      baseProps.defaultIgnorePaths.join('\n'),
+    );
+    expect(onReset).toHaveBeenCalledTimes(1);
   });
 });

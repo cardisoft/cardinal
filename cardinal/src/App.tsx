@@ -252,7 +252,6 @@ function App() {
   );
 
   const handleResetPreferences = useCallback(() => {
-    applyWatchConfig(defaultWatchRoot, defaultIgnorePaths);
     setSortThreshold(DEFAULT_SORTABLE_RESULT_THRESHOLD);
     setTrayIconEnabled(false);
     persistThemePreference('system');
@@ -260,7 +259,7 @@ function App() {
     const nextLanguage = getBrowserLanguage();
     void i18n.changeLanguage(nextLanguage);
     setPreferencesResetToken((token) => token + 1);
-  }, [applyWatchConfig, defaultIgnorePaths, defaultWatchRoot, i18n, setSortThreshold]);
+  }, [i18n, setSortThreshold]);
 
   const focusSearchInput = useCallback(() => {
     requestAnimationFrame(() => {
@@ -806,12 +805,15 @@ function App() {
         open={isPreferencesOpen}
         onClose={() => setIsPreferencesOpen(false)}
         sortThreshold={sortThreshold}
+        defaultSortThreshold={DEFAULT_SORTABLE_RESULT_THRESHOLD}
         onSortThresholdChange={setSortThreshold}
         trayIconEnabled={trayIconEnabled}
         onTrayIconEnabledChange={setTrayIconEnabled}
         watchRoot={watchRoot ?? defaultWatchRoot}
+        defaultWatchRoot={defaultWatchRoot}
         onWatchConfigChange={handleWatchConfigChange}
         ignorePaths={ignorePaths}
+        defaultIgnorePaths={defaultIgnorePaths}
         onReset={handleResetPreferences}
         themeResetToken={preferencesResetToken}
       />

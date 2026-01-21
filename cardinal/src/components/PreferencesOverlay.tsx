@@ -8,12 +8,15 @@ type PreferencesOverlayProps = {
   open: boolean;
   onClose: () => void;
   sortThreshold: number;
+  defaultSortThreshold: number;
   onSortThresholdChange: (value: number) => void;
   trayIconEnabled: boolean;
   onTrayIconEnabledChange: (enabled: boolean) => void;
   watchRoot: string;
+  defaultWatchRoot: string;
   onWatchConfigChange: (next: { watchRoot: string; ignorePaths: string[] }) => void;
   ignorePaths: string[];
+  defaultIgnorePaths: string[];
   onReset: () => void;
   themeResetToken: number;
 };
@@ -22,12 +25,15 @@ export function PreferencesOverlay({
   open,
   onClose,
   sortThreshold,
+  defaultSortThreshold,
   onSortThresholdChange,
   trayIconEnabled,
   onTrayIconEnabledChange,
   watchRoot,
+  defaultWatchRoot,
   onWatchConfigChange,
   ignorePaths,
+  defaultIgnorePaths,
   onReset,
   themeResetToken,
 }: PreferencesOverlayProps): React.JSX.Element | null {
@@ -57,9 +63,15 @@ export function PreferencesOverlay({
       return;
     }
     setThresholdInput(sortThreshold.toString());
+  }, [open, sortThreshold]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
     setWatchRootInput(watchRoot);
     setIgnorePathsInput(ignorePaths.join('\n'));
-  }, [open, sortThreshold, watchRoot, ignorePaths]);
+  }, [open, watchRoot, ignorePaths]);
 
   const commitThreshold = useCallback(() => {
     const numericText = thresholdInput.replace(/[^\d]/g, '');
@@ -125,6 +137,13 @@ export function PreferencesOverlay({
     setWatchRootInput(trimmedWatchRoot);
     setIgnorePathsInput(parsedIgnorePaths.join('\n'));
     onClose();
+  };
+
+  const handleReset = (): void => {
+    setThresholdInput(defaultSortThreshold.toString());
+    setWatchRootInput(defaultWatchRoot);
+    setIgnorePathsInput(defaultIgnorePaths.join('\n'));
+    onReset();
   };
 
   if (!open) {
@@ -257,7 +276,7 @@ export function PreferencesOverlay({
           >
             {t('preferences.save')}
           </button>
-          <button className="preferences-reset" type="button" onClick={onReset}>
+          <button className="preferences-reset" type="button" onClick={handleReset}>
             {t('preferences.reset')}
           </button>
         </footer>

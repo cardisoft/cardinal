@@ -191,6 +191,9 @@ export const getBrowserLanguage = (): SupportedLanguage => {
 };
 
 const detectInitialLanguage = (): SupportedLanguage => {
+  if (typeof window === 'undefined') {
+    return DEFAULT_LANGUAGE;
+  }
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored) {
