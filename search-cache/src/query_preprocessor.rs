@@ -847,7 +847,9 @@ mod tests {
                 kind: ArgumentKind::Bare,
             }),
         };
-        let query = Query { expr: Expr::Term(Term::Filter(filter)) };
+        let query = Query {
+            expr: Expr::Term(Term::Filter(filter)),
+        };
         let stripped = strip_query_quotes(query);
         match stripped.expr {
             Expr::Term(Term::Filter(filter)) => {
@@ -867,7 +869,9 @@ mod tests {
                 kind: ArgumentKind::Phrase,
             }),
         };
-        let query = Query { expr: Expr::Term(Term::Filter(filter)) };
+        let query = Query {
+            expr: Expr::Term(Term::Filter(filter)),
+        };
         let stripped = strip_query_quotes(query);
         match stripped.expr {
             Expr::Term(Term::Filter(filter)) => {
@@ -884,23 +888,25 @@ mod tests {
             kind: FilterKind::InFolder,
             argument: Some(FilterArgument {
                 raw: String::new(),
-                kind: ArgumentKind::List(vec![
-                    r#""C\\path""#.into(),
-                    r#""D\\data""#.into(),
-                ]),
+                kind: ArgumentKind::List(vec![r#""C\\path""#.into(), r#""D\\data""#.into()]),
             }),
         };
-        let query = Query { expr: Expr::Term(Term::Filter(filter)) };
+        let query = Query {
+            expr: Expr::Term(Term::Filter(filter)),
+        };
         let stripped = strip_query_quotes(query);
         match stripped.expr {
             Expr::Term(Term::Filter(filter)) => {
                 let arg = filter.argument.expect("argument");
                 match arg.kind {
                     ArgumentKind::List(values) => {
-                        assert_eq!(values, vec![
-                            String::from("C\\path".replace("\\\\", "\\")),
-                            String::from("D\\data".replace("\\\\", "\\")),
-                        ]);
+                        assert_eq!(
+                            values,
+                            vec![
+                                "C\\path".replace("\\\\", "\\"),
+                                "D\\data".replace("\\\\", "\\"),
+                            ]
+                        );
                     }
                     other => panic!("Expected list argument, got {other:?}"),
                 }
