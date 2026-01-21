@@ -48,11 +48,18 @@ For the supported operator catalog—including boolean grouping, folder scoping,
 
 ### Keyboard shortcuts & previews
 
-- `Space` – Quick Look the currently selected row without leaving Cardinal.
-- `Cmd+R` – reveal the highlighted result in Finder.
-- `Cmd+F` – jump focus back to the search bar.
-- `Cmd+C` – copy the selected file's path to the clipboard.
 - `Cmd+Shift+Space` – toggle the Cardinal window globally via the quick-launch hotkey.
+- `Cmd+,` – open Preferences.
+- `Esc` – hide the Cardinal window.
+- `ArrowUp`/`ArrowDown` – move the selection.
+- `Shift+ArrowUp`/`Shift+ArrowDown` – extend the selection.
+- `Space` – Quick Look the currently selected row without leaving Cardinal.
+- `Cmd+O` – open the highlighted result.
+- `Cmd+R` – reveal the highlighted result in Finder.
+- `Cmd+C` – copy the selected files to the clipboard.
+- `Cmd+Shift+C` – copy the selected paths to the clipboard.
+- `Cmd+F` – jump focus back to the search bar.
+- `ArrowUp`/`ArrowDown` (in search bar) – cycle search history.
 
 Happy searching!
 

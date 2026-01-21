@@ -48,11 +48,18 @@ Cardinal अब क्लासिक substring/prefix मैचिंग के
 
 ### कीबोर्ड शॉर्टकट और प्रीव्यू
 
-- `Space` – Cardinal छोड़े बिना चयनित row का Quick Look।
-- `Cmd+R` – हाइलाइट किए गए परिणाम को Finder में दिखाएँ।
-- `Cmd+F` – फोकस वापस search bar पर।
-- `Cmd+C` – चयनित फ़ाइल का path क्लिपबोर्ड में कॉपी करें।
 - `Cmd+Shift+Space` – global hotkey से Cardinal विंडो टॉगल करें।
+- `Cmd+,` – Preferences खोलें।
+- `Esc` – Cardinal विंडो छिपाएं।
+- `ArrowUp`/`ArrowDown` – चयन को ऊपर/नीचे ले जाएं।
+- `Shift+ArrowUp`/`Shift+ArrowDown` – चयन का विस्तार करें।
+- `Space` – Cardinal छोड़े बिना चयनित row का Quick Look।
+- `Cmd+O` – चयनित परिणाम खोलें।
+- `Cmd+R` – हाइलाइट किए गए परिणाम को Finder में दिखाएँ।
+- `Cmd+C` – चयनित फ़ाइलें क्लिपबोर्ड में कॉपी करें।
+- `Cmd+Shift+C` – चयनित paths क्लिपबोर्ड में कॉपी करें।
+- `Cmd+F` – फोकस वापस search bar पर।
+- `ArrowUp`/`ArrowDown` (search bar में) – खोज इतिहास में नेविगेट करें।
 
 खोज का आनंद लें!
 

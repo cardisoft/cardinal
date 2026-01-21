@@ -48,11 +48,18 @@ Cardinal 现在在经典的子串/前缀匹配基础上叠加了 Everything 兼�
 
 ### 键盘快捷键与预览
 
-- `Space` – 不离开 Cardinal 即可对当前行执行 Quick Look。
-- `Cmd+R` – 在 Finder 中定位选中的结果。
-- `Cmd+F` – 焦点回到搜索框。
-- `Cmd+C` – 复制所选文件的路径。
 - `Cmd+Shift+Space` – 通过全局快捷键开/关 Cardinal 窗口。
+- `Cmd+,` – 打开偏好设置。
+- `Esc` – 隐藏 Cardinal 窗口。
+- `ArrowUp`/`ArrowDown` – 上下移动选中项。
+- `Shift+ArrowUp`/`Shift+ArrowDown` – 扩展选中范围。
+- `Space` – 不离开 Cardinal 即可对当前行执行 Quick Look。
+- `Cmd+O` – 打开选中的结果。
+- `Cmd+R` – 在 Finder 中定位选中的结果。
+- `Cmd+C` – 复制所选文件到剪贴板。
+- `Cmd+Shift+C` – 复制所选路径到剪贴板。
+- `Cmd+F` – 焦点回到搜索框。
+- `ArrowUp`/`ArrowDown`（在搜索框内）– 浏览搜索历史。
 
 祝你搜索愉快！
 

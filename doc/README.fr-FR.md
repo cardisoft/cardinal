@@ -48,11 +48,18 @@ Consultez le catalogue complet des opérateurs (groupement booléen, périmètre
 
 ### Raccourcis clavier et aperçus
 
-- `Space` – Quick Look de la ligne sélectionnée sans quitter Cardinal.
-- `Cmd+R` – affiche le résultat sélectionné dans Finder.
-- `Cmd+F` – ramène le focus sur la barre de recherche.
-- `Cmd+C` – copie le chemin du fichier sélectionné dans le presse-papiers.
 - `Cmd+Shift+Space` – bascule la fenêtre Cardinal globalement via le raccourci rapide.
+- `Cmd+,` – ouvre les Préférences.
+- `Esc` – masque la fenêtre Cardinal.
+- `ArrowUp`/`ArrowDown` – déplace la sélection.
+- `Shift+ArrowUp`/`Shift+ArrowDown` – étend la sélection.
+- `Space` – Quick Look de la ligne sélectionnée sans quitter Cardinal.
+- `Cmd+O` – ouvre le résultat sélectionné.
+- `Cmd+R` – affiche le résultat sélectionné dans Finder.
+- `Cmd+C` – copie les fichiers sélectionnés dans le presse-papiers.
+- `Cmd+Shift+C` – copie les chemins sélectionnés dans le presse-papiers.
+- `Cmd+F` – ramène le focus sur la barre de recherche.
+- `ArrowUp`/`ArrowDown` (dans la barre de recherche) – parcourt l’historique de recherche.
 
 Bonne recherche !
 

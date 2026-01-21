@@ -48,11 +48,18 @@ Consulta il catalogo degli operatori supportati—inclusi raggruppamento boolean
 
 ### Scorciatoie da tastiera e anteprime
 
-- `Space` – Quick Look della riga selezionata senza lasciare Cardinal.
-- `Cmd+R` – mostra il risultato evidenziato nel Finder.
-- `Cmd+F` – riporta il focus sulla barra di ricerca.
-- `Cmd+C` – copia il percorso del file selezionato negli appunti.
 - `Cmd+Shift+Space` – attiva o chiude la finestra di Cardinal globalmente tramite scorciatoia rapida.
+- `Cmd+,` – apre le Preferenze.
+- `Esc` – nasconde la finestra di Cardinal.
+- `ArrowUp`/`ArrowDown` – sposta la selezione.
+- `Shift+ArrowUp`/`Shift+ArrowDown` – estende la selezione.
+- `Space` – Quick Look della riga selezionata senza lasciare Cardinal.
+- `Cmd+O` – apre il risultato selezionato.
+- `Cmd+R` – mostra il risultato evidenziato nel Finder.
+- `Cmd+C` – copia i file selezionati negli appunti.
+- `Cmd+Shift+C` – copia i percorsi selezionati negli appunti.
+- `Cmd+F` – riporta il focus sulla barra di ricerca.
+- `ArrowUp`/`ArrowDown` (nella barra di ricerca) – scorre la cronologia di ricerca.
 
 Buona ricerca!
 
