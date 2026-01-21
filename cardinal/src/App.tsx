@@ -400,7 +400,6 @@ function App() {
     }
     const handleWindowFocus = () => {
       setIsWindowFocused(true);
-      focusSearchInput();
     };
     const handleWindowBlur = () => setIsWindowFocused(false);
     window.addEventListener('focus', handleWindowFocus);
@@ -409,7 +408,7 @@ function App() {
       window.removeEventListener('focus', handleWindowFocus);
       window.removeEventListener('blur', handleWindowBlur);
     };
-  }, [focusSearchInput]);
+  }, []);
 
   useEffect(() => {
     if (typeof document === 'undefined') {
