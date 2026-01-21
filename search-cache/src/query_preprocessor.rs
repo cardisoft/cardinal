@@ -109,10 +109,28 @@ fn strip_term_quotes(term: Term) -> Term {
 }
 
 fn strip_quotes_owned(value: String) -> String {
-    if !value.contains('"') {
+    if !value.contains('"') && !value.contains('\\') {
         return value;
     }
-    value.chars().filter(|ch| *ch != '"').collect()
+
+    let mut result = String::with_capacity(value.len());
+    let mut chars = value.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            match chars.peek().copied() {
+                Some('\\') | Some('"') => {
+                    result.push(chars.next().expect("peeked value exists"));
+                }
+                _ => result.push(ch),
+            }
+            continue;
+        }
+        if ch == '"' {
+            continue;
+        }
+        result.push(ch);
+    }
+    result
 }
 
 fn expand_filter(mut filter: Filter, home: &str) -> Filter {
@@ -766,6 +784,127 @@ mod tests {
         let stripped = strip_query_quotes(query);
         match stripped.expr {
             Expr::Term(Term::Word(word)) => assert_eq!(word, "helloworld"),
+            other => panic!("Unexpected expr: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn strip_quotes_unescapes_escaped_quotes() {
+        let query = parse_query(r#"\"hello\""#).expect("valid");
+        let stripped = strip_query_quotes(query);
+        match stripped.expr {
+            Expr::Term(Term::Word(word)) => assert_eq!(word, "\"hello\""),
+            other => panic!("Unexpected expr: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn strip_quotes_unescapes_backslashes() {
+        let query = parse_query(r#""C:\\path""#).expect("valid");
+        let stripped = strip_query_quotes(query);
+        match stripped.expr {
+            Expr::Term(Term::Word(word)) => assert_eq!(word, r"C:\path"),
+            other => panic!("Unexpected expr: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn strip_quotes_unescapes_mixed_content_in_word() {
+        let query = parse_query(r#""foo\"bar\"baz""#).expect("valid");
+        let stripped = strip_query_quotes(query);
+        match stripped.expr {
+            Expr::Term(Term::Word(word)) => assert_eq!(word, "foo\"bar\"baz"),
+            other => panic!("Unexpected expr: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn strip_quotes_preserves_non_escape_sequences() {
+        let query = parse_query(r#""a\bc""#).expect("valid");
+        let stripped = strip_query_quotes(query);
+        match stripped.expr {
+            Expr::Term(Term::Word(word)) => assert_eq!(word, "a\\bc"),
+            other => panic!("Unexpected expr: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn strip_quotes_unescapes_multiple_backslashes() {
+        let query = parse_query(r#""C\\\\path""#).expect("valid");
+        let stripped = strip_query_quotes(query);
+        match stripped.expr {
+            Expr::Term(Term::Word(word)) => assert_eq!(word, "C\\\\path"),
+            other => panic!("Unexpected expr: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn strip_quotes_unescapes_bare_argument() {
+        let filter = Filter {
+            kind: FilterKind::InFolder,
+            argument: Some(FilterArgument {
+                raw: r#""C\\Users\\demo""#.into(),
+                kind: ArgumentKind::Bare,
+            }),
+        };
+        let query = Query { expr: Expr::Term(Term::Filter(filter)) };
+        let stripped = strip_query_quotes(query);
+        match stripped.expr {
+            Expr::Term(Term::Filter(filter)) => {
+                let arg = filter.argument.expect("argument");
+                assert_eq!(arg.raw, "C\\Users\\demo".replace("\\\\", "\\"));
+            }
+            other => panic!("Unexpected expr: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn strip_quotes_unescapes_phrase_argument() {
+        let filter = Filter {
+            kind: FilterKind::InFolder,
+            argument: Some(FilterArgument {
+                raw: r#""C\\Users\\demo Documents""#.into(),
+                kind: ArgumentKind::Phrase,
+            }),
+        };
+        let query = Query { expr: Expr::Term(Term::Filter(filter)) };
+        let stripped = strip_query_quotes(query);
+        match stripped.expr {
+            Expr::Term(Term::Filter(filter)) => {
+                let arg = filter.argument.expect("argument");
+                assert_eq!(arg.raw, "C\\Users\\demo Documents".replace("\\\\", "\\"));
+            }
+            other => panic!("Unexpected expr: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn strip_quotes_unescapes_list_argument_values() {
+        let filter = Filter {
+            kind: FilterKind::InFolder,
+            argument: Some(FilterArgument {
+                raw: String::new(),
+                kind: ArgumentKind::List(vec![
+                    r#""C\\path""#.into(),
+                    r#""D\\data""#.into(),
+                ]),
+            }),
+        };
+        let query = Query { expr: Expr::Term(Term::Filter(filter)) };
+        let stripped = strip_query_quotes(query);
+        match stripped.expr {
+            Expr::Term(Term::Filter(filter)) => {
+                let arg = filter.argument.expect("argument");
+                match arg.kind {
+                    ArgumentKind::List(values) => {
+                        assert_eq!(values, vec![
+                            String::from("C\\path".replace("\\\\", "\\")),
+                            String::from("D\\data".replace("\\\\", "\\")),
+                        ]);
+                    }
+                    other => panic!("Expected list argument, got {other:?}"),
+                }
+            }
             other => panic!("Unexpected expr: {other:?}"),
         }
     }
