@@ -67,7 +67,14 @@ describe('PreferencesOverlay', () => {
 
   it('resets inputs to defaults before invoking onReset', () => {
     const onReset = vi.fn();
-    render(<PreferencesOverlay {...baseProps} onReset={onReset} />);
+    const onWatchConfigChange = vi.fn();
+    render(
+      <PreferencesOverlay
+        {...baseProps}
+        onReset={onReset}
+        onWatchConfigChange={onWatchConfigChange}
+      />,
+    );
 
     fireEvent.click(screen.getByText('preferences.reset'));
 
@@ -79,5 +86,6 @@ describe('PreferencesOverlay', () => {
       baseProps.defaultIgnorePaths.join('\n'),
     );
     expect(onReset).toHaveBeenCalledTimes(1);
+    expect(onWatchConfigChange).not.toHaveBeenCalled();
   });
 });
