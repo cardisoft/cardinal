@@ -252,14 +252,13 @@ function App() {
   );
 
   const handleResetPreferences = useCallback(() => {
-    setSortThreshold(DEFAULT_SORTABLE_RESULT_THRESHOLD);
     setTrayIconEnabled(false);
     persistThemePreference('system');
     applyThemePreference('system');
     const nextLanguage = getBrowserLanguage();
     void i18n.changeLanguage(nextLanguage);
     setPreferencesResetToken((token) => token + 1);
-  }, [i18n, setSortThreshold]);
+  }, [i18n]);
 
   const focusSearchInput = useCallback(() => {
     requestAnimationFrame(() => {

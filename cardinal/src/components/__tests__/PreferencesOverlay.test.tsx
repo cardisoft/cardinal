@@ -32,6 +32,7 @@ const baseProps = {
   defaultIgnorePaths: ['/default/ignore'],
   onReset: vi.fn(),
   themeResetToken: 0,
+  onWatchConfigChange: vi.fn(),
 };
 
 describe('PreferencesOverlay', () => {
@@ -68,11 +69,13 @@ describe('PreferencesOverlay', () => {
   it('resets inputs to defaults before invoking onReset', () => {
     const onReset = vi.fn();
     const onWatchConfigChange = vi.fn();
+    const onSortThresholdChange = vi.fn();
     render(
       <PreferencesOverlay
         {...baseProps}
         onReset={onReset}
         onWatchConfigChange={onWatchConfigChange}
+        onSortThresholdChange={onSortThresholdChange}
       />,
     );
 
@@ -86,6 +89,7 @@ describe('PreferencesOverlay', () => {
       baseProps.defaultIgnorePaths.join('\n'),
     );
     expect(onReset).toHaveBeenCalledTimes(1);
+    expect(onSortThresholdChange).not.toHaveBeenCalled();
     expect(onWatchConfigChange).not.toHaveBeenCalled();
   });
 });
