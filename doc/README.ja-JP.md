@@ -48,11 +48,18 @@ Cardinal は従来の部分一致/プレフィックス一致に加えて、Ever
 
 ### キーボードショートカットとプレビュー
 
-- `Space` – Cardinal を離れずに選択行を Quick Look します。
-- `Cmd+R` – ハイライトされた結果を Finder で表示します。
-- `Cmd+F` – 検索バーにフォーカスを戻します。
-- `Cmd+C` – 選択したファイルのパスをクリップボードにコピーします。
 - `Cmd+Shift+Space` – グローバルショートカットで Cardinal ウィンドウを切り替えます。
+- `Cmd+,` – 環境設定を開きます。
+- `Esc` – Cardinal ウィンドウを隠します。
+- `ArrowUp`/`ArrowDown` – 選択を移動します。
+- `Shift+ArrowUp`/`Shift+ArrowDown` – 選択範囲を拡張します。
+- `Space` – Cardinal を離れずに選択行を Quick Look します。
+- `Cmd+O` – 選択した結果を開きます。
+- `Cmd+R` – ハイライトされた結果を Finder で表示します。
+- `Cmd+C` – 選択したファイルをクリップボードにコピーします。
+- `Cmd+Shift+C` – 選択したパスをクリップボードにコピーします。
+- `Cmd+F` – 検索バーにフォーカスを戻します。
+- `ArrowUp`/`ArrowDown`（検索バー内）– 検索履歴を移動します。
 
 よい検索を！
 

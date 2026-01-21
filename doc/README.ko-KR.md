@@ -48,11 +48,18 @@ Cardinal은 기존의 부분 문자열/접두사 매칭 위에 Everything과 호
 
 ### 단축키와 미리보기
 
-- `Space` – Cardinal을 떠나지 않고 선택된 행을 Quick Look으로 확인합니다.
-- `Cmd+R` – 선택한 결과를 Finder에서 열어 보여줍니다.
-- `Cmd+F` – 검색창으로 포커스를 되돌립니다.
-- `Cmd+C` – 선택한 파일의 경로를 클립보드에 복사합니다.
 - `Cmd+Shift+Space` – 전역 단축키로 Cardinal 창을 토글합니다.
+- `Cmd+,` – 환경설정을 엽니다.
+- `Esc` – Cardinal 창을 숨깁니다.
+- `ArrowUp`/`ArrowDown` – 선택을 이동합니다.
+- `Shift+ArrowUp`/`Shift+ArrowDown` – 선택 범위를 확장합니다.
+- `Space` – Cardinal을 떠나지 않고 선택된 행을 Quick Look으로 확인합니다.
+- `Cmd+O` – 선택한 결과를 엽니다.
+- `Cmd+R` – 선택한 결과를 Finder에서 열어 보여줍니다.
+- `Cmd+C` – 선택한 파일을 클립보드에 복사합니다.
+- `Cmd+Shift+C` – 선택한 경로를 클립보드에 복사합니다.
+- `Cmd+F` – 검색창으로 포커스를 되돌립니다.
+- `ArrowUp`/`ArrowDown`(검색창) – 검색 기록을 이동합니다.
 
 즐거운 검색 되세요!
 

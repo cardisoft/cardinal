@@ -48,11 +48,18 @@ Confira o catálogo completo de operadores—incluindo agrupamento booleano, esc
 
 ### Atalhos de teclado e pré-visualizações
 
-- `Space` – Quick Look da linha selecionada sem sair do Cardinal.
-- `Cmd+R` – revela o resultado destacado no Finder.
-- `Cmd+F` – devolve o foco à barra de busca.
-- `Cmd+C` – copia o caminho do arquivo selecionado para a área de transferência.
 - `Cmd+Shift+Space` – alterna a janela do Cardinal globalmente pelo atalho rápido.
+- `Cmd+,` – abre Preferências.
+- `Esc` – oculta a janela do Cardinal.
+- `ArrowUp`/`ArrowDown` – move a seleção.
+- `Shift+ArrowUp`/`Shift+ArrowDown` – amplia a seleção.
+- `Space` – Quick Look da linha selecionada sem sair do Cardinal.
+- `Cmd+O` – abre o resultado selecionado.
+- `Cmd+R` – revela o resultado destacado no Finder.
+- `Cmd+C` – copia os arquivos selecionados para a área de transferência.
+- `Cmd+Shift+C` – copia os caminhos selecionados para a área de transferência.
+- `Cmd+F` – devolve o foco à barra de busca.
+- `ArrowUp`/`ArrowDown` (na barra de busca) – percorre o histórico de busca.
 
 Boas buscas!
 

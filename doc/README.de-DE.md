@@ -48,11 +48,18 @@ Den vollständigen Operator-Katalog (Boolesche Gruppierung, Ordner-Scopes, Erwei
 
 ### Tastenkürzel & Vorschauen
 
-- `Space` – Quick Look der aktuell markierten Zeile, ohne Cardinal zu verlassen.
-- `Cmd+R` – zeigt das markierte Ergebnis im Finder.
-- `Cmd+F` – Fokus zurück in die Suchleiste.
-- `Cmd+C` – kopiert den Pfad der ausgewählten Datei in die Zwischenablage.
 - `Cmd+Shift+Space` – schaltet das Cardinal-Fenster global per Schnellstart-Hotkey um.
+- `Cmd+,` – öffnet die Einstellungen.
+- `Esc` – blendet das Cardinal-Fenster aus.
+- `ArrowUp`/`ArrowDown` – bewegt die Auswahl.
+- `Shift+ArrowUp`/`Shift+ArrowDown` – erweitert die Auswahl.
+- `Space` – Quick Look der aktuell markierten Zeile, ohne Cardinal zu verlassen.
+- `Cmd+O` – öffnet das markierte Ergebnis.
+- `Cmd+R` – zeigt das markierte Ergebnis im Finder.
+- `Cmd+C` – kopiert die ausgewählten Dateien in die Zwischenablage.
+- `Cmd+Shift+C` – kopiert die ausgewählten Pfade in die Zwischenablage.
+- `Cmd+F` – Fokus zurück in die Suchleiste.
+- `ArrowUp`/`ArrowDown` (im Suchfeld) – blättert im Suchverlauf.
 
 Viel Spaß beim Suchen!
 

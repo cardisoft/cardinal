@@ -48,11 +48,18 @@ Desteklenen operatör kataloğu (mantıksal gruplama, klasör kapsamı, uzantı 
 
 ### Klavye kısayolları ve önizlemeler
 
-- `Space` – Cardinal’den ayrılmadan seçili satırı Quick Look ile önizleyin.
-- `Cmd+R` – vurgulanan sonucu Finder’da gösterin.
-- `Cmd+F` – odağı arama çubuğuna geri alın.
-- `Cmd+C` – seçili dosyanın yolunu panoya kopyalayın.
 - `Cmd+Shift+Space` – hızlı başlatma kısayoluyla Cardinal penceresini global olarak aç/kapatın.
+- `Cmd+,` – Tercihler’i açın.
+- `Esc` – Cardinal penceresini gizleyin.
+- `ArrowUp`/`ArrowDown` – seçimi hareket ettirin.
+- `Shift+ArrowUp`/`Shift+ArrowDown` – seçimi genişletin.
+- `Space` – Cardinal’den ayrılmadan seçili satırı Quick Look ile önizleyin.
+- `Cmd+O` – seçili sonucu açın.
+- `Cmd+R` – vurgulanan sonucu Finder’da gösterin.
+- `Cmd+C` – seçili dosyaları panoya kopyalayın.
+- `Cmd+Shift+C` – seçili yolları panoya kopyalayın.
+- `Cmd+F` – odağı arama çubuğuna geri alın.
+- `ArrowUp`/`ArrowDown` (arama çubuğunda) – arama geçmişinde gezin.
 
 İyi aramalar!
 

@@ -48,11 +48,18 @@ Cardinal 現在在經典的子字串/前綴匹配基礎上疊加了 Everything �
 
 ### 鍵盤快捷鍵與預覽
 
-- `Space` – 不離開 Cardinal 即可對目前行執行 Quick Look。
-- `Cmd+R` – 在 Finder 中定位選中的結果。
-- `Cmd+F` – 焦點回到搜尋框。
-- `Cmd+C` – 複製所選檔案的路徑。
 - `Cmd+Shift+Space` – 透過全域快捷鍵開/關 Cardinal 視窗。
+- `Cmd+,` – 打開偏好設定。
+- `Esc` – 隱藏 Cardinal 視窗。
+- `ArrowUp`/`ArrowDown` – 上下移動選取項目。
+- `Shift+ArrowUp`/`Shift+ArrowDown` – 擴展選取範圍。
+- `Space` – 不離開 Cardinal 即可對目前行執行 Quick Look。
+- `Cmd+O` – 打開選中的結果。
+- `Cmd+R` – 在 Finder 中定位選中的結果。
+- `Cmd+C` – 複製所選檔案到剪貼簿。
+- `Cmd+Shift+C` – 複製所選路徑到剪貼簿。
+- `Cmd+F` – 焦點回到搜尋框。
+- `ArrowUp`/`ArrowDown`（在搜尋框內）– 瀏覽搜尋歷史。
 
 祝你搜尋愉快！
 

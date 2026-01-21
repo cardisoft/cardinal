@@ -48,11 +48,18 @@ Consulta el catálogo completo de operadores (agrupación booleana, alcance por 
 
 ### Atajos de teclado y previsualizaciones
 
-- `Space` – Quick Look de la fila seleccionada sin salir de Cardinal.
-- `Cmd+R` – revela el resultado resaltado en Finder.
-- `Cmd+F` – devuelve el foco a la barra de búsqueda.
-- `Cmd+C` – copia la ruta del archivo seleccionado al portapapeles.
 - `Cmd+Shift+Space` – activa o cierra la ventana de Cardinal globalmente mediante el atajo rápido.
+- `Cmd+,` – abre Preferencias.
+- `Esc` – oculta la ventana de Cardinal.
+- `ArrowUp`/`ArrowDown` – mueve la selección.
+- `Shift+ArrowUp`/`Shift+ArrowDown` – amplía la selección.
+- `Space` – Quick Look de la fila seleccionada sin salir de Cardinal.
+- `Cmd+O` – abre el resultado seleccionado.
+- `Cmd+R` – revela el resultado resaltado en Finder.
+- `Cmd+C` – copia los archivos seleccionados al portapapeles.
+- `Cmd+Shift+C` – copia las rutas seleccionadas al portapapeles.
+- `Cmd+F` – devuelve el foco a la barra de búsqueda.
+- `ArrowUp`/`ArrowDown` (en la barra de búsqueda) – recorre el historial de búsqueda.
 
 ¡Feliz búsqueda!
 
