@@ -54,13 +54,6 @@ pub fn word_is(expr: &Expr, expected: &str) {
     }
 }
 
-pub fn phrase_is(expr: &Expr, expected: &str) {
-    match as_term(expr) {
-        Term::Phrase(w) => assert_eq!(w, expected),
-        other => panic!("expected Phrase, got: {other:?}"),
-    }
-}
-
 pub fn regex_is(expr: &Expr, expected: &str) {
     match as_term(expr) {
         Term::Regex(pat) => assert_eq!(pat, expected),

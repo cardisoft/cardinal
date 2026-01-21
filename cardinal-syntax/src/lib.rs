@@ -212,6 +212,7 @@ pub enum Expr {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
     /// A bare word or wildcard token (e.g., `report`, `*.mp3`).
+    /// Quoted phrases are preserved as `"`-wrapped text (e.g., `"summer holiday"`).
     ///
     /// ```
     /// use cardinal_syntax::{parse_query, Expr, Term};
@@ -219,14 +220,6 @@ pub enum Term {
     /// assert_eq!(word, "*.mp3");
     /// ```
     Word(String),
-    /// Quoted phrase such as `"summer holiday"`.
-    ///
-    /// ```
-    /// use cardinal_syntax::{parse_query, Expr, Term};
-    /// let Expr::Term(Term::Phrase(phrase)) = parse_query("\"summer holiday\"").unwrap().expr else { panic!() };
-    /// assert_eq!(phrase, "summer holiday");
-    /// ```
-    Phrase(String),
     /// `name:argument` style filters (`size:>1GB`, `folder:` ...).
     ///
     /// ```
@@ -876,8 +869,8 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    // Primary expressions cover grouped subqueries, quoted phrases, regex, and
-    // bare tokens/filters. Everything does not require escape sequences inside
+    // Primary expressions cover grouped subqueries, regex, and bare tokens/filters.
+    // Quoted phrases are treated as part of word tokens. Everything does not require escape sequences inside
     // quoted strings, so we treat backslashes literally.
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
         self.skip_ws();
@@ -889,17 +882,12 @@ impl<'a> Parser<'a> {
             '<' => self.parse_group('>'),
             '(' => self.parse_group(')'),
             '>' | ')' => Err(self.error("unexpected closing delimiter")),
-            '"' => {
-                let text = self.parse_phrase_string()?;
-                if text.is_empty() {
-                    Ok(Expr::Empty)
-                } else {
-                    Ok(Expr::Term(Term::Phrase(text)))
-                }
-            }
             _ => {
                 let term = self.parse_word_like()?;
-                Ok(Expr::Term(term))
+                match &term {
+                    Term::Word(text) if text == "\"\"" => Ok(Expr::Empty),
+                    _ => Ok(Expr::Term(term)),
+                }
             }
         }
     }
@@ -925,6 +913,23 @@ impl<'a> Parser<'a> {
         let start = self.pos;
         let mut seen = false;
         while let Some(ch) = self.peek_char() {
+            if ch == '"' {
+                self.advance_char();
+                let mut closed = false;
+                while let Some(next) = self.peek_char() {
+                    self.advance_char();
+                    if next == '"' {
+                        closed = true;
+                        break;
+                    }
+                }
+                if !closed {
+                    return Err(self.error("missing closing quote"));
+                }
+                seen = true;
+                continue;
+            }
+
             if ch == ':' && seen {
                 let name = &self.input[start..self.pos];
                 if is_valid_filter_name(name) {
@@ -1040,15 +1045,26 @@ impl<'a> Parser<'a> {
             return Ok(None);
         }
 
-        if self.peek_char() == Some('"') {
-            let text = self.parse_phrase_string()?;
-            let kind = ArgumentKind::Phrase;
-            return Ok(Some(FilterArgument { raw: text, kind }));
-        }
-
         let start = self.pos;
         let mut buffer = String::new();
+        let mut is_quoted = false;
+
+        // Check if this starts with a quote - might be a quoted phrase or quoted list
+        if self.peek_char() == Some('"') {
+            is_quoted = true;
+        }
+
+        // Read the entire argument, handling quotes properly
         while let Some(ch) = self.peek_char() {
+            if ch == '"' {
+                // Read the quoted section
+                let quoted = self.parse_phrase_string()?;
+                buffer.push('"');
+                buffer.push_str(&quoted);
+                buffer.push('"');
+                continue;
+            }
+
             if ch.is_whitespace() || ch == '|' {
                 break;
             }
@@ -1076,7 +1092,7 @@ impl<'a> Parser<'a> {
             return Ok(None);
         }
 
-        let argument_kind = classify_argument(kind, &buffer, false);
+        let argument_kind = classify_argument(kind, &buffer, is_quoted);
         Ok(Some(FilterArgument {
             raw: buffer,
             kind: argument_kind,
@@ -1216,26 +1232,30 @@ fn is_valid_filter_name(name: &str) -> bool {
 /// Lightweight heuristic classification so downstream code can handle the most
 /// common filter syntaxes without writing custom parsers.
 fn classify_argument(kind: &FilterKind, raw: &str, quoted: bool) -> ArgumentKind {
-    if quoted {
-        return ArgumentKind::Phrase;
-    }
-
+    // Check for list first, as it can contain quoted items
     if let Some(list) = try_parse_list(raw) {
         return ArgumentKind::List(list);
     }
 
+    // Check for comparison
     if let Some(comparison) = try_parse_comparison(raw) {
         return ArgumentKind::Comparison(comparison);
     }
 
+    // Check for range (important: check before defaulting to Phrase for quoted)
     if let Some(range) = try_parse_range(kind, raw) {
         return ArgumentKind::Range(range);
+    }
+
+    // If it started with a quote and isn't a list/comparison/range, it's a phrase
+    if quoted {
+        return ArgumentKind::Phrase;
     }
 
     ArgumentKind::Bare
 }
 
-/// Splits `foo;bar;baz` style extension lists.
+/// Splits `foo;bar;baz` or `"foo";"bar";"baz"` style extension lists.
 fn try_parse_list(raw: &str) -> Option<Vec<String>> {
     if !raw.contains(';') {
         return None;
@@ -1301,7 +1321,10 @@ fn try_parse_dotted_range(raw: &str) -> Option<RangeValue> {
     if start_raw.is_empty() && end_raw.is_empty() {
         return None;
     }
-    if !has_digit(start_raw) && !has_digit(end_raw) {
+    // Accept ranges if either side has a digit OR if both sides are quoted strings
+    let has_quotes = (start_raw.starts_with('"') && start_raw.ends_with('"'))
+        || (end_raw.starts_with('"') && end_raw.ends_with('"'));
+    if !has_digit(start_raw) && !has_digit(end_raw) && !has_quotes {
         return None;
     }
     Some(RangeValue {
@@ -1391,10 +1414,7 @@ mod tests {
             query.expr,
             Expr::And(vec![
                 word("foo"),
-                Expr::Or(vec![
-                    word("bar"),
-                    Expr::Term(Term::Phrase("baz qux".into()))
-                ]),
+                Expr::Or(vec![word("bar"), word("\"baz qux\"")]),
                 Expr::Not(Box::new(word("temp"))),
             ])
         );

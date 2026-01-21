@@ -123,3 +123,73 @@ fn filters_preserve_relative_order() {
     filter_is_kind(&parts[3], &FilterKind::DateModified);
     filter_is_kind(&parts[4], &FilterKind::Ext);
 }
+
+#[test]
+fn filter_with_quoted_argument() {
+    let expr = parse_raw("folder:\"My Documents\"");
+    filter_is_kind(&expr, &FilterKind::Folder);
+    filter_arg_raw(&expr, "\"My Documents\"");
+}
+
+#[test]
+fn filter_with_quoted_argument_containing_spaces() {
+    let expr = parse_raw("parent:\"C:\\Program Files\"");
+    filter_is_kind(&expr, &FilterKind::Parent);
+    filter_arg_raw(&expr, "\"C:\\Program Files\"");
+}
+
+#[test]
+fn filter_with_empty_quoted_argument() {
+    let expr = parse_raw("content:\"\"");
+    filter_is_kind(&expr, &FilterKind::Content);
+    filter_arg_raw(&expr, "\"\"");
+}
+
+#[test]
+fn filter_with_multiple_quoted_segments() {
+    let expr = parse_raw("folder:\"part1\"\"part2\"");
+    filter_is_kind(&expr, &FilterKind::Folder);
+    filter_arg_raw(&expr, "\"part1\"\"part2\"");
+}
+
+#[test]
+fn filter_with_quoted_special_characters() {
+    let expr = parse_raw("content:\"!@#$%^&*()\"");
+    filter_is_kind(&expr, &FilterKind::Content);
+    filter_arg_raw(&expr, "\"!@#$%^&*()\"");
+}
+
+#[test]
+fn filter_with_mixed_quoted_and_unquoted() {
+    let expr = parse_ok("folder:prefix\"middle\"suffix");
+    filter_is_kind(&expr, &FilterKind::Folder);
+    filter_arg_raw(&expr, "prefix\"middle\"suffix");
+}
+
+#[test]
+fn filter_list_with_quoted_values() {
+    let expr = parse_raw("ext:\"jpg\";\"png\"");
+    filter_is_kind(&expr, &FilterKind::Ext);
+    filter_arg_is_list(&expr, &["\"jpg\"", "\"png\""]);
+}
+
+#[test]
+fn filter_comparison_with_quoted_value() {
+    let expr = parse_ok("parent:>\"path\"");
+    filter_is_kind(&expr, &FilterKind::Parent);
+    filter_arg_is_comparison(&expr, ComparisonOp::Gt, "\"path\"");
+}
+
+#[test]
+fn filter_range_with_quoted_values() {
+    let expr = parse_raw("parent:\"start\"..\"end\"");
+    filter_is_kind(&expr, &FilterKind::Parent);
+    filter_arg_is_range_dots(&expr, Some("\"start\""), Some("\"end\""));
+}
+
+#[test]
+fn filter_with_unicode_in_quotes() {
+    let expr = parse_raw("content:\"你好世界\"");
+    filter_is_kind(&expr, &FilterKind::Content);
+    filter_arg_raw(&expr, "\"你好世界\"");
+}
