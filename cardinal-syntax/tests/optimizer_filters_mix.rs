@@ -181,7 +181,7 @@ fn tag_filters_with_words_and_phrases() {
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 5);
     word_is(&parts[0], "alpha");
-    phrase_is(&parts[1], "beta gamma");
+    word_is(&parts[1], "\"beta gamma\"");
     word_is(&parts[2], "delta");
     filter_is_kind(&parts[3], &FilterKind::Tag);
     filter_is_kind(&parts[4], &FilterKind::Tag);
@@ -406,7 +406,7 @@ fn tag_with_phrase_and_regex() {
     let parts = as_and(&expr);
     assert_eq!(parts.len(), 4);
 
-    phrase_is(&parts[0], "hello world");
+    word_is(&parts[0], "\"hello world\"");
     regex_is(&parts[1], "^foo.*bar$");
     filter_is_kind(&parts[2], &FilterKind::Tag);
     filter_is_kind(&parts[3], &FilterKind::Tag);

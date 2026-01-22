@@ -3,7 +3,7 @@ use crate::{
     SlabNodeMetadataCompact, State, ThinSlab,
     highlight::derive_highlight_terms,
     persistent::{PersistentStorage, read_cache_from_file, write_cache_to_file},
-    query_preprocessor::expand_query_home_dirs,
+    query_preprocessor::{expand_query_home_dirs, strip_query_quotes},
 };
 use anyhow::{Context, Result, anyhow};
 use cardinal_sdk::{EventFlag, FsEvent, ScanType, current_event_id};
@@ -217,8 +217,9 @@ impl SearchCache {
     ) -> Result<SearchOutcome> {
         let parsed = parse_query(line).map_err(|err| anyhow!("Failed to parse query: {err}"))?;
         let expanded = expand_query_home_dirs(parsed);
-        let optimized = optimize_query(expanded);
-        let highlights = derive_highlight_terms(&optimized.expr);
+        let unquoted = strip_query_quotes(expanded);
+        let highlights = derive_highlight_terms(&unquoted.expr);
+        let optimized = optimize_query(unquoted);
         let search_time = Instant::now();
         let result = self.evaluate_expr(&optimized.expr, options, cancellation_token);
         info!("Search time: {:?}", search_time.elapsed());

@@ -132,20 +132,10 @@ impl SearchCache {
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
         match term {
-            Term::Word(text) => self.evaluate_word(text, options, token),
-            Term::Phrase(text) => self.evaluate_phrase(text, options, token),
+            Term::Word(text) => self.evaluate_phrase(text, options, token),
             Term::Regex(pattern) => self.evaluate_regex(pattern, options, token),
             Term::Filter(filter) => self.evaluate_filter(filter, None, options, token),
         }
-    }
-
-    fn evaluate_word(
-        &self,
-        text: &str,
-        options: SearchOptions,
-        token: CancellationToken,
-    ) -> Result<Option<Vec<SlabIndex>>> {
-        self.evaluate_phrase(text, options, token)
     }
 
     fn evaluate_phrase(
