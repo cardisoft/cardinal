@@ -11,6 +11,8 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Segment<'s> {
     Concrete(SegmentConcrete<'s>),
+    /// Single-segment wildcard (`*`) that matches any path segment.
+    Star,
     /// Globstar (`**`) that may span multiple path segments.
     GlobStar,
 }
@@ -88,6 +90,8 @@ pub fn query_segmentation(query: &str) -> Vec<Segment<'_>> {
         .map(|(state, segment)| {
             if segment == "**" {
                 Segment::GlobStar
+            } else if segment == "*" {
+                Segment::Star
             } else {
                 let concrete = match state {
                     State::Substr => SegmentConcrete::Substr(segment),
@@ -117,6 +121,10 @@ impl<'s> Segment<'s> {
     pub fn exact(value: &'s str) -> Self {
         Segment::Concrete(SegmentConcrete::Exact(value))
     }
+
+    pub fn star() -> Self {
+        Segment::Star
+    }
 }
 
 #[cfg(test)]
@@ -129,6 +137,7 @@ mod tests {
             query_segmentation("elloworl"),
             vec![Segment::substr("elloworl")]
         );
+        assert_eq!(query_segmentation("*"), vec![Segment::Star]);
         assert_eq!(query_segmentation("**"), vec![Segment::GlobStar]);
         assert_eq!(query_segmentation("/root"), vec![Segment::prefix("root")]);
         assert_eq!(query_segmentation("root/"), vec![Segment::suffix("root")]);
@@ -158,6 +167,14 @@ mod tests {
             vec![
                 Segment::suffix("foo"),
                 Segment::GlobStar,
+                Segment::prefix("bar")
+            ]
+        );
+        assert_eq!(
+            query_segmentation("foo/*/bar"),
+            vec![
+                Segment::suffix("foo"),
+                Segment::Star,
                 Segment::prefix("bar")
             ]
         );

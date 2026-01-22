@@ -17,6 +17,7 @@ pub(crate) enum SegmentKind {
 #[derive(Clone, Debug)]
 pub(crate) enum SegmentMatcher {
     Concrete(SegmentMatcherConcrete),
+    Star,
     GlobStar,
 }
 
@@ -66,6 +67,7 @@ pub(crate) fn build_segment_matchers(
         .iter()
         .map(|segment| match segment {
             Segment::GlobStar => Ok(SegmentMatcher::GlobStar),
+            Segment::Star => Ok(SegmentMatcher::Star),
             Segment::Concrete(concrete) => build_concrete_segment_matcher(concrete, options),
         })
         .collect()
@@ -219,6 +221,14 @@ mod tests {
             SegmentMatcher::Concrete(SegmentMatcherConcrete::Regex { .. })
                 | SegmentMatcher::Concrete(SegmentMatcherConcrete::Plain { .. })
         ));
+    }
+
+    #[test]
+    fn star_segment_builds_star_matcher() {
+        let segments = [Segment::Star];
+        let opts = SearchOptions::default();
+        let matchers = build_segment_matchers(&segments, opts).expect("ok");
+        assert!(matches!(matchers[0], SegmentMatcher::Star));
     }
 
     // --- build_segment_matchers (plain, no wildcard, case-sensitive) ---
@@ -641,6 +651,7 @@ mod tests {
         match segment {
             Segment::Concrete(concrete) => concrete,
             Segment::GlobStar => panic!("expected concrete segment"),
+            Segment::Star => panic!("expected concrete segment"),
         }
     }
 }

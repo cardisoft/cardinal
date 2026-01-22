@@ -158,7 +158,9 @@ impl SearchCache {
         matchers: &[SegmentMatcher],
         token: CancellationToken,
     ) -> Option<Vec<SlabIndex>> {
+        // node_set of matching nodes, sorted by file path
         let mut node_set: Option<Vec<SlabIndex>> = None;
+
         let mut pending_globstar = false;
         let mut saw_matcher = false;
         let mut saw_globstar = false;
@@ -167,6 +169,20 @@ impl SearchCache {
                 SegmentMatcher::GlobStar => {
                     saw_globstar = true;
                     pending_globstar = true;
+                }
+                SegmentMatcher::Star => {
+                    saw_matcher = true;
+                    let new_node_set = if let Some(nodes) = &node_set {
+                        if pending_globstar {
+                            self.all_descendant_segments(nodes, token)
+                        } else {
+                            self.all_direct_children(nodes, token)
+                        }
+                    } else {
+                        self.search_empty(token)
+                    }?;
+                    node_set = Some(new_node_set);
+                    pending_globstar = false;
                 }
                 SegmentMatcher::Concrete(concrete) => {
                     saw_matcher = true;
@@ -187,9 +203,7 @@ impl SearchCache {
 
         let mut nodes = if pending_globstar {
             if let Some(nodes) = node_set.take() {
-                Some(self.expand_trailing_globstar(nodes, token)?)
-            } else if saw_matcher {
-                node_set
+                Some(self.all_descendant_segments(&nodes, token)?)
             } else {
                 self.search_empty(token)
             }
@@ -198,10 +212,13 @@ impl SearchCache {
         } else {
             self.search_empty(token)
         };
-        // Deduplicate results if globstar was used, for correctness
+        // Deduplicate results if a globstar and a matcher were used, for correctness
         // e.g. There is a file `/bar/emm/bar/foo`, searching for `bar/**/foo`
         // will match it twice. We want to return it only once.
-        if saw_globstar && let Some(nodes) = &mut nodes {
+        if saw_globstar
+            && saw_matcher
+            && let Some(nodes) = &mut nodes
+        {
             dedup_indices_in_place(nodes);
         }
         nodes
@@ -258,6 +275,28 @@ impl SearchCache {
         Some(new_node_set)
     }
 
+    fn all_direct_children(
+        &self,
+        parents: &[SlabIndex],
+        token: CancellationToken,
+    ) -> Option<Vec<SlabIndex>> {
+        let mut new_node_set = Vec::new();
+        for (i, &node) in parents.iter().enumerate() {
+            token.is_cancelled_sparse(i)?;
+            let mut child_matches = self.file_nodes[node]
+                .children
+                .iter()
+                .map(|&child| {
+                    let name = self.file_nodes[child].name();
+                    (name, child)
+                })
+                .collect::<Vec<_>>();
+            child_matches.sort_unstable_by_key(|(name, _)| *name);
+            new_node_set.extend(child_matches.into_iter().map(|(_, index)| index));
+        }
+        Some(new_node_set)
+    }
+
     fn match_descendant_segments(
         &self,
         parents: &[SlabIndex],
@@ -282,28 +321,25 @@ impl SearchCache {
         Some(matches.into_iter().map(|(_, index)| index).collect())
     }
 
-    fn expand_trailing_globstar(
+    fn all_descendant_segments(
         &self,
-        mut nodes: Vec<SlabIndex>,
+        parents: &[SlabIndex],
         token: CancellationToken,
     ) -> Option<Vec<SlabIndex>> {
-        if nodes.is_empty() {
-            return Some(nodes);
-        }
-        let base = nodes.clone();
-        let mut extra = Vec::new();
+        let mut matches = Vec::new();
         let mut visited = 0usize;
-        for &node in &base {
+        for &node in parents {
             token.is_cancelled_sparse(visited)?;
             let descendants = self.all_subnodes(node, token)?;
             for descendant in descendants {
                 token.is_cancelled_sparse(visited)?;
                 visited += 1;
-                extra.push(descendant);
+                let name = self.file_nodes[descendant].name();
+                matches.push((name, descendant));
             }
         }
-        nodes.extend(extra);
-        Some(nodes)
+        matches.sort_unstable_by_key(|(name, _)| *name);
+        Some(matches.into_iter().map(|(_, index)| index).collect())
     }
 
     fn evaluate_regex(

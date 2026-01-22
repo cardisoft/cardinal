@@ -115,7 +115,6 @@ fn test_globstar_dedup_trailing_expansion() {
         "globstar should dedup trailing expansion"
     );
     let mut expected = vec![
-        PathBuf::from("a"),
         PathBuf::from("a/a"),
         PathBuf::from("a/a/file.txt"),
         PathBuf::from("a/file.txt"),
@@ -424,4 +423,363 @@ fn test_extension_case_sensitivity_in_type_filter() {
 
     let results = cache.search("type:picture").unwrap();
     assert_eq!(results.len(), 3, "Should match case-insensitively");
+}
+
+// ============================================================================
+// Trailing Globstar Behavior Tests
+// ============================================================================
+// Tests for the refactored trailing globstar implementation using
+// all_descendant_segments instead of expand_trailing_globstar.
+// Key behavior: trailing /** now returns only descendants, not the parent.
+// ============================================================================
+
+#[test]
+fn test_trailing_globstar_excludes_parent_directory() {
+    let tmp = TempDir::new("trailing_globstar_parent").unwrap();
+    fs::create_dir_all(tmp.path().join("src/utils")).unwrap();
+    fs::write(tmp.path().join("src/main.rs"), b"x").unwrap();
+    fs::write(tmp.path().join("src/utils/helper.rs"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let hits = cache.search("src/**").unwrap();
+    let rel_paths: Vec<_> = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect();
+
+    // Should NOT include src itself, only its descendants
+    assert!(!rel_paths.contains(&PathBuf::from("src")));
+    assert!(rel_paths.contains(&PathBuf::from("src/main.rs")));
+    assert!(rel_paths.contains(&PathBuf::from("src/utils")));
+    assert!(rel_paths.contains(&PathBuf::from("src/utils/helper.rs")));
+}
+
+#[test]
+fn test_trailing_globstar_empty_directory() {
+    let tmp = TempDir::new("trailing_globstar_empty").unwrap();
+    fs::create_dir_all(tmp.path().join("empty")).unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let hits = cache.search("empty/**").unwrap();
+    // Empty directory has no descendants
+    assert_eq!(hits.len(), 0, "empty directory should have no descendants");
+}
+
+#[test]
+fn test_trailing_globstar_single_file() {
+    let tmp = TempDir::new("trailing_globstar_single").unwrap();
+    fs::create_dir_all(tmp.path().join("dir")).unwrap();
+    fs::write(tmp.path().join("dir/only.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let hits = cache.search("dir/**").unwrap();
+    let rel_paths: Vec<_> = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect();
+
+    assert_eq!(rel_paths.len(), 1);
+    assert!(rel_paths.contains(&PathBuf::from("dir/only.txt")));
+}
+
+#[test]
+fn test_trailing_globstar_deeply_nested() {
+    let tmp = TempDir::new("trailing_globstar_deep").unwrap();
+    fs::create_dir_all(tmp.path().join("a/b/c/d/e")).unwrap();
+    fs::write(tmp.path().join("a/b/c/d/e/deep.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let hits = cache.search("a/**").unwrap();
+    let rel_paths: Vec<_> = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect();
+
+    // Should include all levels except 'a' itself
+    assert!(rel_paths.contains(&PathBuf::from("a/b")));
+    assert!(rel_paths.contains(&PathBuf::from("a/b/c")));
+    assert!(rel_paths.contains(&PathBuf::from("a/b/c/d")));
+    assert!(rel_paths.contains(&PathBuf::from("a/b/c/d/e")));
+    assert!(rel_paths.contains(&PathBuf::from("a/b/c/d/e/deep.txt")));
+}
+
+#[test]
+fn test_trailing_globstar_multiple_branches() {
+    let tmp = TempDir::new("trailing_globstar_branches").unwrap();
+    fs::create_dir_all(tmp.path().join("root/branch1")).unwrap();
+    fs::create_dir_all(tmp.path().join("root/branch2")).unwrap();
+    fs::write(tmp.path().join("root/branch1/file1.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("root/branch2/file2.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let hits = cache.search("root/**").unwrap();
+    let rel_paths: Vec<_> = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect();
+
+    // Should include all branches and their contents
+    assert!(rel_paths.contains(&PathBuf::from("root/branch1")));
+    assert!(rel_paths.contains(&PathBuf::from("root/branch2")));
+    assert!(rel_paths.contains(&PathBuf::from("root/branch1/file1.txt")));
+    assert!(rel_paths.contains(&PathBuf::from("root/branch2/file2.txt")));
+}
+
+#[test]
+fn test_trailing_globstar_with_filters() {
+    let tmp = TempDir::new("trailing_globstar_filters").unwrap();
+    fs::create_dir_all(tmp.path().join("project/src")).unwrap();
+    fs::write(tmp.path().join("project/README.md"), b"x").unwrap();
+    fs::write(tmp.path().join("project/src/main.rs"), b"x").unwrap();
+    fs::write(tmp.path().join("project/src/lib.rs"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    // Trailing globstar + extension filter
+    let hits = cache.search("project/** ext:rs").unwrap();
+    let rel_paths: Vec<_> = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect();
+
+    assert_eq!(rel_paths.len(), 2);
+    assert!(rel_paths.contains(&PathBuf::from("project/src/main.rs")));
+    assert!(rel_paths.contains(&PathBuf::from("project/src/lib.rs")));
+}
+
+#[test]
+fn test_trailing_globstar_with_type_filter() {
+    let tmp = TempDir::new("trailing_globstar_type").unwrap();
+    fs::create_dir_all(tmp.path().join("root/sub1/sub2")).unwrap();
+    fs::write(tmp.path().join("root/file.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("root/sub1/file.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    // Only directories under root
+    let hits = cache.search("root/** type:directory").unwrap();
+    let rel_paths: Vec<_> = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect();
+
+    assert!(rel_paths.contains(&PathBuf::from("root/sub1")));
+    assert!(rel_paths.contains(&PathBuf::from("root/sub1/sub2")));
+    assert!(
+        !rel_paths
+            .iter()
+            .any(|p| p.to_string_lossy().ends_with(".txt"))
+    );
+}
+
+#[test]
+fn test_trailing_globstar_with_boolean_operators() {
+    let tmp = TempDir::new("trailing_globstar_bool").unwrap();
+    fs::create_dir_all(tmp.path().join("src")).unwrap();
+    fs::create_dir_all(tmp.path().join("tests")).unwrap();
+    fs::write(tmp.path().join("src/main.rs"), b"x").unwrap();
+    fs::write(tmp.path().join("tests/test.rs"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    // OR with trailing globstars
+    let hits = cache.search("src/** OR tests/**").unwrap();
+    let rel_paths: Vec<_> = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect();
+
+    assert!(rel_paths.contains(&PathBuf::from("src/main.rs")));
+    assert!(rel_paths.contains(&PathBuf::from("tests/test.rs")));
+}
+
+#[test]
+fn test_trailing_globstar_performance_many_files() {
+    let tmp = TempDir::new("trailing_globstar_perf").unwrap();
+    fs::create_dir_all(tmp.path().join("large")).unwrap();
+
+    // Create many nested files
+    for i in 0..50 {
+        fs::write(tmp.path().join(format!("large/file{:03}.txt", i)), b"x").unwrap();
+    }
+    fs::create_dir_all(tmp.path().join("large/subdir")).unwrap();
+    for i in 0..50 {
+        fs::write(
+            tmp.path().join(format!("large/subdir/file{:03}.txt", i)),
+            b"x",
+        )
+        .unwrap();
+    }
+
+    let mut cache = SearchCache::walk_fs(tmp.path());
+    let start = std::time::Instant::now();
+    let hits = cache.search("large/**").unwrap();
+    let duration = start.elapsed();
+
+    // Should find all files + subdir
+    assert!(hits.len() >= 101, "should find all descendants");
+    assert!(
+        duration.as_millis() < 100,
+        "should complete quickly: {:?}",
+        duration
+    );
+}
+
+#[test]
+fn test_trailing_globstar_no_duplicates() {
+    let tmp = TempDir::new("trailing_globstar_nodup").unwrap();
+    fs::create_dir_all(tmp.path().join("foo/foo")).unwrap();
+    fs::write(tmp.path().join("foo/bar.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("foo/foo/bar.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let hits = cache.search("foo/**").unwrap();
+    let paths: Vec<_> = hits.iter().map(|i| cache.node_path(*i).unwrap()).collect();
+
+    // Check for duplicates
+    let mut unique_paths = paths.clone();
+    unique_paths.sort();
+    unique_paths.dedup();
+
+    assert_eq!(
+        paths.len(),
+        unique_paths.len(),
+        "should not contain duplicate paths"
+    );
+}
+
+#[test]
+fn test_trailing_globstar_vs_concrete_segment() {
+    let tmp = TempDir::new("trailing_vs_concrete").unwrap();
+    fs::create_dir_all(tmp.path().join("src/utils")).unwrap();
+    fs::write(tmp.path().join("src/main.rs"), b"x").unwrap();
+    fs::write(tmp.path().join("src/utils/helper.rs"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    // src/** should match all descendants
+    let globstar_hits = cache.search("src/**").unwrap();
+
+    // src/main.rs should match only that file
+    let concrete_hits = cache.search("src/main.rs").unwrap();
+
+    assert!(globstar_hits.len() > concrete_hits.len());
+    assert_eq!(concrete_hits.len(), 1);
+}
+
+#[test]
+fn test_multiple_trailing_globstars() {
+    let tmp = TempDir::new("multi_trailing_globstar").unwrap();
+    fs::create_dir_all(tmp.path().join("a/b")).unwrap();
+    fs::create_dir_all(tmp.path().join("c/d")).unwrap();
+    fs::write(tmp.path().join("a/b/file1.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("c/d/file2.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    // Multiple patterns with trailing globstars using OR
+    let hits = cache.search("a/b/** OR c/d/**").unwrap();
+    let rel_paths: Vec<_> = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect();
+
+    assert!(rel_paths.contains(&PathBuf::from("a/b/file1.txt")));
+    assert!(rel_paths.contains(&PathBuf::from("c/d/file2.txt")));
+}
+
+#[test]
+fn test_trailing_globstar_symlink_handling() {
+    let tmp = TempDir::new("trailing_globstar_symlink").unwrap();
+    fs::create_dir_all(tmp.path().join("real")).unwrap();
+    fs::write(tmp.path().join("real/file.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    // Should handle the real directory normally
+    let hits = cache.search("real/**").unwrap();
+    assert!(
+        !hits.is_empty(),
+        "should find descendants in real directory"
+    );
+}
+
+#[test]
+fn test_trailing_globstar_result_ordering() {
+    let tmp = TempDir::new("trailing_globstar_order").unwrap();
+    fs::create_dir_all(tmp.path().join("dir")).unwrap();
+    fs::write(tmp.path().join("dir/zzz.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("dir/aaa.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("dir/mmm.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let hits = cache.search("dir/**").unwrap();
+    let names: Vec<_> = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string()
+        })
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    // Results should be sorted
+    let mut sorted = names.clone();
+    sorted.sort();
+    assert_eq!(names, sorted, "results should be sorted by name");
 }

@@ -70,6 +70,10 @@ impl HighlightCollector {
                     // "**" does not contribute to highlight terms
                     return;
                 }
+                Segment::Star => {
+                    // "*" does not contribute to highlight terms
+                    return;
+                }
             };
             let candidates = literal_chunks(segment.as_value());
             if !candidates.is_empty() {

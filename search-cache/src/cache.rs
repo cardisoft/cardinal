@@ -254,7 +254,7 @@ impl SearchCache {
         Some(current)
     }
 
-    /// Get all subnode indices of a given node index(including itself).
+    /// Get all subnode indices of a given node index
     pub fn all_subnodes(
         &self,
         index: SlabIndex,
