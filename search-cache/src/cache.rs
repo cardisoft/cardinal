@@ -217,8 +217,8 @@ impl SearchCache {
     ) -> Result<SearchOutcome> {
         let parsed = parse_query(line).map_err(|err| anyhow!("Failed to parse query: {err}"))?;
         let expanded = expand_query_home_dirs(parsed);
-        let highlights = derive_highlight_terms(&expanded.expr);
         let unquoted = strip_query_quotes(expanded);
+        let highlights = derive_highlight_terms(&unquoted.expr);
         let optimized = optimize_query(unquoted);
         let search_time = Instant::now();
         let result = self.evaluate_expr(&optimized.expr, options, cancellation_token);

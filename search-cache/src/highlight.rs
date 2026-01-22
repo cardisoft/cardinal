@@ -30,13 +30,7 @@ impl HighlightCollector {
 
     fn collect_term(&mut self, term: &Term) {
         match term {
-            Term::Word(word) => {
-                if word.contains('"') {
-                    self.collect_literal_text(word);
-                } else {
-                    self.collect_text(word)
-                }
-            }
+            Term::Word(word) => self.collect_text(word),
             Term::Filter(filter) => {
                 if let Some(argument) = &filter.argument {
                     self.collect_argument(argument);
@@ -82,6 +76,7 @@ impl HighlightCollector {
                 for candidate in candidates {
                     self.push(candidate);
                 }
+                // Return last segment only(which is the filename part in a path)
                 return;
             }
         }
@@ -132,7 +127,7 @@ fn literal_chunks(value: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query_preprocessor::expand_query_home_dirs;
+    use crate::query_preprocessor::{expand_query_home_dirs, strip_query_quotes};
     use cardinal_syntax::{ParseError, parse_query as raw_parse_query};
 
     /// Helper for highlight tests: mirrors production order
@@ -140,6 +135,7 @@ mod tests {
     fn parse_and_highlight(input: &str) -> Result<Vec<String>, ParseError> {
         raw_parse_query(input)
             .map(expand_query_home_dirs)
+            .map(strip_query_quotes)
             .map(|expanded| {
                 // Derive highlights while quotes are still present (literal marker)
                 derive_highlight_terms(&expanded.expr)
@@ -468,7 +464,7 @@ mod tests {
     #[test]
     fn test_wildcard_in_phrase() {
         let terms = parse_and_highlight("\"test * file\"").unwrap();
-        assert_eq!(terms, vec!["test * file"]);
+        assert_eq!(terms, vec!["file", "test"]);
     }
 
     #[test]
@@ -1598,7 +1594,7 @@ mod tests {
     #[test]
     fn test_sanitize_in_phrase() {
         let terms = parse_and_highlight("\"***test***\"").unwrap();
-        assert_eq!(terms, vec!["***test***"]);
+        assert_eq!(terms, vec!["test"]);
     }
 
     #[test]
@@ -1680,7 +1676,7 @@ mod tests {
     #[test]
     fn test_quoted_with_wildcards_extracts_segments() {
         let terms = parse_and_highlight("\"test * file\"").unwrap();
-        assert_eq!(terms, vec!["test * file"]);
+        assert_eq!(terms, vec!["file", "test"]);
     }
 
     #[test]
@@ -1778,13 +1774,13 @@ mod tests {
     #[test]
     fn test_quoted_special_chars_preserved() {
         let terms = parse_and_highlight("\"!@#$%^&*()\"").unwrap();
-        assert_eq!(terms, vec!["!@#$%^&*()"]);
+        assert_eq!(terms, vec!["!@#$%^&", "()"]);
     }
 
     #[test]
     fn test_quoted_path_like() {
         let terms = parse_and_highlight("\"path/to/file\"").unwrap();
-        assert_eq!(terms, vec!["path/to/file"]);
+        assert_eq!(terms, vec!["file"]);
     }
 
     #[test]
