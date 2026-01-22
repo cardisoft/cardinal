@@ -120,12 +120,9 @@ pub(crate) fn strip_query_quotes_text(value: &str) -> String {
                 }
                 _ => result.push(ch),
             }
-            continue;
+        } else if ch != '"' {
+            result.push(ch);
         }
-        if ch == '"' {
-            continue;
-        }
-        result.push(ch);
     }
     result
 }

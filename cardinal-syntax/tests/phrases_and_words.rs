@@ -33,6 +33,16 @@ fn empty_phrase_produces_empty_expression() {
 }
 
 #[test]
+fn whitespace_phrase_is_not_empty() {
+    let expr = parse_ok("\" \"");
+    assert!(!is_empty(&expr));
+    match expr {
+        Expr::Term(Term::Word(w)) => assert_eq!(w, "\" \""),
+        other => panic!("unexpected: {other:?}"),
+    }
+}
+
+#[test]
 fn double_quotes_are_literal_no_escapes() {
     // No escape semantics: backslashes are preserved, quotes terminate.
     let expr = parse_ok("\"a \\ b c\"");
