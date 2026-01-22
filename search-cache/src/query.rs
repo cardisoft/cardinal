@@ -158,7 +158,7 @@ impl SearchCache {
         matchers: &[SegmentMatcher],
         token: CancellationToken,
     ) -> Option<Vec<SlabIndex>> {
-        // sorted by name
+        // node_set of matching nodes, sorted by file path
         let mut node_set: Option<Vec<SlabIndex>> = None;
 
         let mut pending_globstar = false;
@@ -204,9 +204,6 @@ impl SearchCache {
         let mut nodes = if pending_globstar {
             if let Some(nodes) = node_set.take() {
                 Some(self.expand_trailing_globstar(nodes, token)?)
-            } else if saw_matcher {
-                // TODO(ldm0): fishy case, should not happen?
-                node_set
             } else {
                 self.search_empty(token)
             }
