@@ -212,7 +212,7 @@ impl SearchCache {
         } else {
             self.search_empty(token)
         };
-        // Deduplicate results if globstar and matcher was used, for correctness
+        // Deduplicate results if a globstar and a matcher were used, for correctness
         // e.g. There is a file `/bar/emm/bar/foo`, searching for `bar/**/foo`
         // will match it twice. We want to return it only once.
         if saw_globstar
