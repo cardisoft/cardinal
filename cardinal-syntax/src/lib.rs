@@ -1107,6 +1107,11 @@ impl<'a> Parser<'a> {
             return Ok(None);
         }
 
+        // Empty quotes (just "\"\"") should result in None argument
+        if buffer == "\"\"" {
+            return Ok(None);
+        }
+
         let argument_kind = classify_argument(kind, &buffer, is_quoted);
         Ok(Some(FilterArgument {
             raw: buffer,
@@ -1289,6 +1294,8 @@ fn classify_argument(kind: &FilterKind, raw: &str, quoted: bool) -> ArgumentKind
 }
 
 /// Splits `foo;bar;baz` or `"foo";"bar";"baz"` style extension lists.
+/// Semicolons inside quotes are treated as literals.
+/// Escaped semicolons outside quotes (`\;`) are also treated as literals.
 fn try_parse_list(raw: &str) -> Option<Vec<String>> {
     if !raw.contains(';') {
         return None;
@@ -1315,7 +1322,7 @@ fn try_parse_list(raw: &str) -> Option<Vec<String>> {
             continue;
         }
 
-        // Only semicolons outside quotes act as separators.
+        // Only semicolons outside quotes (and not escaped) act as separators.
         if ch == ';' && !in_quotes {
             let part = raw[start..idx].trim();
             if !part.is_empty() {

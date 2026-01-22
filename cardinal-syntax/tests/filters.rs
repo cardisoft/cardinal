@@ -147,9 +147,14 @@ fn filter_with_quoted_argument_containing_spaces() {
 
 #[test]
 fn filter_with_empty_quoted_argument() {
-    let expr = parse_raw("content:\"\"");
-    filter_is_kind(&expr, &FilterKind::Content);
-    filter_arg_raw(&expr, "\"\"");
+    // Empty quotes result in None argument (per user-confirmed semantics)
+    let parsed = parse_raw(r#"content:"""#);
+    if let Expr::Term(Term::Filter(filter)) = parsed {
+        assert!(matches!(filter.kind, FilterKind::Content));
+        assert!(filter.argument.is_none());
+    } else {
+        panic!("Expected filter term");
+    }
 }
 
 #[test]
@@ -395,4 +400,124 @@ fn ext_list_semicolon_inside_quotes_is_literal() {
     let expr = parse_raw("ext:\"tar;gz\";zip");
     filter_is_kind(&expr, &FilterKind::Ext);
     filter_arg_is_list(&expr, &["\"tar;gz\"", "zip"]);
+}
+
+#[test]
+fn tag_filter_mixed_quoted_and_unquoted_with_semicolons() {
+    let expr = parse_raw("tag:\"Red;Orange\";Green;\"Blue;Indigo\"");
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &["\"Red;Orange\"", "Green", "\"Blue;Indigo\""]);
+}
+
+// ========== Corner Cases: Semicolons + Escaping + Empty Items ==========
+
+#[test]
+fn tag_filter_mixed_quotes_and_bare_three_items() {
+    // tag:"a;b";c;"d;e" → ["a;b", "c", "d;e"] (3 items)
+    let expr = parse_raw(r#"tag:"a;b";c;"d;e""#);
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &[r#""a;b""#, "c", r#""d;e""#]);
+}
+
+#[test]
+fn tag_filter_escaped_semicolon_inside_quotes() {
+    // tag:"a\;b";c → semicolon inside quotes is literal (backslash preserved)
+    let expr = parse_raw(r#"tag:"a\;b";c"#);
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &[r#""a\;b""#, "c"]);
+}
+
+#[test]
+fn tag_filter_escaped_quote_with_semicolon_inside_quotes() {
+    // tag:"a;\"b\"";c → escaped quote doesn't break quote state, semicolon stays literal
+    let expr = parse_raw(r#"tag:"a;\"b\"";c"#);
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &[r#""a;\"b\"""#, "c"]);
+}
+
+#[test]
+fn tag_filter_backslash_before_semicolon_inside_quotes() {
+    // tag:"a\\;b";c → backslash before semicolon, semicolon still literal inside quotes
+    let expr = parse_raw(r#"tag:"a\\;b";c"#);
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &[r#""a\\;b""#, "c"]);
+}
+
+#[test]
+fn tag_filter_backslash_escaped_quote_inside_quotes() {
+    // tag:"a\\\"b";c → backslash-escaped quote (quote becomes literal)
+    let expr = parse_raw(r#"tag:"a\\\"b";c"#);
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &[r#""a\\\"b""#, "c"]);
+}
+
+#[test]
+fn tag_filter_consecutive_semicolons_with_spaces() {
+    // tag:"a";"b";; → empty items ignored (trailing semicolons)
+    // Note: spaces outside quotes break the argument parsing
+    let expr = parse_raw(r#"tag:"a";"b";;"#);
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &[r#""a""#, r#""b""#]);
+}
+
+#[test]
+fn tag_filter_empty_quotes_with_value() {
+    // tag:"";a → empty quoted string is preserved as empty item
+    let expr = parse_raw(r#"tag:"";a"#);
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &[r#""""#, "a"]);
+}
+
+#[test]
+fn tag_filter_only_empty_quotes() {
+    // tag:"" → empty quoted string, but Filter::argument should be None
+    let parsed = parse_raw(r#"tag:"""#);
+    if let Expr::Term(Term::Filter(filter)) = parsed {
+        assert!(matches!(filter.kind, FilterKind::Tag));
+        // Empty quotes should result in None argument (per user confirmation)
+        assert!(filter.argument.is_none());
+    } else {
+        panic!("Expected filter term");
+    }
+}
+
+#[test]
+fn tag_filter_escaped_semicolon_outside_quotes() {
+    // tag:a\;b;c → \; outside quotes is literal (does not split)
+    let expr = parse_raw(r#"tag:a\;b;c"#);
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &[r#"a\;b"#, "c"]);
+}
+
+#[test]
+fn ext_filter_semicolon_inside_quotes() {
+    // ext:"tar;gz";zip → non-tag filter should have same behavior
+    let expr = parse_raw(r#"ext:"tar;gz";zip"#);
+    filter_is_kind(&expr, &FilterKind::Ext);
+    filter_arg_is_list(&expr, &[r#""tar;gz""#, "zip"]);
+}
+
+#[test]
+fn custom_filter_semicolon_inside_quotes() {
+    // proj:"a;b";c → custom filter should have same behavior
+    if let Expr::Term(Term::Filter(filter)) = parse_raw(r#"proj:"a;b";c"#) {
+        assert!(matches!(filter.kind, FilterKind::Custom(ref name) if name == "proj"));
+        let arg = filter.argument.unwrap();
+        match arg.kind {
+            ArgumentKind::List(values) => {
+                assert_eq!(values, vec![r#""a;b""#, "c"]);
+            }
+            _ => panic!("Expected list argument"),
+        }
+    } else {
+        panic!("Expected filter term");
+    }
+}
+
+#[test]
+fn tag_filter_complex_mixed_escape_scenarios() {
+    // tag:"a\\;b\"c";d\;e;"f;g" → complex mix
+    let expr = parse_raw(r#"tag:"a\\;b\"c";d\;e;"f;g""#);
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &[r#""a\\;b\"c""#, r#"d\;e"#, r#""f;g""#]);
 }
