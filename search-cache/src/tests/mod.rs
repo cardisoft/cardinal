@@ -20,3 +20,4 @@ mod query_logic;
 mod size_filters;
 mod traversal;
 mod type_filters;
+mod wildcard_star;
