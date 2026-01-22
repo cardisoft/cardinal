@@ -90,16 +90,13 @@ fn strip_expr_quotes(expr: Expr) -> Expr {
 
 fn strip_term_quotes(term: Term) -> Term {
     match term {
-        Term::Word(word) => Term::Word(strip_quotes_owned(word)),
+        Term::Word(word) => Term::Word(strip_query_quotes_text(&word)),
         Term::Filter(mut filter) => {
             if let Some(arg) = &mut filter.argument {
-                arg.raw = strip_quotes_owned(arg.raw.clone());
+                arg.raw = strip_query_quotes_text(&arg.raw);
                 // Also strip quotes from list values
                 if let ArgumentKind::List(values) = &mut arg.kind {
-                    *values = values
-                        .iter()
-                        .map(|v| strip_quotes_owned(v.clone()))
-                        .collect();
+                    *values = values.iter().map(|v| strip_query_quotes_text(v)).collect();
                 }
             }
             Term::Filter(filter)
@@ -108,9 +105,9 @@ fn strip_term_quotes(term: Term) -> Term {
     }
 }
 
-fn strip_quotes_owned(value: String) -> String {
+pub(crate) fn strip_query_quotes_text(value: &str) -> String {
     if !value.contains('"') && !value.contains('\\') {
-        return value;
+        return value.to_string();
     }
 
     let mut result = String::with_capacity(value.len());

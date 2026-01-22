@@ -1,3 +1,4 @@
+use crate::query_preprocessor::strip_query_quotes_text;
 use cardinal_syntax::{ArgumentKind, Expr, FilterArgument, Term};
 use query_segmentation::{Segment, query_segmentation};
 use std::collections::BTreeSet;
@@ -91,7 +92,7 @@ impl HighlightCollector {
     }
 
     fn collect_literal_text(&mut self, value: &str) {
-        let unquoted = strip_quotes(value);
+        let unquoted = strip_query_quotes_text(value);
         let unquoted = unquoted.trim();
         if unquoted.is_empty() {
             return;
@@ -126,10 +127,6 @@ fn literal_chunks(value: &str) -> Vec<String> {
     } else {
         chunks
     }
-}
-
-fn strip_quotes(value: &str) -> String {
-    value.chars().filter(|ch| *ch != '"').collect()
 }
 
 #[cfg(test)]
@@ -216,6 +213,30 @@ mod tests {
     fn test_phrase_single_word() {
         let terms = parse_and_highlight("\"hello\"").unwrap();
         assert_eq!(terms, vec!["hello"]);
+    }
+
+    #[test]
+    fn test_phrase_with_escaped_quotes() {
+        let terms = parse_and_highlight(r#"\"hello\""#).unwrap();
+        assert_eq!(terms, vec![r#""hello""#]);
+    }
+
+    #[test]
+    fn test_phrase_with_escaped_backslash() {
+        let terms = parse_and_highlight(r#""C:\\path""#).unwrap();
+        assert_eq!(terms, vec![r"c:\path"]);
+    }
+
+    #[test]
+    fn test_word_with_escaped_quotes() {
+        let terms = parse_and_highlight(r#"foo\"bar\"baz"#).unwrap();
+        assert_eq!(terms, vec![r#"foo"bar"baz"#]);
+    }
+
+    #[test]
+    fn test_word_with_escaped_quotes_and_backslashes() {
+        let terms = parse_and_highlight(r#"\"C:\\path\""#).unwrap();
+        assert_eq!(terms, vec![r#""c:\path""#]);
     }
 
     #[test]
@@ -1786,6 +1807,12 @@ mod tests {
     }
 
     #[test]
+    fn test_filter_phrase_with_escaped_backslashes() {
+        let terms = parse_and_highlight(r#"parent:"C:\\Users\\Demo""#).unwrap();
+        assert_eq!(terms, vec![r"c:\users\demo"]);
+    }
+
+    #[test]
     fn test_quoted_comparison_in_filter() {
         let terms = parse_and_highlight("name:>\"test\"").unwrap();
 
@@ -1807,6 +1834,12 @@ mod tests {
 
         // After stripping quotes from the list items
         assert_eq!(terms, vec!["gif", "jpg", "png"]);
+    }
+
+    #[test]
+    fn test_filter_list_with_escaped_backslashes() {
+        let terms = parse_and_highlight(r#"ext:"J\\PG";"P\\NG""#).unwrap();
+        assert_eq!(terms, vec![r"j\pg", r"p\ng"]);
     }
 
     #[test]
