@@ -436,6 +436,14 @@ fn tag_filter_escaped_quote_with_semicolon_inside_quotes() {
 }
 
 #[test]
+fn tag_filter_escaped_quote_before_semicolon_inside_quotes() {
+    // tag:"a\";b";c → escaped quote doesn't break quote state, semicolon stays literal
+    let expr = parse_raw(r#"tag:"a\";b";c"#);
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &[r#""a\";b""#, "c"]);
+}
+
+#[test]
 fn tag_filter_backslash_before_semicolon_inside_quotes() {
     // tag:"a\\;b";c → backslash before semicolon, semicolon still literal inside quotes
     let expr = parse_raw(r#"tag:"a\\;b";c"#);
