@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.21 — 2026-01-23
+- Add shortcut `cmd+shift+c` for copy-paths
+- Allow partial-quoted queries: `"Application Support"/**`
+- Add drag-and-drop support for search input
+- Faster wildcard search.
+- Exclude more cloud storage paths from icon generation for better performance.
+- Better experience for non-root monitor path
+- Better experience for panel switching
+- Fix duplicate results of globstar `**` search
+
 ## 0.1.20 — 2026-01-11
 - Improve context menu for multiple selections.
 - Add copy file(s) to clipboard support.
