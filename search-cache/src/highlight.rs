@@ -1809,6 +1809,29 @@ mod tests {
     }
 
     #[test]
+    fn test_path_with_quoted_phrase_containing_spaces() {
+        // /"google chrome" should produce "google chrome" as a highlight
+        let terms = parse_and_highlight(r#"/"google chrome""#).unwrap();
+        assert_eq!(terms, vec!["google chrome"]);
+    }
+
+    #[test]
+    fn test_quoted_phrase_with_path_separator() {
+        // "Application Support/Lark Shell" should have two highlights:
+        // "Application Support" and "Lark Shell"
+        let terms = parse_and_highlight(r#""Application Support/Lark Shell""#).unwrap();
+        assert_eq!(terms, vec!["lark shell"]);
+    }
+
+    #[test]
+    fn test_quoted_phrase_with_globstar_separator() {
+        // "Application Support/**/Lark Shell" should have two highlights:
+        // "Application Support" and "Lark Shell"
+        let terms = parse_and_highlight(r#""Application Support/**/Lark Shell""#).unwrap();
+        assert_eq!(terms, vec!["lark shell"]);
+    }
+
+    #[test]
     fn test_quoted_comparison_in_filter() {
         let terms = parse_and_highlight("name:>\"test\"").unwrap();
 
