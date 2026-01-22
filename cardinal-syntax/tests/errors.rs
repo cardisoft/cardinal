@@ -69,3 +69,57 @@ fn unclosed_quote_with_unicode() {
     let err = parse_err("\"你好");
     assert!(err.message.contains("missing closing quote"));
 }
+
+#[test]
+fn escaped_quote_without_closing() {
+    let err = parse_err("\"test\\\"");
+    assert!(err.message.contains("missing closing quote"));
+}
+
+#[test]
+fn multiple_escaped_quotes_without_closing() {
+    let err = parse_err("\"a\\\"b\\\"c");
+    assert!(err.message.contains("missing closing quote"));
+}
+
+#[test]
+fn escaped_quote_at_end_without_closing() {
+    let err = parse_err("\"value\\\"");
+    assert!(err.message.contains("missing closing quote"));
+}
+
+#[test]
+fn trailing_backslash_without_closing() {
+    let err = parse_err("\"value\\");
+    assert!(err.message.contains("missing closing quote"));
+}
+
+#[test]
+fn escaped_quote_in_filter_without_closing() {
+    let err = parse_err("content:\"test\\\"value");
+    assert!(err.message.contains("missing closing quote"));
+}
+
+#[test]
+fn complex_escaped_path_without_closing() {
+    let err = parse_err("\"C:\\\\Path\\\"Name\\\"\\\\file");
+    assert!(err.message.contains("missing closing quote"));
+}
+
+#[test]
+fn escaped_quote_in_list_without_closing() {
+    let err = parse_err("ext:\"jpg\";\"png\\\"");
+    assert!(err.message.contains("missing closing quote"));
+}
+
+#[test]
+fn escaped_quote_with_unicode_without_closing() {
+    let err = parse_err("\"你好\\\"世界");
+    assert!(err.message.contains("missing closing quote"));
+}
+
+#[test]
+fn nested_escapes_without_closing() {
+    let err = parse_err("\"\\\"nested\\\\\\\"quotes");
+    assert!(err.message.contains("missing closing quote"));
+}

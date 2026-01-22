@@ -132,6 +132,13 @@ fn filter_with_quoted_argument() {
 }
 
 #[test]
+fn filter_with_escaped_quote_in_argument() {
+    let expr = parse_raw("content:\"foo\\\"bar\"");
+    filter_is_kind(&expr, &FilterKind::Content);
+    filter_arg_raw(&expr, "\"foo\\\"bar\"");
+}
+
+#[test]
 fn filter_with_quoted_argument_containing_spaces() {
     let expr = parse_raw("parent:\"C:\\Program Files\"");
     filter_is_kind(&expr, &FilterKind::Parent);
@@ -174,6 +181,13 @@ fn filter_list_with_quoted_values() {
 }
 
 #[test]
+fn filter_list_with_escaped_quotes() {
+    let expr = parse_raw("ext:\"jp\\\"g\";\"pn\\\"g\"");
+    filter_is_kind(&expr, &FilterKind::Ext);
+    filter_arg_is_list(&expr, &["\"jp\\\"g\"", "\"pn\\\"g\""]);
+}
+
+#[test]
 fn filter_comparison_with_quoted_value() {
     let expr = parse_ok("parent:>\"path\"");
     filter_is_kind(&expr, &FilterKind::Parent);
@@ -192,4 +206,193 @@ fn filter_with_unicode_in_quotes() {
     let expr = parse_raw("content:\"你好世界\"");
     filter_is_kind(&expr, &FilterKind::Content);
     filter_arg_raw(&expr, "\"你好世界\"");
+}
+
+#[test]
+fn filter_with_multiple_escaped_quotes() {
+    let expr = parse_raw("content:\"a\\\"b\\\"c\"");
+    filter_is_kind(&expr, &FilterKind::Content);
+    filter_arg_raw(&expr, "\"a\\\"b\\\"c\"");
+}
+
+#[test]
+fn filter_with_escaped_quote_at_start() {
+    // Escaped quote at start must be inside a quoted phrase
+    let expr = parse_raw("content:\"\\\"value\"");
+    filter_is_kind(&expr, &FilterKind::Content);
+    filter_arg_raw(&expr, "\"\\\"value\"");
+}
+
+#[test]
+fn filter_with_escaped_quote_at_end() {
+    // Escaped quote at end must be inside a quoted phrase
+    let expr = parse_raw("content:\"value\\\"\"");
+    filter_is_kind(&expr, &FilterKind::Content);
+    filter_arg_raw(&expr, "\"value\\\"\"");
+}
+
+#[test]
+fn filter_with_backslash_and_escaped_quote() {
+    let expr = parse_raw("parent:\"C:\\\\Path\\\"Name\\\"\\\\file\"");
+    filter_is_kind(&expr, &FilterKind::Parent);
+    filter_arg_raw(&expr, "\"C:\\\\Path\\\"Name\\\"\\\\file\"");
+}
+
+#[test]
+fn filter_list_with_complex_escapes() {
+    let expr = parse_raw("ext:\"a\\\"b\";\"c\\\\d\";\"e\\\"f\\\"g\"");
+    filter_is_kind(&expr, &FilterKind::Ext);
+    filter_arg_is_list(&expr, &["\"a\\\"b\"", "\"c\\\\d\"", "\"e\\\"f\\\"g\""]);
+}
+
+#[test]
+fn filter_comparison_with_escaped_quotes() {
+    let expr = parse_raw("parent:>\"path\\\"with\\\"quotes\"");
+    filter_is_kind(&expr, &FilterKind::Parent);
+    filter_arg_is_comparison(&expr, ComparisonOp::Gt, "\"path\\\"with\\\"quotes\"");
+}
+
+#[test]
+fn filter_range_with_escaped_quotes() {
+    let expr = parse_raw("parent:\"start\\\"1\"..\"end\\\"2\"");
+    filter_is_kind(&expr, &FilterKind::Parent);
+    filter_arg_is_range_dots(&expr, Some("\"start\\\"1\""), Some("\"end\\\"2\""));
+}
+
+#[test]
+fn filter_with_escaped_quote_in_unicode() {
+    let expr = parse_raw("content:\"你好\\\"世界\"");
+    filter_is_kind(&expr, &FilterKind::Content);
+    filter_arg_raw(&expr, "\"你好\\\"世界\"");
+}
+
+#[test]
+fn filter_with_only_escaped_quote() {
+    // Single escaped quote must be in a quoted phrase
+    let expr = parse_raw("content:\"\\\"\"");
+    filter_is_kind(&expr, &FilterKind::Content);
+    filter_arg_raw(&expr, "\"\\\"\"");
+}
+
+#[test]
+fn filter_with_consecutive_escaped_quotes() {
+    // Multiple escaped quotes in a quoted phrase
+    let expr = parse_raw("content:\"\\\"\\\"\\\"\"");
+    filter_is_kind(&expr, &FilterKind::Content);
+    filter_arg_raw(&expr, "\"\\\"\\\"\\\"\"");
+}
+
+#[test]
+fn filter_with_mixed_quoted_and_escaped() {
+    // Mixed quoted segments with escaped quotes
+    let expr = parse_raw("content:\"prefix\\\"\"\"middle\"\"suffix\"");
+    filter_is_kind(&expr, &FilterKind::Content);
+    filter_arg_raw(&expr, "\"prefix\\\"\"\"middle\"\"suffix\"");
+}
+
+#[test]
+fn filter_range_with_open_start_and_escaped_end() {
+    let expr = parse_raw("parent:..\"end\\\"value\"");
+    filter_is_kind(&expr, &FilterKind::Parent);
+    filter_arg_is_range_dots(&expr, None, Some("\"end\\\"value\""));
+}
+
+#[test]
+fn filter_range_with_escaped_start_and_open_end() {
+    let expr = parse_raw("parent:\"start\\\"value\"..");
+    filter_is_kind(&expr, &FilterKind::Parent);
+    filter_arg_is_range_dots(&expr, Some("\"start\\\"value\""), None);
+}
+
+#[test]
+fn multiple_filters_with_escaped_quotes() {
+    let expr = parse_ok("content:\"a\\\"b\" parent:\"c\\\"d\" tag:\"e\\\"f\"");
+    let parts = as_and(&expr);
+    assert_eq!(parts.len(), 3);
+    // Optimizer reorders: parent (priority 0), then content, then tag (priority 3)
+    filter_is_kind(&parts[0], &FilterKind::Parent);
+    filter_is_kind(&parts[1], &FilterKind::Content);
+    filter_is_kind(&parts[2], &FilterKind::Tag);
+}
+
+#[test]
+fn filter_with_special_chars_and_escapes() {
+    let expr = parse_raw("content:\"<>|&\\\"!@#$\"");
+    filter_is_kind(&expr, &FilterKind::Content);
+    filter_arg_raw(&expr, "\"<>|&\\\"!@#$\"");
+}
+
+#[test]
+fn filter_with_quoted_empty_after_escape() {
+    // Escaped quote followed by empty quotes
+    let expr = parse_raw("content:\"\\\"\"\"suffix\"");
+    filter_is_kind(&expr, &FilterKind::Content);
+    filter_arg_raw(&expr, "\"\\\"\"\"suffix\"");
+}
+
+#[test]
+fn tag_filter_with_escaped_quote_in_list() {
+    let expr = parse_raw("tag:\"Red\\\"Orange\";Blue");
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &["\"Red\\\"Orange\"", "Blue"]);
+}
+
+#[test]
+fn tag_filter_with_escaped_semicolon_separator() {
+    // Semicolon outside quotes acts as separator, escaped quote inside quotes
+    let expr = parse_raw("tag:\"Red\";\"Blue\\\"Green\"");
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &["\"Red\"", "\"Blue\\\"Green\""]);
+}
+
+#[test]
+fn tag_filter_with_semicolon_inside_quotes() {
+    // Intuitive expectation: semicolon inside quotes should be literal
+    let expr = parse_raw("tag:\"Red;\";\"Blue\\\"Green\"");
+    filter_is_kind(&expr, &FilterKind::Tag);
+
+    // Expected: semicolon inside "Red;" is part of the value
+    // Only semicolon outside quotes should act as separator
+    filter_arg_is_list(&expr, &["\"Red;\"", "\"Blue\\\"Green\""]);
+}
+
+#[test]
+fn tag_filter_semicolon_inside_quotes_with_text() {
+    // Intuitive expectation: semicolon inside quotes should be literal
+    let expr = parse_raw("tag:\"Red;Orange\";\"Blue\\\"Green\"");
+    filter_is_kind(&expr, &FilterKind::Tag);
+
+    // Expected: "Red;Orange" is one value with semicolon as literal character
+    filter_arg_is_list(&expr, &["\"Red;Orange\"", "\"Blue\\\"Green\""]);
+}
+
+#[test]
+fn tag_filter_semicolon_inside_quotes_with_multiple_items() {
+    let expr = parse_raw("tag:\"Red;Orange;Yellow\";\"Blue;Green\";Purple");
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(
+        &expr,
+        &["\"Red;Orange;Yellow\"", "\"Blue;Green\"", "Purple"],
+    );
+}
+
+#[test]
+fn tag_filter_semicolon_inside_quotes_with_escaped_quote() {
+    let expr = parse_raw(r#"tag:"Red;\"Orange\"";Blue"#);
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &["\"Red;\\\"Orange\\\"\"", "Blue"]);
+}
+
+#[test]
+fn tag_filter_semicolon_inside_quotes_with_escaped_semicolon() {
+    let expr = parse_raw(r#"tag:"Red\;Orange";Blue"#);
+    filter_is_kind(&expr, &FilterKind::Tag);
+    filter_arg_is_list(&expr, &["\"Red\\;Orange\"", "Blue"]);
+}
+
+#[test]
+fn ext_list_semicolon_inside_quotes_is_literal() {
+    let expr = parse_raw("ext:\"tar;gz\";zip");
+    filter_is_kind(&expr, &FilterKind::Ext);
+    filter_arg_is_list(&expr, &["\"tar;gz\"", "zip"]);
 }

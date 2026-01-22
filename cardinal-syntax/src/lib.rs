@@ -913,11 +913,26 @@ impl<'a> Parser<'a> {
         let start = self.pos;
         let mut seen = false;
         while let Some(ch) = self.peek_char() {
+            if ch == '\\' && self.peek_next_char() == Some('"') {
+                seen = true;
+                self.advance_char();
+                self.advance_char();
+                continue;
+            }
             if ch == '"' {
                 self.advance_char();
                 let mut closed = false;
+                let mut escaped = false;
                 while let Some(next) = self.peek_char() {
                     self.advance_char();
+                    if escaped {
+                        escaped = false;
+                        continue;
+                    }
+                    if next == '\\' {
+                        escaped = true;
+                        continue;
+                    }
                     if next == '"' {
                         closed = true;
                         break;
@@ -1099,15 +1114,27 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    // Everything supports literal double-quoted phrases without escape syntax.
-    // We still surface a parse error if the closing quote is missing so callers
-    // can provide useful feedback.
+    // Everything supports literal double-quoted phrases. We allow backslash-
+    // escaped quotes so `\"` can appear inside a phrase without terminating it.
+    // The backslashes are preserved in the output so callers can decide how to
+    // interpret them later.
     fn parse_phrase_string(&mut self) -> Result<String, ParseError> {
         let quote_pos = self.pos;
         self.advance_char(); // opening quote
         let mut result = String::new();
+        let mut escaped = false;
         while let Some(ch) = self.peek_char() {
             self.advance_char();
+            if escaped {
+                escaped = false;
+                result.push(ch);
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                result.push(ch);
+                continue;
+            }
             if ch == '"' {
                 return Ok(result);
             }
@@ -1162,6 +1189,12 @@ impl<'a> Parser<'a> {
 
     fn peek_char(&self) -> Option<char> {
         self.remaining().chars().next()
+    }
+
+    fn peek_next_char(&self) -> Option<char> {
+        let mut chars = self.remaining().chars();
+        chars.next();
+        chars.next()
     }
 
     fn advance_char(&mut self) {
@@ -1261,12 +1294,41 @@ fn try_parse_list(raw: &str) -> Option<Vec<String>> {
         return None;
     }
 
-    let parts: Vec<String> = raw
-        .split(';')
-        .map(|p| p.trim())
-        .filter(|p| !p.is_empty())
-        .map(|p| p.to_string())
-        .collect();
+    let mut parts = Vec::new();
+    let mut start = 0;
+    let mut in_quotes = false;
+    let mut escaped = false;
+
+    for (idx, ch) in raw.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+
+        if ch == '"' {
+            in_quotes = !in_quotes;
+            continue;
+        }
+
+        // Only semicolons outside quotes act as separators.
+        if ch == ';' && !in_quotes {
+            let part = raw[start..idx].trim();
+            if !part.is_empty() {
+                parts.push(part.to_string());
+            }
+            start = idx + ch.len_utf8();
+        }
+    }
+
+    let tail = raw[start..].trim();
+    if !tail.is_empty() {
+        parts.push(tail.to_string());
+    }
 
     (!parts.is_empty()).then_some(parts)
 }
@@ -1746,7 +1808,7 @@ mod tests {
             },
             DocExample {
                 line: 17,
-                query: r#""C:\Program Files\""#,
+                query: r#""C:\Program Files\\""#,
             },
             DocExample {
                 line: 19,
