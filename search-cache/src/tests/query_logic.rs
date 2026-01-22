@@ -115,7 +115,6 @@ fn test_globstar_dedup_trailing_expansion() {
         "globstar should dedup trailing expansion"
     );
     let mut expected = vec![
-        PathBuf::from("a"),
         PathBuf::from("a/a"),
         PathBuf::from("a/a/file.txt"),
         PathBuf::from("a/file.txt"),

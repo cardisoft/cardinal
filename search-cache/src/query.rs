@@ -203,7 +203,7 @@ impl SearchCache {
 
         let mut nodes = if pending_globstar {
             if let Some(nodes) = node_set.take() {
-                Some(self.expand_trailing_globstar(nodes, token)?)
+                Some(self.all_descendant_segments(&nodes, token)?)
             } else {
                 self.search_empty(token)
             }
@@ -340,30 +340,6 @@ impl SearchCache {
         }
         matches.sort_unstable_by_key(|(name, _)| *name);
         Some(matches.into_iter().map(|(_, index)| index).collect())
-    }
-
-    fn expand_trailing_globstar(
-        &self,
-        mut nodes: Vec<SlabIndex>,
-        token: CancellationToken,
-    ) -> Option<Vec<SlabIndex>> {
-        if nodes.is_empty() {
-            return Some(nodes);
-        }
-        let base = nodes.clone();
-        let mut extra = Vec::new();
-        let mut visited = 0usize;
-        for &node in &base {
-            token.is_cancelled_sparse(visited)?;
-            let descendants = self.all_subnodes(node, token)?;
-            for descendant in descendants {
-                token.is_cancelled_sparse(visited)?;
-                visited += 1;
-                extra.push(descendant);
-            }
-        }
-        nodes.extend(extra);
-        Some(nodes)
     }
 
     fn evaluate_regex(

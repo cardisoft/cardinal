@@ -414,7 +414,6 @@ fn globstar_trailing_segment_includes_all_descendants() {
         CancellationToken::noop(),
     ));
     let names = normalize(&mut cache, &indices);
-    assert!(names.iter().any(|n| n.ends_with("foo")));
     assert!(names.iter().any(|n| n.ends_with("foo/sub")));
     assert!(names.iter().any(|n| n.ends_with("foo/sub/layer")));
     assert!(names.iter().any(|n| n.ends_with("foo/file.txt")));

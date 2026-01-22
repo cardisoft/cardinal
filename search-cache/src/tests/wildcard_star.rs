@@ -227,11 +227,6 @@ fn star_then_globstar() {
     assert!(
         rel_paths
             .iter()
-            .any(|p| p == &PathBuf::from("src/modules/auth"))
-    );
-    assert!(
-        rel_paths
-            .iter()
             .any(|p| p == &PathBuf::from("src/modules/auth/login.ts"))
     );
     assert!(
