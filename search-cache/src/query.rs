@@ -161,9 +161,11 @@ impl SearchCache {
         let mut node_set: Option<Vec<SlabIndex>> = None;
         let mut pending_globstar = false;
         let mut saw_matcher = false;
+        let mut saw_globstar = false;
         for matcher in matchers {
             match matcher {
                 SegmentMatcher::GlobStar => {
+                    saw_globstar = true;
                     pending_globstar = true;
                 }
                 SegmentMatcher::Concrete(concrete) => {
@@ -183,7 +185,7 @@ impl SearchCache {
             }
         }
 
-        if pending_globstar {
+        let mut nodes = if pending_globstar {
             if let Some(nodes) = node_set.take() {
                 Some(self.expand_trailing_globstar(nodes, token)?)
             } else if saw_matcher {
@@ -195,7 +197,14 @@ impl SearchCache {
             node_set
         } else {
             self.search_empty(token)
+        };
+        // Deduplicate results if globstar was used, for correctness
+        // e.g. There is a file `/bar/emm/bar/foo`, searching for `bar/**/foo`
+        // will match it twice. We want to return it only once.
+        if saw_globstar && let Some(nodes) = &mut nodes {
+            dedup_indices_in_place(nodes);
         }
+        nodes
     }
 
     fn match_initial_segment(
@@ -988,6 +997,11 @@ fn extension_of(name: &str) -> Option<String> {
         return None;
     }
     Some(name[pos + 1..].to_ascii_lowercase())
+}
+
+fn dedup_indices_in_place(indices: &mut Vec<SlabIndex>) {
+    let mut seen = HashSet::with_capacity(indices.len());
+    indices.retain(|index| seen.insert(*index));
 }
 
 #[derive(Clone, Copy)]

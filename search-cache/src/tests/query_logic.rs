@@ -24,6 +24,292 @@ fn test_query_and_or_not_dedup_and_filtering() {
 }
 
 #[test]
+fn test_globstar_dedup_overlapping_parents() {
+    let tmp = TempDir::new("query_globstar_dedup").unwrap();
+    fs::create_dir_all(tmp.path().join("a/a")).unwrap();
+    fs::write(tmp.path().join("a/b.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("a/a/b.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let hits = cache.search("a/**/b.txt").unwrap();
+    let mut unique = hits
+        .iter()
+        .map(|i| cache.node_path(*i).unwrap())
+        .collect::<Vec<_>>();
+    unique.sort();
+    unique.dedup();
+
+    assert_eq!(unique.len(), 2, "expected two unique b.txt hits");
+    assert_eq!(
+        hits.len(),
+        unique.len(),
+        "globstar should dedup overlapping matches"
+    );
+}
+
+#[test]
+fn test_globstar_dedup_nested_bar_paths() {
+    let tmp = TempDir::new("query_globstar_nested_bar").unwrap();
+    fs::create_dir_all(tmp.path().join("bar/emm/bar")).unwrap();
+    fs::write(tmp.path().join("bar/foo.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("bar/emm/bar/foo.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let hits = cache.search("bar/**/foo").unwrap();
+    let mut rel_paths = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect::<Vec<_>>();
+    rel_paths.sort();
+    let mut unique = rel_paths.clone();
+    unique.dedup();
+
+    assert_eq!(unique.len(), 2, "expected two unique foo matches");
+    assert_eq!(
+        hits.len(),
+        unique.len(),
+        "globstar should dedup nested matches"
+    );
+    let mut expected = vec![
+        PathBuf::from("bar/foo.txt"),
+        PathBuf::from("bar/emm/bar/foo.txt"),
+    ];
+    expected.sort();
+    assert_eq!(unique, expected);
+}
+
+#[test]
+fn test_globstar_dedup_trailing_expansion() {
+    let tmp = TempDir::new("query_globstar_trailing").unwrap();
+    fs::create_dir_all(tmp.path().join("a/a")).unwrap();
+    fs::write(tmp.path().join("a/file.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("a/a/file.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let hits = cache.search("a/**").unwrap();
+    let mut rel_paths = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect::<Vec<_>>();
+    rel_paths.sort();
+    let mut unique = rel_paths.clone();
+    unique.dedup();
+
+    assert_eq!(
+        hits.len(),
+        unique.len(),
+        "globstar should dedup trailing expansion"
+    );
+    let mut expected = vec![
+        PathBuf::from("a"),
+        PathBuf::from("a/a"),
+        PathBuf::from("a/a/file.txt"),
+        PathBuf::from("a/file.txt"),
+    ];
+    expected.sort();
+    assert_eq!(unique, expected);
+}
+
+#[test]
+fn test_globstar_dedup_multiple_globstars() {
+    let tmp = TempDir::new("query_multiple_globstars").unwrap();
+    fs::create_dir_all(tmp.path().join("a/b/c")).unwrap();
+    fs::write(tmp.path().join("a/b/c/file.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    // Multiple globstars: a/**/b/**/file.txt
+    let hits = cache.search("a/**/b/**/file.txt").unwrap();
+    let paths: Vec<_> = hits.iter().map(|i| cache.node_path(*i).unwrap()).collect();
+
+    // Verify no duplicates
+    let mut unique = paths.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(
+        hits.len(),
+        unique.len(),
+        "multiple globstars should not produce duplicates"
+    );
+    assert_eq!(unique.len(), 1);
+}
+
+#[test]
+fn test_globstar_dedup_with_wildcards() {
+    let tmp = TempDir::new("query_globstar_wildcard").unwrap();
+    fs::create_dir_all(tmp.path().join("src/utils")).unwrap();
+    fs::write(tmp.path().join("src/test.js"), b"x").unwrap();
+    fs::write(tmp.path().join("src/utils/helper.js"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    // Globstar + wildcard: src/**/*.js
+    let hits = cache.search("src/**/*.js").unwrap();
+    let mut rel_paths = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect::<Vec<_>>();
+    rel_paths.sort();
+    let mut unique = rel_paths.clone();
+    unique.dedup();
+
+    assert_eq!(
+        hits.len(),
+        unique.len(),
+        "globstar with wildcards should dedup"
+    );
+    assert_eq!(unique.len(), 2);
+}
+
+#[test]
+fn test_globstar_dedup_empty_results() {
+    let tmp = TempDir::new("query_globstar_empty").unwrap();
+    fs::create_dir_all(tmp.path().join("a/b")).unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    // Search for non-existent file with globstar
+    let hits = cache.search("a/**/nonexistent.txt").unwrap();
+    assert_eq!(hits.len(), 0, "should return empty without panicking");
+}
+
+#[test]
+fn test_globstar_dedup_single_match() {
+    let tmp = TempDir::new("query_globstar_single").unwrap();
+    fs::create_dir_all(tmp.path().join("dir")).unwrap();
+    fs::write(tmp.path().join("dir/unique.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let hits = cache.search("dir/**/unique.txt").unwrap();
+    assert_eq!(hits.len(), 1, "single match should remain single");
+}
+
+#[test]
+fn test_globstar_dedup_deeply_nested() {
+    let tmp = TempDir::new("query_globstar_deep").unwrap();
+    fs::create_dir_all(tmp.path().join("a/a/a/a")).unwrap();
+    fs::write(tmp.path().join("a/target.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("a/a/target.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("a/a/a/target.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("a/a/a/a/target.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let hits = cache.search("a/**/target.txt").unwrap();
+    let mut rel_paths = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect::<Vec<_>>();
+    rel_paths.sort();
+    let mut unique = rel_paths.clone();
+    unique.dedup();
+
+    assert_eq!(
+        hits.len(),
+        unique.len(),
+        "deeply nested matches should be deduped"
+    );
+    assert_eq!(unique.len(), 4);
+}
+
+#[test]
+fn test_globstar_no_dedup_without_globstar() {
+    let tmp = TempDir::new("query_no_globstar").unwrap();
+    fs::create_dir_all(tmp.path().join("src")).unwrap();
+    fs::write(tmp.path().join("src/file.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    // Regular path search without globstar
+    let hits = cache.search("src/file.txt").unwrap();
+    assert_eq!(hits.len(), 1, "regular search should work normally");
+}
+
+#[test]
+fn test_globstar_dedup_with_boolean_operators() {
+    let tmp = TempDir::new("query_globstar_bool").unwrap();
+    fs::create_dir_all(tmp.path().join("a/a")).unwrap();
+    fs::write(tmp.path().join("a/test.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("a/a/test.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("a/other.md"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    // Globstar with AND operation
+    let hits = cache.search("a/**/test ext:txt").unwrap();
+    let mut paths = hits
+        .iter()
+        .map(|i| cache.node_path(*i).unwrap())
+        .collect::<Vec<_>>();
+    paths.sort();
+    let mut unique = paths.clone();
+    unique.dedup();
+
+    assert_eq!(
+        hits.len(),
+        unique.len(),
+        "globstar with boolean should dedup"
+    );
+    assert_eq!(unique.len(), 2);
+}
+
+#[test]
+fn test_globstar_dedup_leading_globstar() {
+    let tmp = TempDir::new("query_leading_globstar").unwrap();
+    fs::create_dir_all(tmp.path().join("a/b")).unwrap();
+    fs::create_dir_all(tmp.path().join("c/b")).unwrap();
+    fs::write(tmp.path().join("a/b/file.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("c/b/file.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    // Leading globstar: **/b/file.txt
+    let hits = cache.search("**/b/file.txt").unwrap();
+    let mut rel_paths = hits
+        .iter()
+        .map(|i| {
+            cache
+                .node_path(*i)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect::<Vec<_>>();
+    rel_paths.sort();
+    let mut unique = rel_paths.clone();
+    unique.dedup();
+
+    assert_eq!(
+        hits.len(),
+        unique.len(),
+        "leading globstar should dedup correctly"
+    );
+    assert_eq!(unique.len(), 2);
+}
+
+#[test]
 fn test_regex_prefix_in_queries() {
     let tmp = TempDir::new("query_regex").unwrap();
     fs::write(tmp.path().join("Report Q1.md"), b"x").unwrap();
