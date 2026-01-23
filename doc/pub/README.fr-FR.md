@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../cardinal/mac-icon_1024x1024.png" alt="Icône de Cardinal" width="120" height="120">
+  <img src="../../cardinal/mac-icon_1024x1024.png" alt="Icône de Cardinal" width="120" height="120">
   <h1>Cardinal</h1>
   <p>Application de recherche de fichiers pour macOS la plus rapide et la plus précise.</p>
   <p>
@@ -11,7 +11,7 @@
 
 ---
 
-[English](../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
+[English](../../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
 
 ## Utiliser Cardinal
 
@@ -44,7 +44,7 @@ Cardinal ajoute désormais une couche de syntaxe compatible Everything en plus d
 - `/report` · `draft/` · `/report/` – entourez les tokens de barres en début/fin pour forcer les correspondances de préfixe, suffixe ou nom exact lorsque vous avez besoin d’un contrôle mot à mot au-delà de la syntaxe Everything.
 - `~/**/.DS_Store` – le globstar (`**`) descend dans tous les sous-dossiers de votre répertoire personnel pour trouver les `.DS_Store` égarés.
 
-Consultez le catalogue complet des opérateurs (groupement booléen, périmètre de dossiers, filtres d’extension, usage des regex et autres exemples) dans [`search-syntax.md`](search-syntax.md).
+Consultez le catalogue complet des opérateurs (groupement booléen, périmètre de dossiers, filtres d’extension, usage des regex et autres exemples) dans [`search-syntax.fr-FR.md`](search-syntax.fr-FR.md).
 
 ### Raccourcis clavier et aperçus
 

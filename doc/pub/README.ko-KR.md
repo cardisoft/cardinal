@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../cardinal/mac-icon_1024x1024.png" alt="Cardinal 아이콘" width="120" height="120">
+  <img src="../../cardinal/mac-icon_1024x1024.png" alt="Cardinal 아이콘" width="120" height="120">
   <h1>Cardinal</h1>
   <p>macOS에서 가장 빠르고 정확한 파일 검색 앱입니다.</p>
   <p>
@@ -11,7 +11,7 @@
 
 ---
 
-[English](../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
+[English](../../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
 
 ## Cardinal 사용하기
 
@@ -44,7 +44,7 @@ Cardinal은 기존의 부분 문자열/접두사 매칭 위에 Everything과 호
 - `/report` · `draft/` · `/report/` – 토큰 앞뒤에 `/`를 붙여 Everything 문법 이상의 단어 단위 제어가 필요한 경우 접두사/접미사/정확한 이름 매칭을 강제합니다.
 - `~/**/.DS_Store` – 글롭스타(`**`)가 홈 디렉터리의 모든 하위 폴더를 탐색해 흩어진 `.DS_Store` 파일을 찾습니다.
 
-지원되는 연산자 카탈로그(불리언 그룹화, 폴더 범위 지정, 확장자 필터, 정규식 사용, 추가 예시)는 [`search-syntax.md`](search-syntax.md)를 참고하세요.
+지원되는 연산자 카탈로그(불리언 그룹화, 폴더 범위 지정, 확장자 필터, 정규식 사용, 추가 예시)는 [`search-syntax.ko-KR.md`](search-syntax.ko-KR.md)를 참고하세요.
 
 ### 단축키와 미리보기
 

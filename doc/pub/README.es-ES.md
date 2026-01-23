@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../cardinal/mac-icon_1024x1024.png" alt="Ícono de Cardinal" width="120" height="120">
+  <img src="../../cardinal/mac-icon_1024x1024.png" alt="Ícono de Cardinal" width="120" height="120">
   <h1>Cardinal</h1>
   <p>Aplicación de búsqueda de archivos para macOS más rápida y precisa.</p>
   <p>
@@ -11,7 +11,7 @@
 
 ---
 
-[English](../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
+[English](../../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
 
 ## Usar Cardinal
 
@@ -44,7 +44,7 @@ Cardinal ahora incorpora una capa de sintaxis compatible con Everything sobre la
 - `/report` · `draft/` · `/report/` – envuelve tokens con barras iniciales o finales para forzar coincidencias de prefijo, sufijo o nombre exacto cuando necesitas control de palabra completa más allá de la sintaxis de Everything.
 - `~/**/.DS_Store` – el globstar (`**`) recorre todas las subcarpetas de tu carpeta de inicio para encontrar archivos `.DS_Store` sueltos.
 
-Consulta el catálogo completo de operadores (agrupación booleana, alcance por carpeta, filtros por extensión, uso de regex y más ejemplos) en [`search-syntax.md`](search-syntax.md).
+Consulta el catálogo completo de operadores (agrupación booleana, alcance por carpeta, filtros por extensión, uso de regex y más ejemplos) en [`search-syntax.es-ES.md`](search-syntax.es-ES.md).
 
 ### Atajos de teclado y previsualizaciones
 

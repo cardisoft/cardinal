@@ -12,4 +12,3 @@
 - [FS Icon](fs-icon.md)
 - [Search Cancellation](search-cancellation.md)
 - [NamePool](name-pool.md)
-- [Search Syntax](search-syntax.md)

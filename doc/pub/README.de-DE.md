@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../cardinal/mac-icon_1024x1024.png" alt="Cardinal-Symbol" width="120" height="120">
+  <img src="../../cardinal/mac-icon_1024x1024.png" alt="Cardinal-Symbol" width="120" height="120">
   <h1>Cardinal</h1>
   <p>Schnellste und genaueste Dateisuche-App für macOS.</p>
   <p>
@@ -11,7 +11,7 @@
 
 ---
 
-[English](../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
+[English](../../README.md) · [Español](README.es-ES.md) · [한국어](README.ko-KR.md) · [Русский](README.ru-RU.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [Português](README.pt-BR.md) · [Italiano](README.it-IT.md) · [日本語](README.ja-JP.md) · [Français](README.fr-FR.md) · [Deutsch](README.de-DE.md) · [Українська](README.uk-UA.md) · [العربية](README.ar-SA.md) · [हिन्दी](README.hi-IN.md) · [Türkçe](README.tr-TR.md)
 
 ## Cardinal verwenden
 
@@ -44,7 +44,7 @@ Cardinal unterstützt jetzt eine Everything-kompatible Syntaxschicht zusätzlich
 - `/report` · `draft/` · `/report/` – Tokens mit führendem und/oder nachgestelltem `/` erzwingen Präfix-, Suffix- oder exakte Namensmatches, wenn du ganzes Wort-Controlling über Everything-Syntax hinaus brauchst.
 - `~/**/.DS_Store` – Globstar (`**`) durchläuft alle Unterordner unter deinem Home-Verzeichnis, um verstreute `.DS_Store`-Dateien zu finden.
 
-Den vollständigen Operator-Katalog (Boolesche Gruppierung, Ordner-Scopes, Erweiterungsfilter, Regex-Nutzung und mehr Beispiele) findest du in [`search-syntax.md`](search-syntax.md).
+Den vollständigen Operator-Katalog (Boolesche Gruppierung, Ordner-Scopes, Erweiterungsfilter, Regex-Nutzung und mehr Beispiele) findest du in [`search-syntax.de-DE.md`](search-syntax.de-DE.md).
 
 ### Tastenkürzel & Vorschauen
 

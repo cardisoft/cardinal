@@ -1,7 +1,7 @@
 [book]
 title = "Cardinal Documentation"
 authors = ["Cardinal Contributors"]
-src = "doc"
+src = "doc/inner"
 
 [build]
 build-dir = "target/book"
