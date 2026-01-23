@@ -6,12 +6,12 @@
     <a href="#using-cardinal">Using Cardinal</a> ·
     <a href="#building-cardinal">Building Cardinal</a>
   </p>
-  <img src="doc/UI.gif" alt="Cardinal UI preview" width="720">
+  <img src="doc/pub/UI.gif" alt="Cardinal UI preview" width="720">
 </div>
 
 ---
 
-[English](README.md) · [Español](doc/README.es-ES.md) · [한국어](doc/README.ko-KR.md) · [Русский](doc/README.ru-RU.md) · [简体中文](doc/README.zh-CN.md) · [繁體中文](doc/README.zh-TW.md) · [Português](doc/README.pt-BR.md) · [Italiano](doc/README.it-IT.md) · [日本語](doc/README.ja-JP.md) · [Français](doc/README.fr-FR.md) · [Deutsch](doc/README.de-DE.md) · [Українська](doc/README.uk-UA.md) · [العربية](doc/README.ar-SA.md) · [हिन्दी](doc/README.hi-IN.md) · [Türkçe](doc/README.tr-TR.md)
+[English](README.md) · [Español](doc/pub/README.es-ES.md) · [한국어](doc/pub/README.ko-KR.md) · [Русский](doc/pub/README.ru-RU.md) · [简体中文](doc/pub/README.zh-CN.md) · [繁體中文](doc/pub/README.zh-TW.md) · [Português](doc/pub/README.pt-BR.md) · [Italiano](doc/pub/README.it-IT.md) · [日本語](doc/pub/README.ja-JP.md) · [Français](doc/pub/README.fr-FR.md) · [Deutsch](doc/pub/README.de-DE.md) · [Українська](doc/pub/README.uk-UA.md) · [العربية](doc/pub/README.ar-SA.md) · [हिन्दी](doc/pub/README.hi-IN.md) · [Türkçe](doc/pub/README.tr-TR.md)
 
 ## Using Cardinal
 
@@ -44,7 +44,7 @@ Cardinal now speaks an Everything-compatible syntax layer on top of the classic 
 - `/report` · `draft/` · `/report/` – wrap tokens with leading and/or trailing slashes to force **prefix**, **suffix**, or **exact** name matches when you need whole-word control beyond Everything syntax.
 - `~/**/.DS_Store` – globstar (`**`) dives through every subfolder under your home directory to find stray `.DS_Store` files anywhere in the tree.
 
-For the supported operator catalog—including boolean grouping, folder scoping, extension filters, regex usage, and more examples—see [`doc/search-syntax.md`](doc/search-syntax.md).
+For the supported operator catalog—including boolean grouping, folder scoping, extension filters, regex usage, and more examples—see [`doc/pub/search-syntax.md`](doc/pub/search-syntax.md).
 
 ### Keyboard shortcuts & previews
 
