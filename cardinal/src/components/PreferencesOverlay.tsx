@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getWatchRootValidation, isPathInputValid } from '../utils/watchRoot';
 import ThemeSwitcher from './ThemeSwitcher';
@@ -96,10 +96,7 @@ export function PreferencesOverlay({
     }
   };
 
-  const { errorKey: watchRootErrorKey } = useMemo(
-    () => getWatchRootValidation(watchRootInput),
-    [watchRootInput],
-  );
+  const { errorKey: watchRootErrorKey } = getWatchRootValidation(watchRootInput);
   const watchRootErrorMessage = watchRootErrorKey ? t(watchRootErrorKey) : null;
 
   const handleWatchRootKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
@@ -108,18 +105,14 @@ export function PreferencesOverlay({
     }
   };
 
-  const parsedIgnorePaths = useMemo(
-    () =>
-      ignorePathsInput
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0),
-    [ignorePathsInput],
-  );
-  const ignorePathsErrorMessage = useMemo(() => {
+  const parsedIgnorePaths = ignorePathsInput
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const ignorePathsErrorMessage = (() => {
     const invalid = parsedIgnorePaths.find((line) => !isPathInputValid(line));
     return invalid ? t('ignorePaths.errors.absolute') : null;
-  }, [parsedIgnorePaths, t]);
+  })();
 
   const handleIgnorePathsKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key === 'Escape') {
@@ -216,7 +209,7 @@ export function PreferencesOverlay({
             </div>
             <div className="preferences-control">
               <input
-                className="preferences-field preferences-number-input"
+                className="preferences-field preferences-number-input preferences-watch-root-input"
                 type="text"
                 value={watchRootInput}
                 onChange={(event) => setWatchRootInput(event.target.value)}
@@ -224,14 +217,12 @@ export function PreferencesOverlay({
                 aria-label={t('watchRoot.label')}
                 autoComplete="off"
                 spellCheck={false}
-                style={{ width: 240, textAlign: 'left' }}
               />
               {watchRootErrorMessage ? (
                 <p
-                  className="permission-status permission-status--error"
+                  className="permission-status permission-status--error preferences-field-error"
                   role="status"
                   aria-live="polite"
-                  style={{ marginBottom: 0 }}
                 >
                   {watchRootErrorMessage}
                 </p>
@@ -256,10 +247,9 @@ export function PreferencesOverlay({
               />
               {ignorePathsErrorMessage ? (
                 <p
-                  className="permission-status permission-status--error"
+                  className="permission-status permission-status--error preferences-field-error"
                   role="status"
                   aria-live="polite"
-                  style={{ marginBottom: 0 }}
                 >
                   {ignorePathsErrorMessage}
                 </p>

@@ -17,6 +17,12 @@ export function useContextMenu(
   getSelectedPaths?: () => string[],
 ): UseContextMenuResult {
   const { t } = useTranslation();
+  const writeClipboard = useCallback((text: string) => {
+    if (!navigator?.clipboard?.writeText) {
+      return;
+    }
+    void navigator.clipboard.writeText(text);
+  }, []);
 
   const buildFileMenuItems = useCallback(
     (path: string): MenuItemOptions[] => {
@@ -24,8 +30,8 @@ export function useContextMenu(
         return [];
       }
 
-      const selected = getSelectedPaths?.().filter(Boolean);
-      const targetPaths = selected && selected.length > 0 ? selected : [path];
+      const selected = getSelectedPaths?.().filter(Boolean) ?? [];
+      const targetPaths = selected.length > 0 ? selected : [path];
       const copyLabel =
         targetPaths.length > 1 ? t('contextMenu.copyFiles') : t('contextMenu.copyFile');
       const copyFilenameLabel =
@@ -55,15 +61,13 @@ export function useContextMenu(
           id: 'context_menu.copy_filename',
           text: copyFilenameLabel,
           action: () => {
-            if (navigator?.clipboard?.writeText) {
-              const filenames = targetPaths
-                .map((itemPath) => {
-                  const segments = itemPath.split(/[\\/]/).filter(Boolean);
-                  return segments.length > 0 ? segments[segments.length - 1] : itemPath;
-                })
-                .join(' ');
-              void navigator.clipboard.writeText(filenames);
-            }
+            const filenames = targetPaths
+              .map((itemPath) => {
+                const segments = itemPath.split(/[\\/]/).filter(Boolean);
+                return segments.length > 0 ? segments[segments.length - 1] : itemPath;
+              })
+              .join(' ');
+            writeClipboard(filenames);
           },
         },
         {
@@ -71,9 +75,7 @@ export function useContextMenu(
           text: copyPathLabel,
           accelerator: 'Cmd+Shift+C',
           action: () => {
-            if (navigator?.clipboard?.writeText) {
-              void navigator.clipboard.writeText(targetPaths.join('\n'));
-            }
+            writeClipboard(targetPaths.join('\n'));
           },
         },
         {
@@ -94,16 +96,14 @@ export function useContextMenu(
           text: t('contextMenu.quickLook'),
           accelerator: 'Space',
           action: () => {
-            if (onQuickLookRequest) {
-              void onQuickLookRequest();
-            }
+            void onQuickLookRequest();
           },
         });
       }
 
       return items;
     },
-    [getSelectedPaths, onQuickLookRequest, t],
+    [getSelectedPaths, onQuickLookRequest, t, writeClipboard],
   );
 
   const buildHeaderMenuItems = useCallback((): MenuItemOptions[] => {

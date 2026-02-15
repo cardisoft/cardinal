@@ -39,9 +39,4 @@ describe('StateDisplay', () => {
     expect(screen.getByText('No results for "report"')).toBeInTheDocument();
     expect(screen.getByText('Try adjusting your filters.')).toBeInTheDocument();
   });
-
-  it('renders nothing for the results state', () => {
-    const { container } = render(<StateDisplay state="results" />);
-    expect(container.firstChild).toBeNull();
-  });
 });

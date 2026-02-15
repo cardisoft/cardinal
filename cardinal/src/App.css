@@ -1694,6 +1694,11 @@ button:active:not(:disabled) {
   font-size: 0.95rem;
 }
 
+.preferences-watch-root-input {
+  width: 240px;
+  text-align: left;
+}
+
 .preferences-textarea {
   width: 240px;
   min-height: 88px;
@@ -1701,6 +1706,10 @@ button:active:not(:disabled) {
   font-size: 0.9rem;
   line-height: 1.4;
   resize: vertical;
+}
+
+.preferences-field-error {
+  margin-bottom: 0;
 }
 
 .preferences-field:focus {
