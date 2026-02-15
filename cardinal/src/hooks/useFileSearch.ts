@@ -4,7 +4,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { SEARCH_DEBOUNCE_MS } from '../constants';
 import type { AppLifecycleStatus, SearchResponsePayload } from '../types/ipc';
 import type { SlabIndex } from '../types/slab';
-import { toSlabIndexArray } from '../types/slab';
 
 type SearchError = string | Error | null;
 
@@ -240,8 +239,7 @@ export function useFileSearch(): UseFileSearchResult {
         version: requestVersion,
       });
 
-      const slabResults = Array.isArray(rawResults?.results) ? rawResults.results : [];
-      const searchResults = toSlabIndexArray(slabResults);
+      const searchResults = rawResults?.results as SlabIndex[];
       const highlightTerms = Array.isArray(rawResults?.highlights)
         ? rawResults.highlights.filter((term): term is string => typeof term === 'string')
         : [];
