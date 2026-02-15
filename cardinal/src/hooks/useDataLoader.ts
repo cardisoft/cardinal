@@ -4,58 +4,44 @@ import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import type { NodeInfoResponse, SearchResultItem } from '../types/search';
 import type { SlabIndex } from '../types/slab';
-import type { IconUpdatePayload, IconUpdateWirePayload } from '../types/ipc';
+import type { IconUpdateWirePayload } from '../types/ipc';
 
 type IconUpdateEventPayload = readonly IconUpdateWirePayload[] | null | undefined;
 
-export type DataLoaderCache = Map<number, SearchResultItem>;
-type IconOverrideValue = string | null;
+export type DataLoaderCache = Map<SlabIndex, SearchResultItem>;
+type IconOverrideValue = string | undefined;
 
-const normalizeIcon = (icon: string | null | undefined): string | undefined => icon ?? undefined;
+const fromNodeInfo = (node: NodeInfoResponse): SearchResultItem => ({
+  path: node.path,
+  metadata: node.metadata ?? undefined,
+  size: node.size ?? node.metadata?.size,
+  mtime: node.mtime ?? node.metadata?.mtime,
+  ctime: node.ctime ?? node.metadata?.ctime,
+  icon: node.icon ?? undefined,
+});
 
-const fromNodeInfo = (node: NodeInfoResponse): SearchResultItem => {
-  const metadata = node.metadata ?? undefined;
-  const base: SearchResultItem = {
-    path: node.path,
-    metadata,
-    size: node.size ?? metadata?.size,
-    mtime: node.mtime ?? metadata?.mtime,
-    ctime: node.ctime ?? metadata?.ctime,
-    icon: normalizeIcon(node.icon),
-  };
-  return base;
-};
-
-export function useDataLoader(results: SlabIndex[]) {
-  const loadingRef = useRef<Set<number>>(new Set());
+export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) {
+  const loadingRef = useRef<Set<SlabIndex>>(new Set());
   const versionRef = useRef(0);
   const cacheRef = useRef<DataLoaderCache>(new Map());
-  const indexMapRef = useRef<Map<SlabIndex, number>>(new Map());
-  const iconOverridesRef = useRef<Map<number, IconOverrideValue>>(new Map());
+  const iconOverridesRef = useRef<Map<SlabIndex, IconOverrideValue>>(new Map());
   const [cache, setCache] = useState<DataLoaderCache>(() => {
-    const initial = new Map<number, SearchResultItem>();
+    const initial = new Map<SlabIndex, SearchResultItem>();
     cacheRef.current = initial;
     return initial;
   });
   const resultsRef = useRef<SlabIndex[]>([]);
+  resultsRef.current = results;
 
   // Reset loading state whenever the result source changes.
   useEffect(() => {
     versionRef.current += 1;
     loadingRef.current.clear();
     iconOverridesRef.current.clear();
-    const nextCache = new Map<number, SearchResultItem>();
+    const nextCache = new Map<SlabIndex, SearchResultItem>();
     cacheRef.current = nextCache;
-    resultsRef.current = results;
-    const indexMap = new Map<SlabIndex, number>();
-    resultsRef.current.forEach((value, index) => {
-      if (value != null) {
-        indexMap.set(value, index);
-      }
-    });
-    indexMapRef.current = indexMap;
     setCache(nextCache);
-  }, [results]);
+  }, [dataResultsVersion]);
 
   useEffect(() => {
     let unlistenIconUpdate: UnlistenFn | undefined;
@@ -67,41 +53,28 @@ export function useDataLoader(results: SlabIndex[]) {
             return;
           }
 
-          const normalized: IconUpdatePayload[] = [];
-          updates.forEach((update) => {
-            if (update && typeof update.slabIndex === 'number') {
-              normalized.push({
-                slabIndex: update.slabIndex as SlabIndex,
-                icon: update.icon,
-              });
-            }
-          });
-
-          if (normalized.length === 0) {
-            return;
-          }
-
           setCache((prev) => {
             let nextCache: DataLoaderCache | null = null;
 
-            normalized.forEach((update) => {
-              const index = indexMapRef.current.get(update.slabIndex);
-              if (index === undefined) return;
+            updates.forEach((update) => {
+              if (!update || typeof update.slabIndex !== 'number') {
+                return;
+              }
 
-              const overrideValue: IconOverrideValue = update.icon ?? null;
-              iconOverridesRef.current.set(index, overrideValue);
+              const slabIndex = update.slabIndex as SlabIndex;
+              const nextIcon = update.icon;
+              iconOverridesRef.current.set(slabIndex, nextIcon);
 
-              const current = prev.get(index);
-              if (!current) return;
-
-              const nextIcon = normalizeIcon(overrideValue);
-              if (current.icon === nextIcon) return;
+              const current = prev.get(slabIndex);
+              if (!current || current.icon === nextIcon) {
+                return;
+              }
 
               if (nextCache === null) {
                 nextCache = new Map(prev);
               }
 
-              nextCache.set(index, { ...current, icon: nextIcon });
+              nextCache.set(slabIndex, { ...current, icon: nextIcon });
             });
 
             if (nextCache === null) {
@@ -125,39 +98,37 @@ export function useDataLoader(results: SlabIndex[]) {
     const list = resultsRef.current;
     const total = list.length;
     if (start < 0 || end < start || total === 0) return;
-    const needLoading: number[] = [];
+    const needLoading: SlabIndex[] = [];
     for (let i = start; i <= end && i < total; i++) {
-      if (!cacheRef.current.has(i) && !loadingRef.current.has(i) && list[i] != null) {
-        needLoading.push(i);
-        loadingRef.current.add(i);
+      const slabIndex = list[i];
+      if (!cacheRef.current.has(slabIndex) && !loadingRef.current.has(slabIndex)) {
+        needLoading.push(slabIndex);
+        loadingRef.current.add(slabIndex);
       }
     }
     if (needLoading.length === 0) return;
     const versionAtRequest = versionRef.current;
-    const slice = needLoading.map((i) => list[i]);
-    const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', { results: slice });
+    const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', { results: needLoading });
     if (versionRef.current !== versionAtRequest) {
-      needLoading.forEach((i) => loadingRef.current.delete(i));
+      needLoading.forEach((slabIndex) => loadingRef.current.delete(slabIndex));
       return;
     }
     setCache((prev) => {
       if (versionRef.current !== versionAtRequest) return prev;
       let nextCache: DataLoaderCache | null = null;
 
-      needLoading.forEach((originalIndex, idx) => {
+      needLoading.forEach((slabIndex, idx) => {
         const fetchedItem = fetched[idx];
-        loadingRef.current.delete(originalIndex);
+        loadingRef.current.delete(slabIndex);
         if (!fetchedItem) {
           return;
         }
 
         const normalizedItem = fromNodeInfo(fetchedItem);
-        const existing = prev.get(originalIndex);
-        const hasOverride = iconOverridesRef.current.has(originalIndex);
-        const override = hasOverride ? iconOverridesRef.current.get(originalIndex) : undefined;
-
+        const existing = prev.get(slabIndex);
+        const hasOverride = iconOverridesRef.current.has(slabIndex);
         const preferredIcon = hasOverride
-          ? normalizeIcon(override)
+          ? iconOverridesRef.current.get(slabIndex)
           : (existing?.icon ?? normalizedItem.icon);
 
         const mergedItem =
@@ -169,7 +140,7 @@ export function useDataLoader(results: SlabIndex[]) {
           nextCache = new Map(prev);
         }
 
-        nextCache.set(originalIndex, mergedItem);
+        nextCache.set(slabIndex, mergedItem);
       });
 
       if (nextCache === null) {

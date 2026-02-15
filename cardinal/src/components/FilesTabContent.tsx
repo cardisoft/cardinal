@@ -13,12 +13,14 @@ import type { SortKey, SortState } from '../types/sort';
 type FilesTabContentProps = {
   headerRef: React.Ref<HTMLDivElement>;
   onResizeStart: (columnKey: ColumnKey) => (event: ReactMouseEvent<HTMLSpanElement>) => void;
-  onHeaderContextMenu?: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onHeaderContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
   displayState: DisplayState;
   searchErrorMessage: string | null;
   currentQuery: string;
   virtualListRef: React.Ref<VirtualListHandle>;
   results: SlabIndex[];
+  dataResultsVersion: number;
+  displayedResultsVersion: number;
   rowHeight: number;
   overscan: number;
   renderRow: (
@@ -27,11 +29,10 @@ type FilesTabContentProps = {
     rowStyle: CSSProperties,
   ) => ReactNode;
   onScrollSync: (scrollLeft: number) => void;
-  sortState?: SortState;
-  onSortToggle?: (sortKey: SortKey) => void;
-  sortDisabled?: boolean;
-  sortIndicatorMode?: 'triangle' | 'circle';
-  sortDisabledTooltip?: string | null;
+  sortState: SortState;
+  onSortToggle: (sortKey: SortKey) => void;
+  sortDisabled: boolean;
+  sortDisabledTooltip: string | null;
 };
 
 export function FilesTabContent({
@@ -43,14 +44,15 @@ export function FilesTabContent({
   currentQuery,
   virtualListRef,
   results,
+  dataResultsVersion,
+  displayedResultsVersion,
   rowHeight,
   overscan,
   renderRow,
   onScrollSync,
   sortState,
   onSortToggle,
-  sortDisabled = false,
-  sortIndicatorMode = 'triangle',
+  sortDisabled,
   sortDisabledTooltip,
 }: FilesTabContentProps): React.JSX.Element {
   return (
@@ -62,7 +64,6 @@ export function FilesTabContent({
         sortState={sortState}
         onSortToggle={onSortToggle}
         sortDisabled={sortDisabled}
-        sortIndicatorMode={sortIndicatorMode}
         sortDisabledTooltip={sortDisabledTooltip}
       />
       <div className="flex-fill">
@@ -72,6 +73,8 @@ export function FilesTabContent({
           <VirtualList
             ref={virtualListRef}
             results={results}
+            dataResultsVersion={dataResultsVersion}
+            displayedResultsVersion={displayedResultsVersion}
             rowHeight={rowHeight}
             overscan={overscan}
             renderRow={renderRow}

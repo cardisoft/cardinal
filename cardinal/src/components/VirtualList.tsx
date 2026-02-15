@@ -24,21 +24,32 @@ export type VirtualListHandle = {
 };
 
 type VirtualListProps = {
-  results?: SlabIndex[];
-  rowHeight?: number;
-  overscan?: number;
+  results: SlabIndex[];
+  dataResultsVersion: number;
+  displayedResultsVersion: number;
+  rowHeight: number;
+  overscan: number;
   renderRow: (
     rowIndex: number,
     item: SearchResultItem | undefined,
     rowStyle: CSSProperties,
   ) => React.ReactNode;
-  onScrollSync?: (scrollLeft: number) => void;
-  className?: string;
+  onScrollSync: (scrollLeft: number) => void;
+  className: string;
 };
 
 // Virtualized list with lazy row hydration and synchronized column scrolling
 export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(function VirtualList(
-  { results = [], rowHeight = 24, overscan = 5, renderRow, onScrollSync, className = '' },
+  {
+    results,
+    dataResultsVersion,
+    displayedResultsVersion,
+    rowHeight,
+    overscan,
+    renderRow,
+    onScrollSync,
+    className,
+  },
   ref,
 ) {
   // ----- refs -----
@@ -50,11 +61,10 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
 
   // ----- derived -----
   // Row count is inferred from the results array; explicit rowCount is no longer supported
-  const resultsList = results;
-  const rowCount = resultsList.length;
+  const rowCount = results.length;
 
   // ----- data loader -----
-  const { cache, ensureRangeLoaded } = useDataLoader(resultsList);
+  const { cache, ensureRangeLoaded } = useDataLoader(results, dataResultsVersion);
 
   // Virtualized height powers the scrollbar math
   const totalHeight = rowCount * rowHeight;
@@ -68,7 +78,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     rowCount && viewportHeight
       ? Math.min(rowCount - 1, Math.ceil((scrollTop + viewportHeight) / rowHeight) + overscan - 1)
       : -1;
-  useIconViewport({ results: resultsList, start, end });
+  useIconViewport({ results, start, end });
 
   // Clamp scroll updates so callers cannot push the viewport outside legal bounds
   const updateScrollAndRange = useCallback(
@@ -103,7 +113,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   // Propagate horizontal scroll offset to the parent (keeps column headers aligned)
   const handleHorizontalScroll = useCallback(
     (e: ReactUIEvent<HTMLDivElement>) => {
-      if (onScrollSync) onScrollSync((e.target as HTMLDivElement).scrollLeft);
+      onScrollSync((e.target as HTMLDivElement).scrollLeft);
     },
     [onScrollSync],
   );
@@ -112,7 +122,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   // Ensure the data cache stays warm for the active window
   useEffect(() => {
     if (end >= start) ensureRangeLoaded(start, end);
-  }, [start, end, ensureRangeLoaded, resultsList]);
+  }, [start, end, ensureRangeLoaded, displayedResultsVersion]);
 
   // Track container height changes so virtualization recalculates the viewport
   useLayoutEffect(() => {
@@ -176,7 +186,13 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     [rowCount, rowHeight, viewportHeight, updateScrollAndRange],
   );
 
-  const getItemAt = useCallback((index: number) => cache.get(index), [cache]);
+  const getItemByRowIndex = useCallback(
+    (rowIndex: number) => {
+      const slabIndex = results[rowIndex];
+      return slabIndex === undefined ? undefined : cache.get(slabIndex);
+    },
+    [cache, results],
+  );
 
   useImperativeHandle(
     ref,
@@ -184,9 +200,9 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
       scrollToTop: () => updateScrollAndRange(() => 0),
       scrollToRow,
       ensureRangeLoaded,
-      getItem: getItemAt,
+      getItem: getItemByRowIndex,
     }),
-    [updateScrollAndRange, scrollToRow, ensureRangeLoaded, getItemAt],
+    [updateScrollAndRange, scrollToRow, ensureRangeLoaded, getItemByRowIndex],
   );
 
   // ----- rendered items memo -----
@@ -197,7 +213,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     const baseTop = start * rowHeight - scrollTop;
     return Array.from({ length: end - start + 1 }, (_, i) => {
       const rowIndex = start + i;
-      const item = cache.get(rowIndex);
+      const item = getItemByRowIndex(rowIndex);
       return renderRow(rowIndex, item, {
         position: 'absolute',
         top: baseTop + i * rowHeight,
@@ -206,7 +222,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
         right: 0,
       });
     });
-  }, [start, end, scrollTop, rowHeight, cache, renderRow]);
+  }, [start, end, scrollTop, rowHeight, renderRow, getItemByRowIndex]);
 
   // ----- render -----
   return (

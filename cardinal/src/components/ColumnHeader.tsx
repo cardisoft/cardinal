@@ -12,7 +12,7 @@ const columns: Array<{ key: ColumnKey; labelKey: string; className: string }> = 
   { key: 'created', labelKey: 'columns.created', className: 'ctime-text' },
 ];
 
-const sortableColumns: Partial<Record<ColumnKey, SortKey>> = {
+const sortableColumns: Record<ColumnKey, SortKey> = {
   filename: 'filename',
   path: 'fullPath',
   size: 'size',
@@ -22,26 +22,17 @@ const sortableColumns: Partial<Record<ColumnKey, SortKey>> = {
 
 type ColumnHeaderProps = {
   onResizeStart: (columnKey: ColumnKey) => (event: ReactMouseEvent<HTMLSpanElement>) => void;
-  onContextMenu?: (event: ReactMouseEvent<HTMLDivElement>) => void;
-  sortState?: SortState;
-  onSortToggle?: (sortKey: SortKey) => void;
-  sortDisabled?: boolean;
-  sortIndicatorMode?: 'triangle' | 'circle';
-  sortDisabledTooltip?: string | null;
+  onContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  sortState: SortState;
+  onSortToggle: (sortKey: SortKey) => void;
+  sortDisabled: boolean;
+  sortDisabledTooltip: string | null;
 };
 
 // Column widths are applied via CSS vars on container; no need to pass colWidths prop.
 export const ColumnHeader = forwardRef<HTMLDivElement, ColumnHeaderProps>(
   (
-    {
-      onResizeStart,
-      onContextMenu,
-      sortState = null,
-      onSortToggle,
-      sortDisabled = false,
-      sortIndicatorMode = 'triangle',
-      sortDisabledTooltip,
-    },
+    { onResizeStart, onContextMenu, sortState, onSortToggle, sortDisabled, sortDisabledTooltip },
     ref,
   ) => {
     const { t } = useTranslation();
@@ -51,13 +42,10 @@ export const ColumnHeader = forwardRef<HTMLDivElement, ColumnHeaderProps>(
           {columns.map(({ key, labelKey, className }) => {
             const label = t(labelKey);
             const sortKey = sortableColumns[key];
-            const isSortable = Boolean(sortKey && onSortToggle);
-            const isActive = Boolean(sortKey && sortState?.key === sortKey);
+            const isActive = sortState?.key === sortKey;
             const indicatorClasses = ['sort-indicator'];
 
-            if (sortIndicatorMode === 'circle') {
-              indicatorClasses.push('sort-indicator--circle');
-            } else if (isActive && sortState) {
+            if (isActive && sortState) {
               indicatorClasses.push(
                 sortState.direction === 'asc' ? 'sort-indicator--asc' : 'sort-indicator--desc',
               );
@@ -71,25 +59,21 @@ export const ColumnHeader = forwardRef<HTMLDivElement, ColumnHeaderProps>(
               indicatorClasses.push('sort-indicator--active');
             }
 
-            const title = sortDisabled ? (sortDisabledTooltip ?? undefined) : undefined;
+            const title = sortDisabled ? sortDisabledTooltip || undefined : undefined;
 
             return (
               <span key={key} className={`${className} header header-cell`}>
-                {isSortable ? (
-                  <button
-                    type="button"
-                    className="sort-button"
-                    onClick={() => (sortKey ? onSortToggle?.(sortKey) : undefined)}
-                    disabled={sortDisabled}
-                    aria-pressed={isActive && !sortDisabled}
-                    title={title}
-                  >
-                    <span className="sort-button__label">{label}</span>
-                    <span className={indicatorClasses.join(' ')} aria-hidden="true" />
-                  </button>
-                ) : (
-                  label
-                )}
+                <button
+                  type="button"
+                  className="sort-button"
+                  onClick={() => onSortToggle(sortKey)}
+                  disabled={sortDisabled}
+                  aria-pressed={isActive && !sortDisabled}
+                  title={title}
+                >
+                  <span className="sort-button__label">{label}</span>
+                  <span className={indicatorClasses.join(' ')} aria-hidden="true" />
+                </button>
                 <span
                   className="col-resizer"
                   onMouseDown={onResizeStart(key)} // consume column-specific resize closures from the parent hook

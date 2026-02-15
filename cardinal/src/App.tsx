@@ -775,6 +775,8 @@ function App() {
               currentQuery={currentQuery}
               virtualListRef={virtualListRef}
               results={displayedResults}
+              dataResultsVersion={resultsVersion}
+              displayedResultsVersion={displayedResultsVersion}
               rowHeight={ROW_HEIGHT}
               overscan={OVERSCAN_ROW_COUNT}
               renderRow={renderRow}
@@ -782,7 +784,6 @@ function App() {
               sortState={sortState}
               onSortToggle={handleSortToggle}
               sortDisabled={sortButtonsDisabled}
-              sortIndicatorMode="triangle"
               sortDisabledTooltip={sortDisabledTooltip}
             />
           )}

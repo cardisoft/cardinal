@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject, RefObject } from 'react';
 import type { VirtualListHandle } from '../components/VirtualList';
 import type { SlabIndex } from '../types/slab';
-import type { SearchResultItem } from '../types/search';
 
 type RowSelectOptions = {
   isShift: boolean;
@@ -123,7 +122,7 @@ export const useSelection = (
         return;
       }
 
-      const item = virtualListRef.current?.getItem?.(nextIndex);
+      const item = virtualListRef.current?.getItem(nextIndex);
       if (!item) {
         return;
       }
@@ -163,7 +162,7 @@ export const useSelection = (
     }
     const paths: string[] = [];
     selectedIndices.forEach((index) => {
-      const item = list.getItem?.(index) as SearchResultItem | undefined;
+      const item = list.getItem(index);
       if (item?.path) {
         paths.push(item.path);
       }

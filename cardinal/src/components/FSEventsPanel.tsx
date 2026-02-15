@@ -34,7 +34,7 @@ export type FileSystemEvent = RecentEventPayload;
 
 type EventRowContext = {
   events: FileSystemEvent[];
-  onContextMenu?: (event: React.MouseEvent<HTMLDivElement>, path: string) => void;
+  onContextMenu: (event: React.MouseEvent<HTMLDivElement>, path: string) => void;
   searchQuery: string;
   caseInsensitive: boolean;
 };
@@ -78,7 +78,7 @@ const EventRowBase = ({
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (pathSource && onContextMenu) {
+      if (pathSource) {
         onContextMenu(e, pathSource);
       }
     },
@@ -121,8 +121,8 @@ const renderEventRow = (props: EventRowProps): React.ReactElement => <EventRow {
 type FSEventsPanelProps = {
   events: FileSystemEvent[];
   onResizeStart: (event: React.MouseEvent<HTMLSpanElement>, columnKey: EventColumnKey) => void;
-  onContextMenu?: (event: React.MouseEvent<HTMLDivElement>, path: string) => void;
-  onHeaderContextMenu?: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onContextMenu: (event: React.MouseEvent<HTMLDivElement>, path: string) => void;
+  onHeaderContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
   searchQuery: string;
   caseInsensitive: boolean;
 };
