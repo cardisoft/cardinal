@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { SortKey, SortState } from '../types/sort';
 import type { SlabIndex } from '../types/slab';
@@ -42,15 +42,12 @@ const persistSortThreshold = (value: number): void => {
 
 export type RemoteSortControls = {
   sortState: SortState;
-  setSortState: (next: SortState) => void;
-  sortedResults: SlabIndex[];
   displayedResults: SlabIndex[];
   displayedResultsVersion: number;
   sortThreshold: number;
   setSortThreshold: (value: number) => void;
   canSort: boolean;
   isSorting: boolean;
-  sortLimitLabel: string;
   sortDisabledTooltip: string | null;
   sortButtonsDisabled: boolean;
   handleSortToggle: (key: SortKey) => void;
@@ -67,8 +64,10 @@ export const useRemoteSort = (
   const [sortThreshold, setSortThresholdState] = useState<number>(() => readStoredSortThreshold());
   const [isSorting, setIsSorting] = useState(false);
   const sortRequestRef = useRef(0);
-  const displayedVersionRef = useRef(0);
-  const [displayedResultsVersion, setDisplayedResultsVersion] = useState(0);
+  const [displayedResultsVersion, bumpDisplayedResultsVersion] = useReducer(
+    (version: number) => version + 1,
+    0,
+  );
 
   const canSort = results.length > 0 && results.length <= sortThreshold;
   const shouldUseSortedResults = Boolean(sortState && canSort);
@@ -104,11 +103,6 @@ export const useRemoteSort = (
     }
   }, [canSort, sortState]);
 
-  const bumpDisplayedResultsVersion = useCallback(() => {
-    displayedVersionRef.current += 1;
-    setDisplayedResultsVersion(displayedVersionRef.current);
-  }, []);
-
   useEffect(() => {
     const requestId = sortRequestRef.current + 1;
     sortRequestRef.current = requestId;
@@ -141,11 +135,11 @@ export const useRemoteSort = (
 
   useEffect(() => {
     bumpDisplayedResultsVersion();
-  }, [resultsVersion, bumpDisplayedResultsVersion]);
+  }, [resultsVersion]);
 
   useEffect(() => {
     bumpDisplayedResultsVersion();
-  }, [shouldUseSortedResults, bumpDisplayedResultsVersion]);
+  }, [shouldUseSortedResults]);
 
   const sortLimitLabel = useMemo(
     () => new Intl.NumberFormat(locale).format(sortThreshold),
@@ -156,15 +150,12 @@ export const useRemoteSort = (
 
   return {
     sortState,
-    setSortState,
-    sortedResults,
     displayedResults,
     displayedResultsVersion,
     sortThreshold,
     setSortThreshold,
     canSort,
     isSorting,
-    sortLimitLabel,
     sortDisabledTooltip,
     sortButtonsDisabled,
     handleSortToggle,

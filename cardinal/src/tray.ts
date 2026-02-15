@@ -1,7 +1,7 @@
 import { defaultWindowIcon } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { Menu, MenuItem, PredefinedMenuItem } from '@tauri-apps/api/menu';
-import { TrayIcon, type TrayIconEvent, type TrayIconOptions } from '@tauri-apps/api/tray';
+import { TrayIcon, type TrayIconOptions } from '@tauri-apps/api/tray';
 import i18n from './i18n/config';
 import { QUICK_LAUNCH_SHORTCUT } from './utils/globalShortcuts';
 

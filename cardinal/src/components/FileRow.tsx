@@ -4,9 +4,10 @@ import { MiddleEllipsisHighlight } from './MiddleEllipsisHighlight';
 import { formatKB, formatTimestamp } from '../utils/format';
 import type { SearchResultItem } from '../types/search';
 import { startNativeFileDrag } from '../utils/drag';
+import { splitPath } from '../utils/path';
 
 type FileRowProps = {
-  item?: SearchResultItem;
+  item: SearchResultItem;
   rowIndex: number;
   style?: CSSProperties;
   onContextMenu?: (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => void;
@@ -32,31 +33,17 @@ export const FileRow = memo(function FileRow({
   selectedPathsForDrag = [],
   caseInsensitive,
   highlightTerms,
-}: FileRowProps): React.JSX.Element | null {
+}: FileRowProps): React.JSX.Element {
   const pendingSelectRef = useRef<{
     isShift: boolean;
     isMeta: boolean;
     isCtrl: boolean;
   } | null>(null);
 
-  if (!item) {
-    return null;
-  }
-
   const path = item.path;
-  let filename = '';
-  let directoryPath = '';
-
-  if (path) {
-    if (path === '/') {
-      directoryPath = '/';
-    } else {
-      // Split on either slash to support Windows and POSIX paths.
-      const parts = path.split(/[\\/]/);
-      filename = parts.pop() || '';
-      directoryPath = parts.join('/');
-    }
-  }
+  const pathParts = splitPath(path);
+  const filename = path === '/' ? '' : pathParts.name;
+  const directoryPath = pathParts.directory;
 
   const metadata = item.metadata;
   const mtimeSec = metadata?.mtime ?? item.mtime;
@@ -69,7 +56,7 @@ export const FileRow = memo(function FileRow({
   const handleContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (onContextMenu) {
-      onContextMenu(e, path ?? '', rowIndex);
+      onContextMenu(e, path, rowIndex);
     }
   };
 
@@ -129,8 +116,7 @@ export const FileRow = memo(function FileRow({
       }
 
       const isDraggingSelected = isSelected && selectedPathsForDrag.length > 0;
-      const pathsToDrag =
-        isDraggingSelected && selectedPathsForDrag.length > 0 ? selectedPathsForDrag : [path];
+      const pathsToDrag = isDraggingSelected ? selectedPathsForDrag : [path];
 
       dataTransfer.effectAllowed = 'copy';
       dataTransfer.setData('text/plain', pathsToDrag.join('\n'));
@@ -152,7 +138,7 @@ export const FileRow = memo(function FileRow({
     <div
       style={style}
       className={rowClassName}
-      data-row-path={path ?? undefined}
+      data-row-path={path}
       onContextMenu={handleContextMenu}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}

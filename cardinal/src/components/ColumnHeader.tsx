@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import { forwardRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import type { ColumnKey } from '../constants';
 import type { SortKey, SortState } from '../types/sort';
