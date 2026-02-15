@@ -13,7 +13,7 @@ import type { SortKey, SortState } from '../types/sort';
 type FilesTabContentProps = {
   headerRef: React.Ref<HTMLDivElement>;
   onResizeStart: (columnKey: ColumnKey) => (event: ReactMouseEvent<HTMLSpanElement>) => void;
-  onHeaderContextMenu?: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onHeaderContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
   displayState: DisplayState;
   searchErrorMessage: string | null;
   currentQuery: string;
@@ -28,11 +28,11 @@ type FilesTabContentProps = {
     rowStyle: CSSProperties,
   ) => ReactNode;
   onScrollSync: (scrollLeft: number) => void;
-  sortState?: SortState;
-  onSortToggle?: (sortKey: SortKey) => void;
-  sortDisabled?: boolean;
-  sortIndicatorMode?: 'triangle' | 'circle';
-  sortDisabledTooltip?: string | null;
+  sortState: SortState;
+  onSortToggle: (sortKey: SortKey) => void;
+  sortDisabled: boolean;
+  sortIndicatorMode: 'triangle' | 'circle';
+  sortDisabledTooltip: string | null;
 };
 
 export function FilesTabContent({
@@ -51,8 +51,8 @@ export function FilesTabContent({
   onScrollSync,
   sortState,
   onSortToggle,
-  sortDisabled = false,
-  sortIndicatorMode = 'triangle',
+  sortDisabled,
+  sortIndicatorMode,
   sortDisabledTooltip,
 }: FilesTabContentProps): React.JSX.Element {
   return (

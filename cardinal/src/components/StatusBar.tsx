@@ -10,12 +10,12 @@ type StatusBarProps = {
   scannedFiles: number;
   processedEvents: number;
   lifecycleState: AppLifecycleStatus;
-  searchDurationMs?: number | null;
-  resultCount?: number | null;
-  activeTab?: StatusTabKey;
-  onTabChange?: (tab: StatusTabKey) => void;
-  onRequestRescan?: () => void;
-  rescanErrorCount?: number;
+  searchDurationMs: number | null;
+  resultCount: number | null;
+  activeTab: StatusTabKey;
+  onTabChange: (tab: StatusTabKey) => void;
+  onRequestRescan: () => void;
+  rescanErrorCount: number;
 };
 
 const TABS: StatusTabKey[] = ['files', 'events'];
@@ -32,10 +32,10 @@ const StatusBar = ({
   lifecycleState,
   searchDurationMs,
   resultCount,
-  activeTab = 'files',
+  activeTab,
   onTabChange,
   onRequestRescan,
-  rescanErrorCount = 0,
+  rescanErrorCount,
 }: StatusBarProps): React.JSX.Element => {
   const { t } = useTranslation();
   const tabsRef = useRef<HTMLDivElement | null>(null);
@@ -67,18 +67,16 @@ const StatusBar = ({
   const handleSelect = useCallback(
     (tabKey: StatusTabKey) => {
       if (tabKey === activeTab) return;
-      onTabChange?.(tabKey);
+      onTabChange(tabKey);
     },
     [activeTab, onTabChange],
   );
 
-  const formattedResultCount =
-    typeof resultCount === 'number' ? resultCount.toLocaleString() : null;
   const resultsText =
     typeof resultCount === 'number'
       ? t('statusBar.resultsCount', {
           count: resultCount,
-          formatted: formattedResultCount ?? `${resultCount}`,
+          formatted: resultCount.toLocaleString(),
         })
       : t('statusBar.resultsUnavailable');
   const formattedDuration =
@@ -88,7 +86,7 @@ const StatusBar = ({
   const searchDisplay = durationText
     ? t('statusBar.resultsWithDuration', { results: resultsText, duration: durationText })
     : resultsText;
-  const lifecycleMeta = LIFECYCLE_META[lifecycleState] ?? LIFECYCLE_META.Initializing;
+  const lifecycleMeta = LIFECYCLE_META[lifecycleState];
   const lifecycleLabel =
     t(`statusBar.lifecycle.${lifecycleState}`) ?? t('statusBar.lifecycle.Initializing');
   const rescanDisabled = lifecycleState === 'Initializing';
@@ -108,7 +106,7 @@ const StatusBar = ({
     if (rescanDisabled) {
       return;
     }
-    onRequestRescan?.();
+    onRequestRescan();
   }, [onRequestRescan, rescanDisabled]);
 
   const handleOpenPreferences = useCallback(() => {

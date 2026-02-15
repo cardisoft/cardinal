@@ -6,12 +6,12 @@ type SearchBarProps = {
   placeholder: string;
   value: string;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
   caseSensitive: boolean;
   onToggleCaseSensitive: (event: ChangeEvent<HTMLInputElement>) => void;
   caseSensitiveLabel: string;
-  onFocus?: FocusEventHandler<HTMLInputElement>;
-  onBlur?: FocusEventHandler<HTMLInputElement>;
+  onFocus: FocusEventHandler<HTMLInputElement>;
+  onBlur: FocusEventHandler<HTMLInputElement>;
 };
 
 export function SearchBar({

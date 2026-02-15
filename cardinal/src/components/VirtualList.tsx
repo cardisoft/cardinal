@@ -111,7 +111,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   // Propagate horizontal scroll offset to the parent (keeps column headers aligned)
   const handleHorizontalScroll = useCallback(
     (e: ReactUIEvent<HTMLDivElement>) => {
-      if (onScrollSync) onScrollSync((e.target as HTMLDivElement).scrollLeft);
+      onScrollSync((e.target as HTMLDivElement).scrollLeft);
     },
     [onScrollSync],
   );

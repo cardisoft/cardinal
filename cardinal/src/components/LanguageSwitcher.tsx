@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { LANGUAGE_OPTIONS, normalizeLanguageTag } from '../i18n/config';
 
 type LanguageSwitcherProps = {
-  className?: string;
+  className: string;
 };
 
 const LanguageSwitcher = ({ className }: LanguageSwitcherProps): React.JSX.Element => {
