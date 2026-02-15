@@ -121,7 +121,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   // Ensure the data cache stays warm for the active window
   useEffect(() => {
     if (end >= start) ensureRangeLoaded(start, end);
-  }, [start, end, ensureRangeLoaded, resultsList, resultsVersion]);
+  }, [start, end, ensureRangeLoaded, resultsVersion]);
 
   // Track container height changes so virtualization recalculates the viewport
   useLayoutEffect(() => {
@@ -185,7 +185,16 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     [rowCount, rowHeight, viewportHeight, updateScrollAndRange],
   );
 
-  const getItemAt = useCallback((index: number) => cache.get(index), [cache]);
+  const getItemAt = useCallback(
+    (index: number) => {
+      const slabIndex = resultsList[index];
+      if (slabIndex == null) {
+        return undefined;
+      }
+      return cache.get(slabIndex);
+    },
+    [cache, resultsList],
+  );
 
   useImperativeHandle(
     ref,
@@ -206,7 +215,8 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     const baseTop = start * rowHeight - scrollTop;
     return Array.from({ length: end - start + 1 }, (_, i) => {
       const rowIndex = start + i;
-      const item = cache.get(rowIndex);
+      const slabIndex = resultsList[rowIndex];
+      const item = slabIndex == null ? undefined : cache.get(slabIndex);
       return renderRow(rowIndex, item, {
         position: 'absolute',
         top: baseTop + i * rowHeight,
@@ -215,7 +225,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
         right: 0,
       });
     });
-  }, [start, end, scrollTop, rowHeight, cache, renderRow]);
+  }, [start, end, scrollTop, rowHeight, cache, renderRow, resultsList]);
 
   // ----- render -----
   return (
