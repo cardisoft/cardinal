@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { calculateInitialColWidths, MAX_COL_WIDTH, MIN_COL_WIDTH } from '../constants';
 import type { ColumnKey } from '../constants';
+import { startColumnResizeDrag } from './resizeDrag';
 
 type ColumnWidths = Record<ColumnKey, number>;
 
@@ -11,39 +12,24 @@ export function useColumnResize() {
     return calculateInitialColWidths(windowWidth);
   });
 
+  const clampWidth = useCallback(
+    (value: number) => Math.max(MIN_COL_WIDTH, Math.min(MAX_COL_WIDTH, value)),
+    [],
+  );
+
   const onResizeStart = useCallback(
     (key: ColumnKey) => (e: ReactMouseEvent<HTMLSpanElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const resizerElement = e.currentTarget;
-      const startX = e.clientX;
       const startWidth = colWidths[key];
-
-      resizerElement.classList.add('col-resizer--dragging');
-
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        moveEvent.preventDefault();
-        document.body.style.cursor = 'col-resize';
-        const delta = moveEvent.clientX - startX;
-        const newWidth = Math.max(MIN_COL_WIDTH, Math.min(MAX_COL_WIDTH, startWidth + delta));
-        setColWidths((prev) => ({ ...prev, [key]: newWidth }));
-      };
-
-      const handleMouseUp = () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        document.body.style.userSelect = '';
-        document.body.style.cursor = '';
-        resizerElement.classList.remove('col-resizer--dragging');
-      };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.userSelect = 'none';
-      document.body.style.cursor = 'col-resize';
+      startColumnResizeDrag({
+        event: e,
+        startWidth,
+        clampWidth,
+        applyWidth: (newWidth) => {
+          setColWidths((prev) => ({ ...prev, [key]: newWidth }));
+        },
+      });
     },
-    [colWidths],
+    [clampWidth, colWidths],
   );
 
   const autoFitColumns = useCallback(() => {

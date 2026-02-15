@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { CONTAINER_PADDING, MAX_COL_WIDTH, MIN_COL_WIDTH } from '../constants';
+import { startColumnResizeDrag } from './resizeDrag';
 
 const clampWidth = (value: number): number =>
   Math.max(MIN_COL_WIDTH, Math.min(MAX_COL_WIDTH, value));
@@ -24,36 +25,15 @@ export function useEventColumnWidths() {
 
   const onEventResizeStart = useCallback(
     (e: ReactMouseEvent<HTMLSpanElement>, key: EventColumnKey) => {
-      // Reuse the existing DOM drag pattern from the files table to keep UX consistent.
-      e.preventDefault();
-      e.stopPropagation();
-
-      const resizerElement = e.currentTarget;
-      const startX = e.clientX;
       const startWidth = eventColWidths[key];
-
-      resizerElement.classList.add('col-resizer--dragging');
-
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        moveEvent.preventDefault();
-        document.body.style.cursor = 'col-resize';
-        const delta = moveEvent.clientX - startX;
-        const newWidth = clampWidth(startWidth + delta);
-        setEventColWidths((prev) => ({ ...prev, [key]: newWidth }));
-      };
-
-      const handleMouseUp = () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        document.body.style.userSelect = '';
-        document.body.style.cursor = '';
-        resizerElement.classList.remove('col-resizer--dragging');
-      };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.userSelect = 'none';
-      document.body.style.cursor = 'col-resize';
+      startColumnResizeDrag({
+        event: e,
+        startWidth,
+        clampWidth,
+        applyWidth: (newWidth) => {
+          setEventColWidths((prev) => ({ ...prev, [key]: newWidth }));
+        },
+      });
     },
     [eventColWidths],
   );
