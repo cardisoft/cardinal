@@ -3,7 +3,7 @@ import type { MutableRefObject } from 'react';
 import { describe, expect, it } from 'vitest';
 import type { VirtualListHandle } from '../../components/VirtualList';
 import type { SearchResultItem } from '../../types/search';
-import { toSlabIndexArray } from '../../types/slab';
+import type { SlabIndex } from '../../types/slab';
 import { useSelection } from '../useSelection';
 
 const createVirtualListRef = (
@@ -26,16 +26,11 @@ type SelectOptions = {
 
 const renderSelection = (initial: number[], initialVersion = 0) => {
   const virtualListRef = createVirtualListRef();
-  let currentResults = toSlabIndexArray(initial);
+  let currentResults = initial as unknown as SlabIndex[];
   let version = initialVersion;
   const hook = renderHook(
-    ({
-      results,
-      version: activeVersion,
-    }: {
-      results: ReturnType<typeof toSlabIndexArray>;
-      version: number;
-    }) => useSelection(results, activeVersion, virtualListRef),
+    ({ results, version: activeVersion }: { results: SlabIndex[]; version: number }) =>
+      useSelection(results, activeVersion, virtualListRef),
     { initialProps: { results: currentResults, version } },
   );
 
@@ -51,7 +46,7 @@ const renderSelection = (initial: number[], initialVersion = 0) => {
   };
 
   const rerenderResults = (next: number[], options?: { bumpVersion?: boolean }) => {
-    currentResults = toSlabIndexArray(next);
+    currentResults = next as unknown as SlabIndex[];
     act(() => {
       if (options?.bumpVersion !== false) {
         version += 1;
@@ -519,7 +514,9 @@ describe('useSelection', () => {
     it('does nothing when getItem returns undefined', () => {
       const virtualListRef = createVirtualListRef({ getItem: () => undefined });
 
-      const hook = renderHook(() => useSelection(toSlabIndexArray([0, 1, 2]), 0, virtualListRef));
+      const hook = renderHook(() =>
+        useSelection([0, 1, 2] as unknown as SlabIndex[], 0, virtualListRef),
+      );
 
       act(() => {
         hook.result.current.moveSelection(1);
@@ -604,7 +601,9 @@ describe('useSelection', () => {
     it('returns an empty array when virtualListRef is null', () => {
       const virtualListRef: MutableRefObject<VirtualListHandle | null> = { current: null };
 
-      const hook = renderHook(() => useSelection(toSlabIndexArray([0, 1, 2]), 0, virtualListRef));
+      const hook = renderHook(() =>
+        useSelection([0, 1, 2] as unknown as SlabIndex[], 0, virtualListRef),
+      );
 
       act(() => {
         hook.result.current.selectSingleRow(1);
@@ -624,7 +623,7 @@ describe('useSelection', () => {
       });
 
       const hook = renderHook(() =>
-        useSelection(toSlabIndexArray([0, 1, 2, 3]), 0, virtualListRef),
+        useSelection([0, 1, 2, 3] as unknown as SlabIndex[], 0, virtualListRef),
       );
 
       act(() => {

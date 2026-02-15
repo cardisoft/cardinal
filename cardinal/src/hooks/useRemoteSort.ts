@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { SortKey, SortState } from '../types/sort';
 import type { SlabIndex } from '../types/slab';
-import { toSlabIndexArray } from '../types/slab';
 
 const SORT_THRESHOLD_STORAGE_KEY = 'cardinal.sortThreshold';
 export const DEFAULT_SORTABLE_RESULT_THRESHOLD = 20000;
@@ -129,7 +128,7 @@ export const useRemoteSort = (
           sort: sortState,
         });
         if (sortRequestRef.current === requestId) {
-          setSortedResults(toSlabIndexArray(Array.isArray(ordered) ? ordered : []));
+          setSortedResults(ordered as SlabIndex[]);
           bumpDisplayedResultsVersion();
         }
       } finally {

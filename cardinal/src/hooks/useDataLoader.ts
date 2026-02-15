@@ -4,7 +4,6 @@ import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import type { NodeInfoResponse, SearchResultItem } from '../types/search';
 import type { SlabIndex } from '../types/slab';
-import { toSlabIndex } from '../types/slab';
 import type { IconUpdatePayload, IconUpdateWirePayload } from '../types/ipc';
 
 type IconUpdateEventPayload = readonly IconUpdateWirePayload[] | null | undefined;
@@ -72,7 +71,7 @@ export function useDataLoader(results: SlabIndex[]) {
           updates.forEach((update) => {
             if (update && typeof update.slabIndex === 'number') {
               normalized.push({
-                slabIndex: toSlabIndex(update.slabIndex),
+                slabIndex: update.slabIndex as SlabIndex,
                 icon: update.icon,
               });
             }
