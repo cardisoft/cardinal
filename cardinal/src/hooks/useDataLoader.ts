@@ -20,7 +20,7 @@ const fromNodeInfo = (node: NodeInfoResponse): SearchResultItem => ({
   icon: node.icon ?? undefined,
 });
 
-export function useDataLoader(results: SlabIndex[], resultsVersion: number) {
+export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) {
   const loadingRef = useRef<Set<SlabIndex>>(new Set());
   const versionRef = useRef(0);
   const cacheRef = useRef<DataLoaderCache>(new Map());
@@ -41,7 +41,7 @@ export function useDataLoader(results: SlabIndex[], resultsVersion: number) {
     const nextCache = new Map<SlabIndex, SearchResultItem>();
     cacheRef.current = nextCache;
     setCache(nextCache);
-  }, [resultsVersion]);
+  }, [dataResultsVersion]);
 
   useEffect(() => {
     let unlistenIconUpdate: UnlistenFn | undefined;

@@ -25,7 +25,8 @@ export type VirtualListHandle = {
 
 type VirtualListProps = {
   results: SlabIndex[];
-  resultsVersion: number;
+  dataResultsVersion: number;
+  displayedResultsVersion: number;
   rowHeight: number;
   overscan: number;
   renderRow: (
@@ -41,7 +42,8 @@ type VirtualListProps = {
 export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(function VirtualList(
   {
     results,
-    resultsVersion,
+    dataResultsVersion,
+    displayedResultsVersion,
     rowHeight,
     overscan,
     renderRow,
@@ -62,7 +64,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   const rowCount = results.length;
 
   // ----- data loader -----
-  const { cache, ensureRangeLoaded } = useDataLoader(results, resultsVersion);
+  const { cache, ensureRangeLoaded } = useDataLoader(results, dataResultsVersion);
 
   // Virtualized height powers the scrollbar math
   const totalHeight = rowCount * rowHeight;
@@ -120,7 +122,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   // Ensure the data cache stays warm for the active window
   useEffect(() => {
     if (end >= start) ensureRangeLoaded(start, end);
-  }, [start, end, ensureRangeLoaded, resultsVersion]);
+  }, [start, end, ensureRangeLoaded, displayedResultsVersion]);
 
   // Track container height changes so virtualization recalculates the viewport
   useLayoutEffect(() => {

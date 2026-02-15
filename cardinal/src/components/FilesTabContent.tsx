@@ -19,7 +19,8 @@ type FilesTabContentProps = {
   currentQuery: string;
   virtualListRef: React.Ref<VirtualListHandle>;
   results: SlabIndex[];
-  resultsVersion: number;
+  dataResultsVersion: number;
+  displayedResultsVersion: number;
   rowHeight: number;
   overscan: number;
   renderRow: (
@@ -44,7 +45,8 @@ export function FilesTabContent({
   currentQuery,
   virtualListRef,
   results,
-  resultsVersion,
+  dataResultsVersion,
+  displayedResultsVersion,
   rowHeight,
   overscan,
   renderRow,
@@ -74,7 +76,8 @@ export function FilesTabContent({
           <VirtualList
             ref={virtualListRef}
             results={results}
-            resultsVersion={resultsVersion}
+            dataResultsVersion={dataResultsVersion}
+            displayedResultsVersion={displayedResultsVersion}
             rowHeight={rowHeight}
             overscan={overscan}
             renderRow={renderRow}
