@@ -79,7 +79,6 @@ export function FilesTabContent({
             overscan={overscan}
             renderRow={renderRow}
             onScrollSync={onScrollSync}
-            className="virtual-list"
           />
         )}
       </div>

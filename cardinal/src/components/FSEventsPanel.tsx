@@ -1,7 +1,6 @@
 import React, {
   useCallback,
   useRef,
-  memo,
   useEffect,
   useImperativeHandle,
   forwardRef,
@@ -17,6 +16,7 @@ import { formatTimestamp } from '../utils/format';
 import { describeEventFlags } from '../utils/eventFlags';
 import type { RecentEventPayload } from '../types/ipc';
 import { useTranslation } from 'react-i18next';
+import { splitPath } from '../utils/path';
 
 const COLUMNS = [
   { key: 'time', labelKey: 'events.columns.time' },
@@ -41,23 +41,6 @@ type EventRowContext = {
 
 type EventRowProps = RowComponentProps<EventRowContext>;
 
-const splitPath = (path: string | undefined): { name: string; directory: string } => {
-  if (!path) {
-    return { name: '—', directory: '' };
-  }
-  const normalized = path.replace(/\\/g, '/');
-  if (normalized === '/') {
-    return { name: '/', directory: '/' };
-  }
-  const slashIndex = normalized.lastIndexOf('/');
-  if (slashIndex === -1) {
-    return { name: normalized, directory: '' };
-  }
-  const directory = normalized.slice(0, slashIndex) || '/';
-  const name = normalized.slice(slashIndex + 1) || normalized;
-  return { name, directory };
-};
-
 const EventRowBase = ({
   index,
   style,
@@ -68,11 +51,11 @@ const EventRowBase = ({
   ariaAttributes,
 }: EventRowProps): React.ReactElement => {
   const event = events[index];
-  const pathSource = event?.path ?? '';
+  const pathSource = event.path || '';
   const { name, directory } = splitPath(pathSource);
-  const timestamp = typeof event?.timestamp === 'number' ? event.timestamp : undefined;
+  const timestamp = event.timestamp;
   const formattedDate = formatTimestamp(timestamp) || '—';
-  const flagBits = event?.flagBits;
+  const flagBits = event.flagBits;
   const flagDetails = describeEventFlags(flagBits);
   const flagText = flagDetails.labels.join(' • ');
 
@@ -112,11 +95,6 @@ const EventRowBase = ({
     </div>
   );
 };
-
-const EventRow = memo(EventRowBase);
-EventRow.displayName = 'EventRow';
-
-const renderEventRow = (props: EventRowProps): React.ReactElement => <EventRow {...props} />;
 
 type FSEventsPanelProps = {
   events: FileSystemEvent[];
@@ -288,7 +266,7 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
           <div className="events-list-container" ref={listContainerRef}>
             <List
               listRef={attachScrollContainer}
-              rowComponent={renderEventRow}
+              rowComponent={EventRowBase}
               rowCount={events.length}
               rowHeight={ROW_HEIGHT}
               rowProps={rowProps}

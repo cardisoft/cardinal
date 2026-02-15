@@ -4,12 +4,13 @@ import type { SlabIndex } from '../types/slab';
 
 type UseIconViewportProps = {
   results: SlabIndex[];
+  resultsVersion: number;
   start: number;
   end: number;
 };
 
 // Deduplicates and throttles icon viewport updates to the backend.
-export function useIconViewport({ results, start, end }: UseIconViewportProps) {
+export function useIconViewport({ results, resultsVersion, start, end }: UseIconViewportProps) {
   const requestIdRef = useRef(0);
   const lastRangeRef = useRef<{ start: number; end: number } | null>(null);
   const pendingRef = useRef<SlabIndex[] | null>(null);
@@ -37,7 +38,7 @@ export function useIconViewport({ results, start, end }: UseIconViewportProps) {
   useEffect(() => {
     // Reset tracking when the source list identity changes.
     lastRangeRef.current = null;
-  }, [results]);
+  }, [resultsVersion]);
 
   useEffect(() => {
     const clampedStart = Math.max(0, start);

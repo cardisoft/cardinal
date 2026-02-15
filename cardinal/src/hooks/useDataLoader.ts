@@ -94,6 +94,10 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
     };
   }, []);
 
+  const releaseLoadingBatch = useCallback((slabIndices: readonly SlabIndex[]) => {
+    slabIndices.forEach((slabIndex) => loadingRef.current.delete(slabIndex));
+  }, []);
+
   const ensureRangeLoaded = useCallback(async (start: number, end: number) => {
     const list = resultsRef.current;
     const total = list.length;
@@ -110,7 +114,7 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
     const versionAtRequest = versionRef.current;
     const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', { results: needLoading });
     if (versionRef.current !== versionAtRequest) {
-      needLoading.forEach((slabIndex) => loadingRef.current.delete(slabIndex));
+      releaseLoadingBatch(needLoading);
       return;
     }
     setCache((prev) => {
@@ -150,7 +154,7 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
       cacheRef.current = nextCache;
       return nextCache;
     });
-  }, []);
+  }, [releaseLoadingBatch]);
 
   return { cache, ensureRangeLoaded };
 }
