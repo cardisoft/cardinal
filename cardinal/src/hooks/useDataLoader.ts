@@ -94,63 +94,70 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
     };
   }, []);
 
-  const ensureRangeLoaded = useCallback(async (start: number, end: number) => {
-    const list = resultsRef.current;
-    const total = list.length;
-    if (start < 0 || end < start || total === 0) return;
-    const needLoading: SlabIndex[] = [];
-    for (let i = start; i <= end && i < total; i++) {
-      const slabIndex = list[i];
-      if (!cacheRef.current.has(slabIndex) && !loadingRef.current.has(slabIndex)) {
-        needLoading.push(slabIndex);
-        loadingRef.current.add(slabIndex);
-      }
-    }
-    if (needLoading.length === 0) return;
-    const versionAtRequest = versionRef.current;
-    const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', { results: needLoading });
-    if (versionRef.current !== versionAtRequest) {
-      needLoading.forEach((slabIndex) => loadingRef.current.delete(slabIndex));
-      return;
-    }
-    setCache((prev) => {
-      if (versionRef.current !== versionAtRequest) return prev;
-      let nextCache: DataLoaderCache | null = null;
+  const releaseLoadingBatch = useCallback((slabIndices: readonly SlabIndex[]) => {
+    slabIndices.forEach((slabIndex) => loadingRef.current.delete(slabIndex));
+  }, []);
 
-      needLoading.forEach((slabIndex, idx) => {
-        const fetchedItem = fetched[idx];
-        loadingRef.current.delete(slabIndex);
-        if (!fetchedItem) {
-          return;
+  const ensureRangeLoaded = useCallback(
+    async (start: number, end: number) => {
+      const list = resultsRef.current;
+      const total = list.length;
+      if (start < 0 || end < start || total === 0) return;
+      const needLoading: SlabIndex[] = [];
+      for (let i = start; i <= end && i < total; i++) {
+        const slabIndex = list[i];
+        if (!cacheRef.current.has(slabIndex) && !loadingRef.current.has(slabIndex)) {
+          needLoading.push(slabIndex);
+          loadingRef.current.add(slabIndex);
         }
+      }
+      if (needLoading.length === 0) return;
+      const versionAtRequest = versionRef.current;
+      const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', { results: needLoading });
+      if (versionRef.current !== versionAtRequest) {
+        releaseLoadingBatch(needLoading);
+        return;
+      }
+      setCache((prev) => {
+        if (versionRef.current !== versionAtRequest) return prev;
+        let nextCache: DataLoaderCache | null = null;
 
-        const normalizedItem = fromNodeInfo(fetchedItem);
-        const existing = prev.get(slabIndex);
-        const hasOverride = iconOverridesRef.current.has(slabIndex);
-        const preferredIcon = hasOverride
-          ? iconOverridesRef.current.get(slabIndex)
-          : (existing?.icon ?? normalizedItem.icon);
+        needLoading.forEach((slabIndex, idx) => {
+          const fetchedItem = fetched[idx];
+          loadingRef.current.delete(slabIndex);
+          if (!fetchedItem) {
+            return;
+          }
 
-        const mergedItem =
-          preferredIcon === normalizedItem.icon
-            ? normalizedItem
-            : { ...normalizedItem, icon: preferredIcon };
+          const normalizedItem = fromNodeInfo(fetchedItem);
+          const existing = prev.get(slabIndex);
+          const hasOverride = iconOverridesRef.current.has(slabIndex);
+          const preferredIcon = hasOverride
+            ? iconOverridesRef.current.get(slabIndex)
+            : (existing?.icon ?? normalizedItem.icon);
+
+          const mergedItem =
+            preferredIcon === normalizedItem.icon
+              ? normalizedItem
+              : { ...normalizedItem, icon: preferredIcon };
+
+          if (nextCache === null) {
+            nextCache = new Map(prev);
+          }
+
+          nextCache.set(slabIndex, mergedItem);
+        });
 
         if (nextCache === null) {
-          nextCache = new Map(prev);
+          return prev;
         }
 
-        nextCache.set(slabIndex, mergedItem);
+        cacheRef.current = nextCache;
+        return nextCache;
       });
-
-      if (nextCache === null) {
-        return prev;
-      }
-
-      cacheRef.current = nextCache;
-      return nextCache;
-    });
-  }, []);
+    },
+    [releaseLoadingBatch],
+  );
 
   return { cache, ensureRangeLoaded };
 }

@@ -6,6 +6,8 @@ import type { SearchResultItem } from '../../types/search';
 import type { SlabIndex } from '../../types/slab';
 import { useSelection } from '../useSelection';
 
+const toSlabIndex = (value: number): SlabIndex => value as SlabIndex;
+
 const createVirtualListRef = (
   overrides?: Partial<VirtualListHandle>,
 ): MutableRefObject<VirtualListHandle | null> => ({
@@ -24,9 +26,16 @@ type SelectOptions = {
   isCtrl?: boolean;
 };
 
+const shiftClick = (selectRow: (rowIndex: number, options?: SelectOptions) => void, row: number) =>
+  selectRow(row, { isShift: true });
+const metaClick = (selectRow: (rowIndex: number, options?: SelectOptions) => void, row: number) =>
+  selectRow(row, { isMeta: true });
+const ctrlClick = (selectRow: (rowIndex: number, options?: SelectOptions) => void, row: number) =>
+  selectRow(row, { isCtrl: true });
+
 const renderSelection = (initial: number[], initialVersion = 0) => {
   const virtualListRef = createVirtualListRef();
-  let currentResults = initial as unknown as SlabIndex[];
+  let currentResults = initial.map(toSlabIndex);
   let version = initialVersion;
   const hook = renderHook(
     ({ results, version: activeVersion }: { results: SlabIndex[]; version: number }) =>
@@ -46,7 +55,7 @@ const renderSelection = (initial: number[], initialVersion = 0) => {
   };
 
   const rerenderResults = (next: number[], options?: { bumpVersion?: boolean }) => {
-    currentResults = next as unknown as SlabIndex[];
+    currentResults = next.map(toSlabIndex);
     act(() => {
       if (options?.bumpVersion !== false) {
         version += 1;
@@ -72,7 +81,7 @@ describe('useSelection', () => {
     selectRow(2);
     expect(result.current.shiftAnchorIndex).toBe(2);
 
-    selectRow(4, { isShift: true });
+    shiftClick(selectRow, 4);
 
     expect(result.current.selectedIndices).toEqual([2, 3, 4]);
     expect(result.current.shiftAnchorIndex).toBe(2);
@@ -110,19 +119,19 @@ describe('useSelection', () => {
     selectRow(1);
     expect(result.current.selectedIndices).toEqual([1]);
 
-    selectRow(3, { isMeta: true });
+    metaClick(selectRow, 3);
     expect(result.current.selectedIndices).toEqual([1, 3]);
     expect(result.current.shiftAnchorIndex).toBe(3);
 
-    selectRow(3, { isMeta: true });
+    metaClick(selectRow, 3);
     expect(result.current.selectedIndices).toEqual([1]);
     expect(result.current.shiftAnchorIndex).toBe(1);
 
-    selectRow(5, { isShift: true });
+    shiftClick(selectRow, 5);
     expect(result.current.selectedIndices).toEqual([1, 2, 3, 4, 5]);
     expect(result.current.shiftAnchorIndex).toBe(1);
 
-    selectRow(6, { isCtrl: true });
+    ctrlClick(selectRow, 6);
     expect(result.current.selectedIndices).toEqual([1, 2, 3, 4, 5, 6]);
     expect(result.current.shiftAnchorIndex).toBe(6);
   });
@@ -132,7 +141,7 @@ describe('useSelection', () => {
 
     expect(result.current.shiftAnchorIndex).toBeNull();
 
-    selectRow(3, { isShift: true });
+    shiftClick(selectRow, 3);
 
     expect(result.current.selectedIndices).toEqual([3]);
     expect(result.current.shiftAnchorIndex).toBe(3);
@@ -151,7 +160,7 @@ describe('useSelection', () => {
     expect(result.current.selectedIndices).toEqual([]);
     expect(result.current.shiftAnchorIndex).toBeNull();
 
-    selectRow(4, { isShift: true });
+    shiftClick(selectRow, 4);
     expect(result.current.selectedIndices).toEqual([4]);
     expect(result.current.shiftAnchorIndex).toBe(4);
   });
@@ -211,7 +220,7 @@ describe('useSelection', () => {
     const { result, selectRow, rerenderResults } = renderSelection([0, 1, 2, 3, 4]);
 
     selectRow(1);
-    selectRow(3, { isShift: true });
+    shiftClick(selectRow, 3);
     expect(result.current.selectedIndices).toEqual([1, 2, 3]);
 
     rerenderResults([4, 5, 6, 7]);
@@ -246,7 +255,7 @@ describe('useSelection', () => {
       selectRow(4);
       expect(result.current.shiftAnchorIndex).toBe(4);
 
-      selectRow(1, { isShift: true });
+      shiftClick(selectRow, 1);
 
       expect(result.current.selectedIndices).toEqual([1, 2, 3, 4]);
       expect(result.current.shiftAnchorIndex).toBe(4);
@@ -256,7 +265,7 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3]);
 
       selectRow(2);
-      selectRow(2, { isShift: true });
+      shiftClick(selectRow, 2);
 
       expect(result.current.selectedIndices).toEqual([2]);
       expect(result.current.shiftAnchorIndex).toBe(2);
@@ -266,7 +275,7 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
 
       selectRow(3);
-      selectRow(0, { isShift: true });
+      shiftClick(selectRow, 0);
 
       expect(result.current.selectedIndices).toEqual([0, 1, 2, 3]);
     });
@@ -275,7 +284,7 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
 
       selectRow(1);
-      selectRow(4, { isShift: true });
+      shiftClick(selectRow, 4);
 
       expect(result.current.selectedIndices).toEqual([1, 2, 3, 4]);
     });
@@ -284,10 +293,10 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5]);
 
       selectRow(2);
-      selectRow(4, { isShift: true });
+      shiftClick(selectRow, 4);
       expect(result.current.selectedIndices).toEqual([2, 3, 4]);
 
-      selectRow(0, { isShift: true });
+      shiftClick(selectRow, 0);
       expect(result.current.selectedIndices).toEqual([0, 1, 2]);
       expect(result.current.shiftAnchorIndex).toBe(2);
     });
@@ -300,7 +309,7 @@ describe('useSelection', () => {
       selectRow(1);
       expect(result.current.selectedIndices).toEqual([1]);
 
-      selectRow(1, { isMeta: true });
+      metaClick(selectRow, 1);
       expect(result.current.selectedIndices).toEqual([]);
       expect(result.current.shiftAnchorIndex).toBeNull();
     });
@@ -309,8 +318,8 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
 
       selectRow(0);
-      selectRow(2, { isMeta: true });
-      selectRow(4, { isMeta: true });
+      metaClick(selectRow, 2);
+      metaClick(selectRow, 4);
 
       expect(result.current.selectedIndices).toEqual([0, 2, 4]);
       expect(result.current.shiftAnchorIndex).toBe(4);
@@ -320,7 +329,7 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3]);
 
       selectRow(1);
-      selectRow(3, { isCtrl: true });
+      ctrlClick(selectRow, 3);
 
       expect(result.current.selectedIndices).toEqual([1, 3]);
       expect(result.current.shiftAnchorIndex).toBe(3);
@@ -330,13 +339,13 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
 
       selectRow(1);
-      selectRow(2, { isMeta: true });
-      selectRow(3, { isMeta: true });
+      metaClick(selectRow, 2);
+      metaClick(selectRow, 3);
       expect(result.current.selectedIndices).toEqual([1, 2, 3]);
       expect(result.current.shiftAnchorIndex).toBe(3);
 
       // Deselect anchor (3), should move to next below (none), then up to 2
-      selectRow(3, { isMeta: true });
+      metaClick(selectRow, 3);
       expect(result.current.selectedIndices).toEqual([1, 2]);
       expect(result.current.shiftAnchorIndex).toBe(2);
     });
@@ -345,13 +354,13 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5]);
 
       selectRow(1);
-      selectRow(3, { isMeta: true });
-      selectRow(5, { isMeta: true });
+      metaClick(selectRow, 3);
+      metaClick(selectRow, 5);
       expect(result.current.selectedIndices).toEqual([1, 3, 5]);
       expect(result.current.shiftAnchorIndex).toBe(5);
 
       // Deselect the anchor (5), should move to next below (none), then check upward (3)
-      selectRow(5, { isMeta: true });
+      metaClick(selectRow, 5);
       expect(result.current.selectedIndices).toEqual([1, 3]);
       expect(result.current.shiftAnchorIndex).toBe(3);
     });
@@ -360,19 +369,19 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6, 7]);
 
       selectRow(1);
-      selectRow(3, { isMeta: true });
-      selectRow(5, { isMeta: true });
-      selectRow(7, { isMeta: true });
+      metaClick(selectRow, 3);
+      metaClick(selectRow, 5);
+      metaClick(selectRow, 7);
       expect(result.current.selectedIndices).toEqual([1, 3, 5, 7]);
       expect(result.current.shiftAnchorIndex).toBe(7);
 
       // Change anchor by adding 5
-      selectRow(5, { isMeta: true });
-      selectRow(5, { isMeta: true });
+      metaClick(selectRow, 5);
+      metaClick(selectRow, 5);
       expect(result.current.shiftAnchorIndex).toBe(5);
 
       // Deselect the anchor (5), should move to next below (7), not upward
-      selectRow(5, { isMeta: true });
+      metaClick(selectRow, 5);
       expect(result.current.selectedIndices).toEqual([1, 3, 7]);
       expect(result.current.shiftAnchorIndex).toBe(7);
     });
@@ -381,16 +390,16 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6]);
 
       selectRow(1);
-      selectRow(3, { isMeta: true });
-      selectRow(5, { isMeta: true });
+      metaClick(selectRow, 3);
+      metaClick(selectRow, 5);
       expect(result.current.shiftAnchorIndex).toBe(5);
 
       // Deselect row 3, but it's not the anchor, so anchor stays at 5
-      selectRow(3, { isMeta: true });
+      metaClick(selectRow, 3);
       expect(result.current.shiftAnchorIndex).toBe(5);
 
       // Now deselect the current anchor (5), should move to the next selected below (none), then up to 1
-      selectRow(5, { isMeta: true });
+      metaClick(selectRow, 5);
       expect(result.current.selectedIndices).toEqual([1]);
       expect(result.current.shiftAnchorIndex).toBe(1);
     });
@@ -401,7 +410,7 @@ describe('useSelection', () => {
       selectRow(2);
       expect(result.current.shiftAnchorIndex).toBe(2);
 
-      selectRow(2, { isMeta: true });
+      metaClick(selectRow, 2);
       expect(result.current.selectedIndices).toEqual([]);
       expect(result.current.shiftAnchorIndex).toBeNull();
     });
@@ -410,10 +419,10 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6]);
 
       selectRow(1);
-      selectRow(3, { isMeta: true });
+      metaClick(selectRow, 3);
       expect(result.current.shiftAnchorIndex).toBe(3);
 
-      selectRow(5, { isShift: true });
+      shiftClick(selectRow, 5);
       expect(result.current.selectedIndices).toEqual([3, 4, 5]);
     });
 
@@ -421,17 +430,17 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6, 7]);
 
       selectRow(2);
-      selectRow(4, { isMeta: true });
-      selectRow(6, { isMeta: true });
+      metaClick(selectRow, 4);
+      metaClick(selectRow, 6);
       expect(result.current.selectedIndices).toEqual([2, 4, 6]);
       expect(result.current.shiftAnchorIndex).toBe(6);
 
       // Deselect the anchor (6), anchor moves to next selected below (none), then up to 4
-      selectRow(6, { isMeta: true });
+      metaClick(selectRow, 6);
       expect(result.current.shiftAnchorIndex).toBe(4);
 
       // Now shift-select from the new anchor (4) to 7
-      selectRow(7, { isShift: true });
+      shiftClick(selectRow, 7);
       expect(result.current.selectedIndices).toEqual([4, 5, 6, 7]);
     });
   });
@@ -500,7 +509,7 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
 
       selectRow(1);
-      selectRow(3, { isShift: true });
+      shiftClick(selectRow, 3);
       expect(result.current.selectedIndices).toEqual([1, 2, 3]);
 
       act(() => {
@@ -515,7 +524,7 @@ describe('useSelection', () => {
       const virtualListRef = createVirtualListRef({ getItem: () => undefined });
 
       const hook = renderHook(() =>
-        useSelection([0, 1, 2] as unknown as SlabIndex[], 0, virtualListRef),
+        useSelection([toSlabIndex(0), toSlabIndex(1), toSlabIndex(2)], 0, virtualListRef),
       );
 
       act(() => {
@@ -570,7 +579,7 @@ describe('useSelection', () => {
       const { result, selectRow, bumpVersion } = renderSelection([0, 1, 2, 3, 4, 5]);
 
       selectRow(1);
-      selectRow(4, { isShift: true });
+      shiftClick(selectRow, 4);
       expect(result.current.selectedIndices).toEqual([1, 2, 3, 4]);
       expect(result.current.shiftAnchorIndex).toBe(1);
 
@@ -593,7 +602,7 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
 
       selectRow(1);
-      selectRow(3, { isMeta: true });
+      metaClick(selectRow, 3);
 
       expect(result.current.selectedPaths).toEqual(['item-1', 'item-3']);
     });
@@ -602,7 +611,7 @@ describe('useSelection', () => {
       const virtualListRef: MutableRefObject<VirtualListHandle | null> = { current: null };
 
       const hook = renderHook(() =>
-        useSelection([0, 1, 2] as unknown as SlabIndex[], 0, virtualListRef),
+        useSelection([toSlabIndex(0), toSlabIndex(1), toSlabIndex(2)], 0, virtualListRef),
       );
 
       act(() => {
@@ -623,7 +632,11 @@ describe('useSelection', () => {
       });
 
       const hook = renderHook(() =>
-        useSelection([0, 1, 2, 3] as unknown as SlabIndex[], 0, virtualListRef),
+        useSelection(
+          [toSlabIndex(0), toSlabIndex(1), toSlabIndex(2), toSlabIndex(3)],
+          0,
+          virtualListRef,
+        ),
       );
 
       act(() => {
@@ -653,10 +666,10 @@ describe('useSelection', () => {
       selectRow(0);
       expect(result.current.selectedPaths).toEqual(['item-0']);
 
-      selectRow(2, { isMeta: true });
+      metaClick(selectRow, 2);
       expect(result.current.selectedPaths).toEqual(['item-0', 'item-2']);
 
-      selectRow(0, { isMeta: true });
+      metaClick(selectRow, 0);
       expect(result.current.selectedPaths).toEqual(['item-2']);
     });
   });
@@ -670,7 +683,7 @@ describe('useSelection', () => {
       selectRow(1);
       expect(result.current.selectedIndicesRef.current).toEqual([1]);
 
-      selectRow(3, { isMeta: true });
+      metaClick(selectRow, 3);
       expect(result.current.selectedIndicesRef.current).toEqual([1, 3]);
 
       act(() => {
@@ -685,10 +698,10 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6, 7]);
 
       selectRow(2);
-      selectRow(4, { isMeta: true });
+      metaClick(selectRow, 4);
       expect(result.current.selectedIndices).toEqual([2, 4]);
 
-      selectRow(6, { isShift: true });
+      shiftClick(selectRow, 6);
       expect(result.current.selectedIndices).toEqual([4, 5, 6]);
 
       selectRow(1);
@@ -700,14 +713,14 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6, 7, 8]);
 
       selectRow(2);
-      selectRow(4, { isShift: true });
+      shiftClick(selectRow, 4);
       expect(result.current.selectedIndices).toEqual([2, 3, 4]);
 
-      selectRow(6, { isMeta: true });
+      metaClick(selectRow, 6);
       expect(result.current.selectedIndices).toEqual([2, 3, 4, 6]);
       expect(result.current.shiftAnchorIndex).toBe(6);
 
-      selectRow(8, { isShift: true });
+      shiftClick(selectRow, 8);
       expect(result.current.selectedIndices).toEqual([6, 7, 8]);
     });
 
@@ -715,8 +728,8 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4, 5, 6]);
 
       selectRow(1);
-      selectRow(3, { isMeta: true });
-      selectRow(5, { isMeta: true });
+      metaClick(selectRow, 3);
+      metaClick(selectRow, 5);
       expect(result.current.selectedIndices).toEqual([1, 3, 5]);
       expect(result.current.activeRowIndex).toBe(5);
 
@@ -734,10 +747,10 @@ describe('useSelection', () => {
       selectRow(1);
       expect(result.current.activeRowIndex).toBe(1);
 
-      selectRow(3, { isMeta: true });
+      metaClick(selectRow, 3);
       expect(result.current.activeRowIndex).toBe(3);
 
-      selectRow(3, { isMeta: true });
+      metaClick(selectRow, 3);
       expect(result.current.activeRowIndex).toBe(3);
     });
 
@@ -745,7 +758,7 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0, 1, 2, 3, 4]);
 
       selectRow(1);
-      selectRow(3, { isShift: true });
+      shiftClick(selectRow, 3);
       expect(result.current.selectedIndices).toEqual([1, 2, 3]);
 
       act(() => {
@@ -797,7 +810,7 @@ describe('useSelection', () => {
       const { result, selectRow } = renderSelection([0]);
 
       selectRow(0);
-      selectRow(0, { isShift: true });
+      shiftClick(selectRow, 0);
 
       expect(result.current.selectedIndices).toEqual([0]);
     });

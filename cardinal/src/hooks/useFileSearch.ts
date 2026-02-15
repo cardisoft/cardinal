@@ -151,9 +151,6 @@ type UseFileSearchResult = {
   searchParams: SearchParams;
   updateSearchParams: (patch: Partial<SearchParams>) => void;
   queueSearch: (query: string, options?: QueueSearchOptions) => void;
-  handleSearch: (overrides?: Partial<SearchParams>) => Promise<void>;
-  resetSearchQuery: () => void;
-  cancelPendingSearches: () => void;
   handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
   setLifecycleState: (status: AppLifecycleStatus) => void;
   requestRescan: () => Promise<void>;
@@ -308,11 +305,6 @@ export function useFileSearch(): UseFileSearchResult {
     [cancelPendingSearches, handleSearch, updateSearchParams],
   );
 
-  const resetSearchQuery = useCallback(() => {
-    updateSearchParams({ query: '' });
-    cancelPendingSearches();
-  }, [cancelPendingSearches, updateSearchParams]);
-
   useEffect(() => cancelPendingSearches, [cancelPendingSearches]);
 
   useEffect(() => {
@@ -337,9 +329,6 @@ export function useFileSearch(): UseFileSearchResult {
     searchParams,
     updateSearchParams,
     queueSearch,
-    handleSearch,
-    resetSearchQuery,
-    cancelPendingSearches,
     handleStatusUpdate,
     setLifecycleState,
     requestRescan,

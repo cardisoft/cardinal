@@ -6,7 +6,7 @@ import type {
   MouseEvent as ReactMouseEvent,
 } from 'react';
 import './App.css';
-import { FileRowRenderer } from './components/FileRowRenderer';
+import { FileRow } from './components/FileRow';
 import { SearchBar } from './components/SearchBar';
 import { FilesTabContent } from './components/FilesTabContent';
 import { PermissionOverlay } from './components/PermissionOverlay';
@@ -30,7 +30,7 @@ import FSEventsPanel from './components/FSEventsPanel';
 import type { FSEventsPanelHandle } from './components/FSEventsPanel';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { primaryMonitor, getCurrentWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { DragDropEvent } from '@tauri-apps/api/window';
 import type { Event as TauriEvent } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
@@ -59,11 +59,6 @@ type QuickLookKeydownPayload = {
     option: boolean;
     command: boolean;
   };
-};
-
-type WindowGeometry = {
-  windowOrigin: { x: number; y: number };
-  mainScreenHeight: number;
 };
 
 const isEditableTarget = (target: EventTarget | null): boolean => {
@@ -113,9 +108,8 @@ function App() {
   const virtualListRef = useRef<VirtualListHandle | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const isMountedRef = useRef(false);
-  const keyboardStateRef = useRef<{ activeTab: ActiveTab; activePath: string | null }>({
+  const keyboardStateRef = useRef<{ activeTab: ActiveTab }>({
     activeTab,
-    activePath: null,
   });
   const {
     handleInputChange: updateHistoryFromInput,
@@ -137,8 +131,6 @@ function App() {
     displayedResultsVersion,
     sortThreshold,
     setSortThreshold,
-    canSort,
-    isSorting,
     sortDisabledTooltip,
     sortButtonsDisabled,
     handleSortToggle,
@@ -198,16 +190,9 @@ function App() {
     void setTrayEnabled(trayIconEnabled);
   }, [trayIconEnabled]);
 
-  const activePath =
-    activeRowIndex !== null
-      ? (virtualListRef.current?.getItem?.(activeRowIndex)?.path ?? null)
-      : null;
   useEffect(() => {
     keyboardStateRef.current.activeTab = activeTab;
   }, [activeTab]);
-  useEffect(() => {
-    keyboardStateRef.current.activePath = activePath;
-  }, [activePath]);
 
   useEffect(() => {
     if (isCheckingFullDiskAccess) {
@@ -269,44 +254,42 @@ function App() {
     });
   }, []);
   const focusSearchInputStable = useStableEvent(focusSearchInput);
-  const handleMetaShortcut = useStableEvent(
-    (event: KeyboardEvent, currentTab: ActiveTab, currentPath: string | null) => {
-      const key = event.key.toLowerCase();
-      if (key === 'f') {
-        event.preventDefault();
-        focusSearchInputStable();
-        return true;
-      }
+  const handleMetaShortcut = useStableEvent((event: KeyboardEvent, currentTab: ActiveTab) => {
+    const key = event.key.toLowerCase();
+    if (key === 'f') {
+      event.preventDefault();
+      focusSearchInputStable();
+      return true;
+    }
 
-      if (currentTab !== 'files') {
-        return false;
-      }
-
-      if (key === 'r' && selectedPaths.length > 0) {
-        event.preventDefault();
-        selectedPaths.forEach((path) => {
-          void invoke('open_in_finder', { path });
-        });
-        return true;
-      }
-
-      if (key === 'o' && selectedPaths.length > 0) {
-        event.preventDefault();
-        selectedPaths.forEach((path) => openResultPath(path));
-        return true;
-      }
-
-      if (key === 'c' && selectedPaths.length > 0) {
-        event.preventDefault();
-        void invoke('copy_files_to_clipboard', { paths: selectedPaths }).catch((error) => {
-          console.error('Failed to copy files to clipboard', error);
-        });
-        return true;
-      }
-
+    if (currentTab !== 'files') {
       return false;
-    },
-  );
+    }
+
+    if (key === 'r' && selectedPaths.length > 0) {
+      event.preventDefault();
+      selectedPaths.forEach((path) => {
+        void invoke('open_in_finder', { path });
+      });
+      return true;
+    }
+
+    if (key === 'o' && selectedPaths.length > 0) {
+      event.preventDefault();
+      selectedPaths.forEach((path) => openResultPath(path));
+      return true;
+    }
+
+    if (key === 'c' && selectedPaths.length > 0) {
+      event.preventDefault();
+      void invoke('copy_files_to_clipboard', { paths: selectedPaths }).catch((error) => {
+        console.error('Failed to copy files to clipboard', error);
+      });
+      return true;
+    }
+
+    return false;
+  });
 
   const handleFilesNavigation = useStableEvent((event: KeyboardEvent) => {
     const target = event.target as HTMLElement | null;
@@ -440,9 +423,9 @@ function App() {
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      const { activeTab: currentTab, activePath: currentPath } = keyboardStateRef.current;
+      const { activeTab: currentTab } = keyboardStateRef.current;
 
-      if (event.metaKey && handleMetaShortcut(event, currentTab, currentPath)) {
+      if (event.metaKey && handleMetaShortcut(event, currentTab)) {
         return;
       }
 
@@ -645,16 +628,16 @@ function App() {
       }
 
       return (
-        <FileRowRenderer
+        <FileRow
           key={item.path}
           rowIndex={rowIndex}
           item={item}
-          style={rowStyle}
+          style={{ ...rowStyle, width: 'var(--columns-total)' }}
           isSelected={selectedIndexSet.has(rowIndex)}
-          selectedPaths={selectedPaths}
+          selectedPathsForDrag={selectedPaths}
           caseInsensitive={!caseSensitive}
           highlightTerms={highlightTerms}
-          onContextMenu={(event, contextPath) => handleRowContextMenu(event, contextPath, rowIndex)}
+          onContextMenu={handleRowContextMenu}
           onSelect={handleRowSelect}
           onOpen={openResultPath}
         />
@@ -707,20 +690,24 @@ function App() {
 
   const searchInputValue = activeTab === 'events' ? eventFilterQuery : searchParams.query;
 
-  const containerStyle = {
-    '--w-filename': `${colWidths.filename}px`,
-    '--w-path': `${colWidths.path}px`,
-    '--w-size': `${colWidths.size}px`,
-    '--w-modified': `${colWidths.modified}px`,
-    '--w-created': `${colWidths.created}px`,
-    '--w-event-flags': `${eventColWidths.event}px`,
-    '--w-event-name': `${eventColWidths.name}px`,
-    '--w-event-path': `${eventColWidths.path}px`,
-    '--w-event-time': `${eventColWidths.time}px`,
-    '--columns-events-total': `${
-      eventColWidths.event + eventColWidths.name + eventColWidths.path + eventColWidths.time
-    }px`,
-  } as CSSProperties;
+  const containerStyle = useMemo(
+    () =>
+      ({
+        '--w-filename': `${colWidths.filename}px`,
+        '--w-path': `${colWidths.path}px`,
+        '--w-size': `${colWidths.size}px`,
+        '--w-modified': `${colWidths.modified}px`,
+        '--w-created': `${colWidths.created}px`,
+        '--w-event-flags': `${eventColWidths.event}px`,
+        '--w-event-name': `${eventColWidths.name}px`,
+        '--w-event-path': `${eventColWidths.path}px`,
+        '--w-event-time': `${eventColWidths.time}px`,
+        '--columns-events-total': `${
+          eventColWidths.event + eventColWidths.name + eventColWidths.path + eventColWidths.time
+        }px`,
+      }) as CSSProperties,
+    [colWidths, eventColWidths],
+  );
 
   const showFullDiskAccessOverlay = fullDiskAccessStatus === 'denied';
   const overlayStatusMessage = isCheckingFullDiskAccess

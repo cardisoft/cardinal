@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useLayoutEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { AppLifecycleStatus } from '../types/ipc';
 import { useTranslation } from 'react-i18next';
-import { OPEN_PREFERENCES_EVENT } from '../constants/appEvents';
+import { openPreferences } from '../utils/openPreferences';
 
 export type StatusTabKey = 'files' | 'events';
 
@@ -101,16 +101,8 @@ const StatusBar = ({
       : rescanTitle;
   const indicatorLabel = t('statusBar.aria.status', { status: lifecycleLabel });
 
-  const handleRescanClick = useCallback(() => {
-    if (rescanDisabled) {
-      return;
-    }
-    onRequestRescan();
-  }, [onRequestRescan, rescanDisabled]);
-
   const handleOpenPreferences = useCallback(() => {
-    const event = new Event(OPEN_PREFERENCES_EVENT);
-    window.dispatchEvent(event);
+    openPreferences();
   }, []);
 
   return (
@@ -160,7 +152,7 @@ const StatusBar = ({
           <button
             type="button"
             className="status-icon-button status-rescan-button"
-            onClick={handleRescanClick}
+            onClick={onRequestRescan}
             disabled={rescanDisabled}
             title={rescanTooltip}
             aria-label={t('statusBar.aria.rescan')}

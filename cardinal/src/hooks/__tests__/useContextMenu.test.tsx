@@ -35,7 +35,10 @@ const createEvent = () =>
   ({
     preventDefault: vi.fn(),
     stopPropagation: vi.fn(),
-  }) as unknown as React.MouseEvent<HTMLElement>;
+  }) as Pick<
+    React.MouseEvent<HTMLElement>,
+    'preventDefault' | 'stopPropagation'
+  > as React.MouseEvent<HTMLElement>;
 
 describe('useContextMenu', () => {
   beforeEach(async () => {

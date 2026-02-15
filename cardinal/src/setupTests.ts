@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 
-class ResizeObserverStub {
+class ResizeObserverStub implements ResizeObserver {
   callback: ResizeObserverCallback;
 
   constructor(callback: ResizeObserverCallback) {
@@ -13,10 +13,9 @@ class ResizeObserverStub {
 }
 
 if (typeof window !== 'undefined' && !window.ResizeObserver) {
-  window.ResizeObserver = ResizeObserverStub as typeof ResizeObserver;
+  window.ResizeObserver = ResizeObserverStub;
 }
 
 if (typeof globalThis.ResizeObserver === 'undefined') {
-  (globalThis as typeof globalThis & { ResizeObserver: typeof ResizeObserver }).ResizeObserver =
-    ResizeObserverStub as unknown as typeof ResizeObserver;
+  globalThis.ResizeObserver = ResizeObserverStub;
 }

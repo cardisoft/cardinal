@@ -35,7 +35,6 @@ type VirtualListProps = {
     rowStyle: CSSProperties,
   ) => React.ReactNode;
   onScrollSync: (scrollLeft: number) => void;
-  className: string;
 };
 
 // Virtualized list with lazy row hydration and synchronized column scrolling
@@ -48,7 +47,6 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     overscan,
     renderRow,
     onScrollSync,
-    className,
   },
   ref,
 ) {
@@ -78,7 +76,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     rowCount && viewportHeight
       ? Math.min(rowCount - 1, Math.ceil((scrollTop + viewportHeight) / rowHeight) + overscan - 1)
       : -1;
-  useIconViewport({ results, start, end });
+  useIconViewport({ results, resultsVersion: displayedResultsVersion, start, end });
 
   // Clamp scroll updates so callers cannot push the viewport outside legal bounds
   const updateScrollAndRange = useCallback(
@@ -228,7 +226,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   return (
     <div
       ref={containerRef}
-      className={`virtual-list ${className}`}
+      className="virtual-list"
       onWheel={handleWheel}
       role="list"
       aria-rowcount={rowCount}

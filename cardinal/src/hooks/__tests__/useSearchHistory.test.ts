@@ -36,15 +36,17 @@ describe('useSearchHistory', () => {
     type('');
     type('e');
 
-    expect(result.current.getCurrentValue()).toBe('e');
+    expect(navigateHistory(result.current.navigate, 'older')).toBe('d');
+    expect(navigateHistory(result.current.navigate, 'newer')).toBe('e');
+    expect(navigateHistory(result.current.navigate, 'newer')).toBeNull();
 
     expect(navigateHistory(result.current.navigate, 'older')).toBe('d');
 
     type('da');
 
-    expect(result.current.getCurrentValue()).toBe('da');
-
     expect(navigateHistory(result.current.navigate, 'older')).toBe('e');
+    expect(navigateHistory(result.current.navigate, 'newer')).toBe('da');
+    expect(navigateHistory(result.current.navigate, 'newer')).toBeNull();
   });
 
   it('preserves the previous entry when the first letter changes', () => {
@@ -56,7 +58,7 @@ describe('useSearchHistory', () => {
     type('ba');
     type('bar');
 
-    expect(result.current.getCurrentValue()).toBe('bar');
     expect(navigateHistory(result.current.navigate, 'older')).toBe('foo');
+    expect(navigateHistory(result.current.navigate, 'newer')).toBe('bar');
   });
 });

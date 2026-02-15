@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import i18n from './i18n/config';
-import { OPEN_PREFERENCES_EVENT } from './constants/appEvents';
+import { openPreferences } from './utils/openPreferences';
 
 const HELP_UPDATES_URL = 'https://github.com/cardisoft/cardinal/releases';
 
@@ -28,7 +28,7 @@ async function buildAppMenu(): Promise<void> {
     text: i18n.t('menu.preferences'),
     accelerator: 'CmdOrCtrl+,',
     action: () => {
-      openPreferencesOverlay();
+      openPreferences();
     },
   });
   const hideItem = await MenuItem.new({
@@ -128,11 +128,3 @@ function scheduleMenuBuild(): void {
 i18n.on('languageChanged', () => {
   scheduleMenuBuild();
 });
-
-function openPreferencesOverlay(): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  const event = new Event(OPEN_PREFERENCES_EVENT);
-  window.dispatchEvent(event);
-}

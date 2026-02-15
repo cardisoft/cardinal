@@ -36,7 +36,6 @@ export const useSelection = (
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
   const [shiftAnchorIndex, setShiftAnchorIndex] = useState<number | null>(null);
   const selectedIndicesRef = useRef<number[]>([]);
-  const resultsVersionRef = useRef(resultsVersion);
 
   const handleRowSelect = useCallback(
     (rowIndex: number, options: RowSelectOptions) => {
@@ -103,9 +102,9 @@ export const useSelection = (
   }, []);
 
   const clearSelection = useCallback(() => {
-    setSelectedIndices([]);
-    setActiveRowIndex(null);
-    setShiftAnchorIndex(null);
+    setSelectedIndices((prev) => (prev.length === 0 ? prev : []));
+    setActiveRowIndex((prev) => (prev === null ? prev : null));
+    setShiftAnchorIndex((prev) => (prev === null ? prev : null));
   }, []);
 
   const moveSelection = useCallback(
@@ -141,19 +140,8 @@ export const useSelection = (
   }, [selectedIndices]);
 
   useEffect(() => {
-    if (resultsVersionRef.current === resultsVersion) {
-      return;
-    }
-    resultsVersionRef.current = resultsVersion;
-
-    if (selectedIndices.length === 0 && activeRowIndex === null && shiftAnchorIndex === null) {
-      return;
-    }
-
-    setSelectedIndices([]);
-    setActiveRowIndex(null);
-    setShiftAnchorIndex(null);
-  }, [resultsVersion, selectedIndices, activeRowIndex, shiftAnchorIndex]);
+    clearSelection();
+  }, [resultsVersion, clearSelection]);
 
   const selectedPaths = useMemo(() => {
     const list = virtualListRef.current;

@@ -10,7 +10,6 @@ type UseFullDiskAccessPermissionResult = {
   status: FullDiskAccessStatus;
   isChecking: boolean;
   requestPermission: () => Promise<void>;
-  refreshStatus: () => Promise<void>;
 };
 
 // Centralise macOS Full Disk Access state so App.tsx stays focused on UI concerns.
@@ -52,6 +51,5 @@ export function useFullDiskAccessPermission(): UseFullDiskAccessPermissionResult
     status,
     isChecking,
     requestPermission,
-    refreshStatus,
   };
 }

@@ -11,7 +11,6 @@ type UseSearchHistoryResult = {
   navigate: (direction: HistoryDirection) => string | null;
   ensureTailValue: (value: string) => void;
   resetCursorToTail: () => void;
-  getCurrentValue: () => string;
 };
 
 const DEFAULT_MAX_HISTORY = 50;
@@ -143,20 +142,10 @@ export function useSearchHistory(options: UseSearchHistoryOptions = {}): UseSear
     cursorRef.current = history.length - 1;
   }, []);
 
-  const getCurrentValue = useCallback(() => {
-    const history = historyRef.current;
-    if (!history.length) {
-      return '';
-    }
-    const cursor = Math.min(cursorRef.current, history.length - 1);
-    return history[cursor] ?? '';
-  }, []);
-
   return {
     handleInputChange,
     navigate,
     ensureTailValue,
     resetCursorToTail,
-    getCurrentValue,
   };
 }
