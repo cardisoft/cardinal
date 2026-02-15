@@ -118,11 +118,7 @@ export function useDataLoader(results: SlabIndex[], resultsVersion: number) {
     const needLoading: SlabIndex[] = [];
     for (let i = start; i <= end && i < total; i++) {
       const slabIndex = list[i];
-      if (
-        slabIndex != null &&
-        !cacheRef.current.has(slabIndex) &&
-        !loadingRef.current.has(slabIndex)
-      ) {
+      if (!cacheRef.current.has(slabIndex) && !loadingRef.current.has(slabIndex)) {
         needLoading.push(slabIndex);
         loadingRef.current.add(slabIndex);
       }

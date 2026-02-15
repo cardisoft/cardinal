@@ -185,13 +185,10 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     [rowCount, rowHeight, viewportHeight, updateScrollAndRange],
   );
 
-  const getItemAt = useCallback(
-    (index: number) => {
-      const slabIndex = resultsList[index];
-      if (slabIndex == null) {
-        return undefined;
-      }
-      return cache.get(slabIndex);
+  const getItemByRowIndex = useCallback(
+    (rowIndex: number) => {
+      const slabIndex = resultsList[rowIndex];
+      return slabIndex === undefined ? undefined : cache.get(slabIndex);
     },
     [cache, resultsList],
   );
@@ -202,9 +199,9 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
       scrollToTop: () => updateScrollAndRange(() => 0),
       scrollToRow,
       ensureRangeLoaded,
-      getItem: getItemAt,
+      getItem: getItemByRowIndex,
     }),
-    [updateScrollAndRange, scrollToRow, ensureRangeLoaded, getItemAt],
+    [updateScrollAndRange, scrollToRow, ensureRangeLoaded, getItemByRowIndex],
   );
 
   // ----- rendered items memo -----
@@ -215,8 +212,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     const baseTop = start * rowHeight - scrollTop;
     return Array.from({ length: end - start + 1 }, (_, i) => {
       const rowIndex = start + i;
-      const slabIndex = resultsList[rowIndex];
-      const item = slabIndex == null ? undefined : cache.get(slabIndex);
+      const item = getItemByRowIndex(rowIndex);
       return renderRow(rowIndex, item, {
         position: 'absolute',
         top: baseTop + i * rowHeight,
@@ -225,7 +221,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
         right: 0,
       });
     });
-  }, [start, end, scrollTop, rowHeight, cache, renderRow, resultsList]);
+  }, [start, end, scrollTop, rowHeight, renderRow, getItemByRowIndex]);
 
   // ----- render -----
   return (

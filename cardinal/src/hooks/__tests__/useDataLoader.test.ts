@@ -15,6 +15,7 @@ vi.mock('@tauri-apps/api/event', () => ({
 
 const mockedInvoke = vi.mocked(invoke);
 const mockedListen = vi.mocked(listen);
+type HookProps = { results: SlabIndex[]; version: number };
 
 const buildNodeInfo = (slabIndex: SlabIndex) => ({
   path: `/tmp/file-${slabIndex}`,
@@ -24,6 +25,11 @@ const buildNodeInfo = (slabIndex: SlabIndex) => ({
   mtime: null,
   ctime: null,
 });
+
+const renderDataLoader = (initialProps: HookProps) =>
+  renderHook(({ results, version }: HookProps) => useDataLoader(results, version), {
+    initialProps,
+  });
 
 describe('useDataLoader', () => {
   beforeEach(() => {
@@ -46,11 +52,7 @@ describe('useDataLoader', () => {
     const slab11 = 11 as SlabIndex;
     const slab22 = 22 as SlabIndex;
     const first = [slab11, slab22];
-    const { result, rerender } = renderHook(
-      ({ results, version }: { results: SlabIndex[]; version: number }) =>
-        useDataLoader(results, version),
-      { initialProps: { results: first, version: 1 } },
-    );
+    const { result, rerender } = renderDataLoader({ results: first, version: 1 });
 
     await act(async () => {
       await result.current.ensureRangeLoaded(0, 1);
@@ -75,11 +77,7 @@ describe('useDataLoader', () => {
 
   it('resets cache when results version changes', async () => {
     const first = [33 as SlabIndex, 44 as SlabIndex];
-    const { result, rerender } = renderHook(
-      ({ results, version }: { results: SlabIndex[]; version: number }) =>
-        useDataLoader(results, version),
-      { initialProps: { results: first, version: 1 } },
-    );
+    const { result, rerender } = renderDataLoader({ results: first, version: 1 });
 
     await act(async () => {
       await result.current.ensureRangeLoaded(0, 1);
