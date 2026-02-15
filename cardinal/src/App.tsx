@@ -380,7 +380,7 @@ function App() {
         queueSearch('', { immediate: true });
       }
     },
-    [ensureHistoryBuffer, queueSearch, resetCursorToTail, setActiveTab, setEventFilterQuery],
+    [ensureHistoryBuffer, queueSearch, resetCursorToTail, setEventFilterQuery],
   );
 
   const searchInputValue = activeTab === 'events' ? eventFilterQuery : searchParams.query;
