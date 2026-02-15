@@ -24,29 +24,29 @@ export type VirtualListHandle = {
 };
 
 type VirtualListProps = {
-  results?: SlabIndex[];
+  results: SlabIndex[];
   resultsVersion: number;
-  rowHeight?: number;
-  overscan?: number;
+  rowHeight: number;
+  overscan: number;
   renderRow: (
     rowIndex: number,
     item: SearchResultItem | undefined,
     rowStyle: CSSProperties,
   ) => React.ReactNode;
-  onScrollSync?: (scrollLeft: number) => void;
-  className?: string;
+  onScrollSync: (scrollLeft: number) => void;
+  className: string;
 };
 
 // Virtualized list with lazy row hydration and synchronized column scrolling
 export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(function VirtualList(
   {
-    results = [],
+    results,
     resultsVersion,
-    rowHeight = 24,
-    overscan = 5,
+    rowHeight,
+    overscan,
     renderRow,
     onScrollSync,
-    className = '',
+    className,
   },
   ref,
 ) {
