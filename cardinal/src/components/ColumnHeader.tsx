@@ -12,7 +12,7 @@ const columns: Array<{ key: ColumnKey; labelKey: string; className: string }> = 
   { key: 'created', labelKey: 'columns.created', className: 'ctime-text' },
 ];
 
-const sortableColumns: Partial<Record<ColumnKey, SortKey>> = {
+const sortableColumns: Record<ColumnKey, SortKey> = {
   filename: 'filename',
   path: 'fullPath',
   size: 'size',
@@ -26,22 +26,13 @@ type ColumnHeaderProps = {
   sortState: SortState;
   onSortToggle: (sortKey: SortKey) => void;
   sortDisabled: boolean;
-  sortIndicatorMode: 'triangle' | 'circle';
   sortDisabledTooltip: string | null;
 };
 
 // Column widths are applied via CSS vars on container; no need to pass colWidths prop.
 export const ColumnHeader = forwardRef<HTMLDivElement, ColumnHeaderProps>(
   (
-    {
-      onResizeStart,
-      onContextMenu,
-      sortState,
-      onSortToggle,
-      sortDisabled,
-      sortIndicatorMode,
-      sortDisabledTooltip,
-    },
+    { onResizeStart, onContextMenu, sortState, onSortToggle, sortDisabled, sortDisabledTooltip },
     ref,
   ) => {
     const { t } = useTranslation();
@@ -51,12 +42,10 @@ export const ColumnHeader = forwardRef<HTMLDivElement, ColumnHeaderProps>(
           {columns.map(({ key, labelKey, className }) => {
             const label = t(labelKey);
             const sortKey = sortableColumns[key];
-            const isActive = Boolean(sortKey && sortState?.key === sortKey);
+            const isActive = sortState?.key === sortKey;
             const indicatorClasses = ['sort-indicator'];
 
-            if (sortIndicatorMode === 'circle') {
-              indicatorClasses.push('sort-indicator--circle');
-            } else if (isActive && sortState) {
+            if (isActive && sortState) {
               indicatorClasses.push(
                 sortState.direction === 'asc' ? 'sort-indicator--asc' : 'sort-indicator--desc',
               );
@@ -70,19 +59,7 @@ export const ColumnHeader = forwardRef<HTMLDivElement, ColumnHeaderProps>(
               indicatorClasses.push('sort-indicator--active');
             }
 
-            const title = sortDisabled ? (sortDisabledTooltip ?? undefined) : undefined;
-
-            if (!sortKey) {
-              return (
-                <span key={key} className={`${className} header header-cell`}>
-                  {label}
-                  <span
-                    className="col-resizer"
-                    onMouseDown={onResizeStart(key)} // consume column-specific resize closures from the parent hook
-                  />
-                </span>
-              );
-            }
+            const title = sortDisabled ? sortDisabledTooltip || undefined : undefined;
 
             return (
               <span key={key} className={`${className} header header-cell`}>

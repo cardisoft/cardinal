@@ -62,7 +62,7 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
               }
 
               const slabIndex = update.slabIndex as SlabIndex;
-              const nextIcon = update.icon ?? undefined;
+              const nextIcon = update.icon;
               iconOverridesRef.current.set(slabIndex, nextIcon);
 
               const current = prev.get(slabIndex);

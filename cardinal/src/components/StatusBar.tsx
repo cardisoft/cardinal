@@ -87,8 +87,7 @@ const StatusBar = ({
     ? t('statusBar.resultsWithDuration', { results: resultsText, duration: durationText })
     : resultsText;
   const lifecycleMeta = LIFECYCLE_META[lifecycleState];
-  const lifecycleLabel =
-    t(`statusBar.lifecycle.${lifecycleState}`) ?? t('statusBar.lifecycle.Initializing');
+  const lifecycleLabel = t(`statusBar.lifecycle.${lifecycleState}`);
   const rescanDisabled = lifecycleState === 'Initializing';
   const rescanTitle = rescanDisabled
     ? t('statusBar.rescan.disabledHint')

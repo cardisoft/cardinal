@@ -784,7 +784,6 @@ function App() {
               sortState={sortState}
               onSortToggle={handleSortToggle}
               sortDisabled={sortButtonsDisabled}
-              sortIndicatorMode="triangle"
               sortDisabledTooltip={sortDisabledTooltip}
             />
           )}
