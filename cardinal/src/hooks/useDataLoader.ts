@@ -26,7 +26,7 @@ const fromNodeInfo = (node: NodeInfoResponse): SearchResultItem => {
   return base;
 };
 
-export function useDataLoader(results: SlabIndex[]) {
+export function useDataLoader(results: SlabIndex[], resultsVersion: number) {
   const loadingRef = useRef<Set<number>>(new Set());
   const versionRef = useRef(0);
   const cacheRef = useRef<DataLoaderCache>(new Map());
@@ -38,6 +38,7 @@ export function useDataLoader(results: SlabIndex[]) {
     return initial;
   });
   const resultsRef = useRef<SlabIndex[]>([]);
+  resultsRef.current = results;
 
   // Reset loading state whenever the result source changes.
   useEffect(() => {
@@ -46,7 +47,6 @@ export function useDataLoader(results: SlabIndex[]) {
     iconOverridesRef.current.clear();
     const nextCache = new Map<number, SearchResultItem>();
     cacheRef.current = nextCache;
-    resultsRef.current = results;
     const indexMap = new Map<SlabIndex, number>();
     resultsRef.current.forEach((value, index) => {
       if (value != null) {
@@ -55,7 +55,7 @@ export function useDataLoader(results: SlabIndex[]) {
     });
     indexMapRef.current = indexMap;
     setCache(nextCache);
-  }, [results]);
+  }, [resultsVersion]);
 
   useEffect(() => {
     let unlistenIconUpdate: UnlistenFn | undefined;

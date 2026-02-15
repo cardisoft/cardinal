@@ -25,6 +25,7 @@ export type VirtualListHandle = {
 
 type VirtualListProps = {
   results?: SlabIndex[];
+  resultsVersion: number;
   rowHeight?: number;
   overscan?: number;
   renderRow: (
@@ -38,7 +39,15 @@ type VirtualListProps = {
 
 // Virtualized list with lazy row hydration and synchronized column scrolling
 export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(function VirtualList(
-  { results = [], rowHeight = 24, overscan = 5, renderRow, onScrollSync, className = '' },
+  {
+    results = [],
+    resultsVersion,
+    rowHeight = 24,
+    overscan = 5,
+    renderRow,
+    onScrollSync,
+    className = '',
+  },
   ref,
 ) {
   // ----- refs -----
@@ -54,7 +63,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   const rowCount = resultsList.length;
 
   // ----- data loader -----
-  const { cache, ensureRangeLoaded } = useDataLoader(resultsList);
+  const { cache, ensureRangeLoaded } = useDataLoader(resultsList, resultsVersion);
 
   // Virtualized height powers the scrollbar math
   const totalHeight = rowCount * rowHeight;
@@ -112,7 +121,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   // Ensure the data cache stays warm for the active window
   useEffect(() => {
     if (end >= start) ensureRangeLoaded(start, end);
-  }, [start, end, ensureRangeLoaded, resultsList]);
+  }, [start, end, ensureRangeLoaded, resultsList, resultsVersion]);
 
   // Track container height changes so virtualization recalculates the viewport
   useLayoutEffect(() => {
