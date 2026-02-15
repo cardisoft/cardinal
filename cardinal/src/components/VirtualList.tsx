@@ -59,11 +59,10 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
 
   // ----- derived -----
   // Row count is inferred from the results array; explicit rowCount is no longer supported
-  const resultsList = results;
-  const rowCount = resultsList.length;
+  const rowCount = results.length;
 
   // ----- data loader -----
-  const { cache, ensureRangeLoaded } = useDataLoader(resultsList, resultsVersion);
+  const { cache, ensureRangeLoaded } = useDataLoader(results, resultsVersion);
 
   // Virtualized height powers the scrollbar math
   const totalHeight = rowCount * rowHeight;
@@ -77,7 +76,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     rowCount && viewportHeight
       ? Math.min(rowCount - 1, Math.ceil((scrollTop + viewportHeight) / rowHeight) + overscan - 1)
       : -1;
-  useIconViewport({ results: resultsList, start, end });
+  useIconViewport({ results, start, end });
 
   // Clamp scroll updates so callers cannot push the viewport outside legal bounds
   const updateScrollAndRange = useCallback(
@@ -187,10 +186,10 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
 
   const getItemByRowIndex = useCallback(
     (rowIndex: number) => {
-      const slabIndex = resultsList[rowIndex];
+      const slabIndex = results[rowIndex];
       return slabIndex === undefined ? undefined : cache.get(slabIndex);
     },
-    [cache, resultsList],
+    [cache, results],
   );
 
   useImperativeHandle(

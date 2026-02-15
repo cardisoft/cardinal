@@ -4,27 +4,21 @@ import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import type { NodeInfoResponse, SearchResultItem } from '../types/search';
 import type { SlabIndex } from '../types/slab';
-import type { IconUpdatePayload, IconUpdateWirePayload } from '../types/ipc';
+import type { IconUpdateWirePayload } from '../types/ipc';
 
 type IconUpdateEventPayload = readonly IconUpdateWirePayload[] | null | undefined;
 
 export type DataLoaderCache = Map<SlabIndex, SearchResultItem>;
 type IconOverrideValue = string | undefined;
 
-const normalizeIcon = (icon: string | null | undefined): string | undefined => icon ?? undefined;
-
-const fromNodeInfo = (node: NodeInfoResponse): SearchResultItem => {
-  const metadata = node.metadata ?? undefined;
-  const base: SearchResultItem = {
-    path: node.path,
-    metadata,
-    size: node.size ?? metadata?.size,
-    mtime: node.mtime ?? metadata?.mtime,
-    ctime: node.ctime ?? metadata?.ctime,
-    icon: node.icon ?? undefined,
-  };
-  return base;
-};
+const fromNodeInfo = (node: NodeInfoResponse): SearchResultItem => ({
+  path: node.path,
+  metadata: node.metadata ?? undefined,
+  size: node.size ?? node.metadata?.size,
+  mtime: node.mtime ?? node.metadata?.mtime,
+  ctime: node.ctime ?? node.metadata?.ctime,
+  icon: node.icon ?? undefined,
+});
 
 export function useDataLoader(results: SlabIndex[], resultsVersion: number) {
   const loadingRef = useRef<Set<SlabIndex>>(new Set());
@@ -59,33 +53,22 @@ export function useDataLoader(results: SlabIndex[], resultsVersion: number) {
             return;
           }
 
-          const normalized: IconUpdatePayload[] = [];
-          updates.forEach((update) => {
-            if (update && typeof update.slabIndex === 'number') {
-              normalized.push({
-                slabIndex: update.slabIndex as SlabIndex,
-                icon: update.icon,
-              });
-            }
-          });
-
-          if (normalized.length === 0) {
-            return;
-          }
-
           setCache((prev) => {
             let nextCache: DataLoaderCache | null = null;
 
-            normalized.forEach((update) => {
-              const slabIndex = update.slabIndex;
+            updates.forEach((update) => {
+              if (!update || typeof update.slabIndex !== 'number') {
+                return;
+              }
 
-              iconOverridesRef.current.set(slabIndex, update.icon);
+              const slabIndex = update.slabIndex as SlabIndex;
+              const nextIcon = update.icon ?? undefined;
+              iconOverridesRef.current.set(slabIndex, nextIcon);
 
               const current = prev.get(slabIndex);
-              if (!current) return;
-
-              const nextIcon = update.icon;
-              if (current.icon === nextIcon) return;
+              if (!current || current.icon === nextIcon) {
+                return;
+              }
 
               if (nextCache === null) {
                 nextCache = new Map(prev);
@@ -144,10 +127,8 @@ export function useDataLoader(results: SlabIndex[], resultsVersion: number) {
         const normalizedItem = fromNodeInfo(fetchedItem);
         const existing = prev.get(slabIndex);
         const hasOverride = iconOverridesRef.current.has(slabIndex);
-        const override = hasOverride ? iconOverridesRef.current.get(slabIndex) : undefined;
-
         const preferredIcon = hasOverride
-          ? normalizeIcon(override)
+          ? iconOverridesRef.current.get(slabIndex)
           : (existing?.icon ?? normalizedItem.icon);
 
         const mergedItem =
