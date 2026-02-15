@@ -17,11 +17,14 @@ export function useWatchRoot() {
     writeErrorMessage: 'Unable to persist default watch root',
   });
 
-  const setWatchRoot = useCallback((next: string) => {
-    const trimmed = next.trim();
-    const normalized = trimmed.length > 0 ? trimmed : DEFAULT_WATCH_ROOT;
-    setWatchRootState(normalized);
-  }, [setWatchRootState]);
+  const setWatchRoot = useCallback(
+    (next: string) => {
+      const trimmed = next.trim();
+      const normalized = trimmed.length > 0 ? trimmed : DEFAULT_WATCH_ROOT;
+      setWatchRootState(normalized);
+    },
+    [setWatchRootState],
+  );
 
   return { watchRoot, setWatchRoot, defaultWatchRoot: DEFAULT_WATCH_ROOT };
 }

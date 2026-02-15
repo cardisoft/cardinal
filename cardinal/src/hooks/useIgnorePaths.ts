@@ -21,10 +21,13 @@ export function useIgnorePaths() {
     writeErrorMessage: 'Unable to persist default ignore paths',
   });
 
-  const setIgnorePaths = useCallback((next: string[]) => {
-    const cleaned = cleanPaths(next);
-    setIgnorePathsState(cleaned);
-  }, [setIgnorePathsState]);
+  const setIgnorePaths = useCallback(
+    (next: string[]) => {
+      const cleaned = cleanPaths(next);
+      setIgnorePathsState(cleaned);
+    },
+    [setIgnorePathsState],
+  );
 
   return { ignorePaths, setIgnorePaths, defaultIgnorePaths: DEFAULT_IGNORE_PATHS };
 }

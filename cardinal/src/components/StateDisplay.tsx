@@ -27,11 +27,7 @@ const State = ({ icon, title, message }: StateProps): React.JSX.Element => (
 );
 
 // Consistent empty/error/loading presentation inside the results pane.
-export function StateDisplay({
-  state,
-  message,
-  query,
-}: StateDisplayProps): React.JSX.Element {
+export function StateDisplay({ state, message, query }: StateDisplayProps): React.JSX.Element {
   const { t } = useTranslation();
   if (state === 'loading') {
     return <State icon={<div className="spinner" />} title={t('stateDisplay.loading')} />;
