@@ -65,7 +65,7 @@ describe('useAppHotkeys', () => {
     });
   });
 
-  it('handles Meta+F, Meta+O, and Meta+C shortcuts on files tab', async () => {
+  it('handles Meta+F, Meta+R, Meta+O, and Meta+C shortcuts on files tab', async () => {
     renderHotkeys();
 
     const findEvent = new KeyboardEvent('keydown', {
@@ -89,6 +89,17 @@ describe('useAppHotkeys', () => {
     });
     expect(mockedOpenResultPath).toHaveBeenCalledWith('/tmp/a');
     expect(mockedOpenResultPath).toHaveBeenCalledWith('/tmp/b');
+
+    const revealEvent = new KeyboardEvent('keydown', {
+      key: 'r',
+      metaKey: true,
+      cancelable: true,
+    });
+    act(() => {
+      window.dispatchEvent(revealEvent);
+    });
+    expect(mockedInvoke).toHaveBeenCalledWith('open_in_finder', { path: '/tmp/a' });
+    expect(mockedInvoke).toHaveBeenCalledWith('open_in_finder', { path: '/tmp/b' });
 
     const copyEvent = new KeyboardEvent('keydown', {
       key: 'c',

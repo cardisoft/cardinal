@@ -19,7 +19,9 @@ type FilesTabContentProps = {
   currentQuery: string;
   virtualListRef: React.Ref<VirtualListHandle>;
   results: SlabIndex[];
+  // Bumps when backend search results change; invalidates row metadata cache.
   dataResultsVersion: number;
+  // Bumps when visible ordering changes; invalidates viewport-dependent state.
   displayedResultsVersion: number;
   rowHeight: number;
   overscan: number;

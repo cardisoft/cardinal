@@ -9,6 +9,9 @@ type UseFilesTabStateResult = {
   handleSearchBlur: () => void;
 };
 
+/**
+ * Manages the active tab state and search focus for the status bar tabs.
+ */
 export function useFilesTabState(): UseFilesTabStateResult {
   const [activeTab, setActiveTab] = useState<StatusTabKey>('files');
   const [isSearchFocused, setIsSearchFocused] = useState(false);

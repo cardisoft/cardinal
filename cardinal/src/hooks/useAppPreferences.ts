@@ -37,6 +37,10 @@ type UseAppPreferencesResult = {
   handleResetPreferences: () => void;
 };
 
+/**
+ * Manages app preferences including watch config, tray, theme, language, and overlay state.
+ * Provides actions for updating watch settings and resetting preferences to defaults.
+ */
 export function useAppPreferences({
   fullDiskAccessStatus,
   isCheckingFullDiskAccess,

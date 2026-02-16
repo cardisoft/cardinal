@@ -26,6 +26,7 @@ export type SelectionController = {
  * exposes helpers for shift/meta selection, and remaps selections when the backing data changes.
  * The hook also tracks the concrete paths backing the selection so consumers can interact with
  * context menus, Quick Look, etc. without reimplementing bookkeeping.
+ * `resultsVersion` should bump whenever visible rows/order change so stale selection is cleared.
  */
 export const useSelection = (
   displayedResults: SlabIndex[],

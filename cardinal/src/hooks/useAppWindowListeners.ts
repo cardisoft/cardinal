@@ -26,6 +26,10 @@ type UseAppWindowListenersResult = {
   isWindowFocused: boolean;
 };
 
+/**
+ * Manages window-level listeners for Tauri IPC events and browser window events.
+ * Keeps the DOM focus attribute in sync and routes drag-drop queries by active tab.
+ */
 export function useAppWindowListeners({
   activeTab,
   focusSearchInput,

@@ -80,6 +80,8 @@ function App() {
   const { caseSensitive } = searchParams;
   const { eventColWidths, onEventResizeStart, autoFitEventColumns } = useEventColumnWidths();
   const { t, i18n } = useTranslation();
+  // `resultsVersion` tracks raw backend search result-set changes.
+  // `displayedResultsVersion` additionally tracks UI ordering/projection changes (e.g. sort toggle).
   const {
     sortState,
     displayedResults,
@@ -448,6 +450,8 @@ function App() {
               caseInsensitive={!caseSensitive}
             />
           ) : (
+            // `dataResultsVersion`: backend result-set changes (cache invalidation).
+            // `displayedResultsVersion`: visible-order/projection changes (viewport invalidation).
             <FilesTabContent
               headerRef={headerRef}
               onResizeStart={onResizeStart}
