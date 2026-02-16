@@ -7,14 +7,13 @@ import { useTranslation } from 'react-i18next';
 import { openResultPath } from '../utils/openResultPath';
 
 type UseContextMenuResult = {
-  showContextMenu: (event: ReactMouseEvent<HTMLElement>, path: string) => void;
+  showContextMenu: (event: ReactMouseEvent<HTMLElement>, targetPaths: string[]) => void;
   showHeaderContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
 };
 
 export function useContextMenu(
   autoFitColumns: (() => void) | null = null,
   onQuickLookRequest?: () => void | Promise<void>,
-  getSelectedPaths?: () => string[],
 ): UseContextMenuResult {
   const { t } = useTranslation();
   const writeClipboard = useCallback((text: string) => {
@@ -25,13 +24,11 @@ export function useContextMenu(
   }, []);
 
   const buildFileMenuItems = useCallback(
-    (path: string): MenuItemOptions[] => {
-      if (!path) {
+    (targetPathsInput: string[]): MenuItemOptions[] => {
+      const targetPaths = targetPathsInput.filter(Boolean);
+      if (targetPaths.length === 0) {
         return [];
       }
-
-      const selected = getSelectedPaths?.().filter(Boolean) ?? [];
-      const targetPaths = selected.length > 0 ? selected : [path];
       const copyLabel =
         targetPaths.length > 1 ? t('contextMenu.copyFiles') : t('contextMenu.copyFile');
       const copyFilenameLabel =
@@ -103,7 +100,7 @@ export function useContextMenu(
 
       return items;
     },
-    [getSelectedPaths, onQuickLookRequest, t, writeClipboard],
+    [onQuickLookRequest, t, writeClipboard],
   );
 
   const buildHeaderMenuItems = useCallback((): MenuItemOptions[] => {
@@ -136,10 +133,10 @@ export function useContextMenu(
   }, []);
 
   const showContextMenu = useCallback(
-    (event: ReactMouseEvent<HTMLElement>, path: string) => {
+    (event: ReactMouseEvent<HTMLElement>, targetPaths: string[]) => {
       event.preventDefault();
       event.stopPropagation();
-      void showMenu(buildFileMenuItems(path));
+      void showMenu(buildFileMenuItems(targetPaths));
     },
     [buildFileMenuItems, showMenu],
   );
