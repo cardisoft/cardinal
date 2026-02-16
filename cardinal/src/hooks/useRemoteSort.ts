@@ -43,6 +43,7 @@ const persistSortThreshold = (value: number): void => {
 export type RemoteSortControls = {
   sortState: SortState;
   displayedResults: SlabIndex[];
+  // Monotonic token for consumers that must invalidate when visible rows/order changes.
   displayedResultsVersion: number;
   sortThreshold: number;
   setSortThreshold: (value: number) => void;
@@ -64,6 +65,7 @@ export const useRemoteSort = (
   const [sortThreshold, setSortThresholdState] = useState<number>(() => readStoredSortThreshold());
   const [isSorting, setIsSorting] = useState(false);
   const sortRequestRef = useRef(0);
+  // Separate from backend `resultsVersion`: also bumps when sorted/non-sorted projection flips.
   const [displayedResultsVersion, bumpDisplayedResultsVersion] = useReducer(
     (version: number) => version + 1,
     0,
