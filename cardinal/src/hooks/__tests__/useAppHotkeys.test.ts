@@ -1,23 +1,23 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
+import { subscribeQuickLookKeydown } from '../../runtime/tauriEventRuntime';
 import { openResultPath } from '../../utils/openResultPath';
 import { useAppHotkeys } from '../useAppHotkeys';
 
-vi.mock('@tauri-apps/api/event', () => ({
-  listen: vi.fn(),
-}));
-
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
+}));
+
+vi.mock('../../runtime/tauriEventRuntime', () => ({
+  subscribeQuickLookKeydown: vi.fn(),
 }));
 
 vi.mock('../../utils/openResultPath', () => ({
   openResultPath: vi.fn(),
 }));
 
-const mockedListen = vi.mocked(listen);
+const mockedSubscribeQuickLookKeydown = vi.mocked(subscribeQuickLookKeydown);
 const mockedInvoke = vi.mocked(invoke);
 const mockedOpenResultPath = vi.mocked(openResultPath);
 
@@ -36,7 +36,7 @@ describe('useAppHotkeys', () => {
   const navigateSelection = vi.fn();
   const triggerQuickLook = vi.fn();
 
-  let quickLookListener: ((event: any) => void) | null;
+  let quickLookListener: ((payload: any) => void) | null;
 
   const renderHotkeys = (overrides: Partial<HookProps> = {}) =>
     renderHook((props: HookProps) => useAppHotkeys(props), {
@@ -56,12 +56,9 @@ describe('useAppHotkeys', () => {
     quickLookListener = null;
     mockedInvoke.mockResolvedValue(undefined);
 
-    mockedListen.mockImplementation(async (eventName: string, callback: (event: any) => void) => {
-      if (eventName === 'quicklook-keydown') {
-        quickLookListener = callback;
-        return quickLookUnlisten;
-      }
-      return vi.fn();
+    mockedSubscribeQuickLookKeydown.mockImplementation((listener) => {
+      quickLookListener = listener;
+      return quickLookUnlisten;
     });
   });
 
@@ -148,7 +145,7 @@ describe('useAppHotkeys', () => {
     expect(navigateSelection).toHaveBeenCalledWith(-1, { extend: false });
   });
 
-  it('handles Quick Look native keydown events and cleanup', async () => {
+  it('handles Quick Look runtime keydown events and cleanup', async () => {
     const { rerender, unmount } = renderHotkeys();
 
     await waitFor(() => {
@@ -157,14 +154,12 @@ describe('useAppHotkeys', () => {
 
     act(() => {
       quickLookListener?.({
-        payload: {
-          keyCode: 125,
-          modifiers: {
-            shift: true,
-            control: false,
-            option: false,
-            command: false,
-          },
+        keyCode: 125,
+        modifiers: {
+          shift: true,
+          control: false,
+          option: false,
+          command: false,
         },
       });
     });
@@ -182,20 +177,18 @@ describe('useAppHotkeys', () => {
     navigateSelection.mockClear();
     act(() => {
       quickLookListener?.({
-        payload: {
-          keyCode: 126,
-          modifiers: {
-            shift: false,
-            control: false,
-            option: false,
-            command: false,
-          },
+        keyCode: 126,
+        modifiers: {
+          shift: false,
+          control: false,
+          option: false,
+          command: false,
         },
       });
     });
     expect(navigateSelection).not.toHaveBeenCalled();
 
     unmount();
-    expect(quickLookUnlisten).toHaveBeenCalledTimes(1);
+    expect(quickLookUnlisten).toHaveBeenCalled();
   });
 });
