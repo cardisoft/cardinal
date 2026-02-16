@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
 import type { MutableRefObject } from 'react';
-import { listen } from '@tauri-apps/api/event';
-import type { UnlistenFn } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import type { StatusTabKey } from '../components/StatusBar';
+import {
+  subscribeQuickLookKeydown,
+  type QuickLookKeydownPayload,
+} from '../runtime/tauriEventRuntime';
 import { openResultPath } from '../utils/openResultPath';
 import { useStableEvent } from './useStableEvent';
 
@@ -18,17 +20,6 @@ type UseAppHotkeysOptions = {
   focusSearchInput: () => void;
   navigateSelection: (delta: 1 | -1, options?: MoveSelectionOptions) => void;
   triggerQuickLook: () => void;
-};
-
-type QuickLookKeydownPayload = {
-  keyCode: number;
-  characters?: string | null;
-  modifiers: {
-    shift: boolean;
-    control: boolean;
-    option: boolean;
-    command: boolean;
-  };
 };
 
 const QUICK_LOOK_KEYCODE_DOWN = 125;
@@ -148,43 +139,29 @@ export function useAppHotkeys({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleMetaShortcut, handleFilesNavigation]);
 
+  const handleQuickLookKeydown = useStableEvent((payload: QuickLookKeydownPayload) => {
+    if (keyboardStateRef.current.activeTab !== 'files') {
+      return;
+    }
+
+    if (!payload || !selectedIndicesRef.current.length) {
+      return;
+    }
+
+    const { keyCode, modifiers } = payload;
+    if (modifiers.command || modifiers.option || modifiers.control) {
+      return;
+    }
+
+    if (keyCode === QUICK_LOOK_KEYCODE_DOWN) {
+      navigateSelection(1, { extend: modifiers.shift });
+    } else if (keyCode === QUICK_LOOK_KEYCODE_UP) {
+      navigateSelection(-1, { extend: modifiers.shift });
+    }
+  });
+
   useEffect(() => {
-    let unlisten: UnlistenFn | null = null;
-
-    const setup = async () => {
-      try {
-        unlisten = await listen<QuickLookKeydownPayload>('quicklook-keydown', (event) => {
-          if (keyboardStateRef.current.activeTab !== 'files') {
-            return;
-          }
-
-          const payload = event.payload;
-          if (!payload || !selectedIndicesRef.current.length) {
-            return;
-          }
-
-          const { keyCode, modifiers } = payload;
-          if (modifiers.command || modifiers.option || modifiers.control) {
-            return;
-          }
-
-          if (keyCode === QUICK_LOOK_KEYCODE_DOWN) {
-            navigateSelection(1, { extend: modifiers.shift });
-          } else if (keyCode === QUICK_LOOK_KEYCODE_UP) {
-            navigateSelection(-1, { extend: modifiers.shift });
-          }
-        });
-      } catch (error) {
-        console.error('Failed to subscribe to Quick Look key events', error);
-      }
-    };
-
-    void setup();
-
-    return () => {
-      if (unlisten) {
-        unlisten();
-      }
-    };
-  }, [navigateSelection, selectedIndicesRef]);
+    const unlistenQuickLook = subscribeQuickLookKeydown(handleQuickLookKeydown);
+    return unlistenQuickLook;
+  }, [handleQuickLookKeydown]);
 }

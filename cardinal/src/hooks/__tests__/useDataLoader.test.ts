@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { subscribeIconUpdate } from '../../runtime/tauriEventRuntime';
 import type { SlabIndex } from '../../types/slab';
 import { useDataLoader } from '../useDataLoader';
 
@@ -9,12 +9,12 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }));
 
-vi.mock('@tauri-apps/api/event', () => ({
-  listen: vi.fn(),
+vi.mock('../../runtime/tauriEventRuntime', () => ({
+  subscribeIconUpdate: vi.fn(),
 }));
 
 const mockedInvoke = vi.mocked(invoke);
-const mockedListen = vi.mocked(listen);
+const mockedSubscribeIconUpdate = vi.mocked(subscribeIconUpdate);
 type HookProps = { results: SlabIndex[]; version: number };
 
 const buildNodeInfo = (slabIndex: SlabIndex) => ({
@@ -32,8 +32,10 @@ const renderDataLoader = (initialProps: HookProps) =>
   });
 
 describe('useDataLoader', () => {
+  const iconUpdateUnlisten = vi.fn();
+
   beforeEach(() => {
-    mockedListen.mockResolvedValue((() => {}) as () => void);
+    mockedSubscribeIconUpdate.mockImplementation(() => iconUpdateUnlisten);
     mockedInvoke.mockImplementation((command: string, payload?: unknown) => {
       if (command !== 'get_nodes_info') {
         return Promise.resolve(null);
@@ -96,5 +98,12 @@ describe('useDataLoader', () => {
 
     await waitFor(() => expect(result.current.cache.size).toBe(2));
     expect(mockedInvoke).toHaveBeenCalledTimes(2);
+  });
+
+  it('cleans up icon update subscription on unmount', async () => {
+    const { unmount } = renderDataLoader({ results: [11 as SlabIndex], version: 1 });
+    unmount();
+
+    expect(iconUpdateUnlisten).toHaveBeenCalled();
   });
 });

@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { listen } from '@tauri-apps/api/event';
-import type { Event as TauriEvent, UnlistenFn } from '@tauri-apps/api/event';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import type { DragDropEvent } from '@tauri-apps/api/window';
+import { useEffect, useState } from 'react';
 import type { StatusTabKey } from '../components/StatusBar';
+import {
+  subscribeLifecycleState,
+  subscribeQuickLaunch,
+  subscribeStatusBarUpdate,
+  subscribeWindowDragDrop,
+  type WindowDragDropEvent,
+} from '../runtime/tauriEventRuntime';
 import type { AppLifecycleStatus, StatusBarUpdatePayload } from '../types/ipc';
 import { useStableEvent } from './useStableEvent';
 
@@ -45,45 +48,27 @@ export function useAppWindowListeners({
     }
     return document.hasFocus();
   });
-  const isMountedRef = useRef(false);
+  useEffect(() => {
+    const unlistenStatus = subscribeStatusBarUpdate((payload: StatusBarUpdatePayload) => {
+      const { scannedFiles, processedEvents, rescanErrors } = payload;
+      handleStatusUpdate(scannedFiles, processedEvents, rescanErrors);
+    });
+    return unlistenStatus;
+  }, [handleStatusUpdate]);
 
   useEffect(() => {
-    isMountedRef.current = true;
-    let unlistenStatus: UnlistenFn | undefined;
-    let unlistenLifecycle: UnlistenFn | undefined;
-    let unlistenQuickLaunch: UnlistenFn | undefined;
+    const unlistenLifecycle = subscribeLifecycleState((status: AppLifecycleStatus) => {
+      setLifecycleState(status);
+    });
+    return unlistenLifecycle;
+  }, [setLifecycleState]);
 
-    const setupListeners = async (): Promise<void> => {
-      unlistenStatus = await listen<StatusBarUpdatePayload>('status_bar_update', (event) => {
-        if (!isMountedRef.current) return;
-        const payload = event.payload;
-        if (!payload) return;
-        const { scannedFiles, processedEvents, rescanErrors } = payload;
-        handleStatusUpdate(scannedFiles, processedEvents, rescanErrors);
-      });
-
-      unlistenLifecycle = await listen<AppLifecycleStatus>('app_lifecycle_state', (event) => {
-        if (!isMountedRef.current) return;
-        const status = event.payload;
-        if (!status) return;
-        setLifecycleState(status);
-      });
-
-      unlistenQuickLaunch = await listen('quick_launch', () => {
-        if (!isMountedRef.current) return;
-        focusSearchInput();
-      });
-    };
-
-    void setupListeners();
-
-    return () => {
-      isMountedRef.current = false;
-      unlistenStatus?.();
-      unlistenLifecycle?.();
-      unlistenQuickLaunch?.();
-    };
-  }, [focusSearchInput, handleStatusUpdate, setLifecycleState]);
+  useEffect(() => {
+    const unlistenQuickLaunch = subscribeQuickLaunch(() => {
+      focusSearchInput();
+    });
+    return unlistenQuickLaunch;
+  }, [focusSearchInput]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -108,7 +93,7 @@ export function useAppWindowListeners({
     document.documentElement.dataset.windowFocused = isWindowFocused ? 'true' : 'false';
   }, [isWindowFocused]);
 
-  const handleWindowDragDrop = useStableEvent((event: TauriEvent<DragDropEvent>) => {
+  const handleWindowDragDrop = useStableEvent((event: WindowDragDropEvent) => {
     const payload = event.payload;
     if (payload.type !== 'drop') {
       return;
@@ -129,21 +114,8 @@ export function useAppWindowListeners({
   });
 
   useEffect(() => {
-    let unlisten: UnlistenFn | null = null;
-    getCurrentWindow()
-      .onDragDropEvent(handleWindowDragDrop)
-      .then((unsubscribe) => {
-        unlisten = unsubscribe;
-      })
-      .catch((error) => {
-        console.error('Failed to register drag-drop listener', error);
-      });
-
-    return () => {
-      if (unlisten) {
-        unlisten();
-      }
-    };
+    const unlistenDragDrop = subscribeWindowDragDrop(handleWindowDragDrop);
+    return unlistenDragDrop;
   }, [handleWindowDragDrop]);
 
   return { isWindowFocused };

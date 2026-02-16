@@ -1,19 +1,24 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { listen } from '@tauri-apps/api/event';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import {
+  subscribeLifecycleState,
+  subscribeQuickLaunch,
+  subscribeStatusBarUpdate,
+  subscribeWindowDragDrop,
+} from '../../runtime/tauriEventRuntime';
 import { useAppWindowListeners } from '../useAppWindowListeners';
 
-vi.mock('@tauri-apps/api/event', () => ({
-  listen: vi.fn(),
+vi.mock('../../runtime/tauriEventRuntime', () => ({
+  subscribeStatusBarUpdate: vi.fn(),
+  subscribeLifecycleState: vi.fn(),
+  subscribeQuickLaunch: vi.fn(),
+  subscribeWindowDragDrop: vi.fn(),
 }));
 
-vi.mock('@tauri-apps/api/window', () => ({
-  getCurrentWindow: vi.fn(),
-}));
-
-const mockedListen = vi.mocked(listen);
-const mockedGetCurrentWindow = vi.mocked(getCurrentWindow);
+const mockedSubscribeStatusBarUpdate = vi.mocked(subscribeStatusBarUpdate);
+const mockedSubscribeLifecycleState = vi.mocked(subscribeLifecycleState);
+const mockedSubscribeQuickLaunch = vi.mocked(subscribeQuickLaunch);
+const mockedSubscribeWindowDragDrop = vi.mocked(subscribeWindowDragDrop);
 
 type HookProps = {
   activeTab: 'files' | 'events';
@@ -41,8 +46,12 @@ describe('useAppWindowListeners', () => {
   const setEventFilterQuery = vi.fn();
   const updateHistoryFromInput = vi.fn();
 
-  let tauriListeners: Record<string, (event: any) => void>;
-  let dragDropListener: ((event: any) => void) | null;
+  let statusCallback:
+    | ((payload: { scannedFiles: number; processedEvents: number; rescanErrors: number }) => void)
+    | null;
+  let lifecycleCallback: ((status: 'Initializing' | 'Updating' | 'Ready') => void) | null;
+  let quickLaunchCallback: (() => void) | null;
+  let dragDropCallback: ((event: any) => void) | null;
 
   const renderWindowListeners = (overrides: Partial<HookProps> = {}) =>
     renderHook((props: HookProps) => useAppWindowListeners(props), {
@@ -60,47 +69,52 @@ describe('useAppWindowListeners', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    tauriListeners = {};
-    dragDropListener = null;
+    statusCallback = null;
+    lifecycleCallback = null;
+    quickLaunchCallback = null;
+    dragDropCallback = null;
     document.documentElement.removeAttribute('data-window-focused');
 
-    mockedListen.mockImplementation(async (eventName: string, callback: (event: any) => void) => {
-      tauriListeners[eventName] = callback;
-      if (eventName === 'status_bar_update') return statusUnlisten;
-      if (eventName === 'app_lifecycle_state') return lifecycleUnlisten;
-      if (eventName === 'quick_launch') return quickLaunchUnlisten;
-      return vi.fn();
+    mockedSubscribeStatusBarUpdate.mockImplementation((listener) => {
+      statusCallback = listener;
+      return statusUnlisten;
     });
-
-    mockedGetCurrentWindow.mockReturnValue({
-      onDragDropEvent: vi.fn(async (callback: (event: any) => void) => {
-        dragDropListener = callback;
-        return dragDropUnlisten;
-      }),
-    } as unknown as ReturnType<typeof getCurrentWindow>);
+    mockedSubscribeLifecycleState.mockImplementation((listener) => {
+      lifecycleCallback = listener;
+      return lifecycleUnlisten;
+    });
+    mockedSubscribeQuickLaunch.mockImplementation((listener) => {
+      quickLaunchCallback = listener;
+      return quickLaunchUnlisten;
+    });
+    mockedSubscribeWindowDragDrop.mockImplementation((listener) => {
+      dragDropCallback = listener;
+      return dragDropUnlisten;
+    });
   });
 
-  it('subscribes to tauri events and dispatches payloads to handlers', async () => {
+  it('subscribes to runtime events and dispatches payloads to handlers', async () => {
     renderWindowListeners();
 
     await waitFor(() => {
-      expect(mockedListen).toHaveBeenCalledTimes(3);
+      expect(mockedSubscribeStatusBarUpdate).toHaveBeenCalledTimes(1);
+      expect(mockedSubscribeLifecycleState).toHaveBeenCalledTimes(1);
+      expect(mockedSubscribeQuickLaunch).toHaveBeenCalledTimes(1);
+      expect(mockedSubscribeWindowDragDrop).toHaveBeenCalledTimes(1);
     });
 
     act(() => {
-      tauriListeners.status_bar_update?.({
-        payload: { scannedFiles: 11, processedEvents: 22, rescanErrors: 3 },
-      });
+      statusCallback?.({ scannedFiles: 11, processedEvents: 22, rescanErrors: 3 });
     });
     expect(handleStatusUpdate).toHaveBeenCalledWith(11, 22, 3);
 
     act(() => {
-      tauriListeners.app_lifecycle_state?.({ payload: 'Ready' });
+      lifecycleCallback?.('Ready');
     });
     expect(setLifecycleState).toHaveBeenCalledWith('Ready');
 
     act(() => {
-      tauriListeners.quick_launch?.({});
+      quickLaunchCallback?.();
     });
     expect(focusSearchInput).toHaveBeenCalledTimes(1);
   });
@@ -109,11 +123,11 @@ describe('useAppWindowListeners', () => {
     const { rerender } = renderWindowListeners();
 
     await waitFor(() => {
-      expect(dragDropListener).not.toBeNull();
+      expect(dragDropCallback).not.toBeNull();
     });
 
     act(() => {
-      dragDropListener?.({
+      dragDropCallback?.({
         payload: { type: 'drop', paths: [' /tmp/file-a '] },
       });
     });
@@ -133,19 +147,15 @@ describe('useAppWindowListeners', () => {
     });
 
     act(() => {
-      dragDropListener?.({
+      dragDropCallback?.({
         payload: { type: 'drop', paths: [' /tmp/file-b '] },
       });
     });
     expect(setEventFilterQuery).toHaveBeenCalledWith('"/tmp/file-b"');
   });
 
-  it('syncs window focus attribute and cleans up listeners on unmount', async () => {
+  it('syncs window focus attribute and cleans up runtime subscriptions on unmount', async () => {
     const { unmount } = renderWindowListeners();
-
-    await waitFor(() => {
-      expect(dragDropListener).not.toBeNull();
-    });
 
     act(() => {
       window.dispatchEvent(new Event('blur'));

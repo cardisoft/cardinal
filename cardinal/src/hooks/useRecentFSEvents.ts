@@ -1,24 +1,9 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { listen } from '@tauri-apps/api/event';
-import type { UnlistenFn } from '@tauri-apps/api/event';
+import { subscribeFSEventsBatch } from '../runtime/tauriEventRuntime';
 import type { RecentEventPayload } from '../types/ipc';
 
 // Listen to batched file-system events and expose filtered projections for the UI.
 const MAX_EVENTS = 10000;
-
-const isRecentEventPayload = (value: unknown): value is RecentEventPayload => {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.path === 'string' &&
-    typeof candidate.eventId === 'number' &&
-    typeof candidate.timestamp === 'number' &&
-    typeof candidate.flagBits === 'number'
-  );
-};
 
 type RecentEventRecord = {
   payload: RecentEventPayload;
@@ -36,7 +21,6 @@ type RecentEventsOptions = {
 export function useRecentFSEvents({ caseSensitive, isActive }: RecentEventsOptions) {
   const eventsRef = useRef<RecentEventRecord[]>([]);
   const [eventFilterQuery, setEventFilterQuery] = useState('');
-  const isMountedRef = useRef(false);
   const isActiveRef = useRef(isActive);
   const [bufferVersion, bumpBufferVersion] = useReducer((count: number) => count + 1, 0);
 
@@ -48,45 +32,22 @@ export function useRecentFSEvents({ caseSensitive, isActive }: RecentEventsOptio
   }, [isActive]);
 
   useEffect(() => {
-    isMountedRef.current = true;
-    let unlistenEvents: UnlistenFn | undefined;
+    const unlistenEvents = subscribeFSEventsBatch((payload: RecentEventPayload[]) => {
+      if (payload.length === 0) return;
 
-    // Capture streamed events from the Rust side and keep only the latest N entries.
-    const setupListener = async () => {
-      try {
-        unlistenEvents = await listen<RecentEventPayload[]>('fs_events_batch', (event) => {
-          if (!isMountedRef.current) return;
-          const payload = event?.payload;
-          if (!Array.isArray(payload) || payload.length === 0) return;
-
-          const validEvents = payload.filter(isRecentEventPayload);
-          if (validEvents.length === 0) {
-            return;
-          }
-
-          const previous = eventsRef.current;
-          const normalizedBatch = validEvents.map(toEventRecord);
-          let updated = [...previous, ...normalizedBatch];
-          if (updated.length > MAX_EVENTS) {
-            updated = updated.slice(updated.length - MAX_EVENTS);
-          }
-          eventsRef.current = updated;
-
-          if (isActiveRef.current) {
-            bumpBufferVersion();
-          }
-        });
-      } catch (error) {
-        console.error('Failed to listen for file events', error);
+      const previous = eventsRef.current;
+      const normalizedBatch = payload.map(toEventRecord);
+      let updated = [...previous, ...normalizedBatch];
+      if (updated.length > MAX_EVENTS) {
+        updated = updated.slice(updated.length - MAX_EVENTS);
       }
-    };
+      eventsRef.current = updated;
 
-    void setupListener();
-
-    return () => {
-      isMountedRef.current = false;
-      unlistenEvents?.();
-    };
+      if (isActiveRef.current) {
+        bumpBufferVersion();
+      }
+    });
+    return unlistenEvents;
   }, []);
 
   const filteredEvents = useMemo(

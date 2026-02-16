@@ -1,12 +1,9 @@
 import { useCallback, useRef, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import type { UnlistenFn } from '@tauri-apps/api/event';
+import { subscribeIconUpdate } from '../runtime/tauriEventRuntime';
 import type { NodeInfoResponse, SearchResultItem } from '../types/search';
 import type { SlabIndex } from '../types/slab';
-import type { IconUpdateWirePayload } from '../types/ipc';
-
-type IconUpdateEventPayload = readonly IconUpdateWirePayload[] | null | undefined;
+import type { IconUpdatePayload } from '../types/ipc';
 
 export type DataLoaderCache = Map<SlabIndex, SearchResultItem>;
 type IconOverrideValue = string | undefined;
@@ -44,54 +41,40 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
   }, [dataResultsVersion]);
 
   useEffect(() => {
-    let unlistenIconUpdate: UnlistenFn | undefined;
-    (async () => {
-      try {
-        unlistenIconUpdate = await listen<IconUpdateEventPayload>('icon_update', (event) => {
-          const updates = event?.payload;
-          if (!Array.isArray(updates) || updates.length === 0) {
+    const unlistenIconUpdate = subscribeIconUpdate((updates: readonly IconUpdatePayload[]) => {
+      if (updates.length === 0) {
+        return;
+      }
+
+      setCache((prev) => {
+        let nextCache: DataLoaderCache | null = null;
+
+        updates.forEach((update) => {
+          const slabIndex = update.slabIndex;
+          const nextIcon = update.icon;
+          iconOverridesRef.current.set(slabIndex, nextIcon);
+
+          const current = prev.get(slabIndex);
+          if (!current || current.icon === nextIcon) {
             return;
           }
 
-          setCache((prev) => {
-            let nextCache: DataLoaderCache | null = null;
+          if (nextCache === null) {
+            nextCache = new Map(prev);
+          }
 
-            updates.forEach((update) => {
-              if (!update || typeof update.slabIndex !== 'number') {
-                return;
-              }
-
-              const slabIndex = update.slabIndex as SlabIndex;
-              const nextIcon = update.icon;
-              iconOverridesRef.current.set(slabIndex, nextIcon);
-
-              const current = prev.get(slabIndex);
-              if (!current || current.icon === nextIcon) {
-                return;
-              }
-
-              if (nextCache === null) {
-                nextCache = new Map(prev);
-              }
-
-              nextCache.set(slabIndex, { ...current, icon: nextIcon });
-            });
-
-            if (nextCache === null) {
-              return prev;
-            }
-
-            cacheRef.current = nextCache;
-            return nextCache;
-          });
+          nextCache.set(slabIndex, { ...current, icon: nextIcon });
         });
-      } catch (error) {
-        console.error('Failed to listen icon_update', error);
-      }
-    })();
-    return () => {
-      unlistenIconUpdate?.();
-    };
+
+        if (nextCache === null) {
+          return prev;
+        }
+
+        cacheRef.current = nextCache;
+        return nextCache;
+      });
+    });
+    return unlistenIconUpdate;
   }, []);
 
   const releaseLoadingBatch = useCallback((slabIndices: readonly SlabIndex[]) => {
