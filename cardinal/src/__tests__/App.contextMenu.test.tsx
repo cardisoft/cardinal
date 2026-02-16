@@ -41,7 +41,11 @@ vi.mock('../components/FileRow', () => ({
   }: {
     item: { path: string };
     rowIndex: number;
-    onContextMenu?: (event: React.MouseEvent<HTMLDivElement>, path: string, rowIndex: number) => void;
+    onContextMenu?: (
+      event: React.MouseEvent<HTMLDivElement>,
+      path: string,
+      rowIndex: number,
+    ) => void;
   }) => (
     <div
       data-testid="file-row"
