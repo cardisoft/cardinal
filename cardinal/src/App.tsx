@@ -127,9 +127,7 @@ function App() {
   const {
     showContextMenu: showFilesContextMenu,
     showHeaderContextMenu: showFilesHeaderContextMenu,
-  } = useContextMenu(autoFitColumns, toggleQuickLook, () =>
-    activeTab === 'files' ? selectedPaths : [],
-  );
+  } = useContextMenu(autoFitColumns, toggleQuickLook);
 
   const {
     showContextMenu: showEventsContextMenu,
@@ -311,14 +309,21 @@ function App() {
 
   const handleRowContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => {
-      if (!selectedIndexSet.has(rowIndex)) {
+      const isRowSelected = selectedIndexSet.has(rowIndex);
+      if (!isRowSelected) {
         selectSingleRow(rowIndex);
       }
-      if (path) {
-        showFilesContextMenu(event, path);
-      }
+      const targetPaths = isRowSelected && selectedPaths.length > 0 ? selectedPaths : [path];
+      showFilesContextMenu(event, targetPaths);
     },
-    [selectedIndexSet, selectSingleRow, showFilesContextMenu],
+    [selectedIndexSet, selectedPaths, selectSingleRow, showFilesContextMenu],
+  );
+
+  const handleEventsContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>, path: string) => {
+      showEventsContextMenu(event, [path]);
+    },
+    [showEventsContextMenu],
   );
 
   const renderRow = useCallback(
@@ -444,7 +449,7 @@ function App() {
               ref={eventsPanelRef}
               events={filteredEvents}
               onResizeStart={onEventResizeStart}
-              onContextMenu={showEventsContextMenu}
+              onContextMenu={handleEventsContextMenu}
               onHeaderContextMenu={showEventsHeaderContextMenu}
               searchQuery={eventFilterQuery}
               caseInsensitive={!caseSensitive}

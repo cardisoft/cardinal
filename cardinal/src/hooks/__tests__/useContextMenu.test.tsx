@@ -49,12 +49,9 @@ describe('useContextMenu', () => {
   });
 
   it('uses plural Copy Paths label and shortcut when multiple paths are selected', async () => {
-    const getSelectedPaths = () => ['/a', '/b'];
-    const { result } = renderHook(() => useContextMenu(null, undefined, getSelectedPaths), {
-      wrapper,
-    });
+    const { result } = renderHook(() => useContextMenu(null), { wrapper });
 
-    result.current.showContextMenu(createEvent(), '/a');
+    result.current.showContextMenu(createEvent(), ['/a', '/b']);
 
     await waitFor(() => {
       expect(mocks.menuNewMock).toHaveBeenCalled();
@@ -71,12 +68,9 @@ describe('useContextMenu', () => {
   });
 
   it('uses singular Copy Path label when a single path is targeted', async () => {
-    const getSelectedPaths = () => [];
-    const { result } = renderHook(() => useContextMenu(null, undefined, getSelectedPaths), {
-      wrapper,
-    });
+    const { result } = renderHook(() => useContextMenu(null), { wrapper });
 
-    result.current.showContextMenu(createEvent(), '/a');
+    result.current.showContextMenu(createEvent(), ['/a']);
 
     await waitFor(() => {
       expect(mocks.menuNewMock).toHaveBeenCalled();
@@ -91,19 +85,43 @@ describe('useContextMenu', () => {
     expect(copyPaths?.text).toBe('Copy Path');
   });
 
-  it('copies all selected paths to the clipboard', async () => {
-    const getSelectedPaths = () => ['/a', '/b'];
+  it('uses provided target paths and ignores empty entries', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(globalThis.navigator, 'clipboard', {
       value: { writeText },
       configurable: true,
     });
 
-    const { result } = renderHook(() => useContextMenu(null, undefined, getSelectedPaths), {
-      wrapper,
+    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+
+    result.current.showContextMenu(createEvent(), ['', '/clicked']);
+
+    await waitFor(() => {
+      expect(mocks.menuNewMock).toHaveBeenCalled();
     });
 
-    result.current.showContextMenu(createEvent(), '/a');
+    const items = mocks.menuNewMock.mock.calls[0][0].items as Array<{
+      id: string;
+      text?: string;
+      action?: () => void;
+    }>;
+    const copyPaths = items.find((item) => item.id === 'context_menu.copy_paths');
+    expect(copyPaths?.text).toBe('Copy Path');
+    copyPaths?.action?.();
+
+    expect(writeText).toHaveBeenCalledWith('/clicked');
+  });
+
+  it('copies all selected paths to the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+
+    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+
+    result.current.showContextMenu(createEvent(), ['/a', '/b']);
 
     await waitFor(() => {
       expect(mocks.menuNewMock).toHaveBeenCalled();
