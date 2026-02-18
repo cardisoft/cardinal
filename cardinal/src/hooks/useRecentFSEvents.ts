@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { subscribeFSEventsBatch } from '../runtime/tauriEventRuntime';
 import type { RecentEventPayload } from '../types/ipc';
+import { splitPath } from '../utils/path';
 
 // Listen to batched file-system events and expose filtered projections for the UI.
 const MAX_EVENTS = 10000;
@@ -87,7 +88,7 @@ const filterBuffer = (
 
 const toEventRecord = (payload: RecentEventPayload): RecentEventRecord => {
   const path = payload.path || '';
-  const name = path.split('/').pop() || '';
+  const { name } = splitPath(path);
   return {
     payload,
     path,

@@ -8,17 +8,16 @@ export const splitPath = (path: string | undefined): SplitPathResult => {
     return { name: '', directory: '' };
   }
 
-  const normalized = path.replace(/\\/g, '/');
-  if (normalized === '/') {
+  if (path === '/') {
     return { name: '/', directory: '/' };
   }
 
-  const slashIndex = normalized.lastIndexOf('/');
+  const slashIndex = path.lastIndexOf('/');
   if (slashIndex === -1) {
-    return { name: normalized, directory: '' };
+    return { name: path, directory: '' };
   }
 
-  const directory = normalized.slice(0, slashIndex) || '/';
-  const name = normalized.slice(slashIndex + 1) || normalized;
+  const directory = path.slice(0, slashIndex) || '/';
+  const name = path.slice(slashIndex + 1);
   return { name, directory };
 };

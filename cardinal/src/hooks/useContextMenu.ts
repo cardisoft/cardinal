@@ -5,6 +5,7 @@ import { Menu } from '@tauri-apps/api/menu';
 import type { MenuItemOptions } from '@tauri-apps/api/menu';
 import { useTranslation } from 'react-i18next';
 import { openResultPath } from '../utils/openResultPath';
+import { splitPath } from '../utils/path';
 
 type UseContextMenuResult = {
   showContextMenu: (event: ReactMouseEvent<HTMLElement>, targetPaths: string[]) => void;
@@ -59,10 +60,7 @@ export function useContextMenu(
           text: copyFilenameLabel,
           action: () => {
             const filenames = targetPaths
-              .map((itemPath) => {
-                const segments = itemPath.split(/[\\/]/).filter(Boolean);
-                return segments.length > 0 ? segments[segments.length - 1] : itemPath;
-              })
+              .map((itemPath) => splitPath(itemPath).name || itemPath)
               .join(' ');
             writeClipboard(filenames);
           },

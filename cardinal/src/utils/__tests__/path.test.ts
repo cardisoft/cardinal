@@ -15,16 +15,16 @@ describe('splitPath', () => {
     expect(splitPath('filename')).toEqual({ name: 'filename', directory: '' });
   });
 
-  it('normalizes Windows backslashes before splitting', () => {
+  it('does not normalize backslashes', () => {
     expect(splitPath('C:\\Users\\alice\\file.txt')).toEqual({
-      name: 'file.txt',
-      directory: 'C:/Users/alice',
+      name: 'C:\\Users\\alice\\file.txt',
+      directory: '',
     });
   });
 
-  it('keeps trailing slash paths consistent with current behavior', () => {
+  it('keeps trailing slash as empty leaf name', () => {
     expect(splitPath('/Users/alice/')).toEqual({
-      name: '/Users/alice/',
+      name: '',
       directory: '/Users/alice',
     });
   });
