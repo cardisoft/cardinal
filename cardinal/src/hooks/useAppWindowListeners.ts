@@ -12,7 +12,6 @@ import { useStableEvent } from './useStableEvent';
 
 type QueueSearchOptions = {
   immediate?: boolean;
-  onSearchCommitted?: (query: string) => void;
 };
 
 type UseAppWindowListenersOptions = {
@@ -20,9 +19,8 @@ type UseAppWindowListenersOptions = {
   focusSearchInput: () => void;
   handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
   setLifecycleState: (status: AppLifecycleStatus) => void;
-  queueSearch: (query: string, options?: QueueSearchOptions) => void;
+  submitFilesQuery: (query: string, options?: QueueSearchOptions) => void;
   setEventFilterQuery: (value: string) => void;
-  updateHistoryFromInput: (query: string) => void;
 };
 
 type UseAppWindowListenersResult = {
@@ -38,9 +36,8 @@ export function useAppWindowListeners({
   focusSearchInput,
   handleStatusUpdate,
   setLifecycleState,
-  queueSearch,
+  submitFilesQuery,
   setEventFilterQuery,
-  updateHistoryFromInput,
 }: UseAppWindowListenersOptions): UseAppWindowListenersResult {
   const [isWindowFocused, setIsWindowFocused] = useState<boolean>(() => {
     if (typeof document === 'undefined') {
@@ -107,10 +104,7 @@ export function useAppWindowListeners({
       setEventFilterQuery(query);
       return;
     }
-    queueSearch(query, {
-      immediate: true,
-      onSearchCommitted: updateHistoryFromInput,
-    });
+    submitFilesQuery(query, { immediate: true });
   });
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef } from 'react';
 import { subscribeFSEventsBatch } from '../runtime/tauriEventRuntime';
 import type { RecentEventPayload } from '../types/ipc';
 import { splitPath } from '../utils/path';
@@ -17,11 +17,15 @@ type RecentEventRecord = {
 type RecentEventsOptions = {
   caseSensitive: boolean;
   isActive: boolean;
+  eventFilterQuery: string;
 };
 
-export function useRecentFSEvents({ caseSensitive, isActive }: RecentEventsOptions) {
+export function useRecentFSEvents({
+  caseSensitive,
+  isActive,
+  eventFilterQuery,
+}: RecentEventsOptions) {
   const eventsRef = useRef<RecentEventRecord[]>([]);
-  const [eventFilterQuery, setEventFilterQuery] = useState('');
   const isActiveRef = useRef(isActive);
   const [bufferVersion, bumpBufferVersion] = useReducer((count: number) => count + 1, 0);
 
@@ -59,8 +63,6 @@ export function useRecentFSEvents({ caseSensitive, isActive }: RecentEventsOptio
 
   return {
     filteredEvents,
-    eventFilterQuery,
-    setEventFilterQuery,
   };
 }
 

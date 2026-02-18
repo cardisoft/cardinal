@@ -1,10 +1,5 @@
 import { useRef, useCallback, useEffect, useMemo } from 'react';
-import type {
-  ChangeEvent,
-  CSSProperties,
-  KeyboardEvent as ReactKeyboardEvent,
-  MouseEvent as ReactMouseEvent,
-} from 'react';
+import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import './App.css';
 import { FileRow } from './components/FileRow';
 import { SearchBar } from './components/SearchBar';
@@ -12,7 +7,6 @@ import { FilesTabContent } from './components/FilesTabContent';
 import { PermissionOverlay } from './components/PermissionOverlay';
 import PreferencesOverlay from './components/PreferencesOverlay';
 import StatusBar from './components/StatusBar';
-import type { StatusTabKey } from './components/StatusBar';
 import type { SearchResultItem } from './types/search';
 import { useColumnResize } from './hooks/useColumnResize';
 import { useContextMenu } from './hooks/useContextMenu';
@@ -22,7 +16,6 @@ import { useRecentFSEvents } from './hooks/useRecentFSEvents';
 import { DEFAULT_SORTABLE_RESULT_THRESHOLD, useRemoteSort } from './hooks/useRemoteSort';
 import { useSelection } from './hooks/useSelection';
 import { useQuickLook } from './hooks/useQuickLook';
-import { useSearchHistory } from './hooks/useSearchHistory';
 import { ROW_HEIGHT, OVERSCAN_ROW_COUNT } from './constants';
 import type { VirtualListHandle } from './components/VirtualList';
 import FSEventsPanel from './components/FSEventsPanel';
@@ -35,9 +28,8 @@ import { useStableEvent } from './hooks/useStableEvent';
 import { useAppHotkeys } from './hooks/useAppHotkeys';
 import { useAppPreferences } from './hooks/useAppPreferences';
 import { useAppWindowListeners } from './hooks/useAppWindowListeners';
+import { useFilesTabEffects } from './hooks/useFilesTabEffects';
 import { useFilesTabState } from './hooks/useFilesTabState';
-
-const MAX_SEARCH_HISTORY_ENTRIES = 50;
 
 function App() {
   const {
@@ -70,12 +62,6 @@ function App() {
   const virtualListRef = useRef<VirtualListHandle | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  const {
-    handleInputChange: updateHistoryFromInput,
-    navigate: navigateSearchHistory,
-    ensureTailValue: ensureHistoryBuffer,
-    resetCursorToTail,
-  } = useSearchHistory({ maxEntries: MAX_SEARCH_HISTORY_ENTRIES });
   const { colWidths, onResizeStart, autoFitColumns } = useColumnResize();
   const { caseSensitive } = searchParams;
   const { eventColWidths, onEventResizeStart, autoFitEventColumns } = useEventColumnWidths();
@@ -95,11 +81,26 @@ function App() {
     t('sorting.disabled', { limit }),
   );
 
-  const { activeTab, setActiveTab, isSearchFocused, handleSearchFocus, handleSearchBlur } =
-    useFilesTabState();
-  const { filteredEvents, eventFilterQuery, setEventFilterQuery } = useRecentFSEvents({
+  const {
+    activeTab,
+    isSearchFocused,
+    handleSearchFocus,
+    handleSearchBlur,
+    eventFilterQuery,
+    setEventFilterQuery,
+    onTabChange,
+    searchInputValue,
+    onQueryChange,
+    onSearchInputKeyDown,
+    submitFilesQuery,
+  } = useFilesTabState({
+    searchQuery: searchParams.query,
+    queueSearch,
+  });
+  const { filteredEvents } = useRecentFSEvents({
     caseSensitive,
     isActive: activeTab === 'events',
+    eventFilterQuery,
   });
 
   // Centralized selection management for the virtualized files list.
@@ -181,9 +182,8 @@ function App() {
     focusSearchInput,
     handleStatusUpdate,
     setLifecycleState,
-    queueSearch,
+    submitFilesQuery,
     setEventFilterQuery,
-    updateHistoryFromInput,
   });
 
   const navigateSelection = useStableEvent(moveSelection);
@@ -198,58 +198,17 @@ function App() {
     triggerQuickLook,
   });
 
-  useEffect(() => {
-    if (activeTab !== 'files') {
-      clearSelection();
-    }
-  }, [activeTab, clearSelection]);
-
-  useEffect(() => {
-    if (activeTab !== 'files') {
-      closeQuickLook();
-      return;
-    }
-
-    if (selectedIndices.length) {
-      updateQuickLook();
-    }
-  }, [activeTab, selectedIndices, closeQuickLook, updateQuickLook]);
-
-  useEffect(() => {
-    if (activeRowIndex == null) {
-      return;
-    }
-
-    virtualListRef.current?.scrollToRow?.(activeRowIndex, 'nearest');
-  }, [activeRowIndex]);
-
-  useEffect(() => {
-    clearSelection();
-    virtualListRef.current?.scrollToTop?.();
-  }, [results, clearSelection]);
-
-  useEffect(() => {
-    if (activeTab === 'events') {
-      // Defer to next microtask so AutoSizer/Virtualized list have measured before scrolling.
-      queueMicrotask(() => {
-        eventsPanelRef.current?.scrollToBottom?.();
-      });
-    }
-  }, [activeTab]);
-
-  const onQueryChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const inputValue = event.target.value;
-
-      if (activeTab === 'events') {
-        setEventFilterQuery(inputValue);
-        return;
-      }
-
-      queueSearch(inputValue, { onSearchCommitted: updateHistoryFromInput });
-    },
-    [activeTab, queueSearch, setEventFilterQuery, updateHistoryFromInput],
-  );
+  useFilesTabEffects({
+    activeTab,
+    selectedIndices,
+    activeRowIndex,
+    closeQuickLook,
+    updateQuickLook,
+    clearSelection,
+    resultsVersion,
+    virtualListRef,
+    eventsPanelRef,
+  });
 
   const onToggleCaseSensitive = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -257,45 +216,6 @@ function App() {
       updateSearchParams({ caseSensitive: nextValue });
     },
     [updateSearchParams],
-  );
-
-  const handleHistoryNavigation = useCallback(
-    (direction: 'older' | 'newer') => {
-      if (activeTab !== 'files') {
-        return;
-      }
-      const nextValue = navigateSearchHistory(direction);
-      if (nextValue === null) {
-        return;
-      }
-      queueSearch(nextValue);
-    },
-    [activeTab, navigateSearchHistory, queueSearch],
-  );
-
-  const onSearchInputKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLInputElement>) => {
-      if (activeTab !== 'files') {
-        return;
-      }
-      if (event.key === 'Enter') {
-        queueSearch(event.currentTarget.value, {
-          immediate: true,
-          onSearchCommitted: updateHistoryFromInput,
-        });
-        return;
-      }
-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
-        return;
-      }
-      if (event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) {
-        return;
-      }
-
-      event.preventDefault();
-      handleHistoryNavigation(event.key === 'ArrowUp' ? 'older' : 'newer');
-    },
-    [activeTab, handleHistoryNavigation, queueSearch, updateHistoryFromInput],
   );
 
   const handleHorizontalSync = useCallback((scrollLeft: number) => {
@@ -373,24 +293,6 @@ function App() {
   })();
   const searchErrorMessage =
     typeof searchError === 'string' ? searchError : (searchError?.message ?? null);
-
-  const handleTabChange = useCallback(
-    (newTab: StatusTabKey) => {
-      setActiveTab(newTab);
-      if (newTab === 'events') {
-        // Switch to events: always show newest items and clear transient filters.
-        setEventFilterQuery('');
-        resetCursorToTail();
-      } else {
-        // Switch to files: sync with reducer-managed search state and cancel pending timers.
-        ensureHistoryBuffer('');
-        queueSearch('', { immediate: true });
-      }
-    },
-    [ensureHistoryBuffer, queueSearch, resetCursorToTail, setEventFilterQuery],
-  );
-
-  const searchInputValue = activeTab === 'events' ? eventFilterQuery : searchParams.query;
 
   const containerStyle = useMemo(
     () =>
@@ -486,7 +388,7 @@ function App() {
           searchDurationMs={durationMs}
           resultCount={resultCount}
           activeTab={activeTab}
-          onTabChange={handleTabChange}
+          onTabChange={onTabChange}
           onRequestRescan={requestRescan}
           rescanErrorCount={rescanErrors}
         />
