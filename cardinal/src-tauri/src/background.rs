@@ -402,7 +402,7 @@ pub(crate) fn build_search_cache(
         &path,
         ignore_paths,
         false,
-        Some(&crate::lifecycle::APP_QUIT),
+        || crate::lifecycle::APP_QUIT.load(Ordering::Relaxed),
     );
     let walking_done = AtomicBool::new(false);
 

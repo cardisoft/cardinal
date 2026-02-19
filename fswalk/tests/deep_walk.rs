@@ -50,7 +50,7 @@ fn ignores_directories_and_collects_metadata() {
     let tmp = TempDir::new("fswalk_deep").unwrap();
     build_deep_fixture(tmp.path());
     let ignore = vec![tmp.path().join("skip_dir")];
-    let walk_data = WalkData::new(tmp.path(), &ignore, true, None);
+    let walk_data = WalkData::new(tmp.path(), &ignore, true, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, tmp.path());
 
@@ -94,7 +94,7 @@ fn cancellation_stops_traversal_early() {
         fs::create_dir(tmp.path().join(format!("dir_{i}"))).unwrap();
     }
     let cancel = AtomicBool::new(false);
-    let walk_data = WalkData::new(tmp.path(), &[], false, Some(&cancel));
+    let walk_data = WalkData::new(tmp.path(), &[], false, || cancel.load(Ordering::Relaxed));
     cancel.store(true, Ordering::Relaxed); // cancel immediately
     let node = walk_it(&walk_data);
     assert!(
