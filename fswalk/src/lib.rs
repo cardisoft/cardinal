@@ -7,7 +7,7 @@ use std::{
     num::NonZeroU64,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::atomic::{AtomicUsize, Ordering},
     time::UNIX_EPOCH,
 };
 
@@ -80,35 +80,56 @@ impl From<fs::FileType> for NodeFileType {
     }
 }
 
-#[derive(Debug)]
-pub struct WalkData<'w> {
+pub struct WalkData<'w, F: Fn() -> bool> {
     pub num_files: AtomicUsize,
     pub num_dirs: AtomicUsize,
     /// Cancellation will be checked periodically.
-    cancel: Option<&'w AtomicBool>,
+    cancel: F,
     pub root_path: &'w Path,
     pub ignore_directories: &'w [PathBuf],
     /// If set, metadata will be collected for each file node(folder node will get free metadata).
     need_metadata: bool,
 }
 
-impl<'w> WalkData<'w> {
+impl<F> std::fmt::Debug for WalkData<'_, F>
+where
+    F: Fn() -> bool,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WalkData")
+            .field("num_files", &self.num_files.load(Ordering::Relaxed))
+            .field("num_dirs", &self.num_dirs.load(Ordering::Relaxed))
+            .field("cancel", &((self.cancel)()))
+            .field("root_path", &self.root_path)
+            .field("ignore_directories", &self.ignore_directories)
+            .field("need_metadata", &self.need_metadata)
+            .finish()
+    }
+}
+
+impl<'w> WalkData<'w, fn() -> bool> {
     pub const fn simple(root_path: &'w Path, need_metadata: bool) -> Self {
+        fn never_cancel() -> bool {
+            false
+        }
+
         Self {
             num_files: AtomicUsize::new(0),
             num_dirs: AtomicUsize::new(0),
-            cancel: None,
+            cancel: never_cancel,
             root_path,
             ignore_directories: &[],
             need_metadata,
         }
     }
+}
 
+impl<'w, F: Fn() -> bool> WalkData<'w, F> {
     pub fn new(
         root_path: &'w Path,
         ignore_directories: &'w [PathBuf],
         need_metadata: bool,
-        cancel: Option<&'w AtomicBool>,
+        cancel: F,
     ) -> Self {
         Self {
             num_files: AtomicUsize::new(0),
@@ -125,11 +146,17 @@ impl<'w> WalkData<'w> {
     }
 }
 
-pub fn walk_it_without_root_chain(walk_data: &WalkData) -> Option<Node> {
+pub fn walk_it_without_root_chain<F>(walk_data: &WalkData<'_, F>) -> Option<Node>
+where
+    F: Fn() -> bool + Send + Sync,
+{
     walk(walk_data.root_path, walk_data)
 }
 
-pub fn walk_it(walk_data: &WalkData) -> Option<Node> {
+pub fn walk_it<F>(walk_data: &WalkData<'_, F>) -> Option<Node>
+where
+    F: Fn() -> bool + Send + Sync,
+{
     walk(walk_data.root_path, walk_data).map(|node_tree| {
         if let Some(parent) = walk_data.root_path.parent() {
             let mut path = PathBuf::from(parent);
@@ -164,7 +191,7 @@ pub fn walk_it(walk_data: &WalkData) -> Option<Node> {
     })
 }
 
-fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
+fn walk<F: Fn() -> bool + Send + Sync>(path: &Path, walk_data: &WalkData<'_, F>) -> Option<Node> {
     if walk_data.should_ignore(path) {
         return None;
     }
@@ -179,11 +206,7 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
                 .filter_map(|entry| {
                     match &entry {
                         Ok(entry) => {
-                            if walk_data
-                                .cancel
-                                .map(|x| x.load(Ordering::Relaxed))
-                                .unwrap_or_default()
-                            {
+                            if (walk_data.cancel)() {
                                 return None;
                             }
                             if walk_data.should_ignore(path) {
@@ -235,11 +258,7 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
         walk_data.num_files.fetch_add(1, Ordering::Relaxed);
         vec![]
     };
-    if walk_data
-        .cancel
-        .map(|x| x.load(Ordering::Relaxed))
-        .unwrap_or_default()
-    {
+    if (walk_data.cancel)() {
         return None;
     }
     let name = path
@@ -284,6 +303,7 @@ mod tests {
         fs,
         io::Write,
         path::{Component, Path, PathBuf},
+        sync::atomic::AtomicBool,
         time::{Duration, Instant},
     };
     use tempdir::TempDir;
@@ -488,7 +508,7 @@ mod tests {
     fn test_search_root() {
         let done = AtomicBool::new(false);
         let path = [PathBuf::from("/System/Volumes/Data")];
-        let walk_data = WalkData::new(Path::new("/"), &path, false, None);
+        let walk_data = WalkData::new(Path::new("/"), &path, false, || false);
         std::thread::scope(|s| {
             s.spawn(|| {
                 let node = walk_it(&walk_data).unwrap();
@@ -515,7 +535,7 @@ mod tests {
             Path::new("/Library/Developer/CoreSimulator/Volumes/iOS_23A343"),
             &ignore,
             true,
-            None,
+            || false,
         );
         std::thread::scope(|s| {
             s.spawn(|| {
@@ -539,7 +559,9 @@ mod tests {
         let cancel = AtomicBool::new(false);
         let done = AtomicBool::new(false);
         let ignore = vec![PathBuf::from("/System/Volumes/Data")];
-        let walk_data = WalkData::new(Path::new("/"), &ignore, false, Some(&cancel));
+        let walk_data = WalkData::new(Path::new("/"), &ignore, false, || {
+            cancel.load(Ordering::Relaxed)
+        });
         std::thread::scope(|s| {
             s.spawn(|| {
                 let node = walk_it(&walk_data);
