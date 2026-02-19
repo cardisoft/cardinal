@@ -25,12 +25,8 @@ type HookProps = {
   focusSearchInput: () => void;
   handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
   setLifecycleState: (status: 'Initializing' | 'Updating' | 'Ready') => void;
-  queueSearch: (
-    query: string,
-    options?: { immediate?: boolean; onSearchCommitted?: (query: string) => void },
-  ) => void;
+  submitFilesQuery: (query: string, options?: { immediate?: boolean }) => void;
   setEventFilterQuery: (query: string) => void;
-  updateHistoryFromInput: (query: string) => void;
 };
 
 describe('useAppWindowListeners', () => {
@@ -42,9 +38,8 @@ describe('useAppWindowListeners', () => {
   const focusSearchInput = vi.fn();
   const handleStatusUpdate = vi.fn();
   const setLifecycleState = vi.fn();
-  const queueSearch = vi.fn();
+  const submitFilesQuery = vi.fn();
   const setEventFilterQuery = vi.fn();
-  const updateHistoryFromInput = vi.fn();
 
   let statusCallback:
     | ((payload: { scannedFiles: number; processedEvents: number; rescanErrors: number }) => void)
@@ -60,9 +55,8 @@ describe('useAppWindowListeners', () => {
         focusSearchInput,
         handleStatusUpdate,
         setLifecycleState,
-        queueSearch,
+        submitFilesQuery,
         setEventFilterQuery,
-        updateHistoryFromInput,
         ...overrides,
       },
     });
@@ -131,9 +125,8 @@ describe('useAppWindowListeners', () => {
         payload: { type: 'drop', paths: [' /tmp/file-a '] },
       });
     });
-    expect(queueSearch).toHaveBeenCalledWith('"/tmp/file-a"', {
+    expect(submitFilesQuery).toHaveBeenCalledWith('"/tmp/file-a"', {
       immediate: true,
-      onSearchCommitted: updateHistoryFromInput,
     });
 
     rerender({
@@ -141,9 +134,8 @@ describe('useAppWindowListeners', () => {
       focusSearchInput,
       handleStatusUpdate,
       setLifecycleState,
-      queueSearch,
+      submitFilesQuery,
       setEventFilterQuery,
-      updateHistoryFromInput,
     });
 
     act(() => {

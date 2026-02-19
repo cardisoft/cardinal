@@ -24,9 +24,13 @@ describe('useRecentFSEvents', () => {
   });
 
   it('stores and filters streamed events when active', async () => {
-    const { result } = renderHook(() =>
-      useRecentFSEvents({ caseSensitive: false, isActive: true }),
-    );
+    const { result, rerender } = renderHook((props) => useRecentFSEvents(props), {
+      initialProps: {
+        caseSensitive: false,
+        isActive: true,
+        eventFilterQuery: '',
+      },
+    });
 
     await waitFor(() => {
       expect(fsEventsBatchListener).not.toBeNull();
@@ -41,8 +45,10 @@ describe('useRecentFSEvents', () => {
 
     expect(result.current.filteredEvents).toHaveLength(2);
 
-    act(() => {
-      result.current.setEventFilterQuery('alpha');
+    rerender({
+      caseSensitive: false,
+      isActive: true,
+      eventFilterQuery: 'alpha',
     });
 
     expect(result.current.filteredEvents).toHaveLength(1);
@@ -51,7 +57,7 @@ describe('useRecentFSEvents', () => {
 
   it('cleans up runtime subscription on unmount', async () => {
     const { unmount } = renderHook(() =>
-      useRecentFSEvents({ caseSensitive: false, isActive: true }),
+      useRecentFSEvents({ caseSensitive: false, isActive: true, eventFilterQuery: '' }),
     );
     unmount();
 

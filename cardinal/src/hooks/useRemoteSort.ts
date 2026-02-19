@@ -137,11 +137,7 @@ export const useRemoteSort = (
 
   useEffect(() => {
     bumpDisplayedResultsVersion();
-  }, [resultsVersion]);
-
-  useEffect(() => {
-    bumpDisplayedResultsVersion();
-  }, [shouldUseSortedResults]);
+  }, [resultsVersion, shouldUseSortedResults]);
 
   const sortLimitLabel = useMemo(
     () => new Intl.NumberFormat(locale).format(sortThreshold),

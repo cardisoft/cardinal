@@ -161,8 +161,6 @@ vi.mock('../hooks/useEventColumnWidths', () => ({
 vi.mock('../hooks/useRecentFSEvents', () => ({
   useRecentFSEvents: () => ({
     filteredEvents: [],
-    eventFilterQuery: '',
-    setEventFilterQuery: vi.fn(),
   }),
 }));
 
@@ -247,10 +245,16 @@ vi.mock('../hooks/useAppHotkeys', () => ({
 vi.mock('../hooks/useFilesTabState', () => ({
   useFilesTabState: () => ({
     activeTab: testState.activeTab,
-    setActiveTab: vi.fn(),
     isSearchFocused: false,
     handleSearchFocus: vi.fn(),
     handleSearchBlur: vi.fn(),
+    eventFilterQuery: '',
+    setEventFilterQuery: vi.fn(),
+    onTabChange: vi.fn(),
+    searchInputValue: '',
+    onQueryChange: vi.fn(),
+    onSearchInputKeyDown: vi.fn(),
+    submitFilesQuery: vi.fn(),
   }),
 }));
 
