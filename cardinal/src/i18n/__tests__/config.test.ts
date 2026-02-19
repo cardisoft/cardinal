@@ -8,12 +8,12 @@ beforeEach(() => {
 });
 
 describe('i18n locale normalization', () => {
-  it('normalizes stored language codes (supported + legacy)', () => {
+  it('normalizes stored language codes (supported only)', () => {
     expect(__test__.normalizeStoredLanguage('en-US')).toBe('en-US');
     expect(__test__.normalizeStoredLanguage('zh-TW')).toBe('zh-TW');
 
-    expect(__test__.normalizeStoredLanguage('en')).toBe('en-US');
-    expect(__test__.normalizeStoredLanguage('zh')).toBe('zh-CN');
+    expect(__test__.normalizeStoredLanguage('en')).toBeUndefined();
+    expect(__test__.normalizeStoredLanguage('zh')).toBeUndefined();
 
     expect(__test__.normalizeStoredLanguage('does-not-exist')).toBeUndefined();
   });
@@ -40,7 +40,7 @@ describe('i18n locale normalization', () => {
     expect(__test__.normalizeBrowserLanguage('unknown')).toBe('en-US');
   });
 
-  it('normalizes all legacy language codes correctly', () => {
+  it('normalizes base language browser tags correctly', () => {
     expect(__test__.normalizeBrowserLanguage('en')).toBe('en-US');
     expect(__test__.normalizeBrowserLanguage('ja')).toBe('ja-JP');
     expect(__test__.normalizeBrowserLanguage('ko')).toBe('ko-KR');
@@ -62,12 +62,23 @@ describe('i18n locale normalization', () => {
     expect(__test__.normalizeBrowserLanguage('en_US')).toBe('en-US');
   });
 
-  it('detects initial language from localStorage first (supported + legacy)', () => {
+  it('normalizes mixed-case browser language tags', () => {
+    expect(__test__.normalizeBrowserLanguage('EN_gb')).toBe('en-US');
+    expect(__test__.normalizeBrowserLanguage('PT_br')).toBe('pt-BR');
+    expect(__test__.normalizeBrowserLanguage('ZH_hant_hk')).toBe('zh-TW');
+  });
+
+  it('detects initial language from localStorage first (supported only)', () => {
     window.localStorage.setItem('cardinal.language', 'fr-FR');
     expect(__test__.detectInitialLanguage()).toBe('fr-FR');
 
     window.localStorage.setItem('cardinal.language', 'fr');
-    expect(__test__.detectInitialLanguage()).toBe('fr-FR');
+    const navigatorLanguage = vi
+      .spyOn(window.navigator, 'language', 'get')
+      .mockReturnValue('ja-JP');
+
+    expect(__test__.detectInitialLanguage()).toBe('ja-JP');
+    navigatorLanguage.mockRestore();
   });
 
   it('falls back to browser language when localStorage is invalid', () => {
@@ -78,6 +89,17 @@ describe('i18n locale normalization', () => {
       .mockReturnValue('zh-Hant');
 
     expect(__test__.detectInitialLanguage()).toBe('zh-TW');
+    navigatorLanguage.mockRestore();
+  });
+
+  it('falls back to browser language when stored language casing is invalid', () => {
+    window.localStorage.setItem('cardinal.language', 'fr-fr');
+
+    const navigatorLanguage = vi
+      .spyOn(window.navigator, 'language', 'get')
+      .mockReturnValue('de-DE');
+
+    expect(__test__.detectInitialLanguage()).toBe('de-DE');
     navigatorLanguage.mockRestore();
   });
 

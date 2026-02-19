@@ -16,115 +16,75 @@ import arSA from './resources/ar-SA.json';
 import hiIN from './resources/hi-IN.json';
 import trTR from './resources/tr-TR.json';
 
-export type SupportedLanguage =
-  | 'en-US'
-  | 'zh-CN'
-  | 'zh-TW'
-  | 'ja-JP'
-  | 'ko-KR'
-  | 'fr-FR'
-  | 'es-ES'
-  | 'pt-BR'
-  | 'de-DE'
-  | 'it-IT'
-  | 'ru-RU'
-  | 'uk-UA'
-  | 'ar-SA'
-  | 'hi-IN'
-  | 'tr-TR';
+const LANGUAGE_DEFINITIONS = [
+  { code: 'en-US', label: 'English', translation: enUS },
+  { code: 'zh-CN', label: '简体中文', translation: zhCN },
+  { code: 'zh-TW', label: '繁體中文', translation: zhTW },
+  { code: 'ja-JP', label: '日本語', translation: jaJP },
+  { code: 'ko-KR', label: '한국어', translation: koKR },
+  { code: 'fr-FR', label: 'Français', translation: frFR },
+  { code: 'es-ES', label: 'Español', translation: esES },
+  { code: 'pt-BR', label: 'Português (Brasil)', translation: ptBR },
+  { code: 'de-DE', label: 'Deutsch', translation: deDE },
+  { code: 'it-IT', label: 'Italiano', translation: itIT },
+  { code: 'ru-RU', label: 'Русский', translation: ruRU },
+  { code: 'uk-UA', label: 'Українська', translation: ukUA },
+  { code: 'ar-SA', label: 'العربية', translation: arSA },
+  { code: 'hi-IN', label: 'हिन्दी', translation: hiIN },
+  { code: 'tr-TR', label: 'Türkçe', translation: trTR },
+] as const;
+
+type LanguageDefinition = (typeof LANGUAGE_DEFINITIONS)[number];
+
+export type SupportedLanguage = LanguageDefinition['code'];
 
 type LanguageOption = {
   code: SupportedLanguage;
   label: string;
 };
 
-export const LANGUAGE_OPTIONS: LanguageOption[] = [
-  { code: 'en-US', label: 'English' },
-  { code: 'zh-CN', label: '简体中文' },
-  { code: 'zh-TW', label: '繁體中文' },
-  { code: 'ja-JP', label: '日本語' },
-  { code: 'ko-KR', label: '한국어' },
-  { code: 'fr-FR', label: 'Français' },
-  { code: 'es-ES', label: 'Español' },
-  { code: 'pt-BR', label: 'Português (Brasil)' },
-  { code: 'de-DE', label: 'Deutsch' },
-  { code: 'it-IT', label: 'Italiano' },
-  { code: 'ru-RU', label: 'Русский' },
-  { code: 'uk-UA', label: 'Українська' },
-  { code: 'ar-SA', label: 'العربية' },
-  { code: 'hi-IN', label: 'हिन्दी' },
-  { code: 'tr-TR', label: 'Türkçe' },
-];
+export const LANGUAGE_OPTIONS: LanguageOption[] = LANGUAGE_DEFINITIONS.map(({ code, label }) => ({
+  code,
+  label,
+}));
 
 const STORAGE_KEY = 'cardinal.language';
 const DEFAULT_LANGUAGE: SupportedLanguage = 'en-US';
 
-const resources = {
-  'en-US': { translation: enUS },
-  'zh-CN': { translation: zhCN },
-  'zh-TW': { translation: zhTW },
-  'ja-JP': { translation: jaJP },
-  'ko-KR': { translation: koKR },
-  'fr-FR': { translation: frFR },
-  'es-ES': { translation: esES },
-  'pt-BR': { translation: ptBR },
-  'de-DE': { translation: deDE },
-  'it-IT': { translation: itIT },
-  'ru-RU': { translation: ruRU },
-  'uk-UA': { translation: ukUA },
-  'ar-SA': { translation: arSA },
-  'hi-IN': { translation: hiIN },
-  'tr-TR': { translation: trTR },
-} as const;
+const resources = LANGUAGE_DEFINITIONS.reduce<
+  Record<SupportedLanguage, { translation: LanguageDefinition['translation'] }>
+>(
+  (acc, { code, translation }) => {
+    acc[code] = { translation };
+    return acc;
+  },
+  {} as Record<SupportedLanguage, { translation: LanguageDefinition['translation'] }>,
+);
 
-type LegacyLanguage =
-  | 'en'
-  | 'zh'
-  | 'ja'
-  | 'ko'
-  | 'fr'
-  | 'es'
-  | 'pt'
-  | 'de'
-  | 'it'
-  | 'ru'
-  | 'uk'
-  | 'ar'
-  | 'hi'
-  | 'tr';
+const SUPPORTED_LANGUAGES = LANGUAGE_DEFINITIONS.map(({ code }) => code);
+const SUPPORTED_LANGUAGE_SET = new Set<SupportedLanguage>(SUPPORTED_LANGUAGES);
 
-const LEGACY_LANGUAGE_MAP: Record<LegacyLanguage, SupportedLanguage> = {
-  en: 'en-US',
-  zh: 'zh-CN',
-  ja: 'ja-JP',
-  ko: 'ko-KR',
-  fr: 'fr-FR',
-  es: 'es-ES',
-  pt: 'pt-BR',
-  de: 'de-DE',
-  it: 'it-IT',
-  ru: 'ru-RU',
-  uk: 'uk-UA',
-  ar: 'ar-SA',
-  hi: 'hi-IN',
-  tr: 'tr-TR',
-};
-
-const normalizeStoredLanguage = (stored: string): SupportedLanguage | undefined => {
-  if (stored in resources) {
-    return stored as SupportedLanguage;
+const BASE_LANGUAGE_MAP = new Map<string, SupportedLanguage>();
+for (const code of SUPPORTED_LANGUAGES) {
+  const [base] = code.split('-');
+  if (base) {
+    if (!BASE_LANGUAGE_MAP.has(base)) {
+      BASE_LANGUAGE_MAP.set(base, code);
+    }
   }
-  if (stored in LEGACY_LANGUAGE_MAP) {
-    return LEGACY_LANGUAGE_MAP[stored as LegacyLanguage];
-  }
-  return undefined;
-};
+}
+
+const isSupportedLanguage = (value: string): value is SupportedLanguage =>
+  SUPPORTED_LANGUAGE_SET.has(value as SupportedLanguage);
+
+const normalizeStoredLanguage = (stored: string): SupportedLanguage | undefined =>
+  isSupportedLanguage(stored) ? stored : undefined;
 
 const normalizeBrowserLanguage = (lng: string): SupportedLanguage => {
   const normalizedInput = lng.replace(/_/g, '-');
 
-  if (normalizedInput in resources) {
-    return normalizedInput as SupportedLanguage;
+  if (isSupportedLanguage(normalizedInput)) {
+    return normalizedInput;
   }
 
   const [rawBase, ...subtags] = normalizedInput
@@ -147,36 +107,14 @@ const normalizeBrowserLanguage = (lng: string): SupportedLanguage => {
     return 'zh-CN';
   }
 
-  switch (base) {
-    case 'en':
-      return 'en-US';
-    case 'ja':
-      return 'ja-JP';
-    case 'ko':
-      return 'ko-KR';
-    case 'fr':
-      return 'fr-FR';
-    case 'es':
-      return 'es-ES';
-    case 'pt':
-      return 'pt-BR';
-    case 'de':
-      return 'de-DE';
-    case 'it':
-      return 'it-IT';
-    case 'ru':
-      return 'ru-RU';
-    case 'uk':
-      return 'uk-UA';
-    case 'ar':
-      return 'ar-SA';
-    case 'hi':
-      return 'hi-IN';
-    case 'tr':
-      return 'tr-TR';
-    default:
-      return DEFAULT_LANGUAGE;
+  if (base) {
+    const mappedLanguage = BASE_LANGUAGE_MAP.get(base);
+    if (mappedLanguage) {
+      return mappedLanguage;
+    }
   }
+
+  return DEFAULT_LANGUAGE;
 };
 
 export const normalizeLanguageTag = (lng: string): SupportedLanguage =>
@@ -219,7 +157,7 @@ void i18n.use(initReactI18next).init({
   resources,
   lng: detectInitialLanguage(),
   fallbackLng: DEFAULT_LANGUAGE,
-  supportedLngs: Object.keys(resources),
+  supportedLngs: SUPPORTED_LANGUAGES,
   interpolation: {
     escapeValue: false,
   },
