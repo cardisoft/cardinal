@@ -67,8 +67,10 @@ const SUPPORTED_LANGUAGE_SET = new Set<SupportedLanguage>(SUPPORTED_LANGUAGES);
 const BASE_LANGUAGE_MAP = new Map<string, SupportedLanguage>();
 for (const code of SUPPORTED_LANGUAGES) {
   const [base] = code.split('-');
-  if (base && !BASE_LANGUAGE_MAP.has(base)) {
-    BASE_LANGUAGE_MAP.set(base.toLowerCase(), code);
+  if (base) {
+    if (!BASE_LANGUAGE_MAP.has(base)) {
+      BASE_LANGUAGE_MAP.set(base, code);
+    }
   }
 }
 
