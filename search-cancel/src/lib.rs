@@ -6,6 +6,9 @@ pub const CANCEL_CHECK_INTERVAL: usize = 0x10000;
 /// A global atomic identifies the active search version of Cardinal.
 pub static ACTIVE_SEARCH_VERSION: AtomicU64 = AtomicU64::new(0);
 
+/// A global atomic identifies the active scanning process version of Cardinal.
+pub static ACTIVE_SCAN_VERSION: AtomicU64 = AtomicU64::new(0);
+
 #[derive(Clone, Copy, Debug)]
 pub struct CancellationToken {
     active_version: &'static AtomicU64,
@@ -26,6 +29,14 @@ impl CancellationToken {
         Self {
             version,
             active_version: &ACTIVE_SEARCH_VERSION,
+        }
+    }
+
+    pub fn new_scan() -> Self {
+        let version = self::ACTIVE_SCAN_VERSION.fetch_add(1, Ordering::SeqCst) + 1;
+        Self {
+            version,
+            active_version: &ACTIVE_SCAN_VERSION,
         }
     }
 
