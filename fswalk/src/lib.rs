@@ -121,7 +121,9 @@ impl<'w> WalkData<'w> {
     }
 
     fn should_ignore(&self, path: &Path) -> bool {
-        self.ignore_directories.iter().any(|ignore| ignore == path)
+        self.ignore_directories
+            .iter()
+            .any(|ignore| path.starts_with(ignore))
     }
 }
 
@@ -451,6 +453,72 @@ mod tests {
             "symlink directory should not be traversed"
         );
     }
+
+    // ── should_ignore tests (prefix-based matching) ──────────────────────
+
+    #[test]
+    fn should_ignore_exact_match() {
+        let ignore = vec![PathBuf::from("/a/b/c")];
+        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        assert!(wd.should_ignore(Path::new("/a/b/c")));
+    }
+
+    #[test]
+    fn should_ignore_child_of_ignored_dir() {
+        let ignore = vec![PathBuf::from("/a/b")];
+        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        // direct child
+        assert!(wd.should_ignore(Path::new("/a/b/c")));
+        // deeply nested
+        assert!(wd.should_ignore(Path::new("/a/b/c/d/e")));
+    }
+
+    #[test]
+    fn should_ignore_does_not_match_sibling_with_shared_prefix_string() {
+        // "/tmp/abc" is NOT a child of "/tmp/ab" — Path::starts_with is
+        // component-aware, not string-prefix.
+        let ignore = vec![PathBuf::from("/tmp/ab")];
+        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        assert!(!wd.should_ignore(Path::new("/tmp/abc")));
+        assert!(!wd.should_ignore(Path::new("/tmp/abc/d")));
+    }
+
+    #[test]
+    fn should_ignore_unrelated_path() {
+        let ignore = vec![PathBuf::from("/a/b")];
+        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        assert!(!wd.should_ignore(Path::new("/x/y")));
+        assert!(!wd.should_ignore(Path::new("/a")));
+    }
+
+    #[test]
+    fn should_ignore_empty_ignore_list() {
+        let ignore: Vec<PathBuf> = vec![];
+        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        assert!(!wd.should_ignore(Path::new("/anything")));
+    }
+
+    #[test]
+    fn should_ignore_multiple_ignore_dirs() {
+        let ignore = vec![PathBuf::from("/a"), PathBuf::from("/x/y")];
+        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        assert!(wd.should_ignore(Path::new("/a")));
+        assert!(wd.should_ignore(Path::new("/a/b/c")));
+        assert!(wd.should_ignore(Path::new("/x/y")));
+        assert!(wd.should_ignore(Path::new("/x/y/z")));
+        assert!(!wd.should_ignore(Path::new("/x")));
+        assert!(!wd.should_ignore(Path::new("/b")));
+    }
+
+    #[test]
+    fn should_ignore_parent_of_ignored_dir_is_not_ignored() {
+        let ignore = vec![PathBuf::from("/a/b/c")];
+        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        assert!(!wd.should_ignore(Path::new("/a")));
+        assert!(!wd.should_ignore(Path::new("/a/b")));
+    }
+
+    // ── other unit tests ─────────────────────────────────────────────────
 
     #[test]
     fn test_handle_error_and_retry_only_interrupted() {
