@@ -80,6 +80,12 @@ impl From<fs::FileType> for NodeFileType {
     }
 }
 
+pub fn should_ignore_path(path: &Path, ignore_directories: &[PathBuf]) -> bool {
+    ignore_directories
+        .iter()
+        .any(|ignore| path.starts_with(ignore))
+}
+
 #[derive(Debug)]
 pub struct WalkData<'w> {
     pub num_files: AtomicUsize,
@@ -121,18 +127,32 @@ impl<'w> WalkData<'w> {
     }
 
     fn should_ignore(&self, path: &Path) -> bool {
-        self.ignore_directories
-            .iter()
-            .any(|ignore| path.starts_with(ignore))
+        should_ignore_path(path, self.ignore_directories)
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancel
+            .map(|x| x.load(Ordering::Relaxed))
+            .unwrap_or_default()
     }
 }
 
+/// return `Some(Node)` if walk is successful.
+/// return `None` if walk is cancelled.
+///
+/// Note: if the root path is missing or inaccessible, it will still return
+/// `Some(Node)` with empty children and None metadata.
 pub fn walk_it_without_root_chain(walk_data: &WalkData) -> Option<Node> {
-    walk_shim(walk_data.root_path, walk_data)
+    walk(walk_data.root_path, walk_data)
 }
 
+/// return `Some(Node)` if walk is successful.
+/// return `None` if walk is cancelled.
+///
+/// Note: if the root path is missing or inaccessible, it will still return
+/// `Some(Node)` with empty children and None metadata.
 pub fn walk_it(walk_data: &WalkData) -> Option<Node> {
-    walk_shim(walk_data.root_path, walk_data).map(|node_tree| {
+    walk(walk_data.root_path, walk_data).map(|node_tree| {
         if let Some(parent) = walk_data.root_path.parent() {
             let mut path = PathBuf::from(parent);
             let mut node = Node {
@@ -166,78 +186,73 @@ pub fn walk_it(walk_data: &WalkData) -> Option<Node> {
     })
 }
 
-fn walk_shim(path: &Path, walk_data: &WalkData) -> Option<Node> {
-    if walk_data.should_ignore(path) {
-        return None;
-    }
-    walk(path, walk_data)
-}
-
+/// Note: this function will create a Node for the given path even if it's
+/// missing or inaccessible, but the metadata will be None in that case.
 fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
     let metadata = metadata_of_path(path);
     let children = if metadata.as_ref().map(|x| x.is_dir()).unwrap_or_default() {
         walk_data.num_dirs.fetch_add(1, Ordering::Relaxed);
         let read_dir = fs::read_dir(path);
         match read_dir {
-            Ok(entries) => entries
-                .into_iter()
-                .par_bridge()
-                .filter_map(|entry| {
-                    match &entry {
-                        Ok(entry) => {
-                            if walk_data
-                                .cancel
-                                .map(|x| x.load(Ordering::Relaxed))
-                                .unwrap_or_default()
-                            {
-                                return None;
-                            }
-                            let path = entry.path();
-                            if walk_data.should_ignore(&path) {
-                                return None;
-                            }
-                            // doesn't traverse symlink
-                            if let Ok(data) = entry.file_type() {
-                                if data.is_dir() {
-                                    walk(&path, walk_data)
-                                } else {
-                                    walk_data.num_files.fetch_add(1, Ordering::Relaxed);
-                                    let name = entry
-                                        .file_name()
-                                        .to_string_lossy()
-                                        .into_owned()
-                                        .into_boxed_str();
-                                    Some(Node {
-                                        children: vec![],
-                                        name,
-                                        metadata: walk_data
-                                            .need_metadata
-                                            .then_some(entry)
-                                            .and_then(|entry| {
-                                                // doesn't traverse symlink
-                                                entry.metadata().ok().map(NodeMetadata::from)
-                                            }),
-                                    })
+            Ok(entries) => {
+                let cancelled = AtomicBool::new(false);
+                let results: Vec<_> = entries
+                    .into_iter()
+                    .par_bridge()
+                    .map(|entry| {
+                        match &entry {
+                            Ok(entry) => {
+                                if walk_data.is_cancelled() {
+                                    cancelled.store(true, Ordering::Relaxed);
+                                    return None;
                                 }
-                            } else {
-                                None
+                                let path = entry.path();
+                                if walk_data.should_ignore(&path) {
+                                    return None;
+                                }
+                                // doesn't traverse symlink
+                                if let Ok(data) = entry.file_type() {
+                                    if data.is_dir() {
+                                        walk(&path, walk_data)
+                                    } else {
+                                        walk_data.num_files.fetch_add(1, Ordering::Relaxed);
+                                        let name = entry
+                                            .file_name()
+                                            .to_string_lossy()
+                                            .into_owned()
+                                            .into_boxed_str();
+                                        Some(Node {
+                                            children: vec![],
+                                            name,
+                                            metadata: walk_data
+                                                .need_metadata
+                                                .then_some(entry)
+                                                .and_then(|entry| {
+                                                    // doesn't traverse symlink
+                                                    entry.metadata().ok().map(NodeMetadata::from)
+                                                }),
+                                        })
+                                    }
+                                } else {
+                                    None
+                                }
                             }
+                            Err(_) => None,
                         }
-                        Err(_) => None,
-                    }
-                })
-                .collect(),
+                    })
+                    .collect();
+                if cancelled.load(Ordering::Acquire) {
+                    return None;
+                }
+                results.into_iter().flatten().collect()
+            }
             Err(_) => Vec::new(),
         }
     } else {
         walk_data.num_files.fetch_add(1, Ordering::Relaxed);
         Vec::new()
     };
-    if walk_data
-        .cancel
-        .map(|x| x.load(Ordering::Relaxed))
-        .unwrap_or_default()
-    {
+    if walk_data.is_cancelled() {
         return None;
     }
     let name = path
@@ -544,6 +559,95 @@ mod tests {
             root_node.children.len(),
             50,
             "expected 50 files directly under root"
+        );
+    }
+
+    #[test]
+    fn regression_missing_root_path_currently_returns_some_node() {
+        let tmp = TempDir::new("fswalk_missing_root").unwrap();
+        let root = tmp.path().to_path_buf();
+        drop(tmp);
+
+        let ignore: Vec<PathBuf> = vec![];
+        let walk_data = WalkData::new(&root, &ignore, false, None);
+        let node = match walk_it_without_root_chain(&walk_data) {
+            Some(node) => node,
+            None => panic!("current behavior regression: expected Some, got None"),
+        };
+
+        assert!(
+            node.children.is_empty(),
+            "missing root currently produces a leaf node"
+        );
+        assert!(
+            node.metadata.is_none(),
+            "missing root currently has no metadata"
+        );
+        assert_eq!(
+            walk_data.num_files.load(Ordering::Relaxed),
+            1,
+            "missing root currently increments file counter"
+        );
+    }
+
+    #[test]
+    fn missing_root_via_walk_it_returns_some_with_none_metadata() {
+        let tmp = TempDir::new("fswalk_missing_walk_it").unwrap();
+        let root = tmp.path().to_path_buf();
+        drop(tmp); // remove the directory
+
+        let ignore: Vec<PathBuf> = vec![];
+        let walk_data = WalkData::new(&root, &ignore, true, None);
+        let node = walk_it(&walk_data).expect("walk_it should return Some even for missing root");
+
+        // Navigate to the leaf that represents the (now-missing) root.
+        let root_node = node_for_path(&node, &root);
+        assert!(
+            root_node.children.is_empty(),
+            "missing root should have no children"
+        );
+        assert!(
+            root_node.metadata.is_none(),
+            "missing root should have None metadata even when need_metadata is true"
+        );
+    }
+
+    #[test]
+    fn missing_root_metadata_is_none_regardless_of_need_metadata_flag() {
+        let tmp = TempDir::new("fswalk_missing_meta_flag").unwrap();
+        let root = tmp.path().to_path_buf();
+        drop(tmp);
+
+        for need_metadata in [false, true] {
+            let ignore: Vec<PathBuf> = vec![];
+            let walk_data = WalkData::new(&root, &ignore, need_metadata, None);
+            let node = walk_it_without_root_chain(&walk_data)
+                .expect("walk should return Some for missing path");
+            assert!(
+                node.metadata.is_none(),
+                "missing path metadata should be None (need_metadata={need_metadata})"
+            );
+            assert!(
+                node.children.is_empty(),
+                "missing path should have no children (need_metadata={need_metadata})"
+            );
+        }
+    }
+
+    #[test]
+    fn missing_root_name_is_preserved() {
+        let tmp = TempDir::new("fswalk_missing_name").unwrap();
+        let root = tmp.path().to_path_buf();
+        let expected_name = root.file_name().unwrap().to_string_lossy().into_owned();
+        drop(tmp);
+
+        let ignore: Vec<PathBuf> = vec![];
+        let walk_data = WalkData::new(&root, &ignore, false, None);
+        let node = walk_it_without_root_chain(&walk_data)
+            .expect("walk should return Some for missing path");
+        assert_eq!(
+            &*node.name, expected_name,
+            "missing root node should preserve the directory name"
         );
     }
 
