@@ -126,11 +126,11 @@ impl<'w> WalkData<'w> {
 }
 
 pub fn walk_it_without_root_chain(walk_data: &WalkData) -> Option<Node> {
-    walk(walk_data.root_path, walk_data)
+    walk_shim(walk_data.root_path, walk_data)
 }
 
 pub fn walk_it(walk_data: &WalkData) -> Option<Node> {
-    walk(walk_data.root_path, walk_data).map(|node_tree| {
+    walk_shim(walk_data.root_path, walk_data).map(|node_tree| {
         if let Some(parent) = walk_data.root_path.parent() {
             let mut path = PathBuf::from(parent);
             let mut node = Node {
@@ -164,10 +164,14 @@ pub fn walk_it(walk_data: &WalkData) -> Option<Node> {
     })
 }
 
-fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
+fn walk_shim(path: &Path, walk_data: &WalkData) -> Option<Node> {
     if walk_data.should_ignore(path) {
         return None;
     }
+    walk(path, walk_data)
+}
+
+fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
     let metadata = metadata_of_path(path);
     let children = if metadata.as_ref().map(|x| x.is_dir()).unwrap_or_default() {
         walk_data.num_dirs.fetch_add(1, Ordering::Relaxed);
@@ -186,13 +190,14 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
                             {
                                 return None;
                             }
-                            if walk_data.should_ignore(path) {
+                            let path = entry.path();
+                            if walk_data.should_ignore(&path) {
                                 return None;
                             }
                             // doesn't traverse symlink
                             if let Ok(data) = entry.file_type() {
                                 if data.is_dir() {
-                                    return walk(&entry.path(), walk_data);
+                                    walk(&path, walk_data)
                                 } else {
                                     walk_data.num_files.fetch_add(1, Ordering::Relaxed);
                                     let name = entry
@@ -200,7 +205,7 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
                                         .to_string_lossy()
                                         .into_owned()
                                         .into_boxed_str();
-                                    return Some(Node {
+                                    Some(Node {
                                         children: vec![],
                                         name,
                                         metadata: walk_data
@@ -210,30 +215,21 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
                                                 // doesn't traverse symlink
                                                 entry.metadata().ok().map(NodeMetadata::from)
                                             }),
-                                    });
+                                    })
                                 }
+                            } else {
+                                None
                             }
                         }
-                        Err(failed) => {
-                            if handle_error_and_retry(failed) {
-                                return walk(path, walk_data);
-                            }
-                        }
+                        Err(_) => None,
                     }
-                    None
                 })
                 .collect(),
-            Err(failed) => {
-                if handle_error_and_retry(&failed) {
-                    return walk(path, walk_data);
-                } else {
-                    vec![]
-                }
-            }
+            Err(_) => Vec::new(),
         }
     } else {
         walk_data.num_files.fetch_add(1, Ordering::Relaxed);
-        vec![]
+        Vec::new()
     };
     if walk_data
         .cancel
