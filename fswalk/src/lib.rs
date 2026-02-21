@@ -121,7 +121,7 @@ impl<'w> WalkData<'w> {
     }
 
     fn should_ignore(&self, path: &Path) -> bool {
-        self.ignore_directories.iter().any(|ignore| ignore == path)
+        self.ignore_directories.iter().any(|ignore| path.starts_with(ignore))
     }
 }
 
