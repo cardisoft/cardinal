@@ -15,6 +15,7 @@ use std::{
     ops::{Deref, DerefMut},
     ptr::NonNull,
     slice,
+    sync::LazyLock,
 };
 
 type EventsCallback = Box<dyn FnMut(Vec<FsEvent>) + Send>;
@@ -153,9 +154,13 @@ impl DerefMut for EventWatcher {
 
 impl EventWatcher {
     pub fn noop() -> Self {
+        #[allow(clippy::type_complexity)]
+        static BLACK_HOLE1: LazyLock<(Sender<Vec<FsEvent>>, Receiver<Vec<FsEvent>>)> =
+            LazyLock::new(unbounded);
+        static BLACK_HOLE2: LazyLock<(Sender<()>, Receiver<()>)> = LazyLock::new(|| bounded(1));
         Self {
-            receiver: unbounded().1,
-            _cancellation_token: bounded::<()>(1).0,
+            receiver: BLACK_HOLE1.1.clone(),
+            _cancellation_token: BLACK_HOLE2.0.clone(),
         }
     }
 
