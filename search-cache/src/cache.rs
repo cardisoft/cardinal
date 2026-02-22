@@ -8,7 +8,9 @@ use crate::{
 use anyhow::{Context, Result, anyhow};
 use cardinal_sdk::{EventFlag, FsEvent, ScanType, current_event_id};
 use cardinal_syntax::{optimize_query, parse_query};
-use fswalk::{Node, NodeMetadata, WalkData, walk_it, walk_it_without_root_chain};
+use fswalk::{
+    Node, NodeMetadata, WalkData, should_ignore_path, walk_it, walk_it_without_root_chain,
+};
 use hashbrown::HashSet;
 use namepool::NamePool;
 use search_cancel::CancellationToken;
@@ -20,7 +22,7 @@ use std::{
     time::Instant,
 };
 use thin_vec::ThinVec;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use typed_num::Num;
 
 pub struct SearchCache {
@@ -138,18 +140,10 @@ impl SearchCache {
             // Build the tree of file names in parallel first (we cannot construct the slab directly
             // because slab nodes reference each other and we prefer to avoid locking).
             let visit_time = Instant::now();
-            let node = walk_it(walk_data).unwrap_or_else(|| {
-                warn!("failed to walk path: {:?}", walk_data.root_path);
-                Node {
-                    children: Vec::new(),
-                    name: walk_data
-                        .root_path
-                        .to_string_lossy()
-                        .into_owned()
-                        .into_boxed_str(),
-                    metadata: None,
-                }
-            });
+            let Some(node) = walk_it(walk_data) else {
+                info!("walk filesystem cancelled during walk_it.");
+                return None;
+            };
             info!(
                 "Walk data: {:?}, time: {:?}",
                 walk_data,
@@ -347,6 +341,10 @@ impl SearchCache {
         current
     }
 
+    fn should_ignore(&self, path: &Path) -> bool {
+        should_ignore_path(path, self.file_nodes.ignore_paths())
+    }
+
     // `Self::scan_path_recursive`function returns index of the constructed node(with metadata provided).
     // - If path is not under the watch root, None is returned.
     // - Procedure contains metadata fetching, if metadata fetching failed, None is returned.
@@ -356,6 +354,9 @@ impl SearchCache {
             self.remove_node_path(path);
             return None;
         };
+        if self.should_ignore(path) {
+            return None;
+        }
         let parent = path.parent().expect(
             "scan_path_recursive doesn't expected to scan root(should be filtered outside)",
         );
