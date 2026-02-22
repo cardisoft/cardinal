@@ -122,10 +122,6 @@ fn handle_watch_config_update(
         .map(PathBuf::from)
         .collect::<Vec<_>>();
 
-    if next_watch_root == watch_root && &next_ignore_paths == cache.ignore_paths() {
-        return;
-    }
-
     *event_watcher = EventWatcher::noop();
     update_app_state(app_handle, AppLifecycleState::Initializing);
     reset_status_bar(app_handle);
@@ -141,6 +137,12 @@ fn handle_watch_config_update(
         info!("Watch config change cancelled, keeping existing state");
         return;
     };
+
+    info!(
+        "Search cache built. New root: {}, ignore paths: {:?}",
+        next_watch_root,
+        next_cache.ignore_paths()
+    );
 
     emit_status_bar_update(app_handle, next_cache.get_total_files(), 0, 0);
     *cache = next_cache;
