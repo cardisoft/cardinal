@@ -411,12 +411,14 @@ impl SearchCache {
         &self,
         phantom1: &'p mut PathBuf,
         phantom2: &'p mut Vec<PathBuf>,
+        scan_cancellation_token: CancellationToken,
     ) -> WalkData<'p, impl Fn() -> bool + Send + Sync + Copy + 'static> {
         *phantom1 = self.file_nodes.path().to_path_buf();
         *phantom2 = self.file_nodes.ignore_paths().clone();
         let stop = self.stop;
         WalkData::new(phantom1, phantom2, false, move || {
             stop.map(|x| x.load(Ordering::Relaxed)).unwrap_or_default()
+                || scan_cancellation_token.is_cancelled().is_none()
         })
     }
 

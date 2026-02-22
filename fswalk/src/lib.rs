@@ -496,14 +496,14 @@ mod tests {
     #[test]
     fn should_ignore_exact_match() {
         let ignore = vec![PathBuf::from("/a/b/c")];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
         assert!(wd.should_ignore(Path::new("/a/b/c")));
     }
 
     #[test]
     fn should_ignore_child_of_ignored_dir() {
         let ignore = vec![PathBuf::from("/a/b")];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
         // direct child
         assert!(wd.should_ignore(Path::new("/a/b/c")));
         // deeply nested
@@ -515,7 +515,7 @@ mod tests {
         // "/tmp/abc" is NOT a child of "/tmp/ab" — Path::starts_with is
         // component-aware, not string-prefix.
         let ignore = vec![PathBuf::from("/tmp/ab")];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
         assert!(!wd.should_ignore(Path::new("/tmp/abc")));
         assert!(!wd.should_ignore(Path::new("/tmp/abc/d")));
     }
@@ -523,7 +523,7 @@ mod tests {
     #[test]
     fn should_ignore_unrelated_path() {
         let ignore = vec![PathBuf::from("/a/b")];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
         assert!(!wd.should_ignore(Path::new("/x/y")));
         assert!(!wd.should_ignore(Path::new("/a")));
     }
@@ -531,14 +531,14 @@ mod tests {
     #[test]
     fn should_ignore_empty_ignore_list() {
         let ignore: Vec<PathBuf> = vec![];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
         assert!(!wd.should_ignore(Path::new("/anything")));
     }
 
     #[test]
     fn should_ignore_multiple_ignore_dirs() {
         let ignore = vec![PathBuf::from("/a"), PathBuf::from("/x/y")];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
         assert!(wd.should_ignore(Path::new("/a")));
         assert!(wd.should_ignore(Path::new("/a/b/c")));
         assert!(wd.should_ignore(Path::new("/x/y")));
@@ -550,7 +550,7 @@ mod tests {
     #[test]
     fn should_ignore_parent_of_ignored_dir_is_not_ignored() {
         let ignore = vec![PathBuf::from("/a/b/c")];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, None);
+        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
         assert!(!wd.should_ignore(Path::new("/a")));
         assert!(!wd.should_ignore(Path::new("/a/b")));
     }
@@ -591,7 +591,7 @@ mod tests {
         drop(tmp);
 
         let ignore: Vec<PathBuf> = vec![];
-        let walk_data = WalkData::new(&root, &ignore, false, None);
+        let walk_data = WalkData::new(&root, &ignore, false, || false);
         let node = match walk_it_without_root_chain(&walk_data) {
             Some(node) => node,
             None => panic!("current behavior regression: expected Some, got None"),
@@ -619,7 +619,7 @@ mod tests {
         drop(tmp); // remove the directory
 
         let ignore: Vec<PathBuf> = vec![];
-        let walk_data = WalkData::new(&root, &ignore, true, None);
+        let walk_data = WalkData::new(&root, &ignore, true, || false);
         let node = walk_it(&walk_data).expect("walk_it should return Some even for missing root");
 
         // Navigate to the leaf that represents the (now-missing) root.
@@ -642,7 +642,7 @@ mod tests {
 
         for need_metadata in [false, true] {
             let ignore: Vec<PathBuf> = vec![];
-            let walk_data = WalkData::new(&root, &ignore, need_metadata, None);
+            let walk_data = WalkData::new(&root, &ignore, need_metadata, || false);
             let node = walk_it_without_root_chain(&walk_data)
                 .expect("walk should return Some for missing path");
             assert!(
@@ -664,7 +664,7 @@ mod tests {
         drop(tmp);
 
         let ignore: Vec<PathBuf> = vec![];
-        let walk_data = WalkData::new(&root, &ignore, false, None);
+        let walk_data = WalkData::new(&root, &ignore, false, || false);
         let node = walk_it_without_root_chain(&walk_data)
             .expect("walk should return Some for missing path");
         assert_eq!(

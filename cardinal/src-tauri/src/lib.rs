@@ -25,6 +25,7 @@ use lifecycle::{
 };
 use once_cell::sync::OnceCell;
 use search_cache::{SearchCache, SearchOutcome, SlabIndex};
+use search_cancel::CancellationToken;
 use std::{
     path::{Path, PathBuf},
     sync::{Once, atomic::Ordering},
@@ -60,7 +61,7 @@ pub fn run() -> Result<()> {
     let (result_tx, result_rx) = unbounded::<Result<SearchOutcome>>();
     let (node_info_tx, node_info_rx) = unbounded::<NodeInfoRequest>();
     let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>)>();
-    let (rescan_tx, rescan_rx) = unbounded::<()>();
+    let (rescan_tx, rescan_rx) = unbounded::<CancellationToken>();
     let (watch_config_tx, watch_config_rx) = unbounded::<WatchConfigUpdate>();
     let (icon_update_tx, icon_update_rx) = unbounded::<IconPayload>();
     let (update_window_state_tx, update_window_state_rx) = bounded::<()>(1);
@@ -250,15 +251,25 @@ fn run_logic_thread(
         }
         Err(e) => {
             info!("Walking filesystem: {:?}", e);
-            let Some(cache) = build_search_cache(app_handle, &watch_root, &ignore_paths) else {
-                info!("Walk filesystem cancelled, app quitting");
-                channels
-                    .finish_rx
-                    .recv()
-                    .expect("Failed to receive finish signal")
-                    .send(None)
-                    .expect("Failed to send None cache");
-                return;
+            let cache = loop {
+                if let Some(cache) = build_search_cache(
+                    app_handle,
+                    &watch_root,
+                    &ignore_paths,
+                    CancellationToken::new_scan(),
+                ) {
+                    break cache;
+                } else if APP_QUIT.load(Ordering::Relaxed) {
+                    info!("Walk filesystem cancelled, app quitting");
+                    channels
+                        .finish_rx
+                        .recv()
+                        .expect("Failed to receive finish signal")
+                        .send(None)
+                        .expect("Failed to send None cache");
+                    return;
+                }
+                info!("Initial scan cancelled by newer request, restarting");
             };
 
             emit_status_bar_update(app_handle, cache.get_total_files(), 0, 0);

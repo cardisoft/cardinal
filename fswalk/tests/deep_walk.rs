@@ -119,7 +119,7 @@ fn ignore_prefix_excludes_nested_children() {
     fs::write(root.join("keep.txt"), b"k").unwrap();
 
     let ignore = vec![root.join("skip_dir")];
-    let walk_data = WalkData::new(root, &ignore, false, None);
+    let walk_data = WalkData::new(root, &ignore, false, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
@@ -147,7 +147,7 @@ fn ignore_does_not_affect_sibling_with_similar_name() {
     fs::write(root.join("node_modules_backup/pkg.json"), b"{}").unwrap();
 
     let ignore = vec![root.join("node_modules")];
-    let walk_data = WalkData::new(root, &ignore, false, None);
+    let walk_data = WalkData::new(root, &ignore, false, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
@@ -180,7 +180,7 @@ fn ignore_intermediate_dir_preserves_siblings() {
     fs::write(root.join("parent/keep_me/file.txt"), b"k").unwrap();
 
     let ignore = vec![root.join("parent/ignore_me")];
-    let walk_data = WalkData::new(root, &ignore, false, None);
+    let walk_data = WalkData::new(root, &ignore, false, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
@@ -215,7 +215,7 @@ fn multiple_ignores_with_prefix() {
     fs::write(root.join("c/f.txt"), b"").unwrap();
 
     let ignore = vec![root.join("a"), root.join("b")];
-    let walk_data = WalkData::new(root, &ignore, false, None);
+    let walk_data = WalkData::new(root, &ignore, false, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
@@ -242,7 +242,7 @@ fn file_counts_exclude_ignored_subtree() {
     fs::write(root.join("kept/e.txt"), b"").unwrap();
 
     let ignore = vec![root.join("ignored")];
-    let walk_data = WalkData::new(root, &ignore, false, None);
+    let walk_data = WalkData::new(root, &ignore, false, || false);
     let _tree = walk_it(&walk_data).expect("root node");
 
     let num_files = walk_data.num_files.load(Ordering::Relaxed);
@@ -265,7 +265,7 @@ fn walk_without_root_chain_respects_prefix_ignore() {
     fs::write(root.join("stay.txt"), b"").unwrap();
 
     let ignore = vec![root.join("skip")];
-    let walk_data = WalkData::new(root, &ignore, false, None);
+    let walk_data = WalkData::new(root, &ignore, false, || false);
     let tree = walk_it_without_root_chain(&walk_data).expect("root node");
 
     assert!(

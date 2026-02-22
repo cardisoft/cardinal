@@ -1,6 +1,6 @@
 use crate::{
     commands::{NodeInfoRequest, SearchJob, WatchConfigUpdate},
-    lifecycle::{AppLifecycleState, load_app_state, update_app_state},
+    lifecycle::{APP_QUIT, AppLifecycleState, load_app_state, update_app_state},
     search_activity,
     window_controls::is_main_window_foreground,
 };
@@ -15,6 +15,7 @@ use search_cache::{
     HandleFSEError, SearchCache, SearchOptions, SearchOutcome, SearchResultNode, SlabIndex,
     WalkData,
 };
+use search_cancel::CancellationToken;
 use serde::Serialize;
 use std::{
     path::{Path, PathBuf},
@@ -46,7 +47,7 @@ pub struct BackgroundLoopChannels {
     pub result_tx: Sender<Result<SearchOutcome>>,
     pub node_info_rx: Receiver<NodeInfoRequest>,
     pub icon_viewport_rx: Receiver<(u64, Vec<SlabIndex>)>,
-    pub rescan_rx: Receiver<()>,
+    pub rescan_rx: Receiver<CancellationToken>,
     pub watch_config_rx: Receiver<WatchConfigUpdate>,
     pub icon_update_tx: Sender<IconPayload>,
 }
@@ -104,15 +105,19 @@ fn handle_watch_config_update(
     processed_events: &mut usize,
 ) {
     info!("Received watch config update: {:?}", update);
-    let trimmed_watch_root = update.watch_root.trim();
+    let WatchConfigUpdate {
+        watch_root: update_watch_root,
+        ignore_paths,
+        scan_cancellation_token,
+    } = update;
+    let trimmed_watch_root = update_watch_root.trim();
     let next_watch_root = if trimmed_watch_root.is_empty() {
         watch_root.as_str()
     } else {
         trimmed_watch_root
     };
 
-    let next_ignore_paths = update
-        .ignore_paths
+    let next_ignore_paths = ignore_paths
         .into_iter()
         .map(PathBuf::from)
         .collect::<Vec<_>>();
@@ -127,8 +132,12 @@ fn handle_watch_config_update(
     *history_ready = false;
     *processed_events = 0;
 
-    let Some(next_cache) = build_search_cache(app_handle, next_watch_root, &next_ignore_paths)
-    else {
+    let Some(next_cache) = build_search_cache(
+        app_handle,
+        next_watch_root,
+        &next_ignore_paths,
+        scan_cancellation_token,
+    ) else {
         info!("Watch config change cancelled, keeping existing state");
         return;
     };
@@ -353,7 +362,7 @@ pub fn run_background_event_loop(
                 handle_icon_viewport_update(&mut cache, update, &icon_update_tx);
             }
             recv(rescan_rx) -> request => {
-                request.expect("Rescan channel closed");
+                let scan_cancellation_token = request.expect("Rescan channel closed");
                 info!("Manual rescan requested");
                 perform_rescan(
                     app_handle,
@@ -363,6 +372,7 @@ pub fn run_background_event_loop(
                     fse_latency_secs,
                     &mut history_ready,
                     &mut processed_events,
+                    scan_cancellation_token,
                 );
             }
             recv(watch_config_rx) -> update => {
@@ -396,14 +406,12 @@ pub(crate) fn build_search_cache(
     app_handle: &AppHandle,
     watch_root: &str,
     ignore_paths: &[PathBuf],
+    scan_cancellation_token: CancellationToken,
 ) -> Option<SearchCache> {
     let path = PathBuf::from(watch_root);
-    let walk_data = WalkData::new(
-        &path,
-        ignore_paths,
-        false,
-        || crate::lifecycle::APP_QUIT.load(Ordering::Relaxed),
-    );
+    let walk_data = WalkData::new(&path, ignore_paths, false, move || {
+        APP_QUIT.load(Ordering::Relaxed) || scan_cancellation_token.is_cancelled().is_none()
+    });
     let walking_done = AtomicBool::new(false);
 
     std::thread::scope(|s| {
@@ -432,7 +440,13 @@ fn perform_rescan(
     fse_latency_secs: f64,
     history_ready: &mut bool,
     processed_events: &mut usize,
+    scan_cancellation_token: CancellationToken,
 ) {
+    if scan_cancellation_token.is_cancelled().is_none() {
+        info!("Skipping stale rescan request");
+        return;
+    }
+
     *event_watcher = EventWatcher::noop();
     update_app_state(app_handle, AppLifecycleState::Initializing);
     *history_ready = false;
@@ -441,7 +455,7 @@ fn perform_rescan(
 
     let mut phantom1 = PathBuf::new();
     let mut phantom2 = Vec::new();
-    let walk_data = cache.walk_data(&mut phantom1, &mut phantom2);
+    let walk_data = cache.walk_data(&mut phantom1, &mut phantom2, scan_cancellation_token);
     let walking_done = AtomicBool::new(false);
     let stopped = std::thread::scope(|s| {
         s.spawn(|| {
