@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getWatchRootValidation, isPathInputValid } from '../utils/watchRoot';
+import { getWatchRootValidation, isIgnorePathInputValid } from '../utils/watchRoot';
 import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSwitcher from './LanguageSwitcher';
 
@@ -105,12 +105,9 @@ export function PreferencesOverlay({
     }
   };
 
-  const parsedIgnorePaths = ignorePathsInput
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+  const parsedIgnorePaths = ignorePathsInput.split(/\r?\n/);
   const ignorePathsErrorMessage = (() => {
-    const invalid = parsedIgnorePaths.find((line) => !isPathInputValid(line));
+    const invalid = parsedIgnorePaths.find((line) => !isIgnorePathInputValid(line));
     return invalid ? t('ignorePaths.errors.absolute') : null;
   })();
 
@@ -118,6 +115,10 @@ export function PreferencesOverlay({
     if (event.key === 'Escape') {
       setIgnorePathsInput(ignorePaths.join('\n'));
     }
+  };
+
+  const handleResetIgnorePaths = (): void => {
+    setIgnorePathsInput(defaultIgnorePaths.join('\n'));
   };
 
   const handleSave = (): void => {
@@ -235,7 +236,7 @@ export function PreferencesOverlay({
                 {t('ignorePaths.label')}
               </p>
             </div>
-            <div className="preferences-control">
+            <div className="preferences-control preferences-control--stack">
               <textarea
                 className="preferences-field preferences-textarea"
                 value={ignorePathsInput}
@@ -254,6 +255,13 @@ export function PreferencesOverlay({
                   {ignorePathsErrorMessage}
                 </p>
               ) : null}
+              <button
+                className="preferences-ignore-reset"
+                type="button"
+                onClick={handleResetIgnorePaths}
+              >
+                Reset ignores list
+              </button>
             </div>
           </div>
         </div>

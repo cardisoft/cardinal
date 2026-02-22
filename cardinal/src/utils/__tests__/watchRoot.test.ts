@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getWatchRootValidation, isPathInputValid } from '../watchRoot';
+import { getWatchRootValidation, isIgnorePathInputValid, isPathInputValid } from '../watchRoot';
 
 describe('isPathInputValid', () => {
   it('rejects empty or whitespace-only inputs', () => {
@@ -69,5 +69,26 @@ describe('getWatchRootValidation', () => {
       isValid: true,
       errorKey: null,
     });
+  });
+});
+
+describe('isIgnorePathInputValid', () => {
+  it('accepts gitignore-style entries', () => {
+    expect(isIgnorePathInputValid('/tmp/cache')).toBe(true);
+    expect(isIgnorePathInputValid('~/Library/Caches')).toBe(true);
+    expect(isIgnorePathInputValid('**/node_modules/**')).toBe(true);
+    expect(isIgnorePathInputValid('build/*.tmp')).toBe(true);
+    expect(isIgnorePathInputValid('.cache')).toBe(true);
+    expect(isIgnorePathInputValid('__pycache__')).toBe(true);
+    expect(isIgnorePathInputValid('relative/path')).toBe(true);
+    expect(isIgnorePathInputValid('./relative/path')).toBe(true);
+    expect(isIgnorePathInputValid('Library/Biome/')).toBe(true);
+    expect(isIgnorePathInputValid('!/keep.me')).toBe(true);
+    expect(isIgnorePathInputValid('# comment')).toBe(true);
+  });
+
+  it('accepts empty and whitespace-only entries for formatting', () => {
+    expect(isIgnorePathInputValid('')).toBe(true);
+    expect(isIgnorePathInputValid('   ')).toBe(true);
   });
 });

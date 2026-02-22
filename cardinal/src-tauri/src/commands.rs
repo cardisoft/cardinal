@@ -142,12 +142,7 @@ impl SearchState {
     }
 }
 
-/// Normalizes user-provided path input into an absolute path string.
-///
-/// Expands a leading `~` component using the current `HOME` directory and rejects
-/// non-absolute paths (including relative paths and unsupported `~user` forms).
-/// Returns `Some` absolute path string when valid, otherwise `None`.
-fn normalize_path_input(raw: &str) -> Option<String> {
+fn expand_path_input(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return None;
@@ -167,12 +162,25 @@ fn normalize_path_input(raw: &str) -> Option<String> {
         }
     }
 
-    let resolved = expanded.into_string();
-    if resolved.starts_with('/') {
-        Some(resolved)
-    } else {
-        None
-    }
+    Some(expanded.into_string())
+}
+
+/// Normalizes user-provided path input into an absolute path string.
+///
+/// Expands a leading `~` component using the current `HOME` directory and rejects
+/// non-absolute paths (including relative paths and unsupported `~user` forms).
+/// Returns `Some` absolute path string when valid, otherwise `None`.
+fn normalize_path_input(raw: &str) -> Option<String> {
+    let resolved = expand_path_input(raw)?;
+    resolved.starts_with('/').then_some(resolved)
+}
+
+/// Normalizes ignore entries.
+///
+/// Keeps raw entries so matching follows gitignore semantics exactly,
+/// including empty lines and comments.
+fn normalize_ignore_path_input(raw: &str) -> String {
+    raw.to_string()
 }
 
 pub(crate) fn normalize_watch_config(
@@ -184,13 +192,7 @@ pub(crate) fn normalize_watch_config(
         .or_else(|| fallback_watch_root.and_then(normalize_path_input))?;
     let mut ignore_paths = ignore_paths
         .into_iter()
-        .filter_map(|path| {
-            let normalized = normalize_path_input(&path);
-            if normalized.is_none() {
-                warn!("Ignoring invalid ignore path: {path:?}");
-            }
-            normalized
-        })
+        .map(|path| normalize_ignore_path_input(&path))
         .collect::<Vec<_>>();
     if !ignore_paths
         .iter()
@@ -539,5 +541,79 @@ mod tests {
         assert_eq!(normalize_path_input("./relative"), None);
         assert_eq!(normalize_path_input("~someone"), None);
         assert_eq!(normalize_path_input("~someone/Documents"), None);
+    }
+
+    #[test]
+    fn normalize_ignore_accepts_absolute_paths_and_globs() {
+        assert_eq!(
+            normalize_ignore_path_input("/tmp/cache"),
+            "/tmp/cache".to_string()
+        );
+        assert_eq!(
+            normalize_ignore_path_input("**/node_modules/**"),
+            "**/node_modules/**".to_string()
+        );
+        assert_eq!(
+            normalize_ignore_path_input("build/*.tmp"),
+            "build/*.tmp".to_string()
+        );
+        assert_eq!(normalize_ignore_path_input(".cache"), ".cache".to_string());
+        assert_eq!(
+            normalize_ignore_path_input("Library/Biome/"),
+            "Library/Biome/".to_string()
+        );
+    }
+
+    #[test]
+    fn normalize_ignore_keeps_gitignore_syntax_verbatim() {
+        assert_eq!(
+            normalize_ignore_path_input("!/important.pyc"),
+            "!/important.pyc".to_string()
+        );
+        assert_eq!(
+            normalize_ignore_path_input("# comment"),
+            "# comment".to_string()
+        );
+        assert_eq!(
+            normalize_ignore_path_input("relative/path"),
+            "relative/path".to_string()
+        );
+        assert_eq!(
+            normalize_ignore_path_input("~someone/**"),
+            "~someone/**".to_string()
+        );
+        assert_eq!(
+            normalize_ignore_path_input("../relative/path"),
+            "../relative/path".to_string()
+        );
+    }
+
+    #[test]
+    fn normalize_ignore_keeps_empty_and_whitespace_entries() {
+        assert_eq!(normalize_ignore_path_input(""), String::new());
+        assert_eq!(normalize_ignore_path_input("   "), "   ".to_string());
+    }
+
+    #[test]
+    fn normalize_watch_config_keeps_globs_and_adds_default_ignore_path() {
+        let Some((watch_root, ignore_paths)) = normalize_watch_config(
+            "/",
+            vec![
+                "**/node_modules/**".to_string(),
+                String::new(),
+                "relative/path".to_string(),
+                "/tmp/cache".to_string(),
+            ],
+            None,
+        ) else {
+            panic!("watch config should be valid");
+        };
+
+        assert_eq!(watch_root, "/");
+        assert!(ignore_paths.contains(&"**/node_modules/**".to_string()));
+        assert!(ignore_paths.contains(&String::new()));
+        assert!(ignore_paths.contains(&"relative/path".to_string()));
+        assert!(ignore_paths.contains(&"/tmp/cache".to_string()));
+        assert!(ignore_paths.contains(&DEFAULT_SYSTEM_IGNORE_PATH.to_string()));
     }
 }

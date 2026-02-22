@@ -1,3 +1,4 @@
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use rayon::{iter::ParallelBridge, prelude::ParallelIterator};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -7,7 +8,10 @@ use std::{
     num::NonZeroU64,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
     time::UNIX_EPOCH,
 };
 
@@ -80,6 +84,49 @@ impl From<fs::FileType> for NodeFileType {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct IgnoreMatcher {
+    root_path: PathBuf,
+    gitignore: Option<Gitignore>,
+}
+
+impl IgnoreMatcher {
+    pub fn new(root_path: &Path, ignore_directories: &[PathBuf]) -> Self {
+        if ignore_directories.is_empty() {
+            return Self {
+                root_path: root_path.to_path_buf(),
+                gitignore: None,
+            };
+        }
+
+        let mut builder = GitignoreBuilder::new(root_path);
+        for ignore in ignore_directories {
+            let pattern = ignore.to_string_lossy();
+            let _ = builder.add_line(None, &pattern);
+        }
+
+        let gitignore = builder.build().ok();
+        Self {
+            root_path: root_path.to_path_buf(),
+            gitignore,
+        }
+    }
+
+    pub fn is_ignored(&self, path: &Path, is_dir: bool) -> bool {
+        let Ok(candidate) = path.strip_prefix(&self.root_path) else {
+            return false;
+        };
+        self.gitignore
+            .as_ref()
+            .map(|gitignore| {
+                gitignore
+                    .matched_path_or_any_parents(candidate, is_dir)
+                    .is_ignore()
+            })
+            .unwrap_or(false)
+    }
+}
+
 #[derive(Debug)]
 pub struct WalkData<'w> {
     pub num_files: AtomicUsize,
@@ -88,18 +135,20 @@ pub struct WalkData<'w> {
     cancel: Option<&'w AtomicBool>,
     pub root_path: &'w Path,
     pub ignore_directories: &'w [PathBuf],
+    ignore_matcher: Arc<IgnoreMatcher>,
     /// If set, metadata will be collected for each file node(folder node will get free metadata).
     need_metadata: bool,
 }
 
 impl<'w> WalkData<'w> {
-    pub const fn simple(root_path: &'w Path, need_metadata: bool) -> Self {
+    pub fn simple(root_path: &'w Path, need_metadata: bool) -> Self {
         Self {
             num_files: AtomicUsize::new(0),
             num_dirs: AtomicUsize::new(0),
             cancel: None,
             root_path,
             ignore_directories: &[],
+            ignore_matcher: Arc::new(IgnoreMatcher::default()),
             need_metadata,
         }
     }
@@ -110,18 +159,55 @@ impl<'w> WalkData<'w> {
         need_metadata: bool,
         cancel: Option<&'w AtomicBool>,
     ) -> Self {
+        Self::new_with_ignore_root(
+            root_path,
+            root_path,
+            ignore_directories,
+            need_metadata,
+            cancel,
+        )
+    }
+
+    pub fn new_with_ignore_root(
+        root_path: &'w Path,
+        ignore_root_path: &'w Path,
+        ignore_directories: &'w [PathBuf],
+        need_metadata: bool,
+        cancel: Option<&'w AtomicBool>,
+    ) -> Self {
+        Self::new_with_ignore_matcher(
+            root_path,
+            ignore_directories,
+            Arc::new(IgnoreMatcher::new(ignore_root_path, ignore_directories)),
+            need_metadata,
+            cancel,
+        )
+    }
+
+    pub fn new_with_ignore_matcher(
+        root_path: &'w Path,
+        ignore_directories: &'w [PathBuf],
+        ignore_matcher: Arc<IgnoreMatcher>,
+        need_metadata: bool,
+        cancel: Option<&'w AtomicBool>,
+    ) -> Self {
         Self {
             num_files: AtomicUsize::new(0),
             num_dirs: AtomicUsize::new(0),
             cancel,
             root_path,
             ignore_directories,
+            ignore_matcher,
             need_metadata,
         }
     }
 
-    fn should_ignore(&self, path: &Path) -> bool {
-        self.ignore_directories.iter().any(|ignore| ignore == path)
+    pub fn ignore_matcher(&self) -> Arc<IgnoreMatcher> {
+        Arc::clone(&self.ignore_matcher)
+    }
+
+    fn should_ignore(&self, path: &Path, is_dir: bool) -> bool {
+        self.ignore_matcher.is_ignored(path, is_dir)
     }
 }
 
@@ -165,11 +251,12 @@ pub fn walk_it(walk_data: &WalkData) -> Option<Node> {
 }
 
 fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
-    if walk_data.should_ignore(path) {
+    let metadata = metadata_of_path(path);
+    let is_dir = metadata.as_ref().map(|x| x.is_dir()).unwrap_or_default();
+    if walk_data.should_ignore(path, is_dir) {
         return None;
     }
-    let metadata = metadata_of_path(path);
-    let children = if metadata.as_ref().map(|x| x.is_dir()).unwrap_or_default() {
+    let children = if is_dir {
         walk_data.num_dirs.fetch_add(1, Ordering::Relaxed);
         let read_dir = fs::read_dir(path);
         match read_dir {
@@ -186,13 +273,15 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
                             {
                                 return None;
                             }
-                            if walk_data.should_ignore(path) {
-                                return None;
-                            }
+                            let entry_path = entry.path();
                             // doesn't traverse symlink
                             if let Ok(data) = entry.file_type() {
-                                if data.is_dir() {
-                                    return walk(&entry.path(), walk_data);
+                                let is_dir = data.is_dir();
+                                if walk_data.should_ignore(&entry_path, is_dir) {
+                                    return None;
+                                }
+                                if is_dir {
+                                    return walk(&entry_path, walk_data);
                                 } else {
                                     walk_data.num_files.fetch_add(1, Ordering::Relaxed);
                                     let name = entry

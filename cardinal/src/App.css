@@ -1675,6 +1675,13 @@ button:active:not(:disabled) {
   text-align: right;
 }
 
+.preferences-control--stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
 .preferences-field {
   border: 1px solid var(--color-elevated-border, var(--color-border));
   border-radius: 8px;
@@ -1710,6 +1717,32 @@ button:active:not(:disabled) {
 
 .preferences-field-error {
   margin-bottom: 0;
+}
+
+.preferences-ignore-reset {
+  margin-top: 8px;
+  border: 1px solid var(--color-elevated-border, var(--color-border));
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.preferences-ignore-reset:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  background: rgba(var(--color-accent-rgb), 0.08);
+}
+
+.preferences-ignore-reset:focus-visible {
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.35);
+  outline-offset: 2px;
 }
 
 .preferences-field:focus {

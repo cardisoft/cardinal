@@ -455,7 +455,7 @@ fn test_events_for_ignored_paths() {
     let ignored_dir = root_path.join("ignored");
     std::fs::create_dir(&ignored_dir).unwrap();
 
-    let ignore_paths = vec![ignored_dir.clone()];
+    let ignore_paths = vec![PathBuf::from("/ignored")];
     let mut cache = SearchCache::walk_fs_with_ignore(&root_path, &ignore_paths);
 
     // Create file in ignored directory
@@ -470,14 +470,149 @@ fn test_events_for_ignored_paths() {
 
     cache.handle_fs_events(vec![event]).unwrap();
 
-    // File in ignored path may or may not be indexed depending on implementation
-    // Just verify it doesn't panic
     let search_result = cache
         .query_files("should_not_index".to_string(), CancellationToken::noop())
         .unwrap();
-    assert!(
-        search_result.is_some(),
-        "Search should not panic for ignored paths"
+    assert!(search_result.is_some());
+    assert_eq!(
+        search_result.unwrap().len(),
+        0,
+        "Files under ignored absolute paths should stay excluded"
+    );
+}
+
+#[test]
+fn test_events_for_glob_ignored_paths() {
+    let temp_dir = TempDir::new("glob_ignored_paths_test").unwrap();
+    let root_path = temp_dir.path().to_path_buf();
+    std::mem::forget(temp_dir);
+
+    std::fs::create_dir_all(root_path.join("workspace/node_modules/pkg")).unwrap();
+    std::fs::File::create(root_path.join("workspace/included.txt")).unwrap();
+
+    let ignore_paths = vec![PathBuf::from("**/node_modules/**")];
+    let mut cache = SearchCache::walk_fs_with_ignore(&root_path, &ignore_paths);
+
+    let ignored_file = root_path.join("workspace/node_modules/pkg/new_ignored.txt");
+    std::fs::File::create(&ignored_file).unwrap();
+
+    cache
+        .handle_fs_events(vec![FsEvent {
+            path: ignored_file,
+            flag: EventFlag::ItemCreated,
+            id: 301,
+        }])
+        .unwrap();
+
+    let ignored_result = cache
+        .query_files("new_ignored".to_string(), CancellationToken::noop())
+        .unwrap();
+    assert!(ignored_result.is_some());
+    assert_eq!(
+        ignored_result.unwrap().len(),
+        0,
+        "Files matching glob ignored paths should stay excluded"
+    );
+
+    let included_result = cache
+        .query_files("included".to_string(), CancellationToken::noop())
+        .unwrap();
+    assert!(included_result.is_some());
+    assert_eq!(
+        included_result.unwrap().len(),
+        1,
+        "Non-matching files should remain searchable"
+    );
+}
+
+#[test]
+fn test_events_for_negated_glob_paths() {
+    let temp_dir = TempDir::new("negated_glob_paths_test").unwrap();
+    let root_path = temp_dir.path().to_path_buf();
+    std::mem::forget(temp_dir);
+
+    std::fs::create_dir_all(root_path.join("workspace/node_modules")).unwrap();
+
+    let ignore_paths = vec![
+        PathBuf::from("**/node_modules/**"),
+        PathBuf::from("!**/node_modules/**/included.txt"),
+    ];
+    let mut cache = SearchCache::walk_fs_with_ignore(&root_path, &ignore_paths);
+
+    let included_file = root_path.join("workspace/node_modules/included.txt");
+    std::fs::write(&included_file, b"included").unwrap();
+    let ignored_file = root_path.join("workspace/node_modules/ignored.txt");
+    std::fs::write(&ignored_file, b"ignored").unwrap();
+
+    cache
+        .handle_fs_events(vec![
+            FsEvent {
+                path: included_file,
+                flag: EventFlag::ItemCreated,
+                id: 302,
+            },
+            FsEvent {
+                path: ignored_file,
+                flag: EventFlag::ItemCreated,
+                id: 303,
+            },
+        ])
+        .unwrap();
+
+    let included_result = cache
+        .query_files("included".to_string(), CancellationToken::noop())
+        .unwrap();
+    assert!(included_result.is_some());
+    assert_eq!(
+        included_result.unwrap().len(),
+        1,
+        "Negated patterns should re-include explicit files when parent directories are not ignored"
+    );
+
+    let ignored_result = cache
+        .query_files("ignored".to_string(), CancellationToken::noop())
+        .unwrap();
+    assert!(ignored_result.is_some());
+    assert_eq!(
+        ignored_result.unwrap().len(),
+        0,
+        "Non-negated files should remain ignored"
+    );
+}
+
+#[test]
+fn test_events_for_negation_under_pruned_parent_directory() {
+    let temp_dir = TempDir::new("negated_glob_pruned_parent_test").unwrap();
+    let root_path = temp_dir.path().to_path_buf();
+    std::mem::forget(temp_dir);
+
+    std::fs::create_dir_all(root_path.join("workspace/node_modules")).unwrap();
+
+    let ignore_paths = vec![
+        PathBuf::from("**/node_modules/"),
+        PathBuf::from("!**/node_modules/**/included.txt"),
+    ];
+    let mut cache = SearchCache::walk_fs_with_ignore(&root_path, &ignore_paths);
+
+    let included_file = root_path.join("workspace/node_modules/included.txt");
+    std::fs::write(&included_file, b"included").unwrap();
+
+    cache
+        .handle_fs_events(vec![FsEvent {
+            path: included_file,
+            flag: EventFlag::ItemCreated,
+            id: 304,
+        }])
+        .unwrap();
+
+    let included_result = cache
+        .query_files("included".to_string(), CancellationToken::noop())
+        .unwrap();
+    assert!(included_result.is_some());
+    assert_eq!(
+        included_result.unwrap().len(),
+        0,
+        "Files cannot be re-included when an ancestor directory was ignored and pruned"
     );
 }
 

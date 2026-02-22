@@ -2,10 +2,73 @@ import { useCallback } from 'react';
 import { useStoredState } from './useStoredState';
 
 const STORAGE_KEY = 'cardinal.ignorePaths';
-const DEFAULT_IGNORE_PATHS = ['/Volumes'];
+const DEFAULT_IGNORE_PATHS = [
+  '# Root-anchored system paths',
+  '/Volumes/',
+  '/cores/',
+  '/dev/',
+  '/private/',
+  '/System/Applications/**/Contents/Resources/',
+  '/System/Volumes/',
+  '/usr/share/',
+  '/xarts/',
 
-const cleanPaths = (next: string[]): string[] =>
-  next.map((item) => item.trim()).filter((item) => item.length > 0);
+  '',
+  '# Common project/build caches',
+  'node_modules/',
+  '.next/',
+  '.bun/',
+  '.pnpm/',
+  '**/.local/fsindex*',
+
+  '',
+  '# Application-specific heavy caches',
+  '**/com.docker.docker/Data/',
+  '**/Firefox/Profiles/**/sessionstore-backups/',
+  '**/Firefox/Profiles/**/storage/default/',
+  '**/Firefox/Profiles/**/storage/permanent/',
+  '**/Google/Chrome*/Cache/',
+  '**/Google/Chrome*/leveldb/',
+  '**/IconJar*/Backups/',
+  '**/Sublime Text */Index/',
+  '**/var/postgres/base/',
+  '**/var/postgres/pg_stat_tmp/',
+  '**/var/postgres/pg_wal/',
+  '**/Spotify/Users/*/pending-messages*',
+
+  '',
+  '# Root user-library indexing data',
+  '/Library/Biome/',
+  '/Library/DuetExpertCenter/',
+
+  '',
+  '# Basename folders to ignore anywhere',
+  '.cache/',
+  '.cocoapods/',
+  '.git/',
+  '.opam/',
+  '__pycache__/',
+  'Cache/',
+  'Caches/',
+  'doc/',
+  'Xcode.app/',
+  'wharf/',
+  'Index.noindex/',
+  'TextIndex/',
+  'io.tailscale.ipn.macos/',
+  '.stversions/',
+
+  '',
+  '# File patterns',
+  '*.com.google.Chrome',
+  '*.pyc',
+  '.dat.nosync*',
+  'webappsstore.sqlite-wal',
+  '.DS_Store',
+];
+
+const keepStringEntries = (next: unknown[]): string[] =>
+  next.filter((item): item is string => typeof item === 'string');
 
 export function useIgnorePaths() {
   const [ignorePaths, setIgnorePathsState] = useStoredState<string[]>({
@@ -14,7 +77,7 @@ export function useIgnorePaths() {
     read: (raw) => {
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return null;
-      return cleanPaths(parsed.filter((item): item is string => typeof item === 'string'));
+      return keepStringEntries(parsed);
     },
     write: (value) => JSON.stringify(value),
     readErrorMessage: 'Unable to read saved ignore paths',
@@ -23,8 +86,7 @@ export function useIgnorePaths() {
 
   const setIgnorePaths = useCallback(
     (next: string[]) => {
-      const cleaned = cleanPaths(next);
-      setIgnorePathsState(cleaned);
+      setIgnorePathsState(next);
     },
     [setIgnorePathsState],
   );

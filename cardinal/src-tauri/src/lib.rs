@@ -37,7 +37,7 @@ use window_controls::{activate_window, hide_window};
 
 static DB_PATH: OnceCell<PathBuf> = OnceCell::new();
 pub(crate) static LOGIC_START: OnceCell<Sender<LogicStartConfig>> = OnceCell::new();
-pub(crate) const DEFAULT_SYSTEM_IGNORE_PATH: &str = "/System/Volumes/Data";
+pub(crate) const DEFAULT_SYSTEM_IGNORE_PATH: &str = "/System/Volumes/";
 const FSE_LATENCY_SECS: f64 = 0.1;
 
 #[derive(Debug, Clone)]

@@ -162,9 +162,9 @@
   },
   "ignorePaths": {
     "label": "Ignore paths",
-    "help": "One path per line; ignored paths are skipped during indexing.",
+    "help": "One glob style pattern per line (Use .gitignore patterns like node_modules, **/node_modules/**, !keep.txt).",
     "errors": {
-      "absolute": "Each path must start with '/' or '~'."
+      "absolute": "Please enter a non-empty glob path pattern."
     }
   }
 }

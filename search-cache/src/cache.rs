@@ -8,7 +8,7 @@ use crate::{
 use anyhow::{Context, Result, anyhow};
 use cardinal_sdk::{EventFlag, FsEvent, ScanType, current_event_id};
 use cardinal_syntax::{optimize_query, parse_query};
-use fswalk::{Node, NodeMetadata, WalkData, walk_it, walk_it_without_root_chain};
+use fswalk::{IgnoreMatcher, Node, NodeMetadata, WalkData, walk_it, walk_it_without_root_chain};
 use hashbrown::HashSet;
 use namepool::NamePool;
 use search_cancel::CancellationToken;
@@ -16,7 +16,7 @@ use std::{
     ffi::OsStr,
     io::ErrorKind,
     path::{Path, PathBuf},
-    sync::{LazyLock, atomic::AtomicBool},
+    sync::{Arc, LazyLock, atomic::AtomicBool},
     time::Instant,
 };
 use thin_vec::ThinVec;
@@ -28,6 +28,7 @@ pub struct SearchCache {
     last_event_id: u64,
     rescan_count: u64,
     pub(crate) name_index: NameIndex,
+    ignore_matcher: Arc<IgnoreMatcher>,
     stop: Option<&'static AtomicBool>,
 }
 
@@ -180,7 +181,14 @@ impl SearchCache {
             slab_root,
         );
         // metadata cache inits later
-        Some(Self::new(slab, last_event_id, 0, name_index, cancel))
+        Some(Self::new_with_ignore_matcher(
+            slab,
+            last_event_id,
+            0,
+            name_index,
+            walk_data.ignore_matcher(),
+            cancel,
+        ))
     }
 
     fn new(
@@ -190,11 +198,31 @@ impl SearchCache {
         name_index: NameIndex,
         cancel: Option<&'static AtomicBool>,
     ) -> Self {
+        let ignore_matcher = Arc::new(IgnoreMatcher::new(slab.path(), slab.ignore_paths()));
+        Self::new_with_ignore_matcher(
+            slab,
+            last_event_id,
+            rescan_count,
+            name_index,
+            ignore_matcher,
+            cancel,
+        )
+    }
+
+    fn new_with_ignore_matcher(
+        slab: FileNodes,
+        last_event_id: u64,
+        rescan_count: u64,
+        name_index: NameIndex,
+        ignore_matcher: Arc<IgnoreMatcher>,
+        cancel: Option<&'static AtomicBool>,
+    ) -> Self {
         Self {
             file_nodes: slab,
             last_event_id,
             rescan_count,
             name_index,
+            ignore_matcher,
             stop: cancel,
         }
     }
@@ -347,14 +375,54 @@ impl SearchCache {
         current
     }
 
+    fn has_ignored_ancestor_directory(&self, path: &Path) -> bool {
+        let watch_root = self.file_nodes.path();
+        let mut ancestor = path.parent();
+        while let Some(dir) = ancestor {
+            if dir == watch_root {
+                break;
+            }
+            if !dir.starts_with(watch_root) {
+                break;
+            }
+            if self.ignore_matcher.is_ignored(dir, true) {
+                return true;
+            }
+            ancestor = dir.parent();
+        }
+        false
+    }
+
     // `Self::scan_path_recursive`function returns index of the constructed node(with metadata provided).
     // - If path is not under the watch root, None is returned.
     // - Procedure contains metadata fetching, if metadata fetching failed, None is returned.
     fn scan_path_recursive(&mut self, path: &Path) -> Option<SlabIndex> {
+        if !path.starts_with(self.file_nodes.path()) {
+            warn!("skip incremental scan outside watch root: {:?}", path);
+            return None;
+        }
+        if self.has_ignored_ancestor_directory(path) {
+            self.remove_node_path(path);
+            return None;
+        }
         // Ensure path is under the watch root
         if path.symlink_metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
             self.remove_node_path(path);
             return None;
+        };
+        let walk_data = WalkData::new_with_ignore_matcher(
+            path,
+            self.file_nodes.ignore_paths(),
+            Arc::clone(&self.ignore_matcher),
+            true,
+            self.stop,
+        );
+        let node = match walk_it_without_root_chain(&walk_data) {
+            Some(node) => node,
+            None => {
+                self.remove_node_path(path);
+                return None;
+            }
         };
         let parent = path.parent().expect(
             "scan_path_recursive doesn't expected to scan root(should be filtered outside)",
@@ -369,14 +437,10 @@ impl SearchCache {
         {
             self.remove_node(old_node);
         }
-        // For incremental data, we need metadata
-        let walk_data = WalkData::new(path, self.file_nodes.ignore_paths(), true, self.stop);
-        walk_it_without_root_chain(&walk_data).map(|node| {
-            let node = self.create_node_slab_update_name_index_and_name_pool(Some(parent), &node);
-            // Push the newly created node to the parent's children
-            self.file_nodes[parent].add_children(node);
-            node
-        })
+        let node = self.create_node_slab_update_name_index_and_name_pool(Some(parent), &node);
+        // Push the newly created node to the parent's children
+        self.file_nodes[parent].add_children(node);
+        Some(node)
     }
 
     // `Self::scan_path_nonrecursive`function returns index of the constructed node.
@@ -399,7 +463,13 @@ impl SearchCache {
     ) -> WalkData<'p> {
         *phantom1 = self.file_nodes.path().to_path_buf();
         *phantom2 = self.file_nodes.ignore_paths().clone();
-        WalkData::new(phantom1, phantom2, false, self.stop)
+        WalkData::new_with_ignore_matcher(
+            phantom1,
+            phantom2,
+            Arc::clone(&self.ignore_matcher),
+            false,
+            self.stop,
+        )
     }
 
     pub fn rescan_with_walk_data(&mut self, walk_data: &WalkData) -> Option<()> {
@@ -414,9 +484,10 @@ impl SearchCache {
     pub fn rescan(&mut self) {
         // Remove all memory consuming cache early for memory consumption in Self::walk_fs_new.
         let Some(new_cache) = Self::walk_fs_with_walk_data(
-            &WalkData::new(
+            &WalkData::new_with_ignore_matcher(
                 self.file_nodes.path(),
                 self.file_nodes.ignore_paths(),
+                Arc::clone(&self.ignore_matcher),
                 false,
                 self.stop,
             ),
@@ -478,6 +549,7 @@ impl SearchCache {
             last_event_id,
             rescan_count,
             name_index,
+            ignore_matcher: _,
             stop: _,
         } = self;
         let (path, ignore_paths, slab_root, slab) = file_nodes.into_parts();
@@ -596,7 +668,7 @@ impl SearchCache {
             self.rescan_count = self.rescan_count.saturating_add(1);
             return Err(HandleFSEError::Rescan);
         }
-        for scan_path in scan_paths(events) {
+        for scan_path in scan_paths_under_root(events, self.file_nodes.path()) {
             info!("Scanning path: {scan_path:?}");
             let folder = self.scan_path_recursive(&scan_path);
             if folder.is_some() {
@@ -680,6 +752,15 @@ fn scan_paths(events: Vec<FsEvent>) -> Vec<PathBuf> {
         selected.push(path);
     }
     selected
+}
+
+fn scan_paths_under_root(events: Vec<FsEvent>, watch_root: &Path) -> Vec<PathBuf> {
+    scan_paths(
+        events
+            .into_iter()
+            .filter(|event| event.path.starts_with(watch_root))
+            .collect(),
+    )
 }
 
 fn path_depth(path: &Path) -> usize {
@@ -1527,6 +1608,36 @@ mod tests {
 
         assert_eq!(cache.file_nodes.len(), 2 + depth(temp_path));
         assert_eq!(cache.name_index.len(), 2 + depth(temp_path));
+        assert_eq!(cache.search("new_file.txt").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_handle_fs_event_out_of_root_ancestor_does_not_mask_in_root_path() {
+        let temp_dir = TempDir::new("test_events").expect("Failed to create temp directory");
+        let temp_path = temp_dir.path();
+        let mut cache = SearchCache::walk_fs(temp_path);
+
+        let in_root_file = temp_path.join("new_file.txt");
+        fs::File::create(&in_root_file).expect("Failed to create file");
+
+        let out_of_root_ancestor = temp_path
+            .parent()
+            .expect("temp dir should always have a parent")
+            .to_path_buf();
+        let mock_events = vec![
+            FsEvent {
+                path: out_of_root_ancestor,
+                id: cache.last_event_id + 1,
+                flag: EventFlag::ItemModified | EventFlag::ItemIsDir,
+            },
+            FsEvent {
+                path: in_root_file,
+                id: cache.last_event_id + 2,
+                flag: EventFlag::ItemCreated | EventFlag::ItemIsFile,
+            },
+        ];
+
+        cache.handle_fs_events(mock_events).unwrap();
         assert_eq!(cache.search("new_file.txt").unwrap().len(), 1);
     }
 
@@ -3044,5 +3155,25 @@ mod tests {
         });
         let out = scan_paths(events);
         assert_eq!(out, vec![PathBuf::from("/long")]);
+    }
+
+    #[test]
+    fn test_scan_paths_under_root_filters_masking_out_of_root_ancestor() {
+        let watch_root = Path::new("/tmp/watch");
+        let events = vec![
+            FsEvent {
+                path: PathBuf::from("/tmp"),
+                id: 1,
+                flag: EventFlag::ItemModified | EventFlag::ItemIsDir,
+            },
+            FsEvent {
+                path: PathBuf::from("/tmp/watch/new.txt"),
+                id: 2,
+                flag: EventFlag::ItemCreated | EventFlag::ItemIsFile,
+            },
+        ];
+
+        let out = scan_paths_under_root(events, watch_root);
+        assert_eq!(out, vec![PathBuf::from("/tmp/watch/new.txt")]);
     }
 }
