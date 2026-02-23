@@ -131,8 +131,7 @@ fn handle_watch_config_update(
         Some(cache) => {
             info!(
                 "Search cache built. New root: {}, ignore paths: {:?}",
-                next_watch_root,
-                next_ignore_paths
+                next_watch_root, next_ignore_paths
             );
             emit_status_bar_update(app_handle, cache.get_total_files(), 0, 0);
             cache
@@ -324,7 +323,8 @@ pub fn run_background_event_loop(
         crossbeam_channel::select! {
             recv(finish_rx) -> tx => {
                 let tx = tx.expect("Finish channel closed");
-                tx.send(Some(cache)).expect("Failed to send cache");
+                // Only save cache if it's not a noop (i.e. the initial walk wasn't cancelled), otherwise send None to avoid writing an empty cache file
+                tx.send((!cache.is_noop()).then(|| cache)).expect("Failed to send cache");
                 return;
             }
             recv(update_window_state_rx) -> _ => {

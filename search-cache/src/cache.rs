@@ -208,17 +208,16 @@ impl SearchCache {
     /// expected to be used when walk_fs is cancelled.
     pub fn noop(path: PathBuf, ignore_paths: Vec<PathBuf>, cancel: &'static AtomicBool) -> Self {
         Self {
-            file_nodes: FileNodes::new(
-                path,
-                ignore_paths,
-                ThinSlab::new(),
-                SlabIndex::new(42),
-            ),
+            file_nodes: FileNodes::new(path, ignore_paths, ThinSlab::new(), SlabIndex::new(0)),
             last_event_id: 0,
             rescan_count: 0,
             name_index: NameIndex::default(),
             stop: Some(cancel),
         }
+    }
+
+    pub fn is_noop(&self) -> bool {
+        self.file_nodes.len() == 0 && self.name_index.len() == 0
     }
 
     pub fn search_empty(&self, cancellation_token: CancellationToken) -> Option<Vec<SlabIndex>> {

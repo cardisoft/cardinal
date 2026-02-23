@@ -251,30 +251,27 @@ fn run_logic_thread(
         }
         Err(e) => {
             info!("Walking filesystem: {:?}", e);
-            let cache = loop {
-                if let Some(cache) = build_search_cache(
-                    app_handle,
-                    &watch_root,
-                    &ignore_paths,
-                    CancellationToken::new_scan(),
-                ) {
-                    break cache;
-                } else if APP_QUIT.load(Ordering::Relaxed) {
-                    info!("Walk filesystem cancelled, app quitting");
-                    channels
-                        .finish_rx
-                        .recv()
-                        .expect("Failed to receive finish signal")
-                        .send(None)
-                        .expect("Failed to send None cache");
-                    return;
-                }
-                info!("Initial scan cancelled by newer request, restarting");
-            };
-
-            emit_status_bar_update(app_handle, cache.get_total_files(), 0, 0);
-
-            cache
+            if let Some(cache) = build_search_cache(
+                app_handle,
+                &watch_root,
+                &ignore_paths,
+                CancellationToken::new_scan(),
+            ) {
+                emit_status_bar_update(app_handle, cache.get_total_files(), 0, 0);
+                cache
+            } else if APP_QUIT.load(Ordering::Relaxed) {
+                info!("Walk filesystem cancelled, app quitting");
+                channels
+                    .finish_rx
+                    .recv()
+                    .expect("Failed to receive finish signal")
+                    .send(None)
+                    .expect("Failed to send None cache");
+                return;
+            } else {
+                info!("Initial scan cancelled by newer request, use noop cache");
+                SearchCache::noop(path.clone(), ignore_paths.clone(), &APP_QUIT)
+            }
         }
     };
 
@@ -322,7 +319,7 @@ fn flush_cache_to_file_once(finish_tx: &Sender<Sender<Option<SearchCache>>>, db_
 
             info!("Cache flushed successfully to {:?}", db_path);
         } else {
-            info!("Cancelled during data construction, no cache to flush");
+            info!("Cancelled before data constructed, no cache to flush");
         }
     });
 }
