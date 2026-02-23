@@ -252,6 +252,27 @@ fn file_counts_exclude_ignored_subtree() {
     );
 }
 
+/// `walk_it_without_root_chain` returns `None` when the cancel closure is
+/// already true before traversal starts.
+#[test]
+fn cancellation_stops_walk_it_without_root_chain() {
+    use fswalk::walk_it_without_root_chain;
+
+    let tmp = TempDir::new("fswalk_cancel_noroot").unwrap();
+    for i in 0..20 {
+        fs::create_dir(tmp.path().join(format!("dir_{i}"))).unwrap();
+        fs::write(tmp.path().join(format!("dir_{i}/f.txt")), b"").unwrap();
+    }
+
+    let cancel = AtomicBool::new(true); // already cancelled
+    let walk_data = WalkData::new(tmp.path(), &[], false, || cancel.load(Ordering::Relaxed));
+    let result = walk_it_without_root_chain(&walk_data);
+    assert!(
+        result.is_none(),
+        "walk_it_without_root_chain must return None when cancel closure returns true"
+    );
+}
+
 /// `walk_it_without_root_chain` also respects prefix-based ignore.
 #[test]
 fn walk_without_root_chain_respects_prefix_ignore() {
