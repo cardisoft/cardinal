@@ -324,7 +324,7 @@ pub fn run_background_event_loop(
             recv(finish_rx) -> tx => {
                 let tx = tx.expect("Finish channel closed");
                 // Only save cache if it's not a noop (i.e. the initial walk wasn't cancelled), otherwise send None to avoid writing an empty cache file
-                tx.send((!cache.is_noop()).then(|| cache)).expect("Failed to send cache");
+                tx.send((!cache.is_noop()).then_some(cache)).expect("Failed to send cache");
                 return;
             }
             recv(update_window_state_rx) -> _ => {

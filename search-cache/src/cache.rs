@@ -217,7 +217,7 @@ impl SearchCache {
     }
 
     pub fn is_noop(&self) -> bool {
-        self.file_nodes.len() == 0 && self.name_index.len() == 0
+        self.file_nodes.is_empty() && self.name_index.is_empty()
     }
 
     pub fn search_empty(&self, cancellation_token: CancellationToken) -> Option<Vec<SlabIndex>> {
