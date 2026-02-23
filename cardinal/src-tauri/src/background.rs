@@ -106,16 +106,10 @@ fn handle_watch_config_update(
 ) {
     info!("Received watch config update: {:?}", update);
     let WatchConfigUpdate {
-        watch_root: update_watch_root,
+        watch_root: next_watch_root,
         ignore_paths,
         scan_cancellation_token,
     } = update;
-    let trimmed_watch_root = update_watch_root.trim();
-    let next_watch_root = if trimmed_watch_root.is_empty() {
-        watch_root.as_str()
-    } else {
-        trimmed_watch_root
-    };
 
     let next_ignore_paths = ignore_paths
         .into_iter()
@@ -128,23 +122,34 @@ fn handle_watch_config_update(
     *history_ready = false;
     *processed_events = 0;
 
-    let Some(next_cache) = build_search_cache(
+    let next_cache = match build_search_cache(
         app_handle,
-        next_watch_root,
+        &next_watch_root,
         &next_ignore_paths,
         scan_cancellation_token,
-    ) else {
-        info!("Watch config change cancelled, keeping existing state");
-        return;
+    ) {
+        Some(cache) => {
+            info!(
+                "Search cache built. New root: {}, ignore paths: {:?}",
+                next_watch_root,
+                next_ignore_paths
+            );
+            emit_status_bar_update(app_handle, cache.get_total_files(), 0, 0);
+            cache
+        }
+        None => {
+            // if cache build is cancelled, we cannot reuse the old cache since
+            // it's tied to the old watch root and ignore paths; create a noop
+            // cache instead
+            info!("Watch config change cancelled, use noop state");
+            SearchCache::noop(
+                PathBuf::from(&next_watch_root),
+                next_ignore_paths,
+                &APP_QUIT,
+            )
+        }
     };
 
-    info!(
-        "Search cache built. New root: {}, ignore paths: {:?}",
-        next_watch_root,
-        next_cache.ignore_paths()
-    );
-
-    emit_status_bar_update(app_handle, next_cache.get_total_files(), 0, 0);
     *cache = next_cache;
     *watch_root = next_watch_root.to_string();
     *event_watcher = EventWatcher::spawn(
@@ -410,8 +415,8 @@ pub(crate) fn build_search_cache(
     ignore_paths: &[PathBuf],
     scan_cancellation_token: CancellationToken,
 ) -> Option<SearchCache> {
-    let path = PathBuf::from(watch_root);
-    let walk_data = WalkData::new(&path, ignore_paths, false, move || {
+    let path = Path::new(watch_root);
+    let walk_data = WalkData::new(path, ignore_paths, false, move || {
         APP_QUIT.load(Ordering::Relaxed) || scan_cancellation_token.is_cancelled().is_none()
     });
     let walking_done = AtomicBool::new(false);
@@ -426,8 +431,7 @@ pub(crate) fn build_search_cache(
                 std::thread::sleep(Duration::from_millis(100));
             }
         });
-        let cache =
-            SearchCache::walk_fs_with_walk_data(&walk_data, Some(&crate::lifecycle::APP_QUIT));
+        let cache = SearchCache::walk_fs_with_walk_data(&walk_data, Some(&APP_QUIT));
         walking_done.store(true, Ordering::Relaxed);
         cache
     })
