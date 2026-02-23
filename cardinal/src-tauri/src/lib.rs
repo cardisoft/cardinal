@@ -279,6 +279,7 @@ fn run_logic_thread(
         info!("Using noop event watcher due to cancelled initial scan");
         EventWatcher::noop()
     } else {
+        update_app_state(app_handle, AppLifecycleState::Updating);
         EventWatcher::spawn(
             watch_root.to_string(),
             cache.last_event_id(),
@@ -287,9 +288,6 @@ fn run_logic_thread(
         .1
     };
 
-    if load_app_state() != AppLifecycleState::Ready {
-        update_app_state(app_handle, AppLifecycleState::Updating);
-    }
     info!("Started background processing thread");
     // TODO(ldm0): remove this watch_root, use cache's path instead
     run_background_event_loop(
