@@ -288,6 +288,7 @@ fn run_logic_thread(
         update_app_state(app_handle, AppLifecycleState::Updating);
     }
     info!("Started background processing thread");
+    // TODO(ldm0): remove this watch_root, use cache's path instead
     run_background_event_loop(
         app_handle,
         cache,
