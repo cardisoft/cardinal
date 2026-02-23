@@ -145,6 +145,41 @@ describe('useAppPreferences', () => {
     expect(refreshSearchResults).toHaveBeenCalledTimes(1);
   });
 
+  it('skips setWatchConfig when watch config is unchanged', async () => {
+    const { result } = renderHook(() =>
+      useAppPreferences({
+        fullDiskAccessStatus: 'granted',
+        isCheckingFullDiskAccess: false,
+        refreshSearchResults,
+        i18n: { changeLanguage },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenCalledWith('start_logic', {
+        watchRoot: '/workspace',
+        ignorePaths: ['/Volumes'],
+      });
+    });
+
+    mockedSetWatchConfig.mockClear();
+    refreshSearchResults.mockClear();
+    setWatchRoot.mockClear();
+    setIgnorePaths.mockClear();
+
+    act(() => {
+      result.current.handleWatchConfigChange({
+        watchRoot: '/workspace',
+        ignorePaths: ['/Volumes'],
+      });
+    });
+
+    expect(setWatchRoot).not.toHaveBeenCalled();
+    expect(setIgnorePaths).not.toHaveBeenCalled();
+    expect(mockedSetWatchConfig).not.toHaveBeenCalled();
+    expect(refreshSearchResults).not.toHaveBeenCalled();
+  });
+
   it('opens and closes preferences, and resets user preferences', async () => {
     const { result } = renderHook(() =>
       useAppPreferences({

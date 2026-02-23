@@ -37,6 +37,9 @@ type UseAppPreferencesResult = {
   handleResetPreferences: () => void;
 };
 
+const areStringArraysEqual = (left: string[], right: string[]): boolean =>
+  left.length === right.length && left.every((value, index) => value === right[index]);
+
 /**
  * Manages app preferences including watch config, tray, theme, language, and overlay state.
  * Provides actions for updating watch settings and resetting preferences to defaults.
@@ -89,14 +92,24 @@ export function useAppPreferences({
 
   const applyWatchConfig = useCallback(
     (nextWatchRoot: string, nextIgnorePaths: string[]) => {
+      const watchConfigChanged =
+        nextWatchRoot !== watchRoot || !areStringArraysEqual(nextIgnorePaths, ignorePaths);
+
+      if (!watchConfigChanged) {
+        return;
+      }
+
       setWatchRoot(nextWatchRoot);
       setIgnorePaths(nextIgnorePaths);
       if (logicStartedRef.current && nextWatchRoot) {
-        void setWatchConfig({ watchRoot: nextWatchRoot, ignorePaths: nextIgnorePaths });
+        void setWatchConfig({
+          watchRoot: nextWatchRoot,
+          ignorePaths: nextIgnorePaths,
+        });
       }
       refreshSearchResults();
     },
-    [refreshSearchResults, setIgnorePaths, setWatchRoot],
+    [ignorePaths, refreshSearchResults, setIgnorePaths, setWatchRoot, watchRoot],
   );
 
   const handleWatchConfigChange = useCallback(
