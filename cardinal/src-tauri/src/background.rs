@@ -151,13 +151,17 @@ fn handle_watch_config_update(
 
     *cache = next_cache;
     *watch_root = next_watch_root.to_string();
-    *event_watcher = EventWatcher::spawn(
-        watch_root.to_string(),
-        cache.last_event_id(),
-        fse_latency_secs,
-    )
-    .1;
-    update_app_state(app_handle, AppLifecycleState::Updating);
+    *event_watcher = if cache.is_noop() {
+        EventWatcher::noop()
+    } else {
+        update_app_state(app_handle, AppLifecycleState::Updating);
+        EventWatcher::spawn(
+            watch_root.to_string(),
+            cache.last_event_id(),
+            fse_latency_secs,
+        )
+        .1
+    };
 }
 
 struct EventSnapshot {
@@ -482,6 +486,7 @@ fn perform_rescan(
     *event_watcher = if stopped {
         EventWatcher::noop()
     } else {
+        update_app_state(app_handle, AppLifecycleState::Updating);
         EventWatcher::spawn(
             watch_root.to_string(),
             cache.last_event_id(),
@@ -489,7 +494,6 @@ fn perform_rescan(
         )
         .1
     };
-    update_app_state(app_handle, AppLifecycleState::Updating);
 }
 
 fn unix_timestamp_now() -> i64 {
