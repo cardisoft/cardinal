@@ -255,3 +255,114 @@ fn noop_cache_signals_do_not_persist() {
         "populated cache must produce Some for the persistence gate"
     );
 }
+
+// ── noop cache property tests (last_event_id, rescan_count, search) ──────────
+
+#[test]
+fn noop_cache_last_event_id_is_zero() {
+    let mut cache = SearchCache::noop(PathBuf::from("/w"), vec![], &NEVER_STOPPED);
+    assert_eq!(
+        cache.last_event_id(),
+        0,
+        "noop cache must have last_event_id == 0 (used to spawn EventWatcher)"
+    );
+}
+
+#[test]
+fn noop_cache_rescan_count_is_zero() {
+    let cache = SearchCache::noop(PathBuf::from("/w"), vec![], &NEVER_STOPPED);
+    assert_eq!(
+        cache.rescan_count(),
+        0,
+        "freshly created noop cache must have rescan_count == 0"
+    );
+}
+
+#[test]
+fn noop_cache_search_returns_empty_results() {
+    use search_cache::SearchOptions;
+    let mut cache = SearchCache::noop(PathBuf::from("/w"), vec![], &NEVER_STOPPED);
+    let outcome = cache
+        .search_with_options(
+            "anything",
+            SearchOptions::default(),
+            CancellationToken::noop(),
+        )
+        .expect("search on noop should not error");
+    let nodes = outcome.nodes.unwrap_or_default();
+    assert!(
+        nodes.is_empty(),
+        "searching a noop cache must return an empty result set"
+    );
+}
+
+#[test]
+fn noop_cache_search_empty_returns_empty_vec() {
+    let cache = SearchCache::noop(PathBuf::from("/w"), vec![], &NEVER_STOPPED);
+    let result = cache
+        .search_empty(CancellationToken::noop())
+        .expect("search_empty on noop should not be cancelled");
+    assert!(
+        result.is_empty(),
+        "search_empty on noop cache must return an empty vec"
+    );
+}
+
+// ── noop cache walk_data propagation ─────────────────────────────────────────
+
+#[test]
+fn noop_cache_walk_data_propagates_path_and_ignore() {
+    let _guard = SCAN_TOKEN_LOCK
+        .lock()
+        .expect("scan token lock should not be poisoned");
+
+    let path = PathBuf::from("/my/root");
+    let ignore = vec![PathBuf::from("/my/root/.git")];
+    let cache = SearchCache::noop(path.clone(), ignore.clone(), &NEVER_STOPPED);
+
+    let mut p1 = PathBuf::new();
+    let mut p2 = Vec::new();
+    let token = CancellationToken::new_scan();
+    let wd = cache.walk_data(&mut p1, &mut p2, token);
+
+    assert_eq!(
+        wd.root_path, &path,
+        "walk_data from noop must propagate root path"
+    );
+    assert_eq!(
+        wd.ignore_directories, &ignore,
+        "walk_data from noop must propagate ignore paths"
+    );
+}
+
+// ── handle_fs_events on noop cache ───────────────────────────────────────────
+
+#[test]
+fn noop_cache_handle_fs_events_with_empty_events_is_ok() {
+    let mut cache = SearchCache::noop(PathBuf::from("/w"), vec![], &NEVER_STOPPED);
+    let result = cache.handle_fs_events(vec![]);
+    assert!(
+        result.is_ok(),
+        "handle_fs_events with empty events on noop cache should succeed"
+    );
+}
+
+#[test]
+fn noop_cache_handle_fs_events_with_create_event_panics_on_invalid_slab() {
+    use cardinal_sdk::{EventFlag, FsEvent};
+    let mut cache = SearchCache::noop(PathBuf::from("/w"), vec![], &NEVER_STOPPED);
+    let event = FsEvent {
+        path: PathBuf::from("/w/new_file.txt"),
+        id: 42,
+        flag: EventFlag::ItemCreated | EventFlag::ItemIsFile,
+    };
+    // The noop cache has an empty slab; attempting to scan a path triggers an
+    // "invalid slab index" panic because the root node doesn't exist.
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        cache.handle_fs_events(vec![event])
+    }));
+    assert!(
+        result.is_err(),
+        "handle_fs_events on noop cache with a real event should panic (invalid slab)"
+    );
+}

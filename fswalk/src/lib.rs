@@ -558,6 +558,66 @@ mod tests {
     // ── other unit tests ─────────────────────────────────────────────────
 
     #[test]
+    fn walk_data_debug_shows_cancel_state() {
+        let ignore = vec![PathBuf::from("/a")];
+        let wd = WalkData::new(Path::new("/root"), &ignore, true, || false);
+        let dbg = format!("{wd:?}");
+        assert!(
+            dbg.contains("cancel: false"),
+            "Debug output should show cancel closure result: {dbg}"
+        );
+        assert!(
+            dbg.contains("root_path"),
+            "Debug output should include root_path: {dbg}"
+        );
+        assert!(
+            dbg.contains("need_metadata: true"),
+            "Debug output should include need_metadata: {dbg}"
+        );
+
+        let wd_cancelled = WalkData::new(Path::new("/root"), &ignore, false, || true);
+        let dbg2 = format!("{wd_cancelled:?}");
+        assert!(
+            dbg2.contains("cancel: true"),
+            "Debug output should reflect cancel=true: {dbg2}"
+        );
+    }
+
+    #[test]
+    fn walk_data_closure_cancellation_is_dynamic() {
+        let flag = AtomicBool::new(false);
+        let ignore: Vec<PathBuf> = vec![];
+        let wd = WalkData::new(Path::new("/"), &ignore, false, || {
+            flag.load(Ordering::Relaxed)
+        });
+        assert!(
+            !wd.is_cancelled(),
+            "should not be cancelled when flag is false"
+        );
+
+        flag.store(true, Ordering::Relaxed);
+        assert!(
+            wd.is_cancelled(),
+            "should be cancelled after flag flipped to true"
+        );
+
+        flag.store(false, Ordering::Relaxed);
+        assert!(
+            !wd.is_cancelled(),
+            "should reflect dynamic state of the closure"
+        );
+    }
+
+    #[test]
+    fn walk_data_simple_never_cancels() {
+        let wd = WalkData::simple(Path::new("/tmp"), false);
+        assert!(
+            !wd.is_cancelled(),
+            "simple WalkData should never report cancelled"
+        );
+    }
+
+    #[test]
     fn test_handle_error_and_retry_only_interrupted() {
         let interrupted = Error::from(ErrorKind::Interrupted);
         assert!(handle_error_and_retry(&interrupted));
