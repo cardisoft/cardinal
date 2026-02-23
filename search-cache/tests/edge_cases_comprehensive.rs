@@ -85,7 +85,7 @@ fn test_cancellation_with_stop_flag() {
     }
 
     let stop = Box::leak(Box::new(AtomicBool::new(false)));
-    let walk_data = fswalk::WalkData::new(&root_path, &[], false, Some(stop));
+    let walk_data = fswalk::WalkData::new(&root_path, &[], false, || stop.load(Ordering::Relaxed));
     let mut cache = SearchCache::walk_fs_with_walk_data(&walk_data, Some(stop)).unwrap();
 
     // Set stop flag during search, then create new token to cancel previous

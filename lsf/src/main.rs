@@ -72,7 +72,14 @@ fn main() -> Result<()> {
                         {
                             event_watcher = EventWatcher::noop();
                         }
-                        cache.rescan();
+                        let mut scan_root = PathBuf::new();
+                        let mut scan_ignore_paths = Vec::new();
+                        let walk_data = cache.walk_data(
+                            &mut scan_root,
+                            &mut scan_ignore_paths,
+                            CancellationToken::new_scan(),
+                        );
+                        let _ = cache.rescan_with_walk_data(&walk_data);
                         event_watcher = EventWatcher::spawn("/".to_string(), cache.last_event_id(), 0.1).1;
                     }
                 }

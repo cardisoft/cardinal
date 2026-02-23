@@ -35,6 +35,7 @@ use tracing::{error, info, warn};
 pub struct WatchConfigUpdate {
     pub watch_root: String,
     pub ignore_paths: Vec<String>,
+    pub scan_cancellation_token: CancellationToken,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Default)]
@@ -76,7 +77,7 @@ pub struct SearchState {
     node_info_tx: Sender<NodeInfoRequest>,
 
     icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
-    rescan_tx: Sender<()>,
+    rescan_tx: Sender<CancellationToken>,
     watch_config_tx: Sender<WatchConfigUpdate>,
     sorted_view_cache: Mutex<Option<SortedViewCache>>,
     pub(crate) update_window_state_tx: Sender<()>,
@@ -88,7 +89,7 @@ impl SearchState {
         result_rx: Receiver<Result<SearchOutcome>>,
         node_info_tx: Sender<NodeInfoRequest>,
         icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
-        rescan_tx: Sender<()>,
+        rescan_tx: Sender<CancellationToken>,
         watch_config_tx: Sender<WatchConfigUpdate>,
         update_window_state_tx: Sender<()>,
     ) -> Self {
@@ -393,7 +394,7 @@ pub async fn get_app_status() -> String {
 
 #[tauri::command(async)]
 pub fn trigger_rescan(state: State<'_, SearchState>) {
-    if let Err(e) = state.rescan_tx.send(()) {
+    if let Err(e) = state.rescan_tx.send(CancellationToken::new_scan()) {
         error!("Failed to request rescan: {e:?}");
     }
 }
@@ -413,6 +414,7 @@ pub fn set_watch_config(
     if let Err(e) = state.watch_config_tx.send(WatchConfigUpdate {
         watch_root,
         ignore_paths,
+        scan_cancellation_token: CancellationToken::new_scan(),
     }) {
         error!("Failed to request watch config change: {e:?}");
     }

@@ -15,6 +15,7 @@ use std::{
     ops::{Deref, DerefMut},
     ptr::NonNull,
     slice,
+    sync::LazyLock,
 };
 
 type EventsCallback = Box<dyn FnMut(Vec<FsEvent>) + Send>;
@@ -153,9 +154,13 @@ impl DerefMut for EventWatcher {
 
 impl EventWatcher {
     pub fn noop() -> Self {
+        #[allow(clippy::type_complexity)]
+        static BLACK_HOLE1: LazyLock<(Sender<Vec<FsEvent>>, Receiver<Vec<FsEvent>>)> =
+            LazyLock::new(unbounded);
+        static BLACK_HOLE2: LazyLock<(Sender<()>, Receiver<()>)> = LazyLock::new(|| bounded(1));
         Self {
-            receiver: unbounded().1,
-            _cancellation_token: bounded::<()>(1).0,
+            receiver: BLACK_HOLE1.1.clone(),
+            _cancellation_token: BLACK_HOLE2.0.clone(),
         }
     }
 
@@ -199,6 +204,40 @@ mod tests {
     use crossbeam_channel::RecvTimeoutError;
     use std::time::{Duration, Instant};
     use tempfile::tempdir;
+
+    #[test]
+    fn noop_event_watcher_recv_timeout_never_disconnects() {
+        let watcher = EventWatcher::noop();
+        let result = watcher.recv_timeout(Duration::from_millis(50));
+        assert!(
+            matches!(result, Err(RecvTimeoutError::Timeout)),
+            "noop watcher should block waiting for events instead of disconnecting"
+        );
+    }
+
+    /// Before the LazyLock fix each `noop()` call created a fresh channel pair
+    /// and immediately dropped its sender, causing `Disconnected` on the very
+    /// first `recv_timeout`. This test locks in the correct shared-channel behaviour:
+    /// multiple concurrent noop watchers must all time out, never disconnect.
+    #[test]
+    fn multiple_noop_watchers_all_timeout_not_disconnected() {
+        let watchers: Vec<_> = (0..4).map(|_| EventWatcher::noop()).collect();
+        for (i, w) in watchers.iter().enumerate() {
+            let result = w.recv_timeout(Duration::from_millis(30));
+            assert!(
+                matches!(result, Err(RecvTimeoutError::Timeout)),
+                "noop watcher #{i} disconnected — shared BLACK_HOLE channel not working"
+            );
+        }
+        // Dropping them should not affect the shared channel used by others.
+        drop(watchers);
+        let late = EventWatcher::noop();
+        let result = late.recv_timeout(Duration::from_millis(30));
+        assert!(
+            matches!(result, Err(RecvTimeoutError::Timeout)),
+            "noop watcher created after previous ones dropped must still timeout"
+        );
+    }
 
     #[test]
     fn event_watcher_on_non_existent_path() {
