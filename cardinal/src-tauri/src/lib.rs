@@ -275,12 +275,18 @@ fn run_logic_thread(
         }
     };
 
-    let event_watcher = EventWatcher::spawn(
-        watch_root.to_string(),
-        cache.last_event_id(),
-        FSE_LATENCY_SECS,
-    )
-    .1;
+    let event_watcher = if cache.is_noop() {
+        info!("Using noop event watcher due to cancelled initial scan");
+        EventWatcher::noop()
+    } else {
+        EventWatcher::spawn(
+            watch_root.to_string(),
+            cache.last_event_id(),
+            FSE_LATENCY_SECS,
+        )
+        .1
+    };
+
     if load_app_state() != AppLifecycleState::Ready {
         update_app_state(app_handle, AppLifecycleState::Updating);
     }
