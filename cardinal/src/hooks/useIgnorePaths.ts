@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useStoredState } from './useStoredState';
 
 const STORAGE_KEY = 'cardinal.ignorePaths';
-const DEFAULT_IGNORE_PATHS = ['/Volumes'];
+const DEFAULT_IGNORE_PATHS = ['/Volumes', '~/Library/CloudStorage'];
 
 const cleanPaths = (next: string[]): string[] =>
   next.map((item) => item.trim()).filter((item) => item.length > 0);

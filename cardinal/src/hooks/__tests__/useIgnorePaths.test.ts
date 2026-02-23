@@ -46,6 +46,12 @@ describe('useIgnorePaths', () => {
     );
   });
 
+  it('includes CloudStorage in default ignore paths', () => {
+    const { result } = renderHook(() => useIgnorePaths());
+
+    expect(result.current.defaultIgnorePaths).toContain('~/Library/CloudStorage');
+  });
+
   it('keeps an empty stored array without writing defaults', async () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(['', '   ']));
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
