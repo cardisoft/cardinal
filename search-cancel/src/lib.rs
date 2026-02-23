@@ -60,9 +60,25 @@ impl CancellationToken {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    static TEST_GUARD: Mutex<()> = Mutex::new(());
+
+    fn lock_versions() -> MutexGuard<'static, ()> {
+        TEST_GUARD
+            .lock()
+            .expect("version lock should not be poisoned")
+    }
+
+    fn reset_versions() {
+        ACTIVE_SEARCH_VERSION.store(0, Ordering::SeqCst);
+        ACTIVE_SCAN_VERSION.store(0, Ordering::SeqCst);
+    }
 
     #[test]
     fn noop_token_is_never_cancelled() {
+        let _guard = lock_versions();
+        reset_versions();
         let token = CancellationToken::noop();
         assert!(
             token.is_cancelled().is_some(),
@@ -72,6 +88,8 @@ mod tests {
 
     #[test]
     fn cancelled_after_version_change() {
+        let _guard = lock_versions();
+        reset_versions();
         let token_v1 = CancellationToken::new(1);
         assert!(
             token_v1.is_cancelled().is_some(),
@@ -81,5 +99,46 @@ mod tests {
         // Bump the active version, cancelling the older token.
         let _token_v2 = CancellationToken::new(2);
         assert!(token_v1.is_cancelled().is_none());
+    }
+
+    #[test]
+    fn scan_token_cancelled_after_new_scan_version() {
+        let _guard = lock_versions();
+        reset_versions();
+
+        let scan_v1 = CancellationToken::new_scan();
+        assert!(
+            scan_v1.is_cancelled().is_some(),
+            "latest scan token should start active"
+        );
+
+        let scan_v2 = CancellationToken::new_scan();
+        assert!(
+            scan_v2.is_cancelled().is_some(),
+            "new scan token should be active"
+        );
+        assert!(
+            scan_v1.is_cancelled().is_none(),
+            "older scan token should be cancelled by newer scan"
+        );
+    }
+
+    #[test]
+    fn scan_versions_do_not_cancel_search_tokens() {
+        let _guard = lock_versions();
+        reset_versions();
+
+        let search_v1 = CancellationToken::new(1);
+        let _scan_v1 = CancellationToken::new_scan();
+        assert!(
+            search_v1.is_cancelled().is_some(),
+            "scan token updates should not affect search version"
+        );
+
+        let _search_v2 = CancellationToken::new(2);
+        assert!(
+            search_v1.is_cancelled().is_none(),
+            "search token should still be governed by search version updates"
+        );
     }
 }

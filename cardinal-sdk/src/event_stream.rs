@@ -206,6 +206,16 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
+    fn noop_event_watcher_recv_timeout_never_disconnects() {
+        let watcher = EventWatcher::noop();
+        let result = watcher.recv_timeout(Duration::from_millis(50));
+        assert!(
+            matches!(result, Err(RecvTimeoutError::Timeout)),
+            "noop watcher should block waiting for events instead of disconnecting"
+        );
+    }
+
+    #[test]
     fn event_watcher_on_non_existent_path() {
         let (_dev, watcher) = EventWatcher::spawn("/e mm".to_string(), current_event_id(), 0.05);
         let initial_events = watcher.recv().unwrap();
