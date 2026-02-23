@@ -33,6 +33,7 @@ pub struct SearchCache {
     last_event_id: u64,
     rescan_count: u64,
     pub(crate) name_index: NameIndex,
+    // TODO(ldm0): remove the Option later
     stop: Option<&'static AtomicBool>,
 }
 
@@ -200,6 +201,23 @@ impl SearchCache {
             rescan_count,
             name_index,
             stop: cancel,
+        }
+    }
+
+    /// Create a simple SearchCache which doesn't contain any file node and is
+    /// expected to be used when walk_fs is cancelled.
+    pub fn noop(path: PathBuf, ignore_paths: Vec<PathBuf>, cancel: &'static AtomicBool) -> Self {
+        Self {
+            file_nodes: FileNodes::new(
+                path,
+                ignore_paths,
+                ThinSlab::new(),
+                SlabIndex::new(42),
+            ),
+            last_event_id: 0,
+            rescan_count: 0,
+            name_index: NameIndex::default(),
+            stop: Some(cancel),
         }
     }
 
