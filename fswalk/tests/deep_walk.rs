@@ -50,7 +50,7 @@ fn ignores_directories_and_collects_metadata() {
     let tmp = TempDir::new("fswalk_deep").unwrap();
     build_deep_fixture(tmp.path());
     let ignore = vec![tmp.path().join("skip_dir")];
-    let walk_data = WalkData::new(tmp.path(), &ignore, true, None);
+    let walk_data = WalkData::new(tmp.path(), &ignore, true, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, tmp.path());
 
@@ -94,7 +94,7 @@ fn cancellation_stops_traversal_early() {
         fs::create_dir(tmp.path().join(format!("dir_{i}"))).unwrap();
     }
     let cancel = AtomicBool::new(false);
-    let walk_data = WalkData::new(tmp.path(), &[], false, Some(&cancel));
+    let walk_data = WalkData::new(tmp.path(), &[], false, || cancel.load(Ordering::Relaxed));
     cancel.store(true, Ordering::Relaxed); // cancel immediately
     let node = walk_it(&walk_data);
     assert!(
@@ -119,7 +119,7 @@ fn ignore_prefix_excludes_nested_children() {
     fs::write(root.join("keep.txt"), b"k").unwrap();
 
     let ignore = vec![root.join("skip_dir")];
-    let walk_data = WalkData::new(root, &ignore, false, None);
+    let walk_data = WalkData::new(root, &ignore, false, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
@@ -147,7 +147,7 @@ fn ignore_does_not_affect_sibling_with_similar_name() {
     fs::write(root.join("node_modules_backup/pkg.json"), b"{}").unwrap();
 
     let ignore = vec![root.join("node_modules")];
-    let walk_data = WalkData::new(root, &ignore, false, None);
+    let walk_data = WalkData::new(root, &ignore, false, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
@@ -180,7 +180,7 @@ fn ignore_intermediate_dir_preserves_siblings() {
     fs::write(root.join("parent/keep_me/file.txt"), b"k").unwrap();
 
     let ignore = vec![root.join("parent/ignore_me")];
-    let walk_data = WalkData::new(root, &ignore, false, None);
+    let walk_data = WalkData::new(root, &ignore, false, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
@@ -215,7 +215,7 @@ fn multiple_ignores_with_prefix() {
     fs::write(root.join("c/f.txt"), b"").unwrap();
 
     let ignore = vec![root.join("a"), root.join("b")];
-    let walk_data = WalkData::new(root, &ignore, false, None);
+    let walk_data = WalkData::new(root, &ignore, false, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
@@ -242,13 +242,34 @@ fn file_counts_exclude_ignored_subtree() {
     fs::write(root.join("kept/e.txt"), b"").unwrap();
 
     let ignore = vec![root.join("ignored")];
-    let walk_data = WalkData::new(root, &ignore, false, None);
+    let walk_data = WalkData::new(root, &ignore, false, || false);
     let _tree = walk_it(&walk_data).expect("root node");
 
     let num_files = walk_data.num_files.load(Ordering::Relaxed);
     assert_eq!(
         num_files, 2,
         "only the 2 files under kept/ should be counted, got {num_files}"
+    );
+}
+
+/// `walk_it_without_root_chain` returns `None` when the cancel closure is
+/// already true before traversal starts.
+#[test]
+fn cancellation_stops_walk_it_without_root_chain() {
+    use fswalk::walk_it_without_root_chain;
+
+    let tmp = TempDir::new("fswalk_cancel_noroot").unwrap();
+    for i in 0..20 {
+        fs::create_dir(tmp.path().join(format!("dir_{i}"))).unwrap();
+        fs::write(tmp.path().join(format!("dir_{i}/f.txt")), b"").unwrap();
+    }
+
+    let cancel = AtomicBool::new(true); // already cancelled
+    let walk_data = WalkData::new(tmp.path(), &[], false, || cancel.load(Ordering::Relaxed));
+    let result = walk_it_without_root_chain(&walk_data);
+    assert!(
+        result.is_none(),
+        "walk_it_without_root_chain must return None when cancel closure returns true"
     );
 }
 
@@ -265,7 +286,7 @@ fn walk_without_root_chain_respects_prefix_ignore() {
     fs::write(root.join("stay.txt"), b"").unwrap();
 
     let ignore = vec![root.join("skip")];
-    let walk_data = WalkData::new(root, &ignore, false, None);
+    let walk_data = WalkData::new(root, &ignore, false, || false);
     let tree = walk_it_without_root_chain(&walk_data).expect("root node");
 
     assert!(

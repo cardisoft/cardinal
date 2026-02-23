@@ -145,6 +145,161 @@ describe('useAppPreferences', () => {
     expect(refreshSearchResults).toHaveBeenCalledTimes(1);
   });
 
+  it('skips setWatchConfig when watch config is unchanged', async () => {
+    const { result } = renderHook(() =>
+      useAppPreferences({
+        fullDiskAccessStatus: 'granted',
+        isCheckingFullDiskAccess: false,
+        refreshSearchResults,
+        i18n: { changeLanguage },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenCalledWith('start_logic', {
+        watchRoot: '/workspace',
+        ignorePaths: ['/Volumes'],
+      });
+    });
+
+    mockedSetWatchConfig.mockClear();
+    refreshSearchResults.mockClear();
+    setWatchRoot.mockClear();
+    setIgnorePaths.mockClear();
+
+    act(() => {
+      result.current.handleWatchConfigChange({
+        watchRoot: '/workspace',
+        ignorePaths: ['/Volumes'],
+      });
+    });
+
+    expect(setWatchRoot).not.toHaveBeenCalled();
+    expect(setIgnorePaths).not.toHaveBeenCalled();
+    expect(mockedSetWatchConfig).not.toHaveBeenCalled();
+    expect(refreshSearchResults).not.toHaveBeenCalled();
+  });
+
+  it('updates watch config when only watchRoot changes', async () => {
+    const { result } = renderHook(() =>
+      useAppPreferences({
+        fullDiskAccessStatus: 'granted',
+        isCheckingFullDiskAccess: false,
+        refreshSearchResults,
+        i18n: { changeLanguage },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenCalledWith('start_logic', {
+        watchRoot: '/workspace',
+        ignorePaths: ['/Volumes'],
+      });
+    });
+
+    mockedSetWatchConfig.mockClear();
+    refreshSearchResults.mockClear();
+    setWatchRoot.mockClear();
+    setIgnorePaths.mockClear();
+
+    act(() => {
+      result.current.handleWatchConfigChange({
+        watchRoot: '/new-root',
+        ignorePaths: ['/Volumes'], // same as before
+      });
+    });
+
+    expect(setWatchRoot).toHaveBeenCalledWith('/new-root');
+    expect(setIgnorePaths).toHaveBeenCalledWith(['/Volumes']);
+    expect(mockedSetWatchConfig).toHaveBeenCalledWith({
+      watchRoot: '/new-root',
+      ignorePaths: ['/Volumes'],
+    });
+    expect(refreshSearchResults).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates watch config when only ignorePaths changes', async () => {
+    const { result } = renderHook(() =>
+      useAppPreferences({
+        fullDiskAccessStatus: 'granted',
+        isCheckingFullDiskAccess: false,
+        refreshSearchResults,
+        i18n: { changeLanguage },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenCalledWith('start_logic', {
+        watchRoot: '/workspace',
+        ignorePaths: ['/Volumes'],
+      });
+    });
+
+    mockedSetWatchConfig.mockClear();
+    refreshSearchResults.mockClear();
+    setWatchRoot.mockClear();
+    setIgnorePaths.mockClear();
+
+    act(() => {
+      result.current.handleWatchConfigChange({
+        watchRoot: '/workspace', // same as before
+        ignorePaths: ['/tmp/ignore'], // different
+      });
+    });
+
+    expect(setWatchRoot).toHaveBeenCalledWith('/workspace');
+    expect(setIgnorePaths).toHaveBeenCalledWith(['/tmp/ignore']);
+    expect(mockedSetWatchConfig).toHaveBeenCalledWith({
+      watchRoot: '/workspace',
+      ignorePaths: ['/tmp/ignore'],
+    });
+    expect(refreshSearchResults).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats reordered ignorePaths as a change', async () => {
+    // areStringArraysEqual is index-sensitive: same strings in different order
+    // must NOT be treated as equal, so the update must fire.
+    mockedUseIgnorePaths.mockReturnValue({
+      ignorePaths: ['/Volumes', '/System'],
+      setIgnorePaths,
+      defaultIgnorePaths: ['/Volumes', '/System'],
+    });
+
+    const { result } = renderHook(() =>
+      useAppPreferences({
+        fullDiskAccessStatus: 'granted',
+        isCheckingFullDiskAccess: false,
+        refreshSearchResults,
+        i18n: { changeLanguage },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenCalledWith('start_logic', {
+        watchRoot: '/workspace',
+        ignorePaths: ['/Volumes', '/System'],
+      });
+    });
+
+    mockedSetWatchConfig.mockClear();
+    refreshSearchResults.mockClear();
+    setWatchRoot.mockClear();
+    setIgnorePaths.mockClear();
+
+    act(() => {
+      result.current.handleWatchConfigChange({
+        watchRoot: '/workspace',
+        ignorePaths: ['/System', '/Volumes'], // same items, different order
+      });
+    });
+
+    expect(mockedSetWatchConfig).toHaveBeenCalledWith({
+      watchRoot: '/workspace',
+      ignorePaths: ['/System', '/Volumes'],
+    });
+    expect(refreshSearchResults).toHaveBeenCalledTimes(1);
+  });
+
   it('opens and closes preferences, and resets user preferences', async () => {
     const { result } = renderHook(() =>
       useAppPreferences({

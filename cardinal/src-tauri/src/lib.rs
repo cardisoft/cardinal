@@ -25,6 +25,7 @@ use lifecycle::{
 };
 use once_cell::sync::OnceCell;
 use search_cache::{SearchCache, SearchOutcome, SlabIndex};
+use search_cancel::CancellationToken;
 use std::{
     path::{Path, PathBuf},
     sync::{Once, atomic::Ordering},
@@ -60,7 +61,7 @@ pub fn run() -> Result<()> {
     let (result_tx, result_rx) = unbounded::<Result<SearchOutcome>>();
     let (node_info_tx, node_info_rx) = unbounded::<NodeInfoRequest>();
     let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>)>();
-    let (rescan_tx, rescan_rx) = unbounded::<()>();
+    let (rescan_tx, rescan_rx) = unbounded::<CancellationToken>();
     let (watch_config_tx, watch_config_rx) = unbounded::<WatchConfigUpdate>();
     let (icon_update_tx, icon_update_rx) = unbounded::<IconPayload>();
     let (update_window_state_tx, update_window_state_rx) = bounded::<()>(1);
@@ -250,7 +251,15 @@ fn run_logic_thread(
         }
         Err(e) => {
             info!("Walking filesystem: {:?}", e);
-            let Some(cache) = build_search_cache(app_handle, &watch_root, &ignore_paths) else {
+            if let Some(cache) = build_search_cache(
+                app_handle,
+                &watch_root,
+                &ignore_paths,
+                CancellationToken::new_scan(),
+            ) {
+                emit_status_bar_update(app_handle, cache.get_total_files(), 0, 0);
+                cache
+            } else if APP_QUIT.load(Ordering::Relaxed) {
                 info!("Walk filesystem cancelled, app quitting");
                 channels
                     .finish_rx
@@ -259,24 +268,28 @@ fn run_logic_thread(
                     .send(None)
                     .expect("Failed to send None cache");
                 return;
-            };
-
-            emit_status_bar_update(app_handle, cache.get_total_files(), 0, 0);
-
-            cache
+            } else {
+                info!("Initial scan cancelled by newer request, use noop cache");
+                SearchCache::noop(path.clone(), ignore_paths.clone(), &APP_QUIT)
+            }
         }
     };
 
-    let event_watcher = EventWatcher::spawn(
-        watch_root.to_string(),
-        cache.last_event_id(),
-        FSE_LATENCY_SECS,
-    )
-    .1;
-    if load_app_state() != AppLifecycleState::Ready {
+    let event_watcher = if cache.is_noop() {
+        info!("Using noop event watcher due to cancelled initial scan");
+        EventWatcher::noop()
+    } else {
         update_app_state(app_handle, AppLifecycleState::Updating);
-    }
+        EventWatcher::spawn(
+            watch_root.to_string(),
+            cache.last_event_id(),
+            FSE_LATENCY_SECS,
+        )
+        .1
+    };
+
     info!("Started background processing thread");
+    // TODO(ldm0): remove this watch_root, use cache's path instead
     run_background_event_loop(
         app_handle,
         cache,
@@ -310,7 +323,7 @@ fn flush_cache_to_file_once(finish_tx: &Sender<Sender<Option<SearchCache>>>, db_
 
             info!("Cache flushed successfully to {:?}", db_path);
         } else {
-            info!("Cancelled during data construction, no cache to flush");
+            info!("Cancelled before data constructed, no cache to flush");
         }
     });
 }

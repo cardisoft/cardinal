@@ -18,7 +18,10 @@ use std::{
     ffi::OsStr,
     io::ErrorKind,
     path::{Path, PathBuf},
-    sync::{LazyLock, atomic::AtomicBool},
+    sync::{
+        LazyLock,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Instant,
 };
 use thin_vec::ThinVec;
@@ -30,6 +33,7 @@ pub struct SearchCache {
     last_event_id: u64,
     rescan_count: u64,
     pub(crate) name_index: NameIndex,
+    // TODO(ldm0): remove the Option later
     stop: Option<&'static AtomicBool>,
 }
 
@@ -120,23 +124,30 @@ impl SearchCache {
     }
 
     pub fn walk_fs_with_ignore(path: &Path, ignore_paths: &[PathBuf]) -> Self {
-        Self::walk_fs_with_walk_data(&WalkData::new(path, ignore_paths, false, None), None).unwrap()
+        Self::walk_fs_with_walk_data(&WalkData::new(path, ignore_paths, false, || false), None)
+            .unwrap()
     }
 
     pub fn walk_fs(path: &Path) -> Self {
-        Self::walk_fs_with_walk_data(&WalkData::new(path, &[], false, None), None).unwrap()
+        Self::walk_fs_with_walk_data(&WalkData::new(path, &[], false, || false), None).unwrap()
     }
 
     /// This function is expected to be called with WalkData which metadata is not fetched.
     /// If cancelled during walking, None is returned.
-    pub fn walk_fs_with_walk_data(
-        walk_data: &WalkData,
+    pub fn walk_fs_with_walk_data<F>(
+        walk_data: &WalkData<'_, F>,
         cancel: Option<&'static AtomicBool>,
-    ) -> Option<Self> {
+    ) -> Option<Self>
+    where
+        F: Fn() -> bool + Send + Sync,
+    {
         // Return None if cancelled
-        fn walkfs_to_slab(
-            walk_data: &WalkData,
-        ) -> Option<(SlabIndex, ThinSlab<SlabNode>, NameIndex)> {
+        fn walkfs_to_slab<F>(
+            walk_data: &WalkData<'_, F>,
+        ) -> Option<(SlabIndex, ThinSlab<SlabNode>, NameIndex)>
+        where
+            F: Fn() -> bool + Send + Sync,
+        {
             // Build the tree of file names in parallel first (we cannot construct the slab directly
             // because slab nodes reference each other and we prefer to avoid locking).
             let visit_time = Instant::now();
@@ -191,6 +202,22 @@ impl SearchCache {
             name_index,
             stop: cancel,
         }
+    }
+
+    /// Create a simple SearchCache which doesn't contain any file node and is
+    /// expected to be used when walk_fs is cancelled.
+    pub fn noop(path: PathBuf, ignore_paths: Vec<PathBuf>, cancel: &'static AtomicBool) -> Self {
+        Self {
+            file_nodes: FileNodes::new(path, ignore_paths, ThinSlab::new(), SlabIndex::new(0)),
+            last_event_id: 0,
+            rescan_count: 0,
+            name_index: NameIndex::default(),
+            stop: Some(cancel),
+        }
+    }
+
+    pub fn is_noop(&self) -> bool {
+        self.file_nodes.is_empty() && self.name_index.is_empty()
     }
 
     pub fn search_empty(&self, cancellation_token: CancellationToken) -> Option<Vec<SlabIndex>> {
@@ -371,7 +398,11 @@ impl SearchCache {
             self.remove_node(old_node);
         }
         // For incremental data, we need metadata
-        let walk_data = WalkData::new(path, self.file_nodes.ignore_paths(), true, self.stop);
+        let walk_data = WalkData::new(path, self.file_nodes.ignore_paths(), true, || {
+            self.stop
+                .map(|x| x.load(Ordering::Relaxed))
+                .unwrap_or_default()
+        });
         walk_it_without_root_chain(&walk_data).map(|node| {
             let node = self.create_node_slab_update_name_index_and_name_pool(Some(parent), &node);
             // Push the newly created node to the parent's children
@@ -397,13 +428,21 @@ impl SearchCache {
         &self,
         phantom1: &'p mut PathBuf,
         phantom2: &'p mut Vec<PathBuf>,
-    ) -> WalkData<'p> {
+        scan_cancellation_token: CancellationToken,
+    ) -> WalkData<'p, impl Fn() -> bool + Send + Sync + Copy + 'static> {
         *phantom1 = self.file_nodes.path().to_path_buf();
         *phantom2 = self.file_nodes.ignore_paths().clone();
-        WalkData::new(phantom1, phantom2, false, self.stop)
+        let stop = self.stop;
+        WalkData::new(phantom1, phantom2, false, move || {
+            stop.map(|x| x.load(Ordering::Relaxed)).unwrap_or_default()
+                || scan_cancellation_token.is_cancelled().is_none()
+        })
     }
 
-    pub fn rescan_with_walk_data(&mut self, walk_data: &WalkData) -> Option<()> {
+    pub fn rescan_with_walk_data<F>(&mut self, walk_data: &WalkData<'_, F>) -> Option<()>
+    where
+        F: Fn() -> bool + Send + Sync,
+    {
         let Some(new_cache) = Self::walk_fs_with_walk_data(walk_data, self.stop) else {
             info!("Rescan cancelled.");
             return None;
@@ -419,7 +458,11 @@ impl SearchCache {
                 self.file_nodes.path(),
                 self.file_nodes.ignore_paths(),
                 false,
-                self.stop,
+                || {
+                    self.stop
+                        .map(|x| x.load(Ordering::Relaxed))
+                        .unwrap_or_default()
+                },
             ),
             self.stop,
         ) else {
