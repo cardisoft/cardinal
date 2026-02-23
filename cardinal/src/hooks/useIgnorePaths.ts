@@ -2,7 +2,10 @@ import { useCallback } from 'react';
 import { useStoredState } from './useStoredState';
 
 const STORAGE_KEY = 'cardinal.ignorePaths';
-const DEFAULT_IGNORE_PATHS = ['/Volumes'];
+// Cloud provider stubs under CloudStorage may issue network I/O on first directory traversal.
+// Ignore this path by default to avoid blocking during initial indexing.
+// e.g. OneDrive
+const DEFAULT_IGNORE_PATHS = ['/Volumes', '~/Library/CloudStorage'];
 
 const cleanPaths = (next: string[]): string[] =>
   next.map((item) => item.trim()).filter((item) => item.length > 0);
