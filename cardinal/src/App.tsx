@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect, useMemo } from 'react';
 import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import './App.css';
+import { invoke } from '@tauri-apps/api/core';
 import { FileRow } from './components/FileRow';
 import { SearchBar } from './components/SearchBar';
 import { FilesTabContent } from './components/FilesTabContent';
@@ -30,6 +31,15 @@ import { useAppPreferences } from './hooks/useAppPreferences';
 import { useAppWindowListeners } from './hooks/useAppWindowListeners';
 import { useFilesTabEffects } from './hooks/useFilesTabEffects';
 import { useFilesTabState } from './hooks/useFilesTabState';
+import {
+  buildListedFilesTsvHeader,
+  buildListedFilesTsvRows,
+  createListedFilesTsvFilename,
+} from './utils/exportListedFilesTsv';
+import { REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT } from './constants/appEvents';
+import type { NodeInfoResponse } from './types/search';
+
+const EXPORT_BATCH_SIZE = 1000;
 
 function App() {
   const {
@@ -245,6 +255,79 @@ function App() {
     },
     [showEventsContextMenu],
   );
+
+  const handleExportListedFilesTsv = useCallback(async () => {
+    if (activeTab !== 'files' || displayedResults.length === 0) {
+      return;
+    }
+
+    let savePath: string | null = null;
+    try {
+      savePath = await invoke<string | null>('prompt_save_listed_files_tsv', {
+        defaultFilename: createListedFilesTsvFilename(currentQuery),
+      });
+      if (!savePath) {
+        return;
+      }
+
+      const labels = {
+        filename: t('columns.filename'),
+        path: t('columns.path'),
+        size: t('columns.size'),
+        modified: t('columns.modified'),
+        created: t('columns.created'),
+      } as const;
+
+      const header = buildListedFilesTsvHeader(labels);
+      await invoke('write_listed_files_tsv', {
+        path: savePath,
+        content: `${header}\n`,
+      });
+
+      for (let start = 0; start < displayedResults.length; start += EXPORT_BATCH_SIZE) {
+        const batch = displayedResults.slice(start, start + EXPORT_BATCH_SIZE);
+        const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', {
+          results: batch,
+          includeIcons: false,
+        });
+        const rowsChunk = buildListedFilesTsvRows(fetched);
+        if (!rowsChunk) {
+          continue;
+        }
+        const isLastBatch = start + EXPORT_BATCH_SIZE >= displayedResults.length;
+        const chunkContent = isLastBatch ? rowsChunk : `${rowsChunk}\n`;
+        await invoke('append_listed_files_tsv_chunk', {
+          path: savePath,
+          content: chunkContent,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to export listed files as TSV', error);
+      if (savePath) {
+        try {
+          await invoke('remove_listed_files_tsv', { path: savePath });
+        } catch (cleanupError) {
+          console.error('Failed to clean up partial TSV export', cleanupError);
+        }
+      }
+      if (typeof window !== 'undefined') {
+        window.alert('Failed to export current files list. Please try again.');
+      }
+    }
+  }, [activeTab, currentQuery, displayedResults, t]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const onRequestExport = () => {
+      void handleExportListedFilesTsv();
+    };
+    window.addEventListener(REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT, onRequestExport);
+    return () => {
+      window.removeEventListener(REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT, onRequestExport);
+    };
+  }, [handleExportListedFilesTsv]);
 
   const renderRow = useCallback(
     (rowIndex: number, item: SearchResultItem | undefined, rowStyle: CSSProperties) => {

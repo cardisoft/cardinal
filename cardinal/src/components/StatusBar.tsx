@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { AppLifecycleStatus } from '../types/ipc';
 import { useTranslation } from 'react-i18next';
@@ -41,7 +41,7 @@ const StatusBar = ({
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const filesTabRef = useRef<HTMLButtonElement | null>(null);
   const eventsTabRef = useRef<HTMLButtonElement | null>(null);
-  const [sliderStyle, setSliderStyle] = useState<CSSProperties>({});
+  const [sliderStyle, setSliderStyle] = React.useState<CSSProperties>({});
 
   useLayoutEffect(() => {
     // Keep the active-tab underline aligned even when labels resize or counters update.

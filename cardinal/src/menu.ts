@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import i18n from './i18n/config';
+import { REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT } from './constants/appEvents';
 import { openPreferences } from './utils/openPreferences';
 
 const HELP_UPDATES_URL = 'https://github.com/cardisoft/cardinal/releases';
@@ -31,6 +32,15 @@ async function buildAppMenu(): Promise<void> {
       openPreferences();
     },
   });
+  const exportCurrentFilesListItem = await MenuItem.new({
+    id: 'menu.export_current_files_list',
+    text: 'Export current files list',
+    action: () => {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event(REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT));
+      }
+    },
+  });
   const hideItem = await MenuItem.new({
     id: 'menu.hide',
     text: i18n.t('menu.hide'),
@@ -46,6 +56,7 @@ async function buildAppMenu(): Promise<void> {
       aboutItem,
       await PredefinedMenuItem.new({ item: 'Separator' }),
       preferencesItem,
+      exportCurrentFilesListItem,
       hideItem,
       await PredefinedMenuItem.new({ item: 'Separator' }),
       await PredefinedMenuItem.new({

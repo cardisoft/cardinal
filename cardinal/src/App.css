@@ -1528,7 +1528,7 @@ button:active:not(:disabled) {
 
 .preferences-card {
   width: 100%;
-  max-width: 480px;
+  max-width: 680px;
   max-height: calc(100vh - 96px);
   background: var(--color-elevated-bg, var(--color-bg));
   color: var(--color-text);

@@ -22,7 +22,12 @@ use parking_lot::Mutex;
 use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, SlabNodeMetadata};
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
-use std::{cell::LazyCell, process::Command};
+use std::{
+    cell::LazyCell,
+    fs::OpenOptions,
+    io::Write,
+    process::Command,
+};
 use tauri::{ActivationPolicy, AppHandle, State};
 use tracing::{error, info, warn};
 
@@ -417,6 +422,95 @@ pub async fn open_in_finder(path: String) {
 pub async fn open_path(path: String) {
     if let Err(e) = Command::new("open").arg(&path).spawn() {
         error!("Failed to open path: {e}");
+    }
+}
+
+#[tauri::command]
+pub async fn prompt_save_listed_files_tsv(
+    app: AppHandle,
+    default_filename: String,
+) -> Result<Option<String>, String> {
+    let (response_tx, response_rx) = bounded::<Result<Option<String>, String>>(1);
+
+    app.run_on_main_thread(move || {
+        let result = prompt_save_listed_files_tsv_impl(default_filename);
+        if response_tx.send(result).is_err() {
+            error!("Failed to send prompt_save_listed_files_tsv response");
+        }
+    })
+    .map_err(|e| format!("Failed to dispatch prompt save dialog on main thread: {e:?}"))?;
+
+    response_rx
+        .recv()
+        .map_err(|e| format!("Failed to receive prompt_save_listed_files_tsv response: {e:?}"))?
+}
+
+fn normalize_export_default_filename(default_filename: String) -> String {
+    let fallback_filename = "cardinal-word-list.tsv".to_string();
+    let trimmed = default_filename.trim();
+    if trimmed.is_empty() {
+        fallback_filename
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn prompt_save_listed_files_tsv_impl(default_filename: String) -> Result<Option<String>, String> {
+    let default_filename = normalize_export_default_filename(default_filename);
+
+    info!(
+        "Opening listed-files TSV save dialog with default filename: {}",
+        default_filename
+    );
+
+    let dialog = rfd::FileDialog::new()
+        .add_filter("Tab-separated values", &["tsv"])
+        .set_file_name(&default_filename);
+    let Some(mut path) = dialog.save_file() else {
+        info!("Listed-files TSV save dialog canceled by user");
+        return Ok(None);
+    };
+
+    if path.extension().is_none() {
+        path.set_extension("tsv");
+    }
+
+    let path = path.to_string_lossy().into_owned();
+    Ok(Some(path))
+}
+
+#[tauri::command]
+pub async fn write_listed_files_tsv(path: String, content: String) -> Result<(), String> {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(&path)
+        .map_err(|e| format!("Failed to open TSV file for writing {}: {e}", path))?;
+    file.write_all(content.as_bytes())
+        .map_err(|e| format!("Failed to write TSV file to {}: {e}", path))?;
+    info!("Saved listed-files TSV to {}", path);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn append_listed_files_tsv_chunk(path: String, content: String) -> Result<(), String> {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|e| format!("Failed to open TSV file for appending {}: {e}", path))?;
+    file.write_all(content.as_bytes())
+        .map_err(|e| format!("Failed appending TSV chunk to {}: {e}", path))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remove_listed_files_tsv(path: String) -> Result<(), String> {
+    match std::fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(format!("Failed to remove TSV file {}: {err}", path)),
     }
 }
 

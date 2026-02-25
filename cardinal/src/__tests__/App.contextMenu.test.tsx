@@ -1,14 +1,20 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { forwardRef } from 'react';
 import type { CSSProperties } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
+import { REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT } from '../constants/appEvents';
 
 const mocks = vi.hoisted(() => ({
   showFilesContextMenu: vi.fn(),
   showEventsContextMenu: vi.fn(),
   selectSingleRow: vi.fn(),
   useContextMenuMock: vi.fn(),
+  invoke: vi.fn(),
+  buildListedFilesTsvHeader: vi.fn(),
+  buildListedFilesTsvRows: vi.fn(),
+  createListedFilesTsvFilename: vi.fn(),
+  alert: vi.fn(),
 }));
 
 const testState = vi.hoisted(() => ({
@@ -25,6 +31,10 @@ vi.mock('react-i18next', () => ({
       changeLanguage: vi.fn().mockResolvedValue(undefined),
     },
   }),
+}));
+
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: (...args: unknown[]) => mocks.invoke(...args),
 }));
 
 vi.mock('../components/SearchBar', () => ({
@@ -266,12 +276,22 @@ vi.mock('../hooks/useStableEvent', () => ({
   useStableEvent: <T extends (...args: any[]) => any>(handler: T): T => handler,
 }));
 
+vi.mock('../utils/exportListedFilesTsv', () => ({
+  buildListedFilesTsvHeader: (...args: unknown[]) => mocks.buildListedFilesTsvHeader(...args),
+  buildListedFilesTsvRows: (...args: unknown[]) => mocks.buildListedFilesTsvRows(...args),
+  createListedFilesTsvFilename: (...args: unknown[]) => mocks.createListedFilesTsvFilename(...args),
+}));
+
 describe('App context menu regression', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(window, 'alert').mockImplementation(mocks.alert);
     testState.activeTab = 'files';
     testState.selectedIndices = [0];
     testState.selectedPaths = ['/stale-a', '/stale-b'];
+    mocks.buildListedFilesTsvHeader.mockReturnValue('header-cols');
+    mocks.buildListedFilesTsvRows.mockReturnValue('row1\nrow2');
+    mocks.createListedFilesTsvFilename.mockReturnValue('cardinal-word-list-test-2026-02-22.tsv');
 
     mocks.useContextMenuMock
       .mockReturnValueOnce({
@@ -282,6 +302,10 @@ describe('App context menu regression', () => {
         showContextMenu: mocks.showEventsContextMenu,
         showHeaderContextMenu: vi.fn(),
       });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('uses clicked row path for context menu when row is not already selected', () => {
@@ -329,5 +353,101 @@ describe('App context menu regression', () => {
 
     expect(mocks.showEventsContextMenu).toHaveBeenCalledTimes(1);
     expect(mocks.showEventsContextMenu.mock.calls[0][1]).toEqual(['/event-path']);
+  });
+
+  it('exports listed files as TSV using displayed result order', async () => {
+    const fetchedNodes = [
+      {
+        path: '/tmp/alpha.txt',
+        metadata: { type: 0, size: 10, mtime: 1, ctime: 2 },
+      },
+      {
+        path: '/tmp/folder',
+        metadata: { type: 1, size: 0, mtime: 3, ctime: 4 },
+      },
+    ];
+    mocks.invoke
+      .mockResolvedValueOnce('/tmp/cardinal-word-list-test-2026-02-22.tsv')
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(fetchedNodes)
+      .mockResolvedValueOnce(undefined);
+
+    render(<App />);
+    window.dispatchEvent(new Event(REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT));
+
+    await waitFor(() => {
+      expect(mocks.invoke).toHaveBeenCalledWith('write_listed_files_tsv', {
+        path: '/tmp/cardinal-word-list-test-2026-02-22.tsv',
+        content: 'header-cols\n',
+      });
+    });
+
+    expect(mocks.invoke).toHaveBeenNthCalledWith(1, 'prompt_save_listed_files_tsv', {
+      defaultFilename: 'cardinal-word-list-test-2026-02-22.tsv',
+    });
+    expect(mocks.invoke).toHaveBeenNthCalledWith(2, 'write_listed_files_tsv', {
+      path: '/tmp/cardinal-word-list-test-2026-02-22.tsv',
+      content: 'header-cols\n',
+    });
+    expect(mocks.invoke).toHaveBeenNthCalledWith(3, 'get_nodes_info', {
+      results: [101, 202],
+      includeIcons: false,
+    });
+    expect(mocks.invoke).toHaveBeenNthCalledWith(4, 'append_listed_files_tsv_chunk', {
+      path: '/tmp/cardinal-word-list-test-2026-02-22.tsv',
+      content: 'row1\nrow2',
+    });
+
+    expect(mocks.invoke).toHaveBeenCalledWith('get_nodes_info', {
+      results: [101, 202],
+      includeIcons: false,
+    });
+    expect(mocks.buildListedFilesTsvHeader).toHaveBeenCalledWith({
+      filename: 'columns.filename',
+      path: 'columns.path',
+      size: 'columns.size',
+      modified: 'columns.modified',
+      created: 'columns.created',
+    });
+    expect(mocks.buildListedFilesTsvRows).toHaveBeenCalledWith(fetchedNodes);
+    expect(mocks.createListedFilesTsvFilename).toHaveBeenCalledWith('');
+  });
+
+  it('does not fetch or write when save dialog is canceled', async () => {
+    mocks.invoke.mockResolvedValueOnce(null);
+
+    render(<App />);
+    window.dispatchEvent(new Event(REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT));
+
+    await waitFor(() => {
+      expect(mocks.invoke).toHaveBeenCalledWith('prompt_save_listed_files_tsv', {
+        defaultFilename: 'cardinal-word-list-test-2026-02-22.tsv',
+      });
+    });
+
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    expect(mocks.buildListedFilesTsvHeader).not.toHaveBeenCalled();
+    expect(mocks.buildListedFilesTsvRows).not.toHaveBeenCalled();
+  });
+
+  it('cleans up partial export and shows an alert when writing fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.invoke
+      .mockResolvedValueOnce('/tmp/cardinal-word-list-test-2026-02-22.tsv')
+      .mockRejectedValueOnce(new Error('write failed'))
+      .mockResolvedValueOnce(undefined);
+
+    render(<App />);
+    window.dispatchEvent(new Event(REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT));
+
+    await waitFor(() => {
+      expect(mocks.invoke).toHaveBeenCalledWith('remove_listed_files_tsv', {
+        path: '/tmp/cardinal-word-list-test-2026-02-22.tsv',
+      });
+    });
+
+    expect(mocks.alert).toHaveBeenCalledWith(
+      'Failed to export current files list. Please try again.',
+    );
   });
 });
