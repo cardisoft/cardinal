@@ -46,16 +46,34 @@ describe('useIgnorePaths', () => {
     );
   });
 
-  it('ships grouped defaults with comments and blank separators', () => {
+  it('ships data-driven defaults with per-pattern comments and blank separators', () => {
     const { result } = renderHook(() => useIgnorePaths());
     const defaults = result.current.defaultIgnorePaths;
 
-    expect(defaults[0]).toBe('# Root-anchored system paths');
+    expect(defaults[0]).toContain('0 files in the 2026-02-24 sample');
     expect(defaults).toContain('');
-    expect(defaults).toContain('# Common project/build caches');
-    expect(defaults).toContain('# Application-specific heavy caches');
-    expect(defaults).toContain('# Basename folders to ignore anywhere');
-    expect(defaults).toContain('# File patterns');
+    expect(defaults).toContain('**/node_modules/');
+    expect(defaults).toContain('**/.pnpm/');
+    expect(defaults).toContain('**/.bun/install/cache/');
+    expect(defaults).toContain('**/Library/Caches/');
+    expect(defaults).toContain('**/.cache/');
+    expect(defaults).toContain('**/Library/Application Support/*/Partitions/*/Cache/');
+    expect(defaults).toContain('**/Library/Application Support/*/Cache/');
+    expect(defaults).toContain('**/Library/pnpm/store/');
+    expect(defaults).toContain('**/target/');
+    expect(defaults).toContain('**/Code Cache/');
+    expect(defaults).toContain('**/Service Worker/CacheStorage/');
+    expect(defaults).toContain('**/IndexedDB/');
+    expect(defaults).toContain('**/WebStorage/');
+    expect(defaults).toContain('**/.next/');
+    expect(defaults).toContain('**/.git/');
+    expect(defaults).toContain('**/__pycache__/');
+    expect(defaults).toContain('**/.cocoapods/');
+    expect(defaults).toContain('**/.opam/');
+    expect(defaults).toContain('**/*.pyc');
+    expect(defaults).toContain('**/.DS_Store');
+    expect(defaults).toContain('**/Google/Chrome*/Cache/');
+    expect(defaults).toContain('/System/Volumes/');
   });
 
   it('keeps a whitespace-only stored array without writing defaults', async () => {
