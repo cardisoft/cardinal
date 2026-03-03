@@ -183,8 +183,15 @@ fn normalize_path_input(raw: &str) -> Option<String> {
 /// Normalizes ignore entries.
 ///
 /// Keeps raw entries so matching follows gitignore semantics exactly,
-/// including empty lines and comments.
+/// including empty lines and comments. A leading `~` is expanded so
+/// existing home-relative ignore entries keep matching.
 fn normalize_ignore_path_input(raw: &str) -> String {
+    if raw == "~" || raw.starts_with("~/") {
+        if let Some(expanded) = expand_path_input(raw) {
+            return expanded;
+        }
+    }
+
     raw.to_string()
 }
 
@@ -655,6 +662,19 @@ mod tests {
         assert_eq!(
             normalize_ignore_path_input("Library/Biome/"),
             "Library/Biome/".to_string()
+        );
+    }
+
+    #[test]
+    fn normalize_ignore_expands_home_prefixed_paths() {
+        let Ok(home) = std::env::var("HOME") else {
+            return;
+        };
+
+        assert_eq!(normalize_ignore_path_input("~"), home.clone());
+        assert_eq!(
+            normalize_ignore_path_input("~/Library/Caches"),
+            format!("{home}/Library/Caches")
         );
     }
 
