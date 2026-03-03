@@ -74,6 +74,7 @@ describe('useIgnorePaths', () => {
     expect(defaults).toContain('**/.DS_Store');
     expect(defaults).toContain('**/Google/Chrome*/Cache/');
     expect(defaults).toContain('/System/Volumes/');
+    expect(defaults).toContain('~/Library/CloudStorage');
   });
 
   it('keeps a whitespace-only stored array without writing defaults', async () => {

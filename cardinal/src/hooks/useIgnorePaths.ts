@@ -5,6 +5,8 @@ const STORAGE_KEY = 'cardinal.ignorePaths';
 const DEFAULT_IGNORE_PATHS = [
   '# 0 files in the 2026-02-24 sample. Keep external volumes excluded to avoid indexing large mounted disks/network shares.',
   '/Volumes/',
+  '# Cloud provider stubs under CloudStorage may issue network I/O on first traversal (e.g. OneDrive).',
+  '~/Library/CloudStorage',
   '',
   '# 2,384,029 files across 414 roots. Node dependency trees dominate index volume and are regenerated.',
   '**/node_modules/',

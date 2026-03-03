@@ -50,7 +50,7 @@ fn ignores_directories_and_collects_metadata() {
     let tmp = TempDir::new("fswalk_deep").unwrap();
     build_deep_fixture(tmp.path());
     let ignore = vec![std::path::PathBuf::from("/skip_dir")];
-    let walk_data = WalkData::new(tmp.path(), &ignore, true, None);
+    let walk_data = WalkData::new(tmp.path(), &ignore, true, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, tmp.path());
 
@@ -94,7 +94,7 @@ fn cancellation_stops_traversal_early() {
         fs::create_dir(tmp.path().join(format!("dir_{i}"))).unwrap();
     }
     let cancel = AtomicBool::new(false);
-    let walk_data = WalkData::new(tmp.path(), &[], false, Some(&cancel));
+    let walk_data = WalkData::new(tmp.path(), &[], false, || cancel.load(Ordering::Relaxed));
     cancel.store(true, Ordering::Relaxed); // cancel immediately
     let node = walk_it(&walk_data);
     assert!(
@@ -122,7 +122,7 @@ fn glob_patterns_ignore_nested_directories() {
     .unwrap();
 
     let ignore = vec![std::path::PathBuf::from("**/node_modules/**")];
-    let walk_data = WalkData::new(root, &ignore, true, None);
+    let walk_data = WalkData::new(root, &ignore, true, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
@@ -174,7 +174,7 @@ fn globstar_descendant_pattern_does_not_ignore_parent_directory() {
     fs::write(root.join("Xcode.app/Contents/data.bin"), b"data").unwrap();
 
     let ignore = vec![std::path::PathBuf::from("**/Xcode.app/**")];
-    let walk_data = WalkData::new(root, &ignore, true, None);
+    let walk_data = WalkData::new(root, &ignore, true, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
@@ -202,7 +202,7 @@ fn gitignore_negation_reincludes_file_when_parent_is_not_pruned() {
         std::path::PathBuf::from("**/node_modules/**"),
         std::path::PathBuf::from("!**/node_modules/**/included.js"),
     ];
-    let walk_data = WalkData::new(root, &ignore, true, None);
+    let walk_data = WalkData::new(root, &ignore, true, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
@@ -245,7 +245,7 @@ fn gitignore_negation_cannot_reinclude_when_parent_directory_is_pruned() {
         std::path::PathBuf::from("**/node_modules/"),
         std::path::PathBuf::from("!**/node_modules/**/included.js"),
     ];
-    let walk_data = WalkData::new(root, &ignore, true, None);
+    let walk_data = WalkData::new(root, &ignore, true, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
