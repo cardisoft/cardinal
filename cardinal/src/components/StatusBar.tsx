@@ -16,6 +16,8 @@ type StatusBarProps = {
   onTabChange: (tab: StatusTabKey) => void;
   onRequestRescan: () => void;
   rescanErrorCount: number;
+  canExportListedFiles?: boolean;
+  onRequestExportListedFilesTsv?: () => Promise<void> | void;
 };
 
 const TABS: StatusTabKey[] = ['files', 'events'];
@@ -25,6 +27,7 @@ const LIFECYCLE_META: Record<AppLifecycleStatus, { icon: string; tone: string }>
   Updating: { icon: '◑', tone: 'updating' },
   Ready: { icon: '●', tone: 'ready' },
 };
+const EXPORT_BUTTON_LABEL = 'Export current files list';
 
 const StatusBar = ({
   scannedFiles,
@@ -36,6 +39,8 @@ const StatusBar = ({
   onTabChange,
   onRequestRescan,
   rescanErrorCount,
+  canExportListedFiles = false,
+  onRequestExportListedFilesTsv,
 }: StatusBarProps): React.JSX.Element => {
   const { t } = useTranslation();
   const tabsRef = useRef<HTMLDivElement | null>(null);
@@ -104,6 +109,9 @@ const StatusBar = ({
   const handleOpenPreferences = useCallback(() => {
     openPreferences();
   }, []);
+  const handleRequestExport = useCallback(() => {
+    void onRequestExportListedFilesTsv?.();
+  }, [onRequestExportListedFilesTsv]);
 
   return (
     <div className="status-bar">
@@ -161,6 +169,19 @@ const StatusBar = ({
               ↻
             </span>
             <span className="sr-only">{t('statusBar.aria.rescan')}</span>
+          </button>
+          <button
+            type="button"
+            className="status-icon-button status-export-button"
+            onClick={handleRequestExport}
+            disabled={!canExportListedFiles}
+            title={EXPORT_BUTTON_LABEL}
+            aria-label={EXPORT_BUTTON_LABEL}
+          >
+            <span className="status-rescan-icon" aria-hidden="true">
+              ↓
+            </span>
+            <span className="sr-only">{EXPORT_BUTTON_LABEL}</span>
           </button>
           <button
             type="button"

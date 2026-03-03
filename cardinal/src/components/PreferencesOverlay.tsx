@@ -149,6 +149,7 @@ export function PreferencesOverlay({
       onClose();
     }
   };
+  const resetIgnorePathsLabel = `${t('preferences.reset')} ${t('ignorePaths.label')}`;
 
   return (
     <div
@@ -232,8 +233,17 @@ export function PreferencesOverlay({
           </div>
           <div className="preferences-row">
             <div className="preferences-row__details">
-              <p className="preferences-label" title={t('ignorePaths.help')}>
-                {t('ignorePaths.label')}
+              <p className="preferences-label">
+                <span title={t('ignorePaths.help')}>{t('ignorePaths.label')}</span>
+                <button
+                  className="preferences-ignore-reset"
+                  type="button"
+                  aria-label={resetIgnorePathsLabel}
+                  title={resetIgnorePathsLabel}
+                  onClick={handleResetIgnorePaths}
+                >
+                  <span aria-hidden="true">↺</span>
+                </button>
               </p>
             </div>
             <div className="preferences-control preferences-control--stack">
@@ -255,13 +265,6 @@ export function PreferencesOverlay({
                   {ignorePathsErrorMessage}
                 </p>
               ) : null}
-              <button
-                className="preferences-ignore-reset"
-                type="button"
-                onClick={handleResetIgnorePaths}
-              >
-                Reset ignores list
-              </button>
             </div>
           </div>
         </div>

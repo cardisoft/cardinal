@@ -3,7 +3,6 @@ import { forwardRef } from 'react';
 import type { CSSProperties } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
-import { REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT } from '../constants/appEvents';
 
 const mocks = vi.hoisted(() => ({
   showFilesContextMenu: vi.fn(),
@@ -89,7 +88,17 @@ vi.mock('../components/PreferencesOverlay', () => ({
 }));
 
 vi.mock('../components/StatusBar', () => ({
-  default: () => null,
+  default: ({
+    onRequestExportListedFilesTsv,
+  }: {
+    onRequestExportListedFilesTsv?: () => Promise<void> | void;
+  }) => (
+    <button
+      type="button"
+      data-testid="status-export-trigger"
+      onClick={() => void onRequestExportListedFilesTsv?.()}
+    />
+  ),
 }));
 
 vi.mock('../components/FSEventsPanel', () => ({
@@ -373,7 +382,7 @@ describe('App context menu regression', () => {
       .mockResolvedValueOnce(undefined);
 
     render(<App />);
-    window.dispatchEvent(new Event(REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT));
+    fireEvent.click(screen.getByTestId('status-export-trigger'));
 
     await waitFor(() => {
       expect(mocks.invoke).toHaveBeenCalledWith('write_listed_files_tsv', {
@@ -417,7 +426,7 @@ describe('App context menu regression', () => {
     mocks.invoke.mockResolvedValueOnce(null);
 
     render(<App />);
-    window.dispatchEvent(new Event(REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT));
+    fireEvent.click(screen.getByTestId('status-export-trigger'));
 
     await waitFor(() => {
       expect(mocks.invoke).toHaveBeenCalledWith('prompt_save_listed_files_tsv', {
@@ -438,7 +447,7 @@ describe('App context menu regression', () => {
       .mockResolvedValueOnce(undefined);
 
     render(<App />);
-    window.dispatchEvent(new Event(REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT));
+    fireEvent.click(screen.getByTestId('status-export-trigger'));
 
     await waitFor(() => {
       expect(mocks.invoke).toHaveBeenCalledWith('remove_listed_files_tsv', {

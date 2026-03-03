@@ -36,7 +36,6 @@ import {
   buildListedFilesTsvRows,
   createListedFilesTsvFilename,
 } from './utils/exportListedFilesTsv';
-import { REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT } from './constants/appEvents';
 import type { NodeInfoResponse } from './types/search';
 
 const EXPORT_BATCH_SIZE = 1000;
@@ -316,19 +315,6 @@ function App() {
     }
   }, [activeTab, currentQuery, displayedResults, t]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    const onRequestExport = () => {
-      void handleExportListedFilesTsv();
-    };
-    window.addEventListener(REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT, onRequestExport);
-    return () => {
-      window.removeEventListener(REQUEST_EXPORT_CURRENT_FILES_LIST_EVENT, onRequestExport);
-    };
-  }, [handleExportListedFilesTsv]);
-
   const renderRow = useCallback(
     (rowIndex: number, item: SearchResultItem | undefined, rowStyle: CSSProperties) => {
       if (!item) {
@@ -474,6 +460,8 @@ function App() {
           onTabChange={onTabChange}
           onRequestRescan={requestRescan}
           rescanErrorCount={rescanErrors}
+          canExportListedFiles={activeTab === 'files' && displayedResults.length > 0}
+          onRequestExportListedFilesTsv={handleExportListedFilesTsv}
         />
       </main>
       <PreferencesOverlay

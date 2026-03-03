@@ -162,7 +162,7 @@
   },
   "ignorePaths": {
     "label": "Ignore paths",
-    "help": "One glob style pattern per line (Use .gitignore patterns like node_modules, **/node_modules/**, !keep.txt).",
+    "help": "One glob style pattern per line (Just like .gitignore)",
     "errors": {
       "absolute": "Please enter a non-empty glob path pattern."
     }

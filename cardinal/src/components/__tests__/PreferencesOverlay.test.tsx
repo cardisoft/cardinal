@@ -124,7 +124,7 @@ describe('PreferencesOverlay', () => {
     const ignorePathsInput = screen.getByLabelText('ignorePaths.label');
     fireEvent.change(ignorePathsInput, { target: { value: '/tmp/one\n/tmp/two' } });
 
-    fireEvent.click(screen.getByText('Reset ignores list'));
+    fireEvent.click(screen.getByRole('button', { name: 'preferences.reset ignorePaths.label' }));
 
     expect(ignorePathsInput).toHaveValue('# group\n/default/one\n\n/default/two');
     expect(onWatchConfigChange).not.toHaveBeenCalled();

@@ -1528,7 +1528,7 @@ button:active:not(:disabled) {
 
 .preferences-card {
   width: 100%;
-  max-width: 680px;
+  max-width: 480px;
   max-height: calc(100vh - 96px);
   background: var(--color-elevated-bg, var(--color-bg));
   color: var(--color-text);
@@ -1555,11 +1555,13 @@ button:active:not(:disabled) {
   display: flex;
   flex-direction: column;
   flex: 1;
-  overflow-y: scroll;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 6px;
+  padding-right: 0px;
   min-height: 0;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
   scrollbar-width: auto;
 }
 
@@ -1656,7 +1658,7 @@ button:active:not(:disabled) {
 .preferences-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: 16px;
   padding: 5px 0;
 }
@@ -1665,6 +1667,15 @@ button:active:not(:disabled) {
   font-weight: 500;
   font-size: 0.95rem;
   white-space: nowrap;
+}
+
+.preferences-help-text {
+  margin-top: 4px;
+  max-width: 220px;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  white-space: normal;
 }
 
 .preferences-row__details {
@@ -1720,12 +1731,12 @@ button:active:not(:disabled) {
 }
 
 .preferences-ignore-reset {
-  margin-top: 8px;
+  margin-left: 8px;
   border: 1px solid var(--color-elevated-border, var(--color-border));
   background: transparent;
   color: var(--color-text-secondary);
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 4px 6px;
   font-size: 0.82rem;
   cursor: pointer;
   transition:
