@@ -168,10 +168,9 @@
     "infoTitle": "Ignore path syntax help",
     "helpIntro": "One .gitignore-style pattern per line.",
     "helpComment": "Use '#' for a single-line comment, or place '/*' and '*/' on their own lines to comment out a block while testing patterns.",
-    "helpSingleStar": "Use '*' inside one path segment to match characters except '/': '*.log' matches log files in the current folder.",
-    "helpDoubleStar": "Use '**' to match across directories: '**/node_modules/' matches that folder anywhere below the monitored root.",
-    "helpAnchoring": "Use a leading '/' to anchor a pattern to the monitored root. Without it, the pattern can match anywhere.",
-    "helpNegation": "Use '!' to re-include a path after a broader ignore rule when needed."
+    "helpSingleStar": "Use '*' inside one path segment to match characters except '/': '*.log' matches log files in the current folder. [good performance]",
+    "helpDoubleStar": "Use '**' to match across directories: '**/node_modules/' matches that folder anywhere below the monitored root. [broader match]",
+    "helpAnchoring": "Use a leading '/' to anchor a pattern to the monitored root. Without it, the pattern can match anywhere. [best performance]"
   },
   "exportListedFiles": {
     "failed": "Failed to export current files list. Please try again."

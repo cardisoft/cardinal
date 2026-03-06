@@ -272,7 +272,6 @@ export function PreferencesOverlay({
                     <li className="preferences-help-text">{t('ignorePaths.helpSingleStar')}</li>
                     <li className="preferences-help-text">{t('ignorePaths.helpDoubleStar')}</li>
                     <li className="preferences-help-text">{t('ignorePaths.helpAnchoring')}</li>
-                    <li className="preferences-help-text">{t('ignorePaths.helpNegation')}</li>
                   </ul>
                 </div>
               ) : null}

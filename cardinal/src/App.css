@@ -1767,11 +1767,10 @@ button:active:not(:disabled) {
 }
 
 .preferences-ignore-reset {
-  margin-left: 8px;
   border: 1px solid var(--color-elevated-border, var(--color-border));
   background: transparent;
   color: var(--color-text-secondary);
-  border-radius: 8px;
+  border-radius: 999px;
   padding: 4px 6px;
   font-size: 0.82rem;
   cursor: pointer;

@@ -864,11 +864,9 @@ mod tests {
 
     #[test]
     fn normalize_watch_config_rewrites_watch_root_self_ignore_to_root_contents() {
-        let Some((watch_root, ignore_paths)) = normalize_watch_config(
-            "/Users/me",
-            vec!["/Users/me/".to_string()],
-            None,
-        ) else {
+        let Some((watch_root, ignore_paths)) =
+            normalize_watch_config("/Users/me", vec!["/Users/me/".to_string()], None)
+        else {
             panic!("watch config should be valid");
         };
 

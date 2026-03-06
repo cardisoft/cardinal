@@ -67,7 +67,7 @@ const DEFAULT_IGNORE_PATHS = [
   '**/Firefox/Profiles/**/sessionstore-backups/',
   '**/Firefox/Profiles/**/storage/default/',
   '**/Firefox/Profiles/**/storage/permanent/',
-  '**/Spotify/Users/*/pending-messages*',
+  '**/Spotify/Users/',
   '**/*.com.google.Chrome',
   '**/webappsstore.sqlite-wal',
   '',
