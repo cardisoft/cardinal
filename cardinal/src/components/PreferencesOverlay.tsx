@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getWatchRootValidation, isIgnorePathInputValid } from '../utils/watchRoot';
+import { getWatchRootValidation } from '../utils/watchRoot';
 import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSwitcher from './LanguageSwitcher';
 
@@ -106,10 +106,6 @@ export function PreferencesOverlay({
   };
 
   const parsedIgnorePaths = ignorePathsInput.split(/\r?\n/);
-  const ignorePathsErrorMessage = (() => {
-    const invalid = parsedIgnorePaths.find((line) => !isIgnorePathInputValid(line));
-    return invalid ? t('ignorePaths.errors.absolute') : null;
-  })();
 
   const handleIgnorePathsKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key === 'Escape') {
@@ -122,7 +118,7 @@ export function PreferencesOverlay({
   };
 
   const handleSave = (): void => {
-    if (watchRootErrorMessage || ignorePathsErrorMessage) {
+    if (watchRootErrorMessage) {
       return;
     }
     commitThreshold();
@@ -231,8 +227,8 @@ export function PreferencesOverlay({
               ) : null}
             </div>
           </div>
-          <div className="preferences-row">
-            <div className="preferences-row__details">
+          <div className="preferences-row preferences-row--stacked">
+            <div className="preferences-row__details preferences-row__details--inline">
               <p className="preferences-label">
                 <span title={t('ignorePaths.help')}>{t('ignorePaths.label')}</span>
                 <button
@@ -246,7 +242,7 @@ export function PreferencesOverlay({
                 </button>
               </p>
             </div>
-            <div className="preferences-control preferences-control--stack">
+            <div className="preferences-control preferences-control--stack preferences-control--full-width">
               <textarea
                 className="preferences-field preferences-textarea"
                 value={ignorePathsInput}
@@ -256,15 +252,6 @@ export function PreferencesOverlay({
                 autoComplete="off"
                 spellCheck={false}
               />
-              {ignorePathsErrorMessage ? (
-                <p
-                  className="permission-status permission-status--error preferences-field-error"
-                  role="status"
-                  aria-live="polite"
-                >
-                  {ignorePathsErrorMessage}
-                </p>
-              ) : null}
             </div>
           </div>
         </div>
@@ -273,7 +260,7 @@ export function PreferencesOverlay({
             className="preferences-save"
             type="button"
             onClick={handleSave}
-            disabled={Boolean(watchRootErrorMessage || ignorePathsErrorMessage)}
+            disabled={Boolean(watchRootErrorMessage)}
           >
             {t('preferences.save')}
           </button>

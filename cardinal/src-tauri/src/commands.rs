@@ -191,6 +191,38 @@ fn normalize_ignore_path_input(raw: &str) -> String {
     raw.to_string()
 }
 
+/// Re-anchor legacy absolute ignore entries beneath the watch root so they keep
+/// matching after ignore evaluation switched to watch-root-relative gitignore semantics.
+fn rewrite_ignore_path_for_watch_root(raw: &str, watch_root: &str) -> String {
+    if watch_root == "/" {
+        return raw.to_string();
+    }
+
+    let (prefix, pattern) = if let Some(pattern) = raw.strip_prefix('!') {
+        ("!", pattern)
+    } else {
+        ("", raw)
+    };
+
+    if !pattern.starts_with('/') {
+        return raw.to_string();
+    }
+
+    let rewritten = if pattern == watch_root || pattern == format!("{watch_root}/") {
+        "/*".to_string()
+    } else if let Some(stripped) = pattern.strip_prefix(watch_root) {
+        if stripped.starts_with('/') {
+            stripped.to_string()
+        } else {
+            return raw.to_string();
+        }
+    } else {
+        return raw.to_string();
+    };
+
+    format!("{prefix}{rewritten}")
+}
+
 pub(crate) fn normalize_watch_config(
     watch_root: &str,
     ignore_paths: Vec<String>,
@@ -207,6 +239,9 @@ pub(crate) fn normalize_watch_config(
         .any(|path| path == DEFAULT_SYSTEM_IGNORE_PATH)
     {
         ignore_paths.push(DEFAULT_SYSTEM_IGNORE_PATH.to_string());
+    }
+    for path in &mut ignore_paths {
+        *path = rewrite_ignore_path_for_watch_root(path, &watch_root);
     }
     Some((watch_root, ignore_paths))
 }
@@ -726,5 +761,52 @@ mod tests {
         assert!(ignore_paths.contains(&"relative/path".to_string()));
         assert!(ignore_paths.contains(&"/tmp/cache".to_string()));
         assert!(ignore_paths.contains(&DEFAULT_SYSTEM_IGNORE_PATH.to_string()));
+    }
+
+    #[test]
+    fn normalize_watch_config_rewrites_absolute_ignore_entries_under_non_root_watch_root() {
+        let Some((watch_root, ignore_paths)) = normalize_watch_config(
+            "/Users/me",
+            vec![
+                "/Users/me/Library/Caches/".to_string(),
+                "!/Users/me/project/keep.txt".to_string(),
+                "/Users/other/cache/".to_string(),
+            ],
+            None,
+        ) else {
+            panic!("watch config should be valid");
+        };
+
+        assert_eq!(watch_root, "/Users/me");
+        assert!(ignore_paths.contains(&"/Library/Caches/".to_string()));
+        assert!(ignore_paths.contains(&"!/project/keep.txt".to_string()));
+        assert!(ignore_paths.contains(&"/Users/other/cache/".to_string()));
+        assert!(ignore_paths.contains(&DEFAULT_SYSTEM_IGNORE_PATH.to_string()));
+    }
+
+    #[test]
+    fn normalize_watch_config_rewrites_watch_root_self_ignore_to_root_contents() {
+        let Some((watch_root, ignore_paths)) = normalize_watch_config(
+            "/Users/me",
+            vec!["/Users/me/".to_string()],
+            None,
+        ) else {
+            panic!("watch config should be valid");
+        };
+
+        assert_eq!(watch_root, "/Users/me");
+        assert!(ignore_paths.contains(&"/*".to_string()));
+    }
+
+    #[test]
+    fn normalize_watch_config_rewrites_default_ignore_under_non_root_watch_root() {
+        let Some((watch_root, ignore_paths)) = normalize_watch_config("/System", vec![], None)
+        else {
+            panic!("watch config should be valid");
+        };
+
+        assert_eq!(watch_root, "/System");
+        assert!(ignore_paths.contains(&"/Volumes/".to_string()));
+        assert!(!ignore_paths.contains(&DEFAULT_SYSTEM_IGNORE_PATH.to_string()));
     }
 }

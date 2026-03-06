@@ -1270,6 +1270,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_repr",
+ "tracing",
 ]
 
 [[package]]

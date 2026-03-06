@@ -455,8 +455,6 @@ describe('App context menu regression', () => {
       });
     });
 
-    expect(mocks.alert).toHaveBeenCalledWith(
-      'Failed to export current files list. Please try again.',
-    );
+    expect(mocks.alert).toHaveBeenCalledWith('exportListedFiles.failed');
   });
 });

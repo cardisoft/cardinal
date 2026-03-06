@@ -5,10 +5,6 @@ export const isPathInputValid = (input: string): boolean => {
   return trimmed === '~' || trimmed.startsWith('~/');
 };
 
-export const isIgnorePathInputValid = (_input: string): boolean => {
-  return true;
-};
-
 type WatchRootValidation = {
   isValid: boolean;
   errorKey: 'watchRoot.errors.required' | 'watchRoot.errors.absolute' | null;

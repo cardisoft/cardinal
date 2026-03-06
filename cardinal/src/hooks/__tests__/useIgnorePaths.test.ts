@@ -46,12 +46,18 @@ describe('useIgnorePaths', () => {
     );
   });
 
-  it('ships data-driven defaults with per-pattern comments and blank separators', () => {
+  it('ships grouped defaults with section comments and blank separators', () => {
     const { result } = renderHook(() => useIgnorePaths());
     const defaults = result.current.defaultIgnorePaths;
 
-    expect(defaults[0]).toContain('0 files in the 2026-02-24 sample');
+    expect(defaults[0]).toBe('# System volumes and large bundled trees.');
     expect(defaults).toContain('');
+    expect(defaults).toContain('# Developer tools and generated build outputs.');
+    expect(defaults).toContain('# Dependencies and package manager stores.');
+    expect(defaults).toContain('# Caches and runtime storage.');
+    expect(defaults).toContain('# App-specific local data.');
+    expect(defaults).toContain('# Common metadata and disposable directories.');
+    expect(defaults).toContain('# Database internals.');
     expect(defaults).toContain('**/node_modules/');
     expect(defaults).toContain('**/.pnpm/');
     expect(defaults).toContain('**/.bun/install/cache/');
@@ -59,6 +65,9 @@ describe('useIgnorePaths', () => {
     expect(defaults).toContain('**/.cache/');
     expect(defaults).toContain('**/Library/Application Support/*/Partitions/*/Cache/');
     expect(defaults).toContain('**/Library/Application Support/*/Cache/');
+    expect(defaults).toContain('~/Library/Application Support/Cursor/User/History/');
+    expect(defaults).toContain('~/Library/Application Support/Code*/User/History/');
+    expect(defaults).toContain('~/Library/pnpm/store');
     expect(defaults).toContain('**/Library/pnpm/store/');
     expect(defaults).toContain('**/target/');
     expect(defaults).toContain('**/Code Cache/');
@@ -67,14 +76,34 @@ describe('useIgnorePaths', () => {
     expect(defaults).toContain('**/WebStorage/');
     expect(defaults).toContain('**/.next/');
     expect(defaults).toContain('**/.git/');
+    expect(defaults).toContain('**/.gitignore');
+    expect(defaults).toContain('**/.lock');
+    expect(defaults).toContain('**/.bower.json');
+    expect(defaults).toContain('**/.github');
     expect(defaults).toContain('**/__pycache__/');
     expect(defaults).toContain('**/.cocoapods/');
     expect(defaults).toContain('**/.opam/');
     expect(defaults).toContain('**/*.pyc');
+    expect(defaults).toContain('**/*.db-shm');
     expect(defaults).toContain('**/.DS_Store');
-    expect(defaults).toContain('**/Google/Chrome*/Cache/');
+    expect(defaults).toContain('**/bower_components/');
+    expect(defaults).toContain('~/.rustup/toolchains/');
+    expect(defaults).toContain('~/.cursor/extensions/');
+    expect(defaults).toContain('~/.nuget/packages/');
+    expect(defaults).toContain('**/Google/Chrome*/**/GPUCache/');
+    expect(defaults).toContain('**/Vivaldi*/**/GPUCache/');
+    expect(defaults).toContain('**/Google/Chrome*/**/Local Storage/leveldb/');
+    expect(defaults).toContain('**/Vivaldi*/**/Local Storage/leveldb/');
     expect(defaults).toContain('/System/Volumes/');
+    expect(defaults).toContain('/System/iOSSupport/System/Library/');
+    expect(defaults).toContain('/Library/Apple/System/Library/PrivateFrameworks/');
+    expect(defaults).toContain('/Library/Application Support/Apple/BezelServices/');
     expect(defaults).toContain('~/Library/CloudStorage');
+    expect(defaults).toContain('~/Library/Containers/');
+    expect(defaults).toContain('~/Library/Group Containers/');
+    expect(defaults).toContain('~/.codex-profiles/*/tmp/');
+    expect(defaults).toContain('~/Library/Biome');
+    expect(defaults).toContain('~/Library/DuetExpertCenter');
   });
 
   it('keeps a whitespace-only stored array without writing defaults', async () => {

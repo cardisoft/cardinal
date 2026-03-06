@@ -430,6 +430,7 @@ dependencies = [
  "serde",
  "serde_repr",
  "tempdir",
+ "tracing",
 ]
 
 [[package]]

@@ -62,6 +62,7 @@
       "status": "Application status: {{status}}",
       "tablist": "Search status view",
       "rescan": "Trigger filesystem rescan",
+      "exportListedFiles": "Export current files list",
       "settings": "Open preferences"
     },
     "rescan": {
@@ -162,9 +163,9 @@
   },
   "ignorePaths": {
     "label": "Ignore paths",
-    "help": "One glob style pattern per line (Just like .gitignore)",
-    "errors": {
-      "absolute": "Please enter a non-empty glob path pattern."
-    }
+    "help": "One .gitignore-style pattern per line. Blank lines and lines starting with '#' are allowed."
+  },
+  "exportListedFiles": {
+    "failed": "Failed to export current files list. Please try again."
   }
 }

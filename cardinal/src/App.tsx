@@ -310,7 +310,7 @@ function App() {
         }
       }
       if (typeof window !== 'undefined') {
-        window.alert('Failed to export current files list. Please try again.');
+        window.alert(t('exportListedFiles.failed'));
       }
     }
   }, [activeTab, currentQuery, displayedResults, t]);

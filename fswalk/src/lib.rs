@@ -14,6 +14,7 @@ use std::{
     },
     time::UNIX_EPOCH,
 };
+use tracing::warn;
 
 #[derive(Serialize, Debug)]
 pub struct Node {
@@ -102,10 +103,27 @@ impl IgnoreMatcher {
         let mut builder = GitignoreBuilder::new(root_path);
         for ignore in ignore_directories {
             let pattern = ignore.to_string_lossy();
-            let _ = builder.add_line(None, &pattern);
+            if let Err(error) = builder.add_line(None, &pattern) {
+                warn!(
+                    root_path = %root_path.display(),
+                    pattern = %pattern,
+                    %error,
+                    "failed to add ignore pattern"
+                );
+            }
         }
 
-        let gitignore = builder.build().ok();
+        let gitignore = match builder.build() {
+            Ok(gitignore) => Some(gitignore),
+            Err(error) => {
+                warn!(
+                    root_path = %root_path.display(),
+                    %error,
+                    "failed to build ignore matcher; ignore patterns are disabled for this root"
+                );
+                None
+            }
+        };
         Self {
             root_path: root_path.to_path_buf(),
             gitignore,

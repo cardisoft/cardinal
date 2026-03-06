@@ -1528,7 +1528,7 @@ button:active:not(:disabled) {
 
 .preferences-card {
   width: 100%;
-  max-width: 480px;
+  max-width: 580px;
   max-height: calc(100vh - 96px);
   background: var(--color-elevated-bg, var(--color-bg));
   color: var(--color-text);
@@ -1682,8 +1682,22 @@ button:active:not(:disabled) {
   min-width: 0;
 }
 
+.preferences-row--stacked {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.preferences-row__details--inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .preferences-control {
   text-align: right;
+}
+
+.preferences-control--full-width {
+  width: 100%;
 }
 
 .preferences-control--stack {
@@ -1718,8 +1732,8 @@ button:active:not(:disabled) {
 }
 
 .preferences-textarea {
-  width: 240px;
-  min-height: 88px;
+  width: 100%;
+  min-height: 230px;
   padding: 8px 10px;
   font-size: 0.9rem;
   line-height: 1.4;

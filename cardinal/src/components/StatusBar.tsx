@@ -27,7 +27,6 @@ const LIFECYCLE_META: Record<AppLifecycleStatus, { icon: string; tone: string }>
   Updating: { icon: '◑', tone: 'updating' },
   Ready: { icon: '●', tone: 'ready' },
 };
-const EXPORT_BUTTON_LABEL = 'Export current files list';
 
 const StatusBar = ({
   scannedFiles,
@@ -105,6 +104,7 @@ const StatusBar = ({
         })}`
       : rescanTitle;
   const indicatorLabel = t('statusBar.aria.status', { status: lifecycleLabel });
+  const exportButtonLabel = t('statusBar.aria.exportListedFiles');
 
   const handleOpenPreferences = useCallback(() => {
     openPreferences();
@@ -175,13 +175,13 @@ const StatusBar = ({
             className="status-icon-button status-export-button"
             onClick={handleRequestExport}
             disabled={!canExportListedFiles}
-            title={EXPORT_BUTTON_LABEL}
-            aria-label={EXPORT_BUTTON_LABEL}
+            title={exportButtonLabel}
+            aria-label={exportButtonLabel}
           >
             <span className="status-rescan-icon" aria-hidden="true">
               ↓
             </span>
-            <span className="sr-only">{EXPORT_BUTTON_LABEL}</span>
+            <span className="sr-only">{exportButtonLabel}</span>
           </button>
           <button
             type="button"
