@@ -1,3 +1,4 @@
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use rayon::{iter::ParallelBridge, prelude::ParallelIterator};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -7,9 +8,13 @@ use std::{
     num::NonZeroU64,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
     time::UNIX_EPOCH,
 };
+use tracing::warn;
 
 #[derive(Serialize, Debug)]
 pub struct Node {
@@ -80,6 +85,66 @@ impl From<fs::FileType> for NodeFileType {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct IgnoreMatcher {
+    root_path: PathBuf,
+    gitignore: Option<Gitignore>,
+}
+
+impl IgnoreMatcher {
+    pub fn new(root_path: &Path, ignore_directories: &[PathBuf]) -> Self {
+        if ignore_directories.is_empty() {
+            return Self {
+                root_path: root_path.to_path_buf(),
+                gitignore: None,
+            };
+        }
+
+        let mut builder = GitignoreBuilder::new(root_path);
+        for ignore in ignore_directories {
+            let pattern = ignore.to_string_lossy();
+            if let Err(error) = builder.add_line(None, &pattern) {
+                warn!(
+                    root_path = %root_path.display(),
+                    pattern = %pattern,
+                    %error,
+                    "failed to add ignore pattern"
+                );
+            }
+        }
+
+        let gitignore = match builder.build() {
+            Ok(gitignore) => Some(gitignore),
+            Err(error) => {
+                warn!(
+                    root_path = %root_path.display(),
+                    %error,
+                    "failed to build ignore matcher; ignore patterns are disabled for this root"
+                );
+                None
+            }
+        };
+        Self {
+            root_path: root_path.to_path_buf(),
+            gitignore,
+        }
+    }
+
+    pub fn is_ignored(&self, path: &Path, is_dir: bool) -> bool {
+        let Ok(candidate) = path.strip_prefix(&self.root_path) else {
+            return false;
+        };
+        self.gitignore
+            .as_ref()
+            .map(|gitignore| {
+                gitignore
+                    .matched_path_or_any_parents(candidate, is_dir)
+                    .is_ignore()
+            })
+            .unwrap_or(false)
+    }
+}
+
 pub fn should_ignore_path(path: &Path, ignore_directories: &[PathBuf]) -> bool {
     ignore_directories
         .iter()
@@ -93,6 +158,7 @@ pub struct WalkData<'w, F: Fn() -> bool> {
     cancel: F,
     pub root_path: &'w Path,
     pub ignore_directories: &'w [PathBuf],
+    ignore_matcher: Arc<IgnoreMatcher>,
     /// If set, metadata will be collected for each file node(folder node will get free metadata).
     need_metadata: bool,
 }
@@ -114,7 +180,7 @@ where
 }
 
 impl<'w> WalkData<'w, fn() -> bool> {
-    pub const fn simple(root_path: &'w Path, need_metadata: bool) -> Self {
+    pub fn simple(root_path: &'w Path, need_metadata: bool) -> Self {
         fn never_cancel() -> bool {
             false
         }
@@ -125,6 +191,7 @@ impl<'w> WalkData<'w, fn() -> bool> {
             cancel: never_cancel,
             root_path,
             ignore_directories: &[],
+            ignore_matcher: Arc::new(IgnoreMatcher::default()),
             need_metadata,
         }
     }
@@ -137,18 +204,55 @@ impl<'w, F: Fn() -> bool> WalkData<'w, F> {
         need_metadata: bool,
         cancel: F,
     ) -> Self {
+        Self::new_with_ignore_root(
+            root_path,
+            root_path,
+            ignore_directories,
+            need_metadata,
+            cancel,
+        )
+    }
+
+    pub fn new_with_ignore_root(
+        root_path: &'w Path,
+        ignore_root_path: &'w Path,
+        ignore_directories: &'w [PathBuf],
+        need_metadata: bool,
+        cancel: F,
+    ) -> Self {
+        Self::new_with_ignore_matcher(
+            root_path,
+            ignore_directories,
+            Arc::new(IgnoreMatcher::new(ignore_root_path, ignore_directories)),
+            need_metadata,
+            cancel,
+        )
+    }
+
+    pub fn new_with_ignore_matcher(
+        root_path: &'w Path,
+        ignore_directories: &'w [PathBuf],
+        ignore_matcher: Arc<IgnoreMatcher>,
+        need_metadata: bool,
+        cancel: F,
+    ) -> Self {
         Self {
             num_files: AtomicUsize::new(0),
             num_dirs: AtomicUsize::new(0),
             cancel,
             root_path,
             ignore_directories,
+            ignore_matcher,
             need_metadata,
         }
     }
 
-    fn should_ignore(&self, path: &Path) -> bool {
-        should_ignore_path(path, self.ignore_directories)
+    pub fn ignore_matcher(&self) -> Arc<IgnoreMatcher> {
+        Arc::clone(&self.ignore_matcher)
+    }
+
+    fn should_ignore(&self, path: &Path, is_dir: bool) -> bool {
+        self.ignore_matcher.is_ignored(path, is_dir)
     }
 
     fn is_cancelled(&self) -> bool {
@@ -211,7 +315,11 @@ pub fn walk_it<F: Fn() -> bool + Send + Sync>(walk_data: &WalkData<'_, F>) -> Op
 /// missing or inaccessible, but the metadata will be None in that case.
 fn walk<F: Fn() -> bool + Send + Sync>(path: &Path, walk_data: &WalkData<'_, F>) -> Option<Node> {
     let metadata = metadata_of_path(path);
-    let children = if metadata.as_ref().map(|x| x.is_dir()).unwrap_or_default() {
+    let is_dir = metadata.as_ref().map(|x| x.is_dir()).unwrap_or_default();
+    if walk_data.should_ignore(path, is_dir) {
+        return None;
+    }
+    let children = if is_dir {
         walk_data.num_dirs.fetch_add(1, Ordering::Relaxed);
         let read_dir = fs::read_dir(path);
         match read_dir {
@@ -228,12 +336,13 @@ fn walk<F: Fn() -> bool + Send + Sync>(path: &Path, walk_data: &WalkData<'_, F>)
                                     return None;
                                 }
                                 let path = entry.path();
-                                if walk_data.should_ignore(&path) {
-                                    return None;
-                                }
                                 // doesn't traverse symlink
                                 if let Ok(data) = entry.file_type() {
-                                    if data.is_dir() {
+                                    let is_dir = data.is_dir();
+                                    if walk_data.should_ignore(&path, is_dir) {
+                                        return None;
+                                    }
+                                    if is_dir {
                                         walk(&path, walk_data)
                                     } else {
                                         walk_data.num_files.fetch_add(1, Ordering::Relaxed);
@@ -497,7 +606,7 @@ mod tests {
     fn should_ignore_exact_match() {
         let ignore = vec![PathBuf::from("/a/b/c")];
         let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
-        assert!(wd.should_ignore(Path::new("/a/b/c")));
+        assert!(wd.should_ignore(Path::new("/a/b/c"), true));
     }
 
     #[test]
@@ -505,9 +614,9 @@ mod tests {
         let ignore = vec![PathBuf::from("/a/b")];
         let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
         // direct child
-        assert!(wd.should_ignore(Path::new("/a/b/c")));
+        assert!(wd.should_ignore(Path::new("/a/b/c"), true));
         // deeply nested
-        assert!(wd.should_ignore(Path::new("/a/b/c/d/e")));
+        assert!(wd.should_ignore(Path::new("/a/b/c/d/e"), true));
     }
 
     #[test]
@@ -516,43 +625,43 @@ mod tests {
         // component-aware, not string-prefix.
         let ignore = vec![PathBuf::from("/tmp/ab")];
         let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
-        assert!(!wd.should_ignore(Path::new("/tmp/abc")));
-        assert!(!wd.should_ignore(Path::new("/tmp/abc/d")));
+        assert!(!wd.should_ignore(Path::new("/tmp/abc"), true));
+        assert!(!wd.should_ignore(Path::new("/tmp/abc/d"), true));
     }
 
     #[test]
     fn should_ignore_unrelated_path() {
         let ignore = vec![PathBuf::from("/a/b")];
         let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
-        assert!(!wd.should_ignore(Path::new("/x/y")));
-        assert!(!wd.should_ignore(Path::new("/a")));
+        assert!(!wd.should_ignore(Path::new("/x/y"), true));
+        assert!(!wd.should_ignore(Path::new("/a"), true));
     }
 
     #[test]
     fn should_ignore_empty_ignore_list() {
         let ignore: Vec<PathBuf> = vec![];
         let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
-        assert!(!wd.should_ignore(Path::new("/anything")));
+        assert!(!wd.should_ignore(Path::new("/anything"), true));
     }
 
     #[test]
     fn should_ignore_multiple_ignore_dirs() {
         let ignore = vec![PathBuf::from("/a"), PathBuf::from("/x/y")];
         let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
-        assert!(wd.should_ignore(Path::new("/a")));
-        assert!(wd.should_ignore(Path::new("/a/b/c")));
-        assert!(wd.should_ignore(Path::new("/x/y")));
-        assert!(wd.should_ignore(Path::new("/x/y/z")));
-        assert!(!wd.should_ignore(Path::new("/x")));
-        assert!(!wd.should_ignore(Path::new("/b")));
+        assert!(wd.should_ignore(Path::new("/a"), true));
+        assert!(wd.should_ignore(Path::new("/a/b/c"), true));
+        assert!(wd.should_ignore(Path::new("/x/y"), true));
+        assert!(wd.should_ignore(Path::new("/x/y/z"), true));
+        assert!(!wd.should_ignore(Path::new("/x"), true));
+        assert!(!wd.should_ignore(Path::new("/b"), true));
     }
 
     #[test]
     fn should_ignore_parent_of_ignored_dir_is_not_ignored() {
         let ignore = vec![PathBuf::from("/a/b/c")];
         let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
-        assert!(!wd.should_ignore(Path::new("/a")));
-        assert!(!wd.should_ignore(Path::new("/a/b")));
+        assert!(!wd.should_ignore(Path::new("/a"), true));
+        assert!(!wd.should_ignore(Path::new("/a/b"), true));
     }
 
     // ── other unit tests ─────────────────────────────────────────────────

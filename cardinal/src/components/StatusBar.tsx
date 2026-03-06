@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { AppLifecycleStatus } from '../types/ipc';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +16,8 @@ type StatusBarProps = {
   onTabChange: (tab: StatusTabKey) => void;
   onRequestRescan: () => void;
   rescanErrorCount: number;
+  canExportListedFiles?: boolean;
+  onRequestExportListedFilesTsv?: () => Promise<void> | void;
 };
 
 const TABS: StatusTabKey[] = ['files', 'events'];
@@ -36,12 +38,14 @@ const StatusBar = ({
   onTabChange,
   onRequestRescan,
   rescanErrorCount,
+  canExportListedFiles = false,
+  onRequestExportListedFilesTsv,
 }: StatusBarProps): React.JSX.Element => {
   const { t } = useTranslation();
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const filesTabRef = useRef<HTMLButtonElement | null>(null);
   const eventsTabRef = useRef<HTMLButtonElement | null>(null);
-  const [sliderStyle, setSliderStyle] = useState<CSSProperties>({});
+  const [sliderStyle, setSliderStyle] = React.useState<CSSProperties>({});
 
   useLayoutEffect(() => {
     // Keep the active-tab underline aligned even when labels resize or counters update.
@@ -100,10 +104,14 @@ const StatusBar = ({
         })}`
       : rescanTitle;
   const indicatorLabel = t('statusBar.aria.status', { status: lifecycleLabel });
+  const exportButtonLabel = t('statusBar.aria.exportListedFiles');
 
   const handleOpenPreferences = useCallback(() => {
     openPreferences();
   }, []);
+  const handleRequestExport = useCallback(() => {
+    void onRequestExportListedFilesTsv?.();
+  }, [onRequestExportListedFilesTsv]);
 
   return (
     <div className="status-bar">
@@ -161,6 +169,19 @@ const StatusBar = ({
               ↻
             </span>
             <span className="sr-only">{t('statusBar.aria.rescan')}</span>
+          </button>
+          <button
+            type="button"
+            className="status-icon-button status-export-button"
+            onClick={handleRequestExport}
+            disabled={!canExportListedFiles}
+            title={exportButtonLabel}
+            aria-label={exportButtonLabel}
+          >
+            <span className="status-rescan-icon" aria-hidden="true">
+              ↓
+            </span>
+            <span className="sr-only">{exportButtonLabel}</span>
           </button>
           <button
             type="button"

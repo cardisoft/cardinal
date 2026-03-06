@@ -49,7 +49,7 @@ fn node_for_path<'a>(node: &'a fswalk::Node, path: &Path) -> &'a fswalk::Node {
 fn ignores_directories_and_collects_metadata() {
     let tmp = TempDir::new("fswalk_deep").unwrap();
     build_deep_fixture(tmp.path());
-    let ignore = vec![tmp.path().join("skip_dir")];
+    let ignore = vec![std::path::PathBuf::from("/skip_dir")];
     let walk_data = WalkData::new(tmp.path(), &ignore, true, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, tmp.path());
@@ -103,195 +103,162 @@ fn cancellation_stops_traversal_early() {
     );
 }
 
-// ── should_ignore prefix-matching integration tests ─────────────────────
-
-/// Ignoring a directory also excludes all of its nested descendants.
 #[test]
-fn ignore_prefix_excludes_nested_children() {
-    let tmp = TempDir::new("fswalk_prefix").unwrap();
+fn glob_patterns_ignore_nested_directories() {
+    let tmp = TempDir::new("fswalk_glob_ignore").unwrap();
     let root = tmp.path();
 
-    // /root/skip_dir/sub/deep/file.txt
-    // /root/keep.txt
-    fs::create_dir_all(root.join("skip_dir/sub/deep")).unwrap();
-    fs::write(root.join("skip_dir/sub/deep/file.txt"), b"x").unwrap();
-    fs::write(root.join("skip_dir/top.txt"), b"y").unwrap();
-    fs::write(root.join("keep.txt"), b"k").unwrap();
+    fs::create_dir_all(root.join("packages/app/node_modules/pkg")).unwrap();
+    fs::create_dir_all(root.join("src/components")).unwrap();
+    fs::write(
+        root.join("packages/app/node_modules/pkg/ignored.js"),
+        b"console.log('ignored');",
+    )
+    .unwrap();
+    fs::write(
+        root.join("src/components/kept.tsx"),
+        b"export const kept = true;",
+    )
+    .unwrap();
 
-    let ignore = vec![root.join("skip_dir")];
-    let walk_data = WalkData::new(root, &ignore, false, || false);
+    let ignore = vec![std::path::PathBuf::from("**/node_modules/**")];
+    let walk_data = WalkData::new(root, &ignore, true, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
-    // skip_dir should be completely absent
-    assert!(
-        !tree.children.iter().any(|c| &*c.name == "skip_dir"),
-        "skip_dir and all descendants should be excluded"
-    );
-    // keep.txt should be present
-    assert!(tree.children.iter().any(|c| &*c.name == "keep.txt"));
-}
-
-/// A sibling directory whose name starts with the same characters as the
-/// ignored directory must NOT be ignored (component-aware prefix, not string).
-#[test]
-fn ignore_does_not_affect_sibling_with_similar_name() {
-    let tmp = TempDir::new("fswalk_similar_name").unwrap();
-    let root = tmp.path();
-
-    // /root/node_modules/          <- to be ignored
-    // /root/node_modules_backup/   <- should NOT be ignored
-    fs::create_dir(root.join("node_modules")).unwrap();
-    fs::write(root.join("node_modules/pkg.json"), b"{}").unwrap();
-    fs::create_dir(root.join("node_modules_backup")).unwrap();
-    fs::write(root.join("node_modules_backup/pkg.json"), b"{}").unwrap();
-
-    let ignore = vec![root.join("node_modules")];
-    let walk_data = WalkData::new(root, &ignore, false, || false);
-    let tree = walk_it(&walk_data).expect("root node");
-    let tree = node_for_path(&tree, root);
-
-    assert!(
-        !tree.children.iter().any(|c| &*c.name == "node_modules"),
-        "node_modules should be ignored"
-    );
-    let backup = tree
+    let packages = tree
         .children
         .iter()
-        .find(|c| &*c.name == "node_modules_backup")
-        .expect("node_modules_backup must survive");
+        .find(|child| &*child.name == "packages")
+        .expect("packages directory");
+    let app = packages
+        .children
+        .iter()
+        .find(|child| &*child.name == "app")
+        .expect("app directory");
+    let node_modules = app
+        .children
+        .iter()
+        .find(|child| &*child.name == "node_modules")
+        .expect("node_modules directory should still exist");
     assert!(
-        backup.children.iter().any(|c| &*c.name == "pkg.json"),
-        "sibling with shared prefix string should keep its children"
+        node_modules.children.is_empty(),
+        "glob ignore should remove descendants under node_modules"
+    );
+
+    let src = tree
+        .children
+        .iter()
+        .find(|child| &*child.name == "src")
+        .expect("src directory");
+    let components = src
+        .children
+        .iter()
+        .find(|child| &*child.name == "components")
+        .expect("components directory");
+    assert!(
+        components
+            .children
+            .iter()
+            .any(|child| &*child.name == "kept.tsx"),
+        "non-matching files should remain indexed"
     );
 }
 
-/// Ignoring an intermediate directory preserves ancestors and other siblings.
 #[test]
-fn ignore_intermediate_dir_preserves_siblings() {
-    let tmp = TempDir::new("fswalk_mid").unwrap();
+fn globstar_descendant_pattern_does_not_ignore_parent_directory() {
+    let tmp = TempDir::new("fswalk_globstar_parent_semantics").unwrap();
     let root = tmp.path();
 
-    // /root/parent/ignore_me/file.txt
-    // /root/parent/keep_me/file.txt
-    fs::create_dir_all(root.join("parent/ignore_me")).unwrap();
-    fs::create_dir_all(root.join("parent/keep_me")).unwrap();
-    fs::write(root.join("parent/ignore_me/file.txt"), b"i").unwrap();
-    fs::write(root.join("parent/keep_me/file.txt"), b"k").unwrap();
+    fs::create_dir_all(root.join("Xcode.app/Contents")).unwrap();
+    fs::write(root.join("Xcode.app/Contents/data.bin"), b"data").unwrap();
 
-    let ignore = vec![root.join("parent/ignore_me")];
-    let walk_data = WalkData::new(root, &ignore, false, || false);
+    let ignore = vec![std::path::PathBuf::from("**/Xcode.app/**")];
+    let walk_data = WalkData::new(root, &ignore, true, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
-    let parent = tree
+    let xcode_app = tree
         .children
         .iter()
-        .find(|c| &*c.name == "parent")
-        .expect("parent must survive");
+        .find(|child| &*child.name == "Xcode.app")
+        .expect("Xcode.app should not be ignored by **/Xcode.app/** itself");
     assert!(
-        !parent.children.iter().any(|c| &*c.name == "ignore_me"),
-        "ignore_me should be excluded"
+        xcode_app.children.is_empty(),
+        "descendants under Xcode.app should be ignored by **/Xcode.app/**"
     );
-    let keep = parent
-        .children
-        .iter()
-        .find(|c| &*c.name == "keep_me")
-        .expect("keep_me should survive");
-    assert!(keep.children.iter().any(|c| &*c.name == "file.txt"));
 }
 
-/// Multiple ignore paths with prefix semantics work together.
 #[test]
-fn multiple_ignores_with_prefix() {
-    let tmp = TempDir::new("fswalk_multi_ig").unwrap();
+fn gitignore_negation_reincludes_file_when_parent_is_not_pruned() {
+    let tmp = TempDir::new("fswalk_gitignore_negation_reinclude").unwrap();
     let root = tmp.path();
 
-    fs::create_dir_all(root.join("a/deep/child")).unwrap();
-    fs::create_dir_all(root.join("b/deep/child")).unwrap();
-    fs::create_dir(root.join("c")).unwrap();
-    fs::write(root.join("a/deep/child/f.txt"), b"").unwrap();
-    fs::write(root.join("b/deep/child/f.txt"), b"").unwrap();
-    fs::write(root.join("c/f.txt"), b"").unwrap();
+    fs::create_dir_all(root.join("workspace/node_modules")).unwrap();
+    fs::write(root.join("workspace/node_modules/included.js"), b"ok").unwrap();
+    fs::write(root.join("workspace/node_modules/ignored.js"), b"no").unwrap();
 
-    let ignore = vec![root.join("a"), root.join("b")];
-    let walk_data = WalkData::new(root, &ignore, false, || false);
+    let ignore = vec![
+        std::path::PathBuf::from("**/node_modules/**"),
+        std::path::PathBuf::from("!**/node_modules/**/included.js"),
+    ];
+    let walk_data = WalkData::new(root, &ignore, true, || false);
     let tree = walk_it(&walk_data).expect("root node");
     let tree = node_for_path(&tree, root);
 
-    let names: Vec<&str> = tree.children.iter().map(|c| &*c.name).collect();
-    assert!(!names.contains(&"a"), "a should be ignored");
-    assert!(!names.contains(&"b"), "b should be ignored");
-    assert!(names.contains(&"c"), "c should remain");
-}
-
-/// File counts reflect the prefix-based ignore (descendants not counted).
-#[test]
-fn file_counts_exclude_ignored_subtree() {
-    let tmp = TempDir::new("fswalk_counts").unwrap();
-    let root = tmp.path();
-
-    // 3 files under ignored dir, 2 under kept dir
-    fs::create_dir_all(root.join("ignored/sub")).unwrap();
-    fs::write(root.join("ignored/a.txt"), b"").unwrap();
-    fs::write(root.join("ignored/b.txt"), b"").unwrap();
-    fs::write(root.join("ignored/sub/c.txt"), b"").unwrap();
-
-    fs::create_dir(root.join("kept")).unwrap();
-    fs::write(root.join("kept/d.txt"), b"").unwrap();
-    fs::write(root.join("kept/e.txt"), b"").unwrap();
-
-    let ignore = vec![root.join("ignored")];
-    let walk_data = WalkData::new(root, &ignore, false, || false);
-    let _tree = walk_it(&walk_data).expect("root node");
-
-    let num_files = walk_data.num_files.load(Ordering::Relaxed);
-    assert_eq!(
-        num_files, 2,
-        "only the 2 files under kept/ should be counted, got {num_files}"
-    );
-}
-
-/// `walk_it_without_root_chain` returns `None` when the cancel closure is
-/// already true before traversal starts.
-#[test]
-fn cancellation_stops_walk_it_without_root_chain() {
-    use fswalk::walk_it_without_root_chain;
-
-    let tmp = TempDir::new("fswalk_cancel_noroot").unwrap();
-    for i in 0..20 {
-        fs::create_dir(tmp.path().join(format!("dir_{i}"))).unwrap();
-        fs::write(tmp.path().join(format!("dir_{i}/f.txt")), b"").unwrap();
-    }
-
-    let cancel = AtomicBool::new(true); // already cancelled
-    let walk_data = WalkData::new(tmp.path(), &[], false, || cancel.load(Ordering::Relaxed));
-    let result = walk_it_without_root_chain(&walk_data);
-    assert!(
-        result.is_none(),
-        "walk_it_without_root_chain must return None when cancel closure returns true"
-    );
-}
-
-/// `walk_it_without_root_chain` also respects prefix-based ignore.
-#[test]
-fn walk_without_root_chain_respects_prefix_ignore() {
-    use fswalk::walk_it_without_root_chain;
-
-    let tmp = TempDir::new("fswalk_noroot").unwrap();
-    let root = tmp.path();
-
-    fs::create_dir_all(root.join("skip/nested")).unwrap();
-    fs::write(root.join("skip/nested/f.txt"), b"").unwrap();
-    fs::write(root.join("stay.txt"), b"").unwrap();
-
-    let ignore = vec![root.join("skip")];
-    let walk_data = WalkData::new(root, &ignore, false, || false);
-    let tree = walk_it_without_root_chain(&walk_data).expect("root node");
+    let workspace = tree
+        .children
+        .iter()
+        .find(|child| &*child.name == "workspace")
+        .expect("workspace directory");
+    let node_modules = workspace
+        .children
+        .iter()
+        .find(|child| &*child.name == "node_modules")
+        .expect("node_modules directory");
 
     assert!(
-        !tree.children.iter().any(|c| &*c.name == "skip"),
-        "skip and descendants should be excluded"
+        node_modules
+            .children
+            .iter()
+            .any(|child| &*child.name == "included.js"),
+        "negation should re-include explicit file when parent directory is not pruned"
     );
-    assert!(tree.children.iter().any(|c| &*c.name == "stay.txt"));
+    assert!(
+        node_modules
+            .children
+            .iter()
+            .all(|child| &*child.name != "ignored.js"),
+        "non-negated files should remain ignored"
+    );
+}
+
+#[test]
+fn gitignore_negation_cannot_reinclude_when_parent_directory_is_pruned() {
+    let tmp = TempDir::new("fswalk_gitignore_negation_pruned_parent").unwrap();
+    let root = tmp.path();
+
+    fs::create_dir_all(root.join("workspace/node_modules")).unwrap();
+    fs::write(root.join("workspace/node_modules/included.js"), b"ok").unwrap();
+
+    let ignore = vec![
+        std::path::PathBuf::from("**/node_modules/"),
+        std::path::PathBuf::from("!**/node_modules/**/included.js"),
+    ];
+    let walk_data = WalkData::new(root, &ignore, true, || false);
+    let tree = walk_it(&walk_data).expect("root node");
+    let tree = node_for_path(&tree, root);
+
+    let workspace = tree
+        .children
+        .iter()
+        .find(|child| &*child.name == "workspace")
+        .expect("workspace directory");
+    assert!(
+        workspace
+            .children
+            .iter()
+            .all(|child| &*child.name != "node_modules"),
+        "when a parent directory is ignored, its subtree is pruned and negation cannot re-include descendants"
+    );
 }

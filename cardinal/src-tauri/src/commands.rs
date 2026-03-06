@@ -22,7 +22,7 @@ use parking_lot::Mutex;
 use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, SlabNodeMetadata};
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
-use std::{cell::LazyCell, process::Command};
+use std::{cell::LazyCell, fs::OpenOptions, io::Write, process::Command};
 use tauri::{ActivationPolicy, AppHandle, State};
 use tracing::{error, info, warn};
 
@@ -143,12 +143,7 @@ impl SearchState {
     }
 }
 
-/// Normalizes user-provided path input into an absolute path string.
-///
-/// Expands a leading `~` component using the current `HOME` directory and rejects
-/// non-absolute paths (including relative paths and unsupported `~user` forms).
-/// Returns `Some` absolute path string when valid, otherwise `None`.
-fn normalize_path_input(raw: &str) -> Option<String> {
+fn expand_path_input(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return None;
@@ -168,12 +163,89 @@ fn normalize_path_input(raw: &str) -> Option<String> {
         }
     }
 
-    let resolved = expanded.into_string();
-    if resolved.starts_with('/') {
-        Some(resolved)
-    } else {
-        None
+    Some(expanded.into_string())
+}
+
+/// Normalizes user-provided path input into an absolute path string.
+///
+/// Expands a leading `~` component using the current `HOME` directory and rejects
+/// non-absolute paths (including relative paths and unsupported `~user` forms).
+/// Returns `Some` absolute path string when valid, otherwise `None`.
+fn normalize_path_input(raw: &str) -> Option<String> {
+    let resolved = expand_path_input(raw)?;
+    resolved.starts_with('/').then_some(resolved)
+}
+
+/// Normalizes ignore entries.
+///
+/// Keeps raw entries so matching follows gitignore semantics exactly,
+/// including empty lines and comments. A leading `~` is expanded so
+/// existing home-relative ignore entries keep matching.
+fn normalize_ignore_path_input(raw: &str) -> String {
+    if (raw == "~" || raw.starts_with("~/"))
+        && let Some(expanded) = expand_path_input(raw)
+    {
+        return expanded;
     }
+
+    raw.to_string()
+}
+
+fn strip_multiline_ignore_comments(ignore_paths: Vec<String>) -> Vec<String> {
+    let mut normalized = Vec::with_capacity(ignore_paths.len());
+    let mut in_block_comment = false;
+
+    for path in ignore_paths {
+        let trimmed = path.trim();
+
+        if in_block_comment {
+            if trimmed == "*/" {
+                in_block_comment = false;
+            }
+            continue;
+        }
+
+        if trimmed == "/*" {
+            in_block_comment = true;
+            continue;
+        }
+
+        normalized.push(path);
+    }
+
+    normalized
+}
+
+/// Re-anchor legacy absolute ignore entries beneath the watch root so they keep
+/// matching after ignore evaluation switched to watch-root-relative gitignore semantics.
+fn rewrite_ignore_path_for_watch_root(raw: &str, watch_root: &str) -> String {
+    if watch_root == "/" {
+        return raw.to_string();
+    }
+
+    let (prefix, pattern) = if let Some(pattern) = raw.strip_prefix('!') {
+        ("!", pattern)
+    } else {
+        ("", raw)
+    };
+
+    if !pattern.starts_with('/') {
+        return raw.to_string();
+    }
+
+    let rewritten = if pattern == watch_root || pattern == format!("{watch_root}/") {
+        "/*".to_string()
+    } else if let Some(stripped) = pattern.strip_prefix(watch_root) {
+        if stripped.starts_with('/') {
+            stripped.to_string()
+        } else {
+            return raw.to_string();
+        }
+    } else {
+        return raw.to_string();
+    };
+
+    format!("{prefix}{rewritten}")
 }
 
 pub(crate) fn normalize_watch_config(
@@ -183,21 +255,18 @@ pub(crate) fn normalize_watch_config(
 ) -> Option<(String, Vec<String>)> {
     let watch_root = normalize_path_input(watch_root)
         .or_else(|| fallback_watch_root.and_then(normalize_path_input))?;
-    let mut ignore_paths = ignore_paths
+    let mut ignore_paths = strip_multiline_ignore_comments(ignore_paths)
         .into_iter()
-        .filter_map(|path| {
-            let normalized = normalize_path_input(&path);
-            if normalized.is_none() {
-                warn!("Ignoring invalid ignore path: {path:?}");
-            }
-            normalized
-        })
+        .map(|path| normalize_ignore_path_input(&path))
         .collect::<Vec<_>>();
     if !ignore_paths
         .iter()
         .any(|path| path == DEFAULT_SYSTEM_IGNORE_PATH)
     {
         ignore_paths.push(DEFAULT_SYSTEM_IGNORE_PATH.to_string());
+    }
+    for path in &mut ignore_paths {
+        *path = rewrite_ignore_path_for_watch_root(path, &watch_root);
     }
     Some((watch_root, ignore_paths))
 }
@@ -421,6 +490,95 @@ pub async fn open_path(path: String) {
 }
 
 #[tauri::command]
+pub async fn prompt_save_listed_files_tsv(
+    app: AppHandle,
+    default_filename: String,
+) -> Result<Option<String>, String> {
+    let (response_tx, response_rx) = bounded::<Result<Option<String>, String>>(1);
+
+    app.run_on_main_thread(move || {
+        let result = prompt_save_listed_files_tsv_impl(default_filename);
+        if response_tx.send(result).is_err() {
+            error!("Failed to send prompt_save_listed_files_tsv response");
+        }
+    })
+    .map_err(|e| format!("Failed to dispatch prompt save dialog on main thread: {e:?}"))?;
+
+    response_rx
+        .recv()
+        .map_err(|e| format!("Failed to receive prompt_save_listed_files_tsv response: {e:?}"))?
+}
+
+fn normalize_export_default_filename(default_filename: String) -> String {
+    let fallback_filename = "cardinal-word-list.tsv".to_string();
+    let trimmed = default_filename.trim();
+    if trimmed.is_empty() {
+        fallback_filename
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn prompt_save_listed_files_tsv_impl(default_filename: String) -> Result<Option<String>, String> {
+    let default_filename = normalize_export_default_filename(default_filename);
+
+    info!(
+        "Opening listed-files TSV save dialog with default filename: {}",
+        default_filename
+    );
+
+    let dialog = rfd::FileDialog::new()
+        .add_filter("Tab-separated values", &["tsv"])
+        .set_file_name(&default_filename);
+    let Some(mut path) = dialog.save_file() else {
+        info!("Listed-files TSV save dialog canceled by user");
+        return Ok(None);
+    };
+
+    if path.extension().is_none() {
+        path.set_extension("tsv");
+    }
+
+    let path = path.to_string_lossy().into_owned();
+    Ok(Some(path))
+}
+
+#[tauri::command]
+pub async fn write_listed_files_tsv(path: String, content: String) -> Result<(), String> {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(&path)
+        .map_err(|e| format!("Failed to open TSV file for writing {path}: {e}"))?;
+    file.write_all(content.as_bytes())
+        .map_err(|e| format!("Failed to write TSV file to {path}: {e}"))?;
+    info!("Saved listed-files TSV to {}", path);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn append_listed_files_tsv_chunk(path: String, content: String) -> Result<(), String> {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|e| format!("Failed to open TSV file for appending {path}: {e}"))?;
+    file.write_all(content.as_bytes())
+        .map_err(|e| format!("Failed appending TSV chunk to {path}: {e}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remove_listed_files_tsv(path: String) -> Result<(), String> {
+    match std::fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(format!("Failed to remove TSV file {path}: {err}")),
+    }
+}
+
+#[tauri::command]
 pub async fn start_logic(watch_root: String, ignore_paths: Vec<String>) {
     if let Some(sender) = LOGIC_START.get() {
         let _ = sender.try_send(LogicStartConfig {
@@ -541,5 +699,190 @@ mod tests {
         assert_eq!(normalize_path_input("./relative"), None);
         assert_eq!(normalize_path_input("~someone"), None);
         assert_eq!(normalize_path_input("~someone/Documents"), None);
+    }
+
+    #[test]
+    fn normalize_ignore_accepts_absolute_paths_and_globs() {
+        assert_eq!(
+            normalize_ignore_path_input("/tmp/cache"),
+            "/tmp/cache".to_string()
+        );
+        assert_eq!(
+            normalize_ignore_path_input("**/node_modules/**"),
+            "**/node_modules/**".to_string()
+        );
+        assert_eq!(
+            normalize_ignore_path_input("build/*.tmp"),
+            "build/*.tmp".to_string()
+        );
+        assert_eq!(normalize_ignore_path_input(".cache"), ".cache".to_string());
+        assert_eq!(
+            normalize_ignore_path_input("Library/Biome/"),
+            "Library/Biome/".to_string()
+        );
+    }
+
+    #[test]
+    fn normalize_ignore_expands_home_prefixed_paths() {
+        let Ok(home) = std::env::var("HOME") else {
+            return;
+        };
+
+        assert_eq!(normalize_ignore_path_input("~"), home.clone());
+        assert_eq!(
+            normalize_ignore_path_input("~/Library/Caches"),
+            format!("{home}/Library/Caches")
+        );
+    }
+
+    #[test]
+    fn normalize_ignore_keeps_gitignore_syntax_verbatim() {
+        assert_eq!(
+            normalize_ignore_path_input("!/important.pyc"),
+            "!/important.pyc".to_string()
+        );
+        assert_eq!(
+            normalize_ignore_path_input("# comment"),
+            "# comment".to_string()
+        );
+        assert_eq!(
+            normalize_ignore_path_input("relative/path"),
+            "relative/path".to_string()
+        );
+        assert_eq!(
+            normalize_ignore_path_input("~someone/**"),
+            "~someone/**".to_string()
+        );
+        assert_eq!(
+            normalize_ignore_path_input("../relative/path"),
+            "../relative/path".to_string()
+        );
+    }
+
+    #[test]
+    fn normalize_ignore_keeps_empty_and_whitespace_entries() {
+        assert_eq!(normalize_ignore_path_input(""), String::new());
+        assert_eq!(normalize_ignore_path_input("   "), "   ".to_string());
+    }
+
+    #[test]
+    fn strip_multiline_ignore_comments_skips_wrapped_lines_and_markers() {
+        assert_eq!(
+            strip_multiline_ignore_comments(vec![
+                "/tmp/keep".to_string(),
+                "/*".to_string(),
+                "/tmp/commented".to_string(),
+                "# still commented".to_string(),
+                "*/".to_string(),
+                "/tmp/after".to_string(),
+            ]),
+            vec!["/tmp/keep".to_string(), "/tmp/after".to_string()]
+        );
+    }
+
+    #[test]
+    fn strip_multiline_ignore_comments_comments_until_end_when_unclosed() {
+        assert_eq!(
+            strip_multiline_ignore_comments(vec![
+                "/tmp/keep".to_string(),
+                " /* ".to_string(),
+                "/tmp/commented".to_string(),
+            ]),
+            vec!["/tmp/keep".to_string()]
+        );
+    }
+
+    #[test]
+    fn normalize_watch_config_keeps_globs_and_adds_default_ignore_path() {
+        let Some((watch_root, ignore_paths)) = normalize_watch_config(
+            "/",
+            vec![
+                "**/node_modules/**".to_string(),
+                String::new(),
+                "relative/path".to_string(),
+                "/tmp/cache".to_string(),
+            ],
+            None,
+        ) else {
+            panic!("watch config should be valid");
+        };
+
+        assert_eq!(watch_root, "/");
+        assert!(ignore_paths.contains(&"**/node_modules/**".to_string()));
+        assert!(ignore_paths.contains(&String::new()));
+        assert!(ignore_paths.contains(&"relative/path".to_string()));
+        assert!(ignore_paths.contains(&"/tmp/cache".to_string()));
+        assert!(ignore_paths.contains(&DEFAULT_SYSTEM_IGNORE_PATH.to_string()));
+    }
+
+    #[test]
+    fn normalize_watch_config_drops_multiline_commented_ignore_entries() {
+        let Some((watch_root, ignore_paths)) = normalize_watch_config(
+            "/",
+            vec![
+                "/tmp/keep".to_string(),
+                "/*".to_string(),
+                "/tmp/commented".to_string(),
+                "/tmp/also-commented".to_string(),
+                "*/".to_string(),
+                "/tmp/after".to_string(),
+            ],
+            None,
+        ) else {
+            panic!("watch config should be valid");
+        };
+
+        assert_eq!(watch_root, "/");
+        assert!(ignore_paths.contains(&"/tmp/keep".to_string()));
+        assert!(ignore_paths.contains(&"/tmp/after".to_string()));
+        assert!(!ignore_paths.contains(&"/*".to_string()));
+        assert!(!ignore_paths.contains(&"*/".to_string()));
+        assert!(!ignore_paths.contains(&"/tmp/commented".to_string()));
+        assert!(!ignore_paths.contains(&"/tmp/also-commented".to_string()));
+    }
+
+    #[test]
+    fn normalize_watch_config_rewrites_absolute_ignore_entries_under_non_root_watch_root() {
+        let Some((watch_root, ignore_paths)) = normalize_watch_config(
+            "/Users/me",
+            vec![
+                "/Users/me/Library/Caches/".to_string(),
+                "!/Users/me/project/keep.txt".to_string(),
+                "/Users/other/cache/".to_string(),
+            ],
+            None,
+        ) else {
+            panic!("watch config should be valid");
+        };
+
+        assert_eq!(watch_root, "/Users/me");
+        assert!(ignore_paths.contains(&"/Library/Caches/".to_string()));
+        assert!(ignore_paths.contains(&"!/project/keep.txt".to_string()));
+        assert!(ignore_paths.contains(&"/Users/other/cache/".to_string()));
+        assert!(ignore_paths.contains(&DEFAULT_SYSTEM_IGNORE_PATH.to_string()));
+    }
+
+    #[test]
+    fn normalize_watch_config_rewrites_watch_root_self_ignore_to_root_contents() {
+        let Some((watch_root, ignore_paths)) =
+            normalize_watch_config("/Users/me", vec!["/Users/me/".to_string()], None)
+        else {
+            panic!("watch config should be valid");
+        };
+
+        assert_eq!(watch_root, "/Users/me");
+        assert!(ignore_paths.contains(&"/*".to_string()));
+    }
+
+    #[test]
+    fn normalize_watch_config_rewrites_default_ignore_under_non_root_watch_root() {
+        let Some((watch_root, ignore_paths)) = normalize_watch_config("/System", vec![], None)
+        else {
+            panic!("watch config should be valid");
+        };
+
+        assert_eq!(watch_root, "/System");
+        assert!(ignore_paths.contains(&"/Volumes/".to_string()));
+        assert!(!ignore_paths.contains(&DEFAULT_SYSTEM_IGNORE_PATH.to_string()));
     }
 }

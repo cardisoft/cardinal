@@ -7,6 +7,7 @@
     "core:default",
     "core:app:allow-default-window-icon",
     "core:window:allow-set-focus",
+    "core:webview:allow-set-webview-zoom",
     "opener:default",
     "macos-permissions:default",
     "drag:default",

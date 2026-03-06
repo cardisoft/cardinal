@@ -66,6 +66,70 @@ describe('PreferencesOverlay', () => {
     });
   });
 
+  it('accepts glob ignore path updates via onWatchConfigChange', () => {
+    const onWatchConfigChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onWatchConfigChange={onWatchConfigChange} />);
+
+    const ignorePathsInput = screen.getByLabelText('ignorePaths.label');
+    fireEvent.change(ignorePathsInput, { target: { value: '**/node_modules/**' } });
+
+    fireEvent.click(screen.getByText('preferences.save'));
+
+    expect(onWatchConfigChange).toHaveBeenCalledWith({
+      watchRoot: baseProps.watchRoot,
+      ignorePaths: ['**/node_modules/**'],
+    });
+  });
+
+  it('accepts relative literal ignore path updates via onWatchConfigChange', () => {
+    const onWatchConfigChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onWatchConfigChange={onWatchConfigChange} />);
+
+    const ignorePathsInput = screen.getByLabelText('ignorePaths.label');
+    fireEvent.change(ignorePathsInput, { target: { value: '.cache\n__pycache__' } });
+
+    fireEvent.click(screen.getByText('preferences.save'));
+
+    expect(onWatchConfigChange).toHaveBeenCalledWith({
+      watchRoot: baseProps.watchRoot,
+      ignorePaths: ['.cache', '__pycache__'],
+    });
+  });
+
+  it('preserves blank and whitespace-only ignore lines on save', () => {
+    const onWatchConfigChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onWatchConfigChange={onWatchConfigChange} />);
+
+    const ignorePathsInput = screen.getByLabelText('ignorePaths.label');
+    fireEvent.change(ignorePathsInput, { target: { value: '/tmp/one\n\n   \n# comment' } });
+
+    fireEvent.click(screen.getByText('preferences.save'));
+
+    expect(onWatchConfigChange).toHaveBeenCalledWith({
+      watchRoot: baseProps.watchRoot,
+      ignorePaths: ['/tmp/one', '', '   ', '# comment'],
+    });
+  });
+
+  it('resets only the ignore textarea to default list', () => {
+    const onWatchConfigChange = vi.fn();
+    render(
+      <PreferencesOverlay
+        {...baseProps}
+        onWatchConfigChange={onWatchConfigChange}
+        defaultIgnorePaths={['# group', '/default/one', '', '/default/two']}
+      />,
+    );
+
+    const ignorePathsInput = screen.getByLabelText('ignorePaths.label');
+    fireEvent.change(ignorePathsInput, { target: { value: '/tmp/one\n/tmp/two' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'preferences.reset ignorePaths.label' }));
+
+    expect(ignorePathsInput).toHaveValue('# group\n/default/one\n\n/default/two');
+    expect(onWatchConfigChange).not.toHaveBeenCalled();
+  });
+
   it('resets inputs to defaults before invoking onReset', () => {
     const onReset = vi.fn();
     const onWatchConfigChange = vi.fn();
@@ -91,5 +155,20 @@ describe('PreferencesOverlay', () => {
     expect(onReset).toHaveBeenCalledTimes(1);
     expect(onSortThresholdChange).not.toHaveBeenCalled();
     expect(onWatchConfigChange).not.toHaveBeenCalled();
+  });
+
+  it('hides ignore path syntax help until the info button is clicked', () => {
+    render(<PreferencesOverlay {...baseProps} onWatchConfigChange={vi.fn()} />);
+
+    expect(screen.queryByText('ignorePaths.helpIntro')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'ignorePaths.showInfo' }));
+
+    expect(screen.getByRole('button', { name: 'ignorePaths.hideInfo' })).toBeInTheDocument();
+    expect(screen.getByText('ignorePaths.helpIntro')).toBeInTheDocument();
+    expect(screen.getByText('ignorePaths.helpComment')).toBeInTheDocument();
+    expect(screen.getByText('ignorePaths.helpSingleStar')).toBeInTheDocument();
+    expect(screen.getByText('ignorePaths.helpDoubleStar')).toBeInTheDocument();
+    expect(screen.getByText('ignorePaths.helpAnchoring')).toBeInTheDocument();
   });
 });

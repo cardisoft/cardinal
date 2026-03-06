@@ -18,13 +18,13 @@ describe('useIgnorePaths', () => {
     vi.restoreAllMocks();
   });
 
-  it('hydrates from stored values and filters invalid entries', async () => {
+  it('hydrates from stored values and preserves blank entries', async () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify([' /tmp ', '', 42, '   ', '/var']));
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
 
     const { result } = renderHook(() => useIgnorePaths());
 
-    expect(result.current.ignorePaths).toEqual(['/tmp', '/var']);
+    expect(result.current.ignorePaths).toEqual([' /tmp ', '', '   ', '/var']);
 
     await flushEffects();
 
@@ -46,26 +46,80 @@ describe('useIgnorePaths', () => {
     );
   });
 
-  it('includes CloudStorage in default ignore paths', () => {
+  it('ships grouped defaults with section comments and blank separators', () => {
     const { result } = renderHook(() => useIgnorePaths());
+    const defaults = result.current.defaultIgnorePaths;
 
-    expect(result.current.defaultIgnorePaths).toContain('~/Library/CloudStorage');
+    expect(defaults[0]).toBe('# System volumes and large bundled trees.');
+    expect(defaults).toContain('');
+    expect(defaults).toContain('# Developer tools and generated build outputs.');
+    expect(defaults).toContain('# Dependencies and package manager stores.');
+    expect(defaults).toContain('# Caches and runtime storage.');
+    expect(defaults).toContain('# App-specific local data.');
+    expect(defaults).toContain('# Common metadata and disposable directories.');
+    expect(defaults).toContain('# Database internals.');
+    expect(defaults).toContain('**/node_modules/');
+    expect(defaults).toContain('**/.pnpm/');
+    expect(defaults).toContain('**/.bun/install/cache/');
+    expect(defaults).toContain('**/Library/Caches/');
+    expect(defaults).toContain('**/.cache/');
+    expect(defaults).toContain('**/Library/Application Support/*/Partitions/*/Cache/');
+    expect(defaults).toContain('**/Library/Application Support/*/Cache/');
+    expect(defaults).toContain('~/Library/Application Support/Cursor/User/History/');
+    expect(defaults).toContain('~/Library/Application Support/Code*/User/History/');
+    expect(defaults).toContain('~/Library/pnpm/store');
+    expect(defaults).toContain('**/Library/pnpm/store/');
+    expect(defaults).toContain('**/target/');
+    expect(defaults).toContain('**/Code Cache/');
+    expect(defaults).toContain('**/Service Worker/CacheStorage/');
+    expect(defaults).toContain('**/IndexedDB/');
+    expect(defaults).toContain('**/WebStorage/');
+    expect(defaults).toContain('**/.next/');
+    expect(defaults).toContain('**/.git/');
+    expect(defaults).toContain('**/.gitignore');
+    expect(defaults).toContain('**/.lock');
+    expect(defaults).toContain('**/.bower.json');
+    expect(defaults).toContain('**/.github');
+    expect(defaults).toContain('**/__pycache__/');
+    expect(defaults).toContain('**/.cocoapods/');
+    expect(defaults).toContain('**/.opam/');
+    expect(defaults).toContain('**/*.pyc');
+    expect(defaults).toContain('**/*.db-shm');
+    expect(defaults).toContain('**/.DS_Store');
+    expect(defaults).toContain('**/bower_components/');
+    expect(defaults).toContain('~/.rustup/toolchains/');
+    expect(defaults).toContain('~/.cursor/extensions/');
+    expect(defaults).toContain('~/.nuget/packages/');
+    expect(defaults).toContain('**/Google/Chrome*/**/GPUCache/');
+    expect(defaults).toContain('**/Vivaldi*/**/GPUCache/');
+    expect(defaults).toContain('**/Google/Chrome*/**/Local Storage/leveldb/');
+    expect(defaults).toContain('**/Vivaldi*/**/Local Storage/leveldb/');
+    expect(defaults).toContain('/System/Volumes/');
+    expect(defaults).toContain('/System/iOSSupport/System/Library/');
+    expect(defaults).toContain('/Library/Apple/System/Library/PrivateFrameworks/');
+    expect(defaults).toContain('/Library/Application Support/Apple/BezelServices/');
+    expect(defaults).toContain('~/Library/CloudStorage');
+    expect(defaults).toContain('~/Library/Containers/');
+    expect(defaults).toContain('~/Library/Group Containers/');
+    expect(defaults).toContain('~/.codex-profiles/*/tmp/');
+    expect(defaults).toContain('~/Library/Biome');
+    expect(defaults).toContain('~/Library/DuetExpertCenter');
   });
 
-  it('keeps an empty stored array without writing defaults', async () => {
+  it('keeps a whitespace-only stored array without writing defaults', async () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(['', '   ']));
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
 
     const { result } = renderHook(() => useIgnorePaths());
 
-    expect(result.current.ignorePaths).toEqual([]);
+    expect(result.current.ignorePaths).toEqual(['', '   ']);
 
     await flushEffects();
 
     expect(setItemSpy).not.toHaveBeenCalled();
   });
 
-  it('cleans and persists updates', async () => {
+  it('preserves pattern text including blank entries and persists updates', async () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
 
@@ -77,8 +131,11 @@ describe('useIgnorePaths', () => {
       result.current.setIgnorePaths([' /tmp ', '', '/var', '   ']);
     });
 
-    expect(result.current.ignorePaths).toEqual(['/tmp', '/var']);
-    expect(setItemSpy).toHaveBeenCalledWith(STORAGE_KEY, JSON.stringify(['/tmp', '/var']));
+    expect(result.current.ignorePaths).toEqual([' /tmp ', '', '/var', '   ']);
+    expect(setItemSpy).toHaveBeenCalledWith(
+      STORAGE_KEY,
+      JSON.stringify([' /tmp ', '', '/var', '   ']),
+    );
   });
 
   it('falls back to defaults when stored JSON is invalid', async () => {

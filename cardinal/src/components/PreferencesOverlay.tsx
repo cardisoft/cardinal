@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getWatchRootValidation, isPathInputValid } from '../utils/watchRoot';
+import { getWatchRootValidation } from '../utils/watchRoot';
 import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSwitcher from './LanguageSwitcher';
 
@@ -41,6 +41,7 @@ export function PreferencesOverlay({
   const [thresholdInput, setThresholdInput] = useState<string>(() => sortThreshold.toString());
   const [watchRootInput, setWatchRootInput] = useState<string>(() => watchRoot);
   const [ignorePathsInput, setIgnorePathsInput] = useState<string>(() => ignorePaths.join('\n'));
+  const [isIgnorePathsHelpOpen, setIsIgnorePathsHelpOpen] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -105,14 +106,7 @@ export function PreferencesOverlay({
     }
   };
 
-  const parsedIgnorePaths = ignorePathsInput
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  const ignorePathsErrorMessage = (() => {
-    const invalid = parsedIgnorePaths.find((line) => !isPathInputValid(line));
-    return invalid ? t('ignorePaths.errors.absolute') : null;
-  })();
+  const parsedIgnorePaths = ignorePathsInput.split(/\r?\n/);
 
   const handleIgnorePathsKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key === 'Escape') {
@@ -120,8 +114,12 @@ export function PreferencesOverlay({
     }
   };
 
+  const handleResetIgnorePaths = (): void => {
+    setIgnorePathsInput(defaultIgnorePaths.join('\n'));
+  };
+
   const handleSave = (): void => {
-    if (watchRootErrorMessage || ignorePathsErrorMessage) {
+    if (watchRootErrorMessage) {
       return;
     }
     commitThreshold();
@@ -148,6 +146,11 @@ export function PreferencesOverlay({
       onClose();
     }
   };
+  const resetIgnorePathsLabel = `${t('preferences.reset')} ${t('ignorePaths.label')}`;
+  const ignorePathsHelpPanelId = 'preferences-ignore-paths-help';
+  const ignorePathsHelpToggleLabel = isIgnorePathsHelpOpen
+    ? t('ignorePaths.hideInfo')
+    : t('ignorePaths.showInfo');
 
   return (
     <div
@@ -229,13 +232,51 @@ export function PreferencesOverlay({
               ) : null}
             </div>
           </div>
-          <div className="preferences-row">
+          <div className="preferences-row preferences-row--stacked">
             <div className="preferences-row__details">
-              <p className="preferences-label" title={t('ignorePaths.help')}>
-                {t('ignorePaths.label')}
-              </p>
+              <div className="preferences-row__details--inline">
+                <p className="preferences-label">
+                  <span>{t('ignorePaths.label')}</span>
+                </p>
+                <button
+                  className="preferences-ignore-info"
+                  type="button"
+                  aria-label={ignorePathsHelpToggleLabel}
+                  aria-expanded={isIgnorePathsHelpOpen}
+                  aria-controls={ignorePathsHelpPanelId}
+                  title={ignorePathsHelpToggleLabel}
+                  onClick={() => setIsIgnorePathsHelpOpen((openState) => !openState)}
+                >
+                  i
+                </button>
+                <button
+                  className="preferences-ignore-reset"
+                  type="button"
+                  aria-label={resetIgnorePathsLabel}
+                  title={resetIgnorePathsLabel}
+                  onClick={handleResetIgnorePaths}
+                >
+                  <span aria-hidden="true">↺</span>
+                </button>
+              </div>
+              {isIgnorePathsHelpOpen ? (
+                <div
+                  id={ignorePathsHelpPanelId}
+                  className="preferences-help-panel"
+                  role="note"
+                  aria-label={t('ignorePaths.infoTitle')}
+                >
+                  <p className="preferences-help-text">{t('ignorePaths.helpIntro')}</p>
+                  <ul className="preferences-help-list">
+                    <li className="preferences-help-text">{t('ignorePaths.helpComment')}</li>
+                    <li className="preferences-help-text">{t('ignorePaths.helpSingleStar')}</li>
+                    <li className="preferences-help-text">{t('ignorePaths.helpDoubleStar')}</li>
+                    <li className="preferences-help-text">{t('ignorePaths.helpAnchoring')}</li>
+                  </ul>
+                </div>
+              ) : null}
             </div>
-            <div className="preferences-control">
+            <div className="preferences-control preferences-control--stack preferences-control--full-width">
               <textarea
                 className="preferences-field preferences-textarea"
                 value={ignorePathsInput}
@@ -245,15 +286,6 @@ export function PreferencesOverlay({
                 autoComplete="off"
                 spellCheck={false}
               />
-              {ignorePathsErrorMessage ? (
-                <p
-                  className="permission-status permission-status--error preferences-field-error"
-                  role="status"
-                  aria-live="polite"
-                >
-                  {ignorePathsErrorMessage}
-                </p>
-              ) : null}
             </div>
           </div>
         </div>
@@ -262,7 +294,7 @@ export function PreferencesOverlay({
             className="preferences-save"
             type="button"
             onClick={handleSave}
-            disabled={Boolean(watchRootErrorMessage || ignorePathsErrorMessage)}
+            disabled={Boolean(watchRootErrorMessage)}
           >
             {t('preferences.save')}
           </button>

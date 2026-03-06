@@ -2,13 +2,119 @@ import { useCallback } from 'react';
 import { useStoredState } from './useStoredState';
 
 const STORAGE_KEY = 'cardinal.ignorePaths';
-// Cloud provider stubs under CloudStorage may issue network I/O on first directory traversal.
-// Ignore this path by default to avoid blocking during initial indexing.
-// e.g. OneDrive
-const DEFAULT_IGNORE_PATHS = ['/Volumes', '~/Library/CloudStorage'];
+const DEFAULT_IGNORE_PATHS = [
+  '# System volumes and large bundled trees.',
+  '/Volumes/',
+  '/Applications/',
+  '/cores/',
+  '/dev/',
+  '/private/',
+  '/System/iOSSupport/System/Library/',
+  '/System/Library/',
+  '/System/Volumes/',
+  '/usr/share/',
+  '/xarts/',
+  '/Library/Apple/System/Library/PrivateFrameworks/',
+  '/Library/Application Support/Apple/BezelServices/',
+  '/System/Applications/**/Contents/Resources/',
+  '',
+  '# Developer tools and generated build outputs.',
+  '/Library/Developer/CoreSimulator/Volumes/',
+  '/Library/Developer/CommandLineTools/',
+  '/opt/homebrew/Cellar/',
+  '/opt/homebrew/share/',
+  '~/Library/Developer/CoreSimulator/Devices/',
+  '~/.rustup/toolchains/',
+  '~/.cursor/extensions/',
+  '~/.nuget/packages/',
+  '**/Library/Developer/Xcode/DerivedData/',
+  '**/target/',
+  '**/.next/',
+  '**/Xcode.app/',
+  '',
+  '# Dependencies and package manager stores.',
+  '**/node_modules/',
+  '**/.pnpm/',
+  '~/Library/pnpm/store',
+  '**/Library/pnpm/store/',
+  '**/.bun/install/cache/',
+  '**/.npm/_cacache/',
+  '**/.gradle/caches/',
+  '**/.cargo/registry/',
+  '',
+  '# Caches and runtime storage.',
+  '**/Library/Caches/',
+  '**/Library/Application Support/*/Partitions/*/Cache/',
+  '**/Library/Application Support/*/Cache/',
+  '**/Code Cache/',
+  '**/Service Worker/CacheStorage/',
+  '**/IndexedDB/',
+  '**/WebStorage/',
+  '~/Library/Application Support/Cursor/User/History/',
+  '~/Library/Application Support/Code*/User/History/',
+  '**/Chromium/**/GPUCache/',
+  '**/Google/Chrome*/**/GPUCache/',
+  '**/BraveSoftware/Brave-Browser*/**/GPUCache/',
+  '**/Microsoft Edge*/**/GPUCache/',
+  '**/Arc/**/GPUCache/',
+  '**/Vivaldi*/**/GPUCache/',
+  '**/Chromium/**/Local Storage/leveldb/',
+  '**/Google/Chrome*/**/Local Storage/leveldb/',
+  '**/BraveSoftware/Brave-Browser*/**/Local Storage/leveldb/',
+  '**/Microsoft Edge*/**/Local Storage/leveldb/',
+  '**/Arc/**/Local Storage/leveldb/',
+  '**/Vivaldi*/**/Local Storage/leveldb/',
+  '**/Firefox/Profiles/**/sessionstore-backups/',
+  '**/Firefox/Profiles/**/storage/default/',
+  '**/Firefox/Profiles/**/storage/permanent/',
+  '**/Spotify/Users/',
+  '**/*.com.google.Chrome',
+  '**/webappsstore.sqlite-wal',
+  '',
+  '# App-specific local data.',
+  '~/Library/CloudStorage',
+  '~/Library/Containers/',
+  '~/Library/Group Containers/',
+  '~/.codex-profiles/*/tmp/',
+  '**/.local/share/',
+  '**/.local/fsindex*',
+  '**/com.docker.docker/Data/',
+  '**/IconJar*/Backups/',
+  '**/Sublime Text */Index/',
+  '**/io.tailscale.ipn.macos/',
+  '**/wharf/',
+  '~/Library/Biome',
+  '~/Library/DuetExpertCenter',
+  '',
+  '# Common metadata and disposable directories.',
+  '**/.cache/',
+  '**/.git/',
+  '**/.gitignore',
+  '**/.lock',
+  '**/.bower.json',
+  '**/.github',
+  '**/__pycache__/',
+  '**/.cocoapods/',
+  '**/.opam/',
+  '**/Cache/',
+  '**/Caches/',
+  '**/Index.noindex/',
+  '**/TextIndex/',
+  '**/.stversions/',
+  '**/*.db-shm',
+  '**/*.pyc',
+  '**/.dat.nosync*',
+  '**/.DS_Store',
+  '**/bower_components/',
+  '',
+  '# Database internals.',
+  '**/var/postgres/base/',
+  '**/var/postgres/pg_stat_tmp/',
+  '**/var/postgres/pg_wal/',
+];
 
-const cleanPaths = (next: string[]): string[] =>
-  next.map((item) => item.trim()).filter((item) => item.length > 0);
+const keepStringEntries = (next: unknown[]): string[] =>
+  next.filter((item): item is string => typeof item === 'string');
 
 export function useIgnorePaths() {
   const [ignorePaths, setIgnorePathsState] = useStoredState<string[]>({
@@ -17,7 +123,7 @@ export function useIgnorePaths() {
     read: (raw) => {
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return null;
-      return cleanPaths(parsed.filter((item): item is string => typeof item === 'string'));
+      return keepStringEntries(parsed);
     },
     write: (value) => JSON.stringify(value),
     readErrorMessage: 'Unable to read saved ignore paths',
@@ -26,8 +132,7 @@ export function useIgnorePaths() {
 
   const setIgnorePaths = useCallback(
     (next: string[]) => {
-      const cleaned = cleanPaths(next);
-      setIgnorePathsState(cleaned);
+      setIgnorePathsState(next);
     },
     [setIgnorePathsState],
   );

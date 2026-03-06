@@ -9,6 +9,8 @@ serde_repr = "0.1.0"
 rayon = "1"
 memchr = "2.7.4"
 enumn = "0.1.14"
+ignore = "0.4"
+tracing = "0.1"
 
 [dev-dependencies]
 tempdir = "0.3"

@@ -14,10 +14,12 @@ use background::{
 use cardinal_sdk::EventWatcher;
 use commands::{
     NodeInfoRequest, SearchJob, SearchState, WatchConfigUpdate, activate_main_window,
-    close_quicklook, copy_files_to_clipboard, get_app_status, get_nodes_info, get_sorted_view,
-    hide_main_window, normalize_watch_config, open_in_finder, open_path, search,
+    append_listed_files_tsv_chunk, close_quicklook, copy_files_to_clipboard, get_app_status,
+    get_nodes_info, get_sorted_view, hide_main_window, normalize_watch_config, open_in_finder,
+    open_path, prompt_save_listed_files_tsv, remove_listed_files_tsv, search,
     set_tray_activation_policy, set_watch_config, start_logic, toggle_main_window,
     toggle_quicklook, trigger_rescan, update_icon_viewport, update_quicklook,
+    write_listed_files_tsv,
 };
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, bounded, unbounded};
 use lifecycle::{
@@ -38,7 +40,7 @@ use window_controls::{activate_window, hide_window};
 
 static DB_PATH: OnceCell<PathBuf> = OnceCell::new();
 pub(crate) static LOGIC_START: OnceCell<Sender<LogicStartConfig>> = OnceCell::new();
-pub(crate) const DEFAULT_SYSTEM_IGNORE_PATH: &str = "/System/Volumes/Data";
+pub(crate) const DEFAULT_SYSTEM_IGNORE_PATH: &str = "/System/Volumes/";
 const FSE_LATENCY_SECS: f64 = 0.1;
 
 #[derive(Debug, Clone)]
@@ -132,6 +134,10 @@ pub fn run() -> Result<()> {
             set_watch_config,
             open_in_finder,
             open_path,
+            prompt_save_listed_files_tsv,
+            write_listed_files_tsv,
+            append_listed_files_tsv_chunk,
+            remove_listed_files_tsv,
             toggle_quicklook,
             close_quicklook,
             update_quicklook,

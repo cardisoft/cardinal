@@ -88,10 +88,11 @@ fn test_globstar_dedup_nested_bar_paths() {
 #[test]
 fn test_globstar_dedup_trailing_expansion() {
     let tmp = TempDir::new("query_globstar_trailing").unwrap();
-    fs::create_dir_all(tmp.path().join("a/a")).unwrap();
-    fs::write(tmp.path().join("a/file.txt"), b"x").unwrap();
-    fs::write(tmp.path().join("a/a/file.txt"), b"x").unwrap();
-    let mut cache = SearchCache::walk_fs(tmp.path());
+    let search_root = tmp.path().join("root");
+    fs::create_dir_all(search_root.join("a/a")).unwrap();
+    fs::write(search_root.join("a/file.txt"), b"x").unwrap();
+    fs::write(search_root.join("a/a/file.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(&search_root);
 
     let hits = cache.search("a/**").unwrap();
     let mut rel_paths = hits
@@ -100,7 +101,7 @@ fn test_globstar_dedup_trailing_expansion() {
             cache
                 .node_path(*i)
                 .unwrap()
-                .strip_prefix(tmp.path())
+                .strip_prefix(&search_root)
                 .unwrap()
                 .to_path_buf()
         })
@@ -646,12 +647,12 @@ fn test_trailing_globstar_performance_many_files() {
 
     // Create many nested files
     for i in 0..50 {
-        fs::write(tmp.path().join(format!("large/file{:03}.txt", i)), b"x").unwrap();
+        fs::write(tmp.path().join(format!("large/file{i:03}.txt")), b"x").unwrap();
     }
     fs::create_dir_all(tmp.path().join("large/subdir")).unwrap();
     for i in 0..50 {
         fs::write(
-            tmp.path().join(format!("large/subdir/file{:03}.txt", i)),
+            tmp.path().join(format!("large/subdir/file{i:03}.txt")),
             b"x",
         )
         .unwrap();
@@ -666,8 +667,7 @@ fn test_trailing_globstar_performance_many_files() {
     assert!(hits.len() >= 101, "should find all descendants");
     assert!(
         duration.as_millis() < 100,
-        "should complete quickly: {:?}",
-        duration
+        "should complete quickly: {duration:?}"
     );
 }
 

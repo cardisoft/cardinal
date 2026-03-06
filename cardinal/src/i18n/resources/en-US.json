@@ -62,6 +62,7 @@
       "status": "Application status: {{status}}",
       "tablist": "Search status view",
       "rescan": "Trigger filesystem rescan",
+      "exportListedFiles": "Export current files list",
       "settings": "Open preferences"
     },
     "rescan": {
@@ -162,9 +163,16 @@
   },
   "ignorePaths": {
     "label": "Ignore paths",
-    "help": "One path per line; ignored paths are skipped during indexing.",
-    "errors": {
-      "absolute": "Each path must start with '/' or '~'."
-    }
+    "showInfo": "Show info",
+    "hideInfo": "Hide info",
+    "infoTitle": "Ignore path syntax help",
+    "helpIntro": "One .gitignore-style pattern per line.",
+    "helpComment": "Use '#' for a single-line comment, or place '/*' and '*/' on their own lines to comment out a block while testing patterns.",
+    "helpSingleStar": "Use '*' inside one path segment to match characters except '/': '*.log' matches log files in the current folder. [good performance]",
+    "helpDoubleStar": "Use '**' to match across directories: '**/node_modules/' matches that folder anywhere below the monitored root. [broader match]",
+    "helpAnchoring": "Use a leading '/' to anchor a pattern to the monitored root. Without it, the pattern can match anywhere. [best performance]"
+  },
+  "exportListedFiles": {
+    "failed": "Failed to export current files list. Please try again."
   }
 }

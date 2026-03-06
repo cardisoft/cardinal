@@ -9,6 +9,8 @@
 - [UI Dataflow](ui-dataflow.md)
 - [FS Events SDK](fs-events-sdk.md)
 - [FSWalk](fswalk.md)
+- [Ignore Patterns](ignore-patterns.md)
+- [Ignore Requirements Implemented](ignore-requirements-implemented.md)
 - [FS Icon](fs-icon.md)
 - [Search Cancellation](search-cancellation.md)
 - [NamePool](name-pool.md)

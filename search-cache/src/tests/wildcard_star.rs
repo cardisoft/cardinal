@@ -474,7 +474,7 @@ fn star_performance_many_siblings() {
     fs::create_dir_all(tmp.path().join("large")).unwrap();
 
     for i in 0..100 {
-        fs::write(tmp.path().join(format!("large/file{:03}.txt", i)), b"x").unwrap();
+        fs::write(tmp.path().join(format!("large/file{i:03}.txt")), b"x").unwrap();
     }
 
     let mut cache = SearchCache::walk_fs(tmp.path());
@@ -486,8 +486,7 @@ fn star_performance_many_siblings() {
     // Should complete in reasonable time (< 100ms for 100 files)
     assert!(
         duration.as_millis() < 100,
-        "star search took too long: {:?}",
-        duration
+        "star search took too long: {duration:?}"
     );
 }
 

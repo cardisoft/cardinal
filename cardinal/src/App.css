@@ -1528,7 +1528,7 @@ button:active:not(:disabled) {
 
 .preferences-card {
   width: 100%;
-  max-width: 480px;
+  max-width: 580px;
   max-height: calc(100vh - 96px);
   background: var(--color-elevated-bg, var(--color-bg));
   color: var(--color-text);
@@ -1555,11 +1555,13 @@ button:active:not(:disabled) {
   display: flex;
   flex-direction: column;
   flex: 1;
-  overflow-y: scroll;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 6px;
+  padding-right: 0px;
   min-height: 0;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
   scrollbar-width: auto;
 }
 
@@ -1656,7 +1658,7 @@ button:active:not(:disabled) {
 .preferences-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: 16px;
   padding: 5px 0;
 }
@@ -1667,12 +1669,64 @@ button:active:not(:disabled) {
   white-space: nowrap;
 }
 
+.preferences-help-text {
+  margin-top: 4px;
+  width: 100%;
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.preferences-help-panel {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-elevated-border, var(--color-border));
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.preferences-help-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.preferences-help-list .preferences-help-text {
+  margin-top: 6px;
+}
+
 .preferences-row__details {
   min-width: 0;
 }
 
+.preferences-row--stacked {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.preferences-row__details--inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preferences-row__details--inline .preferences-label {
+  margin: 0;
+}
+
 .preferences-control {
   text-align: right;
+}
+
+.preferences-control--full-width {
+  width: 100%;
+}
+
+.preferences-control--stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .preferences-field {
@@ -1700,16 +1754,70 @@ button:active:not(:disabled) {
 }
 
 .preferences-textarea {
-  width: 240px;
-  min-height: 88px;
+  width: 100%;
+  min-height: 230px;
   padding: 8px 10px;
-  font-size: 0.9rem;
+  font-size: 1rem;
   line-height: 1.4;
   resize: vertical;
 }
 
 .preferences-field-error {
   margin-bottom: 0;
+}
+
+.preferences-ignore-reset {
+  border: 1px solid var(--color-elevated-border, var(--color-border));
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 4px 6px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.preferences-ignore-reset:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  background: rgba(var(--color-accent-rgb), 0.08);
+}
+
+.preferences-ignore-reset:focus-visible {
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.35);
+  outline-offset: 2px;
+}
+
+.preferences-ignore-info {
+  border: 1px solid var(--color-elevated-border, var(--color-border));
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.preferences-ignore-info:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  background: rgba(var(--color-accent-rgb), 0.08);
+}
+
+.preferences-ignore-info:focus-visible {
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.35);
+  outline-offset: 2px;
 }
 
 .preferences-field:focus {
