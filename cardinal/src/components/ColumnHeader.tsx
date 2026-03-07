@@ -3,6 +3,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import type { ColumnKey } from '../constants';
 import type { SortKey, SortState } from '../types/sort';
 import { useTranslation } from 'react-i18next';
+import { getTooltipAttributes } from '../utils/tooltip';
 
 const columns: Array<{ key: ColumnKey; labelKey: string; className: string }> = [
   { key: 'filename', labelKey: 'columns.filename', className: 'filename-text' },
@@ -59,17 +60,20 @@ export const ColumnHeader = forwardRef<HTMLDivElement, ColumnHeaderProps>(
               indicatorClasses.push('sort-indicator--active');
             }
 
-            const title = sortDisabled ? sortDisabledTooltip || undefined : undefined;
+            const tooltipContent = sortDisabled ? sortDisabledTooltip : null;
 
             return (
-              <span key={key} className={`${className} header header-cell`}>
+              <span
+                key={key}
+                className={`${className} header header-cell`}
+                {...getTooltipAttributes(tooltipContent)}
+              >
                 <button
                   type="button"
                   className="sort-button"
                   onClick={() => onSortToggle(sortKey)}
                   disabled={sortDisabled}
                   aria-pressed={isActive && !sortDisabled}
-                  title={title}
                 >
                   <span className="sort-button__label">{label}</span>
                   <span className={indicatorClasses.join(' ')} aria-hidden="true" />

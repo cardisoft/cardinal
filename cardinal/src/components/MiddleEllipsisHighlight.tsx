@@ -159,7 +159,6 @@ export function MiddleEllipsisHighlight({
     const maxChars = Math.floor(containerWidth / CHAR_WIDTH) - 1;
     return applyMiddleEllipsis(highlightedParts, maxChars);
   }, [highlightedParts, containerWidth]);
-
   // Prefer a ResizeObserver so truncation reacts quickly to layout shifts.
   useEffect(() => {
     const el = containerRef.current;

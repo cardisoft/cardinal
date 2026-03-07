@@ -6,6 +6,144 @@
     },
     "options": {
       "caseSensitive": "Toggle case-sensitive matching"
+    },
+    "help": {
+      "open": "Show search help",
+      "close": "Close search help",
+      "openDocs": "Open Full Docs on GitHub",
+      "title": "Search & Filter Guide",
+      "headerLine": "Quick syntax reference for the files search box.",
+      "subtitle": "Cardinal can match file paths, folder paths, filenames, folder names, and file contents using plain terms, quoted phrases, wildcards, operators, and filters.",
+      "examplesTitle": "Examples",
+      "examplesDescription": "Each example shows one syntax feature. Click any example to add it to the files search box",
+      "exampleDescriptions": {
+        "plainWord": "A space means AND, so this matches file paths or folder paths containing both test and report",
+        "quotedPhrase": "Matches file paths or folder paths containing the exact phrase Application Support, including the space",
+        "extensionWildcard": "Matches files whose filename ends with .sqlite",
+        "extensionFilter": "Matches files whose filename extension is pdf",
+        "typeFilter": "Matches files in the picture category",
+        "typeMacro": "Matches files in the audio category using the audio: shortcut",
+        "globstarPath": "Matches files named Cargo.toml anywhere under a src folder tree",
+        "todayModified": "Matches files or folders modified today",
+        "sizeRange": "Matches files whose size is between 1 MB and 10 MB",
+        "regex": "Uses a regular expression to match a file or folder name segment named README.md exactly",
+        "content": "Matches files whose contents contain the word TODO",
+        "parentScope": "Matches only direct children of /Users/demo/Documents",
+        "inScope": "Matches any descendant under /Users/demo/Projects",
+        "noSubfoldersScope": "Matches the folder itself plus direct file children under /Users/demo/Projects, without descending into nested subfolders"
+      },
+      "guideTitle": "How the syntax works",
+      "files": {
+        "title": "Files tab syntax",
+        "description": "Use the main search box to match file paths, folder paths, filenames, folder names, and file contents with flexible syntax.",
+        "fullPath": "Plain search terms are checked against the full indexed file path or folder path, not just the filename.",
+        "words": "A plain word like report matches any file path or folder path containing that text.",
+        "phrases": "A quoted phrase like \"Application Support\" matches file paths or folder paths containing that exact text, including spaces.",
+        "wildcards": "In file and folder path matching, '*' matches zero or more characters, '?' matches exactly one character, and '**' crosses folder levels when used between slashes.",
+        "globstar": "'**' crosses folder levels in file or folder paths when used as its own path segment, like src/**/Cargo.toml.",
+        "literalWildcards": "Quote a token like \"*.rs\" if you want the literal characters '*' or '?' matched in a file path or folder path.",
+        "pathSegments": "Use '/' inside a term to match file or folder path segments, prefixes, suffixes, or exact folder names.",
+        "segmentAnchors": "In file or folder path matching, /foo is a segment prefix, foo/ is a segment suffix, and /foo/ matches an exact folder name.",
+        "implicitAnd": "A space means both terms must appear somewhere in the matched file path or folder path.",
+        "orOperator": "Use OR or '|' when either term can appear in the matched file path or folder path.",
+        "notOperator": "Use NOT or a leading '!' to exclude files or folders whose path matches that term.",
+        "grouping": "Use parentheses '(...)' or angle brackets '<...>' to group file or folder path conditions and filters together.",
+        "precedence": "When you combine file or folder path conditions, NOT is applied first, OR next, and AND last.",
+        "caseSensitivity": "The Aa toggle changes case-sensitive matching for file and folder path text, content: text, and regex: patterns.",
+        "expandOnTilde": "The '~' character expands to your home folder."
+      },
+      "filters": {
+        "title": "Common filters",
+        "description": "These are some of the most useful filters you can combine with normal search terms.",
+        "fileFolder": "file: keeps only file results, and folder: keeps only folder results.",
+        "extensions": "ext: matches files by filename extension, like ext:jpg;png.",
+        "types": "type: matches files whose extension belongs to a category like picture, code, or archive.",
+        "typeMacros": "audio:, video:, doc:, and exe: are shortcuts for common type: categories, and each can take an optional argument.",
+        "dates": "dm: and dc: filter modified and created timestamps using keywords, absolute dates, ranges, or comparisons.",
+        "size": "size: filters by file size using comparisons, ranges, or keywords like tiny and empty.",
+        "scope": "parent:, in:/infolder:, and nosubfolders: restrict results under an absolute folder path.",
+        "regexContent": "regex: matches a regular expression against a file or folder name segment, and content: matches text inside file contents."
+      },
+      "groups": {
+        "matching": {
+          "title": "Matching text"
+        },
+        "patterns": {
+          "title": "Patterns and wildcards"
+        },
+        "logic": {
+          "title": "Boolean logic"
+        },
+        "filters": {
+          "title": "Structured filters"
+        }
+      }
+    },
+    "filterBar": {
+      "ariaLabel": "Search filters",
+      "toggle": {
+        "show": "Show filters",
+        "hide": "Hide filters"
+      },
+      "scope": {
+        "in": "In Folder",
+        "parent": "Parent Folder",
+        "noSubfolders": "No Subfolders"
+      },
+      "tooltips": {
+        "kind": "Choose whether results should be files only or folders only",
+        "type": "Insert a type: filter such as picture, audio, code, or archive",
+        "extension": "Merge selected file extensions into one ext: filter, like ext:pdf;md",
+        "date": "Insert a modified/created date filter such as dm:thisweek or dc:today",
+        "size": "Insert a size: filter such as size:huge or size:1mb..10mb",
+        "regexExample": "Append a sample regex filter: regex:^README\\.md$",
+        "scope": {
+          "in": "Pick a folder and search anywhere under that folder",
+          "parent": "Pick a folder and limit results to its direct child files and folders"
+        }
+      },
+      "kind": {
+        "label": "Kind",
+        "files": "Files",
+        "folders": "Folders"
+      },
+      "type": {
+        "label": "Type",
+        "picture": "Picture",
+        "video": "Video",
+        "audio": "Audio",
+        "document": "Document",
+        "presentation": "Presentation",
+        "spreadsheet": "Spreadsheet",
+        "pdf": "PDF",
+        "archive": "Archive",
+        "code": "Code",
+        "executable": "Executable"
+      },
+      "extension": {
+        "label": "Extension"
+      },
+      "date": {
+        "label": "Date",
+        "modifiedToday": "Modified Today",
+        "modifiedThisWeek": "Modified This Week",
+        "modifiedLastMonth": "Modified Last Month",
+        "createdToday": "Created Today",
+        "createdThisWeek": "Created This Week",
+        "createdLastMonth": "Created Last Month"
+      },
+      "size": {
+        "label": "Size",
+        "empty": "Empty",
+        "tiny": "Tiny",
+        "small": "Small",
+        "medium": "Medium",
+        "large": "Large",
+        "huge": "Huge",
+        "rangeOneToTenMb": "1 MB to 10 MB",
+        "overHundredMb": "Over 100 MB"
+      },
+      "regexExample": "Regex"
     }
   },
   "stateDisplay": {

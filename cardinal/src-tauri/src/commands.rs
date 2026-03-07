@@ -13,10 +13,14 @@ use base64::{Engine as _, engine::general_purpose};
 use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
 use crossbeam_channel::{Receiver, Sender, bounded};
 use objc2::{
+    MainThreadMarker,
     rc::{Retained, autoreleasepool},
     runtime::ProtocolObject,
 };
-use objc2_app_kit::{NSPasteboard, NSPasteboardItem, NSPasteboardTypeString, NSPasteboardWriting};
+use objc2_app_kit::{
+    NSModalResponse, NSModalResponseOK, NSOpenPanel, NSPasteboard, NSPasteboardItem,
+    NSPasteboardTypeString, NSPasteboardWriting,
+};
 use objc2_foundation::{NSArray, NSString, NSURL};
 use parking_lot::Mutex;
 use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, SlabNodeMetadata};
@@ -472,6 +476,44 @@ pub async fn copy_files_to_clipboard(paths: Vec<String>) {
     if let Err(err) = copy_files_to_clipboard_impl(paths) {
         error!("Failed to copy files to clipboard: {err:?}");
     }
+}
+
+#[tauri::command]
+pub async fn pick_folder(app: AppHandle) -> Result<Option<String>, String> {
+    let (response_tx, response_rx) = bounded::<Option<String>>(1);
+    if let Err(err) = app.run_on_main_thread(move || {
+        autoreleasepool(|_| {
+            let Some(mtm) = MainThreadMarker::new() else {
+                let _ = response_tx.send(None);
+                return;
+            };
+
+            let panel = NSOpenPanel::openPanel(mtm);
+            panel.setCanChooseDirectories(true);
+            panel.setCanChooseFiles(false);
+            panel.setAllowsMultipleSelection(false);
+
+            let response: NSModalResponse = panel.runModal();
+            let selected_path = if response == NSModalResponseOK {
+                panel
+                    .URLs()
+                    .firstObject()
+                    .and_then(|url| url.path())
+                    .map(|path| path.to_string())
+            } else {
+                None
+            };
+
+            let _ = response_tx.send(selected_path);
+        });
+    }) {
+        error!("Failed to dispatch folder picker: {err:?}");
+        return Err(format!("Failed to open folder picker: {err:?}"));
+    }
+
+    response_rx
+        .recv()
+        .map_err(|err| format!("Failed to receive folder picker response: {err:?}"))
 }
 
 fn copy_files_to_clipboard_impl(paths: Vec<String>) -> Result<()> {

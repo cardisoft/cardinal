@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ChangeEvent, FocusEventHandler } from 'react';
+import { getTooltipAttributes } from '../utils/tooltip';
 
 type SearchBarProps = {
   inputRef: React.Ref<HTMLInputElement>;
@@ -10,8 +11,11 @@ type SearchBarProps = {
   caseSensitive: boolean;
   onToggleCaseSensitive: (event: ChangeEvent<HTMLInputElement>) => void;
   caseSensitiveLabel: string;
+  filtersToggleLabel?: string;
+  onToggleFilters?: () => void;
   onFocus: FocusEventHandler<HTMLInputElement>;
   onBlur: FocusEventHandler<HTMLInputElement>;
+  filtersBar?: React.ReactNode;
 };
 
 export function SearchBar({
@@ -23,8 +27,11 @@ export function SearchBar({
   caseSensitive,
   onToggleCaseSensitive,
   caseSensitiveLabel,
+  filtersToggleLabel,
+  onToggleFilters,
   onFocus,
   onBlur,
+  filtersBar,
 }: SearchBarProps): React.JSX.Element {
   return (
     <div className="search-container">
@@ -44,7 +51,7 @@ export function SearchBar({
           onBlur={onBlur}
         />
         <div className="search-options">
-          <label className="search-option" title={caseSensitiveLabel}>
+          <label className="search-option" {...getTooltipAttributes(caseSensitiveLabel)}>
             <input
               type="checkbox"
               checked={caseSensitive}
@@ -56,8 +63,20 @@ export function SearchBar({
             </span>
             <span className="sr-only">{caseSensitiveLabel}</span>
           </label>
+          {filtersToggleLabel && onToggleFilters ? (
+            <button
+              className="search-filter-toggle"
+              type="button"
+              aria-label={filtersToggleLabel}
+              {...getTooltipAttributes(filtersToggleLabel)}
+              onClick={onToggleFilters}
+            >
+              Filters
+            </button>
+          ) : null}
         </div>
       </div>
+      {filtersBar}
     </div>
   );
 }

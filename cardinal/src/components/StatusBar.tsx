@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import type { AppLifecycleStatus } from '../types/ipc';
 import { useTranslation } from 'react-i18next';
 import { openPreferences } from '../utils/openPreferences';
+import { getTooltipAttributes } from '../utils/tooltip';
 
 export type StatusTabKey = 'files' | 'events';
 
@@ -112,7 +113,7 @@ const StatusBar = ({
           <span
             className={`readiness-indicator ${lifecycleMeta.tone}`}
             aria-label={indicatorLabel}
-            title={indicatorLabel}
+            {...getTooltipAttributes(indicatorLabel)}
           >
             {lifecycleMeta.icon}
           </span>
@@ -149,47 +150,52 @@ const StatusBar = ({
           })}
         </div>
         <div className="status-controls">
-          <button
-            type="button"
-            className="status-icon-button status-rescan-button"
-            onClick={onRequestRescan}
-            disabled={rescanDisabled}
-            title={rescanTooltip}
-            aria-label={t('statusBar.aria.rescan')}
-          >
-            <span className="status-rescan-icon" aria-hidden="true">
-              ↻
-            </span>
-            <span className="sr-only">{t('statusBar.aria.rescan')}</span>
-          </button>
-          <button
-            type="button"
-            className="status-icon-button status-settings-button"
-            onClick={handleOpenPreferences}
-            title={t('statusBar.aria.settings')}
-            aria-label={t('statusBar.aria.settings')}
-          >
-            <svg
-              className="status-icon-svg"
-              viewBox="0 0 24 24"
-              role="img"
-              aria-hidden="true"
-              focusable="false"
+          <span className="status-icon-button-anchor" {...getTooltipAttributes(rescanTooltip)}>
+            <button
+              type="button"
+              className="status-icon-button status-rescan-button"
+              onClick={onRequestRescan}
+              disabled={rescanDisabled}
+              aria-label={t('statusBar.aria.rescan')}
             >
-              <path
-                fill="currentColor"
-                d="M19.14 12.936c.036-.304.06-.612.06-.936s-.024-.632-.07-.936l2.03-1.578a.5.5 0 0 0 .12-.642l-1.922-3.323a.5.5 0 0 0-.605-.216l-2.39.96a7.02 7.02 0 0 0-1.62-.936l-.36-2.54a.5.5 0 0 0-.496-.425h-3.844a.5.5 0 0 0-.497.425l-.36 2.54a7.02 7.02 0 0 0-1.62.936l-2.39-.96a.5.5 0 0 0-.605.216L2.74 8.844a.5.5 0 0 0 .12.642l2.03 1.578a7.994 7.994 0 0 0 0 1.872l-2.03 1.578a.5.5 0 0 0-.12.642l1.922 3.323a.5.5 0 0 0 .605.216l2.39-.96c.5.383 1.043.699 1.62.936l.36 2.54a.5.5 0 0 0 .497.425h3.844a.5.5 0 0 0 .496-.425l.36-2.54a7.02 7.02 0 0 0 1.62-.936l2.39.96a.5.5 0 0 0 .605-.216l1.922-3.323a.5.5 0 0 0-.12-.642l-2.03-1.578ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"
-              />
-            </svg>
-            <span className="sr-only">{t('statusBar.aria.settings')}</span>
-          </button>
+              <span className="status-rescan-icon" aria-hidden="true">
+                ↻
+              </span>
+              <span className="sr-only">{t('statusBar.aria.rescan')}</span>
+            </button>
+          </span>
+          <span
+            className="status-icon-button-anchor"
+            {...getTooltipAttributes(t('statusBar.aria.settings'))}
+          >
+            <button
+              type="button"
+              className="status-icon-button status-settings-button"
+              onClick={handleOpenPreferences}
+              aria-label={t('statusBar.aria.settings')}
+            >
+              <svg
+                className="status-icon-svg"
+                viewBox="0 0 24 24"
+                role="img"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  fill="currentColor"
+                  d="M19.14 12.936c.036-.304.06-.612.06-.936s-.024-.632-.07-.936l2.03-1.578a.5.5 0 0 0 .12-.642l-1.922-3.323a.5.5 0 0 0-.605-.216l-2.39.96a7.02 7.02 0 0 0-1.62-.936l-.36-2.54a.5.5 0 0 0-.496-.425h-3.844a.5.5 0 0 0-.497.425l-.36 2.54a7.02 7.02 0 0 0-1.62.936l-2.39-.96a.5.5 0 0 0-.605.216L2.74 8.844a.5.5 0 0 0 .12.642l2.03 1.578a7.994 7.994 0 0 0 0 1.872l-2.03 1.578a.5.5 0 0 0-.12.642l1.922 3.323a.5.5 0 0 0 .605.216l2.39-.96c.5.383 1.043.699 1.62.936l.36 2.54a.5.5 0 0 0 .497.425h3.844a.5.5 0 0 0 .496-.425l.36-2.54a7.02 7.02 0 0 0 1.62-.936l2.39.96a.5.5 0 0 0 .605-.216l1.922-3.323a.5.5 0 0 0-.12-.642l-2.03-1.578ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"
+                />
+              </svg>
+              <span className="sr-only">{t('statusBar.aria.settings')}</span>
+            </button>
+          </span>
         </div>
       </div>
 
       <div className="status-right">
         <div className="status-section">
           <span className="status-label">{t('statusBar.searchLabel')}</span>
-          <span className="status-value" title={t('statusBar.resultsTitle')}>
+          <span className="status-value" {...getTooltipAttributes(t('statusBar.resultsTitle'))}>
             {searchDisplay}
           </span>
         </div>

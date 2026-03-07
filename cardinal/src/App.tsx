@@ -1,11 +1,14 @@
-import { useRef, useCallback, useEffect, useMemo } from 'react';
+import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import './App.css';
 import { FileRow } from './components/FileRow';
+import { AppTooltip } from './components/AppTooltip';
 import { SearchBar } from './components/SearchBar';
+import { SearchFiltersBar, type SearchFiltersBarAction } from './components/SearchFiltersBar';
 import { FilesTabContent } from './components/FilesTabContent';
 import { PermissionOverlay } from './components/PermissionOverlay';
 import PreferencesOverlay from './components/PreferencesOverlay';
+import { SearchHelpOverlay } from './components/SearchHelpOverlay';
 import StatusBar from './components/StatusBar';
 import type { SearchResultItem } from './types/search';
 import { useColumnResize } from './hooks/useColumnResize';
@@ -30,6 +33,9 @@ import { useAppPreferences } from './hooks/useAppPreferences';
 import { useAppWindowListeners } from './hooks/useAppWindowListeners';
 import { useFilesTabEffects } from './hooks/useFilesTabEffects';
 import { useFilesTabState } from './hooks/useFilesTabState';
+import { applySearchToolbarQueryAction } from './utils/searchToolbarQuery';
+
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function App() {
   const {
@@ -83,6 +89,7 @@ function App() {
 
   const {
     activeTab,
+    setActiveTab,
     isSearchFocused,
     handleSearchFocus,
     handleSearchBlur,
@@ -102,6 +109,8 @@ function App() {
     isActive: activeTab === 'events',
     eventFilterQuery,
   });
+  const [isSearchHelpOpen, setIsSearchHelpOpen] = useState(false);
+  const [areSearchFiltersVisible, setAreSearchFiltersVisible] = useState(true);
 
   // Centralized selection management for the virtualized files list.
   // Provides memoized helpers for click/keyboard selection and keeps Quick Look hooks fed.
@@ -326,13 +335,71 @@ function App() {
     t('app.fullDiskAccess.steps.three'),
   ];
   const openSettingsLabel = t('app.fullDiskAccess.openSettings');
+  const searchHelpLabel = t('search.help.open');
+  const searchFiltersToggleLabel = areSearchFiltersVisible
+    ? t('search.filterBar.toggle.hide')
+    : t('search.filterBar.toggle.show');
   const resultsContainerClassName = `results-container${
     isSearchFocused ? ' results-container--search-focused' : ''
   }`;
+  const getLiveSearchQuery = useCallback(
+    () => searchInputRef.current?.value ?? searchInputValue,
+    [searchInputValue],
+  );
+  const handleApplySearchExample = useCallback(
+    (example: string) => {
+      const baseQuery = getLiveSearchQuery();
+      const examplePattern = new RegExp(`(^|\\s+)${escapeRegExp(example)}(?=\\s+|$)`, 'g');
+      const dedupedQuery = baseQuery.replace(examplePattern, ' ').replace(/\s+/g, ' ').trimEnd();
+      const nextQuery = `${dedupedQuery} ${example}`;
+
+      setActiveTab('files');
+      submitFilesQuery(nextQuery, { immediate: true });
+
+      requestAnimationFrame(() => {
+        const input = searchInputRef.current;
+        if (!input) {
+          return;
+        }
+
+        input.focus();
+        input.setSelectionRange(nextQuery.length, nextQuery.length);
+      });
+    },
+    [getLiveSearchQuery, setActiveTab, submitFilesQuery],
+  );
+  const focusSearchInputAtEnd = useCallback((nextQuery: string) => {
+    requestAnimationFrame(() => {
+      const input = searchInputRef.current;
+      if (!input) {
+        return;
+      }
+
+      input.focus();
+      input.setSelectionRange(nextQuery.length, nextQuery.length);
+    });
+  }, []);
+  const handleApplySearchFilter = useCallback(
+    (action: SearchFiltersBarAction) => {
+      const baseQuery = getLiveSearchQuery();
+      const nextQuery = applySearchToolbarQueryAction(baseQuery, action);
+      if (nextQuery === baseQuery) {
+        focusSearchInputAtEnd(nextQuery);
+        return;
+      }
+
+      submitFilesQuery(nextQuery, { immediate: true });
+      focusSearchInputAtEnd(nextQuery);
+    },
+    [focusSearchInputAtEnd, getLiveSearchQuery, submitFilesQuery],
+  );
 
   return (
     <>
-      <main className="container" aria-hidden={showFullDiskAccessOverlay || isPreferencesOpen}>
+      <main
+        className="container"
+        aria-hidden={showFullDiskAccessOverlay || isPreferencesOpen || isSearchHelpOpen}
+      >
         <SearchBar
           inputRef={searchInputRef}
           placeholder={searchPlaceholder}
@@ -342,8 +409,23 @@ function App() {
           caseSensitive={caseSensitive}
           onToggleCaseSensitive={onToggleCaseSensitive}
           caseSensitiveLabel={caseSensitiveLabel}
+          filtersToggleLabel={activeTab === 'files' ? searchFiltersToggleLabel : undefined}
+          onToggleFilters={
+            activeTab === 'files'
+              ? () => setAreSearchFiltersVisible((currentValue) => !currentValue)
+              : undefined
+          }
           onFocus={handleSearchFocus}
           onBlur={handleSearchBlur}
+          filtersBar={
+            activeTab === 'files' && areSearchFiltersVisible ? (
+              <SearchFiltersBar
+                onApplyAction={handleApplySearchFilter}
+                onOpenHelp={() => setIsSearchHelpOpen(true)}
+                helpButtonLabel={searchHelpLabel}
+              />
+            ) : undefined
+          }
         />
         <div className={resultsContainerClassName} style={containerStyle}>
           {activeTab === 'events' ? (
@@ -409,6 +491,11 @@ function App() {
         onReset={handleResetPreferences}
         themeResetToken={preferencesResetToken}
       />
+      <SearchHelpOverlay
+        open={isSearchHelpOpen}
+        onClose={() => setIsSearchHelpOpen(false)}
+        onApplyExample={handleApplySearchExample}
+      />
       {showFullDiskAccessOverlay && (
         <PermissionOverlay
           title={t('app.fullDiskAccess.title')}
@@ -420,6 +507,7 @@ function App() {
           actionLabel={openSettingsLabel}
         />
       )}
+      <AppTooltip />
     </>
   );
 }

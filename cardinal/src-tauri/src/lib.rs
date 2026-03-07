@@ -15,7 +15,7 @@ use cardinal_sdk::EventWatcher;
 use commands::{
     NodeInfoRequest, SearchJob, SearchState, WatchConfigUpdate, activate_main_window,
     close_quicklook, copy_files_to_clipboard, get_app_status, get_nodes_info, get_sorted_view,
-    hide_main_window, normalize_watch_config, open_in_finder, open_path, search,
+    hide_main_window, normalize_watch_config, open_in_finder, open_path, pick_folder, search,
     set_tray_activation_policy, set_watch_config, start_logic, toggle_main_window,
     toggle_quicklook, trigger_rescan, update_icon_viewport, update_quicklook,
 };
@@ -141,6 +141,7 @@ pub fn run() -> Result<()> {
             toggle_main_window,
             set_tray_activation_policy,
             copy_files_to_clipboard,
+            pick_folder,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

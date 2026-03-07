@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getWatchRootValidation, isPathInputValid } from '../utils/watchRoot';
+import { getTooltipAttributes } from '../utils/tooltip';
 import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSwitcher from './LanguageSwitcher';
 
@@ -203,7 +204,7 @@ export function PreferencesOverlay({
           </div>
           <div className="preferences-row">
             <div className="preferences-row__details">
-              <p className="preferences-label" title={t('watchRoot.help')}>
+              <p className="preferences-label" {...getTooltipAttributes(t('watchRoot.help'))}>
                 {t('watchRoot.label')}
               </p>
             </div>
@@ -231,7 +232,7 @@ export function PreferencesOverlay({
           </div>
           <div className="preferences-row">
             <div className="preferences-row__details">
-              <p className="preferences-label" title={t('ignorePaths.help')}>
+              <p className="preferences-label" {...getTooltipAttributes(t('ignorePaths.help'))}>
                 {t('ignorePaths.label')}
               </p>
             </div>
