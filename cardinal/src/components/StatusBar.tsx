@@ -150,10 +150,7 @@ const StatusBar = ({
           })}
         </div>
         <div className="status-controls">
-          <span
-            className="status-icon-button-anchor"
-            {...getTooltipAttributes(rescanTooltip)}
-          >
+          <span className="status-icon-button-anchor" {...getTooltipAttributes(rescanTooltip)}>
             <button
               type="button"
               className="status-icon-button status-rescan-button"
@@ -198,10 +195,7 @@ const StatusBar = ({
       <div className="status-right">
         <div className="status-section">
           <span className="status-label">{t('statusBar.searchLabel')}</span>
-          <span
-            className="status-value"
-            {...getTooltipAttributes(t('statusBar.resultsTitle'))}
-          >
+          <span className="status-value" {...getTooltipAttributes(t('statusBar.resultsTitle'))}>
             {searchDisplay}
           </span>
         </div>

@@ -1,8 +1,6 @@
 export const APP_TOOLTIP_ID = 'cardinal-app-tooltip';
 
-export const getTooltipAttributes = (
-  content?: string | null,
-): Record<string, string> => {
+export const getTooltipAttributes = (content?: string | null): Record<string, string> => {
   if (!content) {
     return {};
   }

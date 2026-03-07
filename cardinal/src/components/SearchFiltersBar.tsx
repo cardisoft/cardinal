@@ -142,10 +142,7 @@ export const SearchFiltersBar = ({
   );
 
   const handleReplaceSelection = useCallback(
-    (
-      event: React.ChangeEvent<HTMLSelectElement>,
-      family: 'kind' | 'type' | 'date' | 'size',
-    ) => {
+    (event: React.ChangeEvent<HTMLSelectElement>, family: 'kind' | 'type' | 'date' | 'size') => {
       const selectedToken = event.target.value;
       event.target.value = '';
       if (!selectedToken) {
@@ -246,9 +243,7 @@ export const SearchFiltersBar = ({
           className="search-filter-button search-filter-button--example"
           type="button"
           {...getTooltipAttributes(regexTooltip)}
-          onClick={() =>
-            onApplyAction({ kind: 'append-token', token: 'regex:^README\\.md$' })
-          }
+          onClick={() => onApplyAction({ kind: 'append-token', token: 'regex:^README\\.md$' })}
         >
           {t('search.filterBar.regexExample')}
         </button>

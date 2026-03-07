@@ -350,10 +350,7 @@ function App() {
     (example: string) => {
       const baseQuery = getLiveSearchQuery();
       const examplePattern = new RegExp(`(^|\\s+)${escapeRegExp(example)}(?=\\s+|$)`, 'g');
-      const dedupedQuery = baseQuery
-        .replace(examplePattern, ' ')
-        .replace(/\s+/g, ' ')
-        .trimEnd();
+      const dedupedQuery = baseQuery.replace(examplePattern, ' ').replace(/\s+/g, ' ').trimEnd();
       const nextQuery = `${dedupedQuery} ${example}`;
 
       setActiveTab('files');

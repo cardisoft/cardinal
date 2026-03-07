@@ -29,11 +29,7 @@ export const applySearchToolbarQueryAction = (
   }
 };
 
-const replaceFamilyToken = (
-  query: string,
-  family: ToolbarReplaceFamily,
-  token: string,
-): string => {
+const replaceFamilyToken = (query: string, family: ToolbarReplaceFamily, token: string): string => {
   const prefixes = FAMILY_PREFIXES[family];
   const tokens = splitTopLevelTokens(query);
 
