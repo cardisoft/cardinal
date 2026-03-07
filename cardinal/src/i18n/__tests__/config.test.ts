@@ -137,14 +137,14 @@ describe('i18n locale normalization', () => {
   });
 
   it('detects initial language in SSR environment (window undefined)', () => {
-    const originalWindow = global.window;
+    const originalWindow = globalThis.window;
 
     // @ts-expect-error - testing SSR scenario
-    delete global.window;
+    delete globalThis.window;
 
     expect(__test__.detectInitialLanguage()).toBe('en-US');
 
-    global.window = originalWindow;
+    globalThis.window = originalWindow;
   });
 });
 
