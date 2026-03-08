@@ -71,7 +71,8 @@ export const useRemoteSort = (
     0,
   );
 
-  const canSort = results.length > 0 && results.length <= sortThreshold;
+  const isWithinSortThreshold = results.length <= sortThreshold;
+  const canSort = results.length > 0 && isWithinSortThreshold;
   const shouldUseSortedResults = Boolean(sortState && canSort);
   const displayedResults = shouldUseSortedResults ? sortedResults : results;
 
@@ -100,10 +101,10 @@ export const useRemoteSort = (
   );
 
   useEffect(() => {
-    if (!canSort && sortState) {
+    if (!isWithinSortThreshold && sortState) {
       setSortState(null);
     }
-  }, [canSort, sortState]);
+  }, [isWithinSortThreshold, sortState]);
 
   useEffect(() => {
     const requestId = sortRequestRef.current + 1;
@@ -143,7 +144,7 @@ export const useRemoteSort = (
     () => new Intl.NumberFormat(locale).format(sortThreshold),
     [locale, sortThreshold],
   );
-  const sortDisabledTooltip = canSort ? null : formatDisabledTooltip(sortLimitLabel);
+  const sortDisabledTooltip = isWithinSortThreshold ? null : formatDisabledTooltip(sortLimitLabel);
   const sortButtonsDisabled = !canSort || isSorting;
 
   return {
