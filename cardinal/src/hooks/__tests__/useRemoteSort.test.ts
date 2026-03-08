@@ -109,6 +109,77 @@ describe('useRemoteSort', () => {
     expect(result.current.displayedResults).toEqual(results);
   });
 
+  it('preserves current sort state when result count stays within threshold (including empty results)', async () => {
+    const initial = toSlabIndices([0, 1, 2]);
+
+    const { result, rerender } = renderHook(
+      ({ items, version }: { items: SlabIndex[]; version: number }) =>
+        useRemoteSort(items, version, 'en-US', () => null),
+      {
+        initialProps: {
+          items: initial,
+          version: 1,
+        },
+      },
+    );
+
+    act(() => {
+      result.current.handleSortToggle('filename');
+    });
+
+    await waitFor(() => {
+      expect(result.current.sortState).toEqual({ key: 'filename', direction: 'asc' });
+    });
+
+    act(() => {
+      rerender({
+        items: [],
+        version: 2,
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.sortState).toEqual({ key: 'filename', direction: 'asc' });
+    });
+    expect(result.current.displayedResults).toEqual([]);
+  });
+
+  it('clears current sort state when result count exceeds threshold', async () => {
+    window.localStorage.setItem('cardinal.sortThreshold', '2');
+    const initial = toSlabIndices([0, 1]);
+    const overLimit = toSlabIndices([0, 1, 2]);
+
+    const { result, rerender } = renderHook(
+      ({ items, version }: { items: SlabIndex[]; version: number }) =>
+        useRemoteSort(items, version, 'en-US', () => null),
+      {
+        initialProps: {
+          items: initial,
+          version: 1,
+        },
+      },
+    );
+
+    act(() => {
+      result.current.handleSortToggle('filename');
+    });
+
+    await waitFor(() => {
+      expect(result.current.sortState).toEqual({ key: 'filename', direction: 'asc' });
+    });
+
+    act(() => {
+      rerender({
+        items: overLimit,
+        version: 2,
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.sortState).toBeNull();
+    });
+  });
+
   it('bumps displayedResultsVersion when switching sorted projection on then off', async () => {
     const results = toSlabIndices([0, 1, 2]);
     const { result } = renderHook(() => useRemoteSort(results, 1, 'en-US', () => null));
