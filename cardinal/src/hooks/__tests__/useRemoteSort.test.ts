@@ -144,6 +144,23 @@ describe('useRemoteSort', () => {
     expect(result.current.displayedResults).toEqual([]);
   });
 
+  it('allows toggling sort state for empty results without remote sorting', async () => {
+    const empty: SlabIndex[] = [];
+    const { result } = renderHook(() => useRemoteSort(empty, 1, 'en-US', () => null));
+
+    expect(result.current.sortButtonsDisabled).toBe(false);
+
+    act(() => {
+      result.current.handleSortToggle('filename');
+    });
+
+    await waitFor(() => {
+      expect(result.current.sortState).toEqual({ key: 'filename', direction: 'asc' });
+    });
+    expect(result.current.displayedResults).toEqual(empty);
+    expect(mockedInvoke).not.toHaveBeenCalled();
+  });
+
   it('clears current sort state when result count exceeds threshold', async () => {
     window.localStorage.setItem('cardinal.sortThreshold', '2');
     const initial = toSlabIndices([0, 1]);
