@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.22 — 2026-03-08
+- Add `~/Library/CloudStorage` to default ignored paths to avoid initial indexing delays
+- Make index building cancellable
+- Fix unexpected indexing of files in ignored directories
+- Fix stale selection affecting context menu targets
+- Fix lost sort state and incorrect tooltip when search results are empty
+- Speed up scanning/search by removing redundant index-map and ignore-path checks
+
 ## 0.1.21 — 2026-01-23
 - Add shortcut `cmd+shift+c` for copy-paths
 - Allow partial-quoted queries: `"Application Support"/**`
