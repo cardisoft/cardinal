@@ -193,12 +193,14 @@ fn star_vs_globstar_difference() {
     fs::write(tmp.path().join("a/b/c/file.txt"), b"x").unwrap();
     let mut cache = SearchCache::walk_fs(tmp.path());
 
-    // a/*/file.txt should only match one level deep
-    let star_hits = cache.search("a/*/file.txt").unwrap();
+    // /a/*/file.txt anchors at root `a` and should only match one level deep.
+    // Without leading slash, the first segment is a suffix match and can flake
+    // if TempDir's randomized root name happens to end with `a`.
+    let star_hits = cache.search("/a/*/file.txt").unwrap();
     assert_eq!(star_hits.len(), 1, "single star should match one level");
 
-    // a/**/file.txt should match all levels
-    let globstar_hits = cache.search("a/**/file.txt").unwrap();
+    // /a/**/file.txt should match all levels under root `a`.
+    let globstar_hits = cache.search("/a/**/file.txt").unwrap();
     assert_eq!(globstar_hits.len(), 3, "globstar should match all levels");
 }
 
