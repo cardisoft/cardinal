@@ -74,11 +74,12 @@ paths (&[&str]) + since_event_id + latency
 ### Spawning a watcher
 
 ```rust
-let (dev, watcher) = EventWatcher::spawn(path, since_event_id, latency);
+let (dev, watcher) = EventWatcher::spawn(path, since_event_id, latency, ignore_paths);
 ```
 
 - Creates a bounded cancellation channel and an unbounded events channel.
-- Builds an `EventStream` with a callback that sends event batches into the `sender`.
+- Builds an `EventStream` with a callback that filters out events under `ignore_paths`
+  before sending the remaining batch into the `sender`.
 - Spawns a thread that:
   - Calls `stream.spawn()` to start the FSEvent stream attached to a dispatch queue.
   - Blocks on the cancellation receiver, keeping the stream active until dropped.

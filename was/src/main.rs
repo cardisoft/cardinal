@@ -19,7 +19,8 @@ fn main() {
             .to_string_lossy()
             .to_string()
     });
-    let (dev, event_stream) = EventWatcher::spawn(path, cli.since, 0.1);
+    let (dev, event_stream) =
+        EventWatcher::spawn(path, cli.since, 0.1, Vec::new().into_boxed_slice());
     let cache = &mut std::collections::HashMap::new();
     let mut history_done = false;
     let timezone = chrono::Local::now().timezone();

@@ -159,6 +159,7 @@ fn handle_watch_config_update(
             watch_root.to_string(),
             cache.last_event_id(),
             fse_latency_secs,
+            cache.ignore_paths(),
         )
         .1
     };
@@ -491,6 +492,7 @@ fn perform_rescan(
             watch_root.to_string(),
             cache.last_event_id(),
             fse_latency_secs,
+            cache.ignore_paths(),
         )
         .1
     };
