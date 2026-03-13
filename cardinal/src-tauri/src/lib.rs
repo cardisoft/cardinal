@@ -284,6 +284,7 @@ fn run_logic_thread(
             watch_root.to_string(),
             cache.last_event_id(),
             FSE_LATENCY_SECS,
+            cache.ignore_paths(),
         )
         .1
     };

@@ -63,8 +63,8 @@ impl std::fmt::Debug for SearchCache {
 }
 
 impl SearchCache {
-    pub fn ignore_paths(&self) -> &Vec<PathBuf> {
-        self.file_nodes.ignore_paths()
+    pub fn ignore_paths(&self) -> Box<[PathBuf]> {
+        self.file_nodes.ignore_paths().clone().into_boxed_slice()
     }
 
     /// The `path` is the root path of the constructed cache and fsevent watch path.

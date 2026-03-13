@@ -46,8 +46,12 @@ fn main() -> Result<()> {
     let (search_result_tx, search_result_rx) = unbounded::<Result<Vec<SearchResultNode>>>();
 
     std::thread::spawn(move || {
-        let (dev, mut event_watcher) =
-            EventWatcher::spawn("/".to_string(), cache.last_event_id(), 0.1);
+        let (dev, mut event_watcher) = EventWatcher::spawn(
+            "/".to_string(),
+            cache.last_event_id(),
+            0.1,
+            cache.ignore_paths(),
+        );
         println!("Processing changes of dev:{dev} during preparation.");
         loop {
             crossbeam_channel::select! {
@@ -80,7 +84,13 @@ fn main() -> Result<()> {
                             CancellationToken::new_scan(),
                         );
                         let _ = cache.rescan_with_walk_data(&walk_data);
-                        event_watcher = EventWatcher::spawn("/".to_string(), cache.last_event_id(), 0.1).1;
+                        event_watcher = EventWatcher::spawn(
+                            "/".to_string(),
+                            cache.last_event_id(),
+                            0.1,
+                            cache.ignore_paths(),
+                        )
+                        .1;
                     }
                 }
             }

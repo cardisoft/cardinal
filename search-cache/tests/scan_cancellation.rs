@@ -51,7 +51,7 @@ fn noop_cache_preserves_ignore_paths() {
     let cache = SearchCache::noop(PathBuf::from("/some/path"), ignore.clone(), &NEVER_STOPPED);
     assert_eq!(
         cache.ignore_paths(),
-        &ignore,
+        ignore.into_boxed_slice(),
         "noop() should store the supplied ignore paths unchanged"
     );
 }
