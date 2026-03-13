@@ -46,10 +46,11 @@ describe('useIgnorePaths', () => {
     );
   });
 
-  it('includes CloudStorage in default ignore paths', () => {
+  it('includes CloudStorage and Caches in default ignore paths', () => {
     const { result } = renderHook(() => useIgnorePaths());
 
     expect(result.current.defaultIgnorePaths).toContain('~/Library/CloudStorage');
+    expect(result.current.defaultIgnorePaths).toContain('~/Library/Caches');
   });
 
   it('keeps an empty stored array without writing defaults', async () => {
