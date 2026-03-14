@@ -799,10 +799,12 @@ fn path_query_with_dot_segments_and_files() {
 fn unicode_path_segments_case_insensitive() {
     let temp_dir = TempDir::new("unicode_path_segments_case_insensitive").unwrap();
     let root = temp_dir.path();
-    fs::create_dir_all(root.join("Café/文件")).unwrap();
-    fs::File::create(root.join("Café/文件/notes.txt")).unwrap();
-    fs::create_dir_all(root.join("CAFÉ/文件")).unwrap();
-    fs::File::create(root.join("CAFÉ/文件/notes.txt")).unwrap();
+    let decomposed = "Cafe\u{0301}";
+    let decomposed_upper = "CAFE\u{0301}";
+    fs::create_dir_all(root.join(decomposed).join("文件")).unwrap();
+    fs::File::create(root.join(decomposed).join("文件/notes.txt")).unwrap();
+    fs::create_dir_all(root.join(decomposed_upper).join("文件")).unwrap();
+    fs::File::create(root.join(decomposed_upper).join("文件/notes.txt")).unwrap();
 
     let mut cache = SearchCache::walk_fs(root);
     let opts = SearchOptions {
@@ -816,8 +818,170 @@ fn unicode_path_segments_case_insensitive() {
     let names = normalize(&mut cache, &indices);
     // Both case variants should be matched.
     assert!(
-        names.iter().any(|n| n.ends_with("Café/文件/notes.txt"))
-            || names.iter().any(|n| n.ends_with("CAFÉ/文件/notes.txt"))
+        names
+            .iter()
+            .any(|n| n.ends_with(&format!("{decomposed}/文件/notes.txt")))
+            || names
+                .iter()
+                .any(|n| n.ends_with(&format!("{decomposed_upper}/文件/notes.txt")))
+    );
+}
+
+#[test]
+fn unicode_normalization_equivalent_forms_should_match() {
+    let temp_dir = TempDir::new("unicode_normalization_equivalent_forms_should_match").unwrap();
+    let root = temp_dir.path();
+
+    let composed = "B\u{00FC}ro";
+    let decomposed = "Bu\u{0308}ro";
+    fs::create_dir_all(root.join(decomposed)).unwrap();
+    fs::File::create(root.join(decomposed).join("angebot.pdf")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let opts = SearchOptions {
+        case_insensitive: true,
+    };
+
+    // Filesystems may surface NFC or NFD names; query using the opposite form
+    // to verify canonical-equivalent matching behavior.
+    let all =
+        guard_indices(cache.search_with_options("angebot.pdf", opts, CancellationToken::noop()));
+    let paths = normalize(&mut cache, &all);
+    let stored = paths
+        .iter()
+        .find(|path| path.ends_with("angebot.pdf"))
+        .expect("fixture file should be indexed");
+    let query = if stored.contains(decomposed) {
+        composed
+    } else {
+        decomposed
+    };
+
+    let indices = guard_indices(cache.search_with_options(query, opts, CancellationToken::noop()));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names.iter().any(|n| n.ends_with(composed))
+            || names.iter().any(|n| n.ends_with(decomposed)),
+        "expected canonical-equivalent query form to match folder segment: query={query:?}, indexed={stored:?}, results={names:?}"
+    );
+}
+
+#[test]
+fn unicode_already_nfd_query_keeps_matching() {
+    let temp_dir = TempDir::new("unicode_already_nfd_query_keeps_matching").unwrap();
+    let root = temp_dir.path();
+    let decomposed = "Cafe\u{0301}";
+    fs::create_dir_all(root.join(decomposed)).unwrap();
+    fs::File::create(root.join(decomposed).join("guide.txt")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let query = format!("{decomposed}/guide.txt");
+    let indices = guard_indices(cache.search_with_options(
+        &query,
+        SearchOptions {
+            case_insensitive: false,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names
+            .iter()
+            .any(|n| n.ends_with(&format!("{decomposed}/guide.txt"))),
+        "already-NFD query should continue to match directly: results={names:?}"
+    );
+}
+
+#[test]
+fn unicode_noncanonical_combining_order_is_normalized() {
+    let temp_dir = TempDir::new("unicode_noncanonical_combining_order_is_normalized").unwrap();
+    let root = temp_dir.path();
+    let canonical_nfd = "a\u{0323}\u{0302}";
+    let noncanonical = "a\u{0302}\u{0323}";
+    fs::create_dir_all(root.join(canonical_nfd)).unwrap();
+    fs::File::create(root.join(canonical_nfd).join("probe.txt")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let query = format!("{noncanonical}/probe.txt");
+    let indices = guard_indices(cache.search_with_options(
+        &query,
+        SearchOptions {
+            case_insensitive: false,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names
+            .iter()
+            .any(|n| n.ends_with(&format!("{canonical_nfd}/probe.txt"))),
+        "query with non-canonical combining order should normalize to NFD and match: results={names:?}"
+    );
+}
+
+#[test]
+fn unicode_composed_query_with_wildcard_matches_decomposed_path() {
+    let temp_dir =
+        TempDir::new("unicode_composed_query_with_wildcard_matches_decomposed_path").unwrap();
+    let root = temp_dir.path();
+    let composed = "B\u{00FC}ro";
+    let decomposed = "Bu\u{0308}ro";
+    fs::create_dir_all(root.join(decomposed)).unwrap();
+    fs::File::create(root.join(decomposed).join("bericht.txt")).unwrap();
+    fs::File::create(root.join(decomposed).join("brot.txt")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let query = format!("{composed}/ber*.txt");
+    let indices = guard_indices(cache.search_with_options(
+        &query,
+        SearchOptions {
+            case_insensitive: true,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names
+            .iter()
+            .any(|n| n.ends_with(&format!("{decomposed}/bericht.txt"))),
+        "wildcard + composed query should match decomposed path: results={names:?}"
+    );
+    assert!(
+        !names
+            .iter()
+            .any(|n| n.ends_with(&format!("{decomposed}/brot.txt"))),
+        "wildcard segment should still filter unrelated filenames"
+    );
+}
+
+#[test]
+fn unicode_normalization_preserves_boolean_or_behavior() {
+    let temp_dir = TempDir::new("unicode_normalization_preserves_boolean_or_behavior").unwrap();
+    let root = temp_dir.path();
+    let composed = "B\u{00FC}ro";
+    let decomposed = "Bu\u{0308}ro";
+    let ascii_marker = "alpha_corner_marker_123";
+
+    fs::create_dir_all(root.join(decomposed)).unwrap();
+    fs::create_dir_all(root.join(ascii_marker)).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let query = format!("{composed} OR {ascii_marker}");
+    let indices = guard_indices(cache.search_with_options(
+        &query,
+        SearchOptions {
+            case_insensitive: true,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names.iter().any(|n| n.ends_with(decomposed)),
+        "OR query should still include normalized unicode branch: results={names:?}"
+    );
+    assert!(
+        names.iter().any(|n| n.ends_with(ascii_marker)),
+        "OR query should still include ascii branch: results={names:?}"
     );
 }
 
@@ -1171,4 +1335,334 @@ fn case_insensitive_file_exact_match_variants() {
     for n in &names {
         assert!(n.to_ascii_lowercase().ends_with("guide/readme.md"));
     }
+}
+
+/// A pure ASCII query is normalization-inert (`is_nfd_quick`/`is_nfc_quick`
+/// both return `Yes`), so no secondary normalization pass is needed.
+/// Verify this still produces correct matches.
+#[test]
+fn unicode_ascii_only_query_uses_fast_path_correctly() {
+    let temp_dir = TempDir::new("unicode_ascii_only_query_uses_fast_path_correctly").unwrap();
+    let root = temp_dir.path();
+    fs::create_dir_all(root.join("ascii_docs")).unwrap();
+    fs::File::create(root.join("ascii_docs/readme.txt")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let indices = guard_indices(cache.search_with_options(
+        "ascii_docs/readme.txt",
+        SearchOptions {
+            case_insensitive: false,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names.iter().any(|n| n.ends_with("ascii_docs/readme.txt")),
+        "plain ASCII query should still match normally: results={names:?}"
+    );
+}
+
+/// A trailing-slash query specifies a directory exactly. Pairing this with a
+/// composed (NFC) Unicode query that must be NFD-normalized verifies that the
+/// normalization pass does not disturb trailing-slash semantics.
+#[test]
+fn unicode_trailing_slash_nfc_query_matches_nfd_directory() {
+    let temp_dir = TempDir::new("unicode_trailing_slash_nfc_query_matches_nfd_directory").unwrap();
+    let root = temp_dir.path();
+    let decomposed = "Bu\u{0308}ro"; // NFD: Bu + combining diaeresis
+    fs::create_dir_all(root.join(decomposed).join("sub")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let query = "B\u{00FC}ro/"; // NFC ü + trailing slash
+    let indices = guard_indices(cache.search_with_options(
+        query,
+        SearchOptions {
+            case_insensitive: false,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names
+            .iter()
+            .any(|n| n.ends_with(decomposed) && !n.ends_with("sub")),
+        "trailing-slash NFC query should match NFD directory exactly: results={names:?}"
+    );
+}
+
+/// U+212B ANGSTROM SIGN has a two-step canonical decomposition:
+///   U+212B → U+00C5 (Å) → A + U+030A (combining ring above).
+/// Querying with the Angstrom sign should land on the same NFD form as a path
+/// segment stored with the fully decomposed A + U+030A sequence.
+#[test]
+fn unicode_angstrom_sign_query_matches_a_ring_decomposed_path() {
+    let temp_dir =
+        TempDir::new("unicode_angstrom_sign_query_matches_a_ring_decomposed_path").unwrap();
+    let root = temp_dir.path();
+    let nfd_a_ring = "data_A\u{030A}ngstrom"; // A + combining ring above (NFD Å)
+    fs::create_dir_all(root.join(nfd_a_ring)).unwrap();
+    fs::File::create(root.join(nfd_a_ring).join("spectrum.csv")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let query = "data_\u{212B}ngstrom/spectrum.csv"; // U+212B Angstrom sign
+    let indices = guard_indices(cache.search_with_options(
+        query,
+        SearchOptions {
+            case_insensitive: false,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names.iter().any(|n| n.ends_with("spectrum.csv")),
+        "ANGSTROM SIGN (U+212B) query should NFD-normalize and match A+U+030A path: results={names:?}"
+    );
+}
+
+/// Combining case-insensitive matching with NFC-to-NFD normalization:
+/// an uppercase NFC query (`B\u{00FC}ro`) should match a lowercase NFD path
+/// (`bu\u{0308}ro`) when `case_insensitive` is true.
+#[test]
+fn unicode_uppercase_nfc_query_matches_lowercase_nfd_dir_case_insensitive() {
+    let temp_dir =
+        TempDir::new("unicode_uppercase_nfc_query_matches_lowercase_nfd_dir_case_insensitive")
+            .unwrap();
+    let root = temp_dir.path();
+    let lower_nfd = "bu\u{0308}ro"; // lowercase NFD büro
+    fs::create_dir_all(root.join(lower_nfd)).unwrap();
+    fs::File::create(root.join(lower_nfd).join("rechnung.pdf")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let query = "B\u{00FC}ro/rechnung.pdf"; // uppercase NFC Büro
+    let indices = guard_indices(cache.search_with_options(
+        query,
+        SearchOptions {
+            case_insensitive: true,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names.iter().any(|n| n.ends_with("rechnung.pdf")),
+        "uppercase NFC query should match lowercase NFD path with case_insensitive=true: results={names:?}"
+    );
+}
+
+/// A wildcard pattern whose literal suffix contains a composed (NFC) character
+/// must still correctly match after the whole query string is NFD-normalized.
+/// `*\u{00FC}ro` → `*u\u{0308}ro` should match both `bu\u{0308}ro` and
+/// `ku\u{0308}ro` (any segment ending in `u\u{0308}ro`).
+#[test]
+fn unicode_nfc_wildcard_suffix_matches_nfd_paths() {
+    let temp_dir = TempDir::new("unicode_nfc_wildcard_suffix_matches_nfd_paths").unwrap();
+    let root = temp_dir.path();
+    let nfd_buro = "bu\u{0308}ro";
+    let nfd_kuro = "ku\u{0308}ro";
+    let unrelated = "turbo";
+    fs::create_dir_all(root.join(nfd_buro)).unwrap();
+    fs::File::create(root.join(nfd_buro).join("log.txt")).unwrap();
+    fs::create_dir_all(root.join(nfd_kuro)).unwrap();
+    fs::File::create(root.join(nfd_kuro).join("log.txt")).unwrap();
+    fs::create_dir_all(root.join(unrelated)).unwrap();
+    fs::File::create(root.join(unrelated).join("log.txt")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let query = "*\u{00FC}ro/log.txt"; // NFC *üro/log.txt
+    let indices = guard_indices(cache.search_with_options(
+        query,
+        SearchOptions {
+            case_insensitive: false,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names
+            .iter()
+            .any(|n| n.ends_with(&format!("{nfd_buro}/log.txt"))),
+        "NFC wildcard *üro should match NFD büro: results={names:?}"
+    );
+    assert!(
+        names
+            .iter()
+            .any(|n| n.ends_with(&format!("{nfd_kuro}/log.txt"))),
+        "NFC wildcard *üro should also match NFD küro: results={names:?}"
+    );
+    assert!(
+        !names
+            .iter()
+            .any(|n| n.ends_with(&format!("{unrelated}/log.txt"))),
+        "non-umlaut suffix should not match: results={names:?}"
+    );
+}
+
+/// An OR query whose both branches contain NFC characters must normalize each
+/// branch independently and match its respective NFD directory.
+#[test]
+fn unicode_nfc_or_query_matches_two_nfd_directories() {
+    let temp_dir = TempDir::new("unicode_nfc_or_query_matches_two_nfd_directories").unwrap();
+    let root = temp_dir.path();
+    let nfd_buro = "Bu\u{0308}ro";
+    let nfd_kuche = "Ku\u{0308}che";
+    let unrelated = "reports";
+    fs::create_dir_all(root.join(nfd_buro)).unwrap();
+    fs::create_dir_all(root.join(nfd_kuche)).unwrap();
+    fs::create_dir_all(root.join(unrelated)).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let query = "B\u{00FC}ro OR K\u{00FC}che"; // NFC: Büro OR Küche
+    let indices = guard_indices(cache.search_with_options(
+        query,
+        SearchOptions {
+            case_insensitive: false,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names.iter().any(|n| n.ends_with(nfd_buro)),
+        "NFC Büro branch should match NFD Bu\u{0308}ro: results={names:?}"
+    );
+    assert!(
+        names.iter().any(|n| n.ends_with(nfd_kuche)),
+        "NFC Küche branch should match NFD Ku\u{0308}che: results={names:?}"
+    );
+    assert!(
+        !names.iter().any(|n| n.ends_with(unrelated)),
+        "unrelated directory should not appear in OR results: results={names:?}"
+    );
+}
+
+/// A query spanning multiple NFD path segments verifies that normalization
+/// applies uniformly across the entire query string, not just the first
+/// occurrence of a non-ASCII character.
+#[test]
+fn unicode_nfc_multi_segment_deep_path_matches_nfd_filesystem() {
+    let temp_dir =
+        TempDir::new("unicode_nfc_multi_segment_deep_path_matches_nfd_filesystem").unwrap();
+    let root = temp_dir.path();
+    let nfd_buro = "Bu\u{0308}ro";
+    let nfd_kuche = "Ku\u{0308}che";
+    fs::create_dir_all(root.join(nfd_buro).join(nfd_kuche)).unwrap();
+    fs::File::create(root.join(nfd_buro).join(nfd_kuche).join("rezept.txt")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let query = "B\u{00FC}ro/K\u{00FC}che/rezept.txt"; // NFC: Büro/Küche/rezept.txt
+    let indices = guard_indices(cache.search_with_options(
+        query,
+        SearchOptions {
+            case_insensitive: false,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names.iter().any(|n| n.ends_with("rezept.txt")),
+        "multi-segment NFC path query should match NFD filesystem: results={names:?}"
+    );
+}
+
+/// A plain filename (no directory component) whose NFC form (`caf\u{00E9}.txt`)
+/// differs from its NFD storage form (`cafe\u{0301}.txt`) must still be found.
+#[test]
+fn unicode_nfc_composed_filename_matches_nfd_stored_filename() {
+    let temp_dir =
+        TempDir::new("unicode_nfc_composed_filename_matches_nfd_stored_filename").unwrap();
+    let root = temp_dir.path();
+    let nfd_name = "cafe\u{0301}.txt"; // NFD: e + combining acute
+    fs::File::create(root.join(nfd_name)).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let nfc_query = "caf\u{00E9}.txt"; // NFC: precomposed é
+    let indices = guard_indices(cache.search_with_options(
+        nfc_query,
+        SearchOptions {
+            case_insensitive: false,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names
+            .iter()
+            .any(|n| n.ends_with(nfd_name) || n.ends_with(nfc_query)),
+        "NFC filename query should match NFD-stored filename: results={names:?}"
+    );
+}
+
+/// Write path segments using composed (NFC) forms and search using the same
+/// NFC query. On APFS the stored form may surface as NFD; on other filesystems
+/// it may stay NFC. Either representation should be returned by search.
+#[test]
+fn unicode_write_nfc_then_search_nfc_exact_path() {
+    let temp_dir = TempDir::new("unicode_write_nfc_then_search_nfc_exact_path").unwrap();
+    let root = temp_dir.path();
+
+    let nfc_dir = "B\u{00FC}ro";
+    let nfc_file = "caf\u{00E9}.txt";
+    let nfd_dir = "Bu\u{0308}ro";
+    let nfd_file = "cafe\u{0301}.txt";
+
+    fs::create_dir_all(root.join(nfc_dir)).unwrap();
+    fs::File::create(root.join(nfc_dir).join(nfc_file)).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let query = format!("{nfc_dir}/{nfc_file}");
+    let indices = guard_indices(cache.search_with_options(
+        &query,
+        SearchOptions {
+            case_insensitive: false,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names
+            .iter()
+            .any(|n| n.ends_with(&format!("{nfc_dir}/{nfc_file}")))
+            || names
+                .iter()
+                .any(|n| n.ends_with(&format!("{nfd_dir}/{nfd_file}"))),
+        "NFC-written path should be searchable via NFC query: results={names:?}"
+    );
+}
+
+/// Write NFC names first, then run an NFC wildcard query over that directory.
+/// This directly exercises the "write NFC -> search NFC" behavior while staying
+/// robust to APFS (NFD surfaced names) and non-APFS (NFC surfaced names).
+#[test]
+fn unicode_write_nfc_then_search_nfc_wildcard() {
+    let temp_dir = TempDir::new("unicode_write_nfc_then_search_nfc_wildcard").unwrap();
+    let root = temp_dir.path();
+
+    let nfc_dir = "K\u{00FC}che";
+    let nfd_dir = "Ku\u{0308}che";
+
+    fs::create_dir_all(root.join(nfc_dir)).unwrap();
+    fs::File::create(root.join(nfc_dir).join("rezept.txt")).unwrap();
+    fs::File::create(root.join(nfc_dir).join("liste.md")).unwrap();
+
+    let mut cache = SearchCache::walk_fs(root);
+    let query = format!("{nfc_dir}/*.txt");
+    let indices = guard_indices(cache.search_with_options(
+        &query,
+        SearchOptions {
+            case_insensitive: false,
+        },
+        CancellationToken::noop(),
+    ));
+    let names = normalize(&mut cache, &indices);
+    assert!(
+        names
+            .iter()
+            .any(|n| n.ends_with(&format!("{nfc_dir}/rezept.txt")))
+            || names
+                .iter()
+                .any(|n| n.ends_with(&format!("{nfd_dir}/rezept.txt"))),
+        "NFC wildcard query should find txt file in NFC-written dir: results={names:?}"
+    );
+    assert!(
+        !names.iter().any(|n| n.ends_with("liste.md")),
+        "wildcard should still filter by extension"
+    );
 }

@@ -27,6 +27,7 @@ use std::{
 use thin_vec::ThinVec;
 use tracing::{debug, info};
 use typed_num::Num;
+use unicode_normalization::{IsNormalized, UnicodeNormalization, is_nfc_quick, is_nfd_quick};
 
 pub struct SearchCache {
     pub(crate) file_nodes: FileNodes,
@@ -39,6 +40,8 @@ pub struct SearchCache {
 
 #[derive(Debug, Clone)]
 pub struct SearchOutcome {
+    /// `None` means search was cancelled (not "no match");
+    /// `Some(vec![])` means completed search with zero matches.
     pub nodes: Option<Vec<SlabIndex>>,
     pub highlights: Vec<String>,
 }
@@ -46,6 +49,53 @@ pub struct SearchOutcome {
 impl SearchOutcome {
     fn new(nodes: Option<Vec<SlabIndex>>, highlights: Vec<String>) -> Self {
         Self { nodes, highlights }
+    }
+
+    fn cancelled() -> Self {
+        Self {
+            nodes: None,
+            highlights: vec![],
+        }
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.nodes.is_none()
+    }
+
+    fn merge(self, other: Self) -> Self {
+        let SearchOutcome {
+            nodes: primary_nodes,
+            highlights: primary_highlights,
+        } = self;
+        let SearchOutcome {
+            nodes: secondary_nodes,
+            highlights: secondary_highlights,
+        } = other;
+
+        let (Some(primary_nodes), Some(secondary_nodes)) = (primary_nodes, secondary_nodes) else {
+            return Self::cancelled();
+        };
+
+        let merged_nodes = Self::merge_preserve_order(primary_nodes, secondary_nodes);
+        let merged_highlights =
+            Self::merge_preserve_order(primary_highlights, secondary_highlights);
+        Self::new(Some(merged_nodes), merged_highlights)
+    }
+
+    fn merge_preserve_order<T>(lhs: Vec<T>, rhs: Vec<T>) -> Vec<T>
+    where
+        T: Eq + std::hash::Hash + Clone,
+    {
+        let mut merged = Vec::with_capacity(lhs.len() + rhs.len());
+        let mut seen = HashSet::with_capacity(lhs.len() + rhs.len());
+
+        for item in lhs.into_iter().chain(rhs.into_iter()) {
+            if seen.insert(item.clone()) {
+                merged.push(item);
+            }
+        }
+
+        merged
     }
 }
 
@@ -236,6 +286,29 @@ impl SearchCache {
         options: SearchOptions,
         cancellation_token: CancellationToken,
     ) -> Result<SearchOutcome> {
+        let primary = self.search_with_query_line(line, options, cancellation_token)?;
+        // Cancellation must short-circuit and propagate as `nodes: None`.
+        // Running a secondary normalization pass after cancellation would be wasted work.
+        if primary.is_cancelled() {
+            return Ok(SearchOutcome::cancelled());
+        }
+
+        // Best-effort APFS workaround: run primary query first, then optionally
+        // run one alternate normalization form when the input is normalization-sensitive.
+        let Some(alt_line) = self.alternate_normalization_query(line) else {
+            return Ok(primary);
+        };
+
+        let secondary = self.search_with_query_line(&alt_line, options, cancellation_token)?;
+        Ok(primary.merge(secondary))
+    }
+
+    fn search_with_query_line(
+        &mut self,
+        line: &str,
+        options: SearchOptions,
+        cancellation_token: CancellationToken,
+    ) -> Result<SearchOutcome> {
         let parsed = parse_query(line).map_err(|err| anyhow!("Failed to parse query: {err}"))?;
         let expanded = expand_query_home_dirs(parsed);
         let unquoted = strip_query_quotes(expanded);
@@ -245,6 +318,37 @@ impl SearchCache {
         let result = self.evaluate_expr(&optimized.expr, options, cancellation_token);
         info!("Search time: {:?}", search_time.elapsed());
         result.map(|nodes| SearchOutcome::new(nodes, highlights))
+    }
+
+    // Why this exists:
+    // - APFS may surface path segments in either NFC or NFD (unlike HFS+ forcing NFD).
+    // - Our matcher is byte-oriented, so canonically equivalent Unicode forms
+    //   can miss each other without an alternate query form.
+    //
+    // Performance:
+    // - `is_nfd_quick` / `is_nfc_quick` are cheap probes.
+    // - If both are `Yes`, query is normalization-inert, so we skip the second pass.
+    //
+    // Limitations (by design):
+    // - This is a low-overhead workaround, not a fully normalization-aware index.
+    // - We only generate one alternate query line.
+    // - A filename that mixes NFC/NFD within the same segment can still be a miss,
+    //   depending on which form the matcher ultimately compares against.
+    fn alternate_normalization_query(&self, line: &str) -> Option<String> {
+        let nfd_quick = is_nfd_quick(line.chars());
+        let nfc_quick = is_nfc_quick(line.chars());
+        let nfd_yes = matches!(nfd_quick, IsNormalized::Yes);
+        let nfc_yes = matches!(nfc_quick, IsNormalized::Yes);
+        if nfd_yes && nfc_yes {
+            return None;
+        }
+
+        let alt = if nfd_yes {
+            line.nfc().collect::<String>()
+        } else {
+            line.nfd().collect::<String>()
+        };
+        (alt != line).then_some(alt)
     }
 
     /// Get the path of the node in the slab.
@@ -1896,6 +2000,109 @@ mod tests {
             token,
         );
         assert!(matches!(result, Ok(SearchOutcome { nodes: None, .. })));
+    }
+
+    #[test]
+    fn alternate_normalization_query_ascii_returns_none() {
+        let temp_dir = TempDir::new("alternate_normalization_query_ascii_returns_none").unwrap();
+        let cache = SearchCache::walk_fs(temp_dir.path());
+
+        assert_eq!(
+            cache.alternate_normalization_query("office/report.txt"),
+            None
+        );
+    }
+
+    #[test]
+    fn alternate_normalization_query_normalization_inert_unicode_returns_none() {
+        let temp_dir =
+            TempDir::new("alternate_normalization_query_normalization_inert_unicode_returns_none")
+                .unwrap();
+        let cache = SearchCache::walk_fs(temp_dir.path());
+
+        // CJK characters are normalization-inert in this context.
+        assert_eq!(cache.alternate_normalization_query("文件/项目"), None);
+    }
+
+    #[test]
+    fn alternate_normalization_query_nfc_input_returns_nfd_variant() {
+        let temp_dir =
+            TempDir::new("alternate_normalization_query_nfc_input_returns_nfd_variant").unwrap();
+        let cache = SearchCache::walk_fs(temp_dir.path());
+
+        let nfc = "B\u{00FC}ro/rechnung.txt";
+        let nfd = "Bu\u{0308}ro/rechnung.txt";
+        assert_eq!(
+            cache.alternate_normalization_query(nfc),
+            Some(nfd.to_string())
+        );
+    }
+
+    #[test]
+    fn alternate_normalization_query_nfd_input_returns_nfc_variant() {
+        let temp_dir =
+            TempDir::new("alternate_normalization_query_nfd_input_returns_nfc_variant").unwrap();
+        let cache = SearchCache::walk_fs(temp_dir.path());
+
+        let nfd = "Bu\u{0308}ro/rechnung.txt";
+        let nfc = "B\u{00FC}ro/rechnung.txt";
+        assert_eq!(
+            cache.alternate_normalization_query(nfd),
+            Some(nfc.to_string())
+        );
+    }
+
+    #[test]
+    fn alternate_normalization_query_noncanonical_combining_order_is_reordered() {
+        let temp_dir =
+            TempDir::new("alternate_normalization_query_noncanonical_combining_order_is_reordered")
+                .unwrap();
+        let cache = SearchCache::walk_fs(temp_dir.path());
+
+        let noncanonical = "a\u{0302}\u{0323}";
+        let canonical_nfd = "a\u{0323}\u{0302}";
+        assert_eq!(
+            cache.alternate_normalization_query(noncanonical),
+            Some(canonical_nfd.to_string())
+        );
+    }
+
+    #[test]
+    fn search_with_options_merges_highlights_from_secondary_normalization_pass() {
+        let temp_dir =
+            TempDir::new("search_with_options_merges_highlights_from_secondary_normalization_pass")
+                .unwrap();
+        let root = temp_dir.path();
+        let nfd_dir = "Bu\u{0308}ro";
+        fs::create_dir_all(root.join(nfd_dir)).unwrap();
+        fs::File::create(root.join(nfd_dir).join("angebot.pdf")).unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let result = cache
+            .search_with_options(
+                "B\u{00FC}ro",
+                SearchOptions {
+                    case_insensitive: false,
+                },
+                CancellationToken::noop(),
+            )
+            .expect("search should succeed");
+
+        let nodes = result
+            .nodes
+            .expect("noop cancellation token should not cancel");
+        assert!(
+            !nodes.is_empty(),
+            "secondary normalization pass should match NFD path"
+        );
+        assert!(
+            result.highlights.contains(&"büro".to_string()),
+            "highlights should keep primary NFC form"
+        );
+        assert!(
+            result.highlights.contains(&"bu\u{0308}ro".to_string()),
+            "highlights should include secondary NFD form"
+        );
     }
 
     #[test]
