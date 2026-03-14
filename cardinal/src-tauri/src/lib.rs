@@ -238,42 +238,38 @@ fn run_logic_thread(
     let path = PathBuf::from(&watch_root);
     let ignore_paths: Vec<_> = ignore_paths.into_iter().map(PathBuf::from).collect();
 
-    let mut cache = match SearchCache::try_read_persistent_cache(
-        &path,
-        db_path,
-        &ignore_paths,
-        Some(&APP_QUIT),
-    ) {
-        Ok(cached) => {
-            info!("Loaded existing cache");
-            emit_status_bar_update(app_handle, cached.get_total_files(), 0, 0);
-            cached
-        }
-        Err(e) => {
-            info!("Walking filesystem: {:?}", e);
-            if let Some(cache) = build_search_cache(
-                app_handle,
-                &watch_root,
-                &ignore_paths,
-                CancellationToken::new_scan(),
-            ) {
-                emit_status_bar_update(app_handle, cache.get_total_files(), 0, 0);
-                cache
-            } else if APP_QUIT.load(Ordering::Relaxed) {
-                info!("Walk filesystem cancelled, app quitting");
-                channels
-                    .finish_rx
-                    .recv()
-                    .expect("Failed to receive finish signal")
-                    .send(None)
-                    .expect("Failed to send None cache");
-                return;
-            } else {
-                info!("Initial scan cancelled by newer request, use noop cache");
-                SearchCache::noop(path.clone(), ignore_paths.clone(), &APP_QUIT)
+    let mut cache =
+        match SearchCache::try_read_persistent_cache(&path, db_path, &ignore_paths, &APP_QUIT) {
+            Ok(cached) => {
+                info!("Loaded existing cache");
+                emit_status_bar_update(app_handle, cached.get_total_files(), 0, 0);
+                cached
             }
-        }
-    };
+            Err(e) => {
+                info!("Walking filesystem: {:?}", e);
+                if let Some(cache) = build_search_cache(
+                    app_handle,
+                    &watch_root,
+                    &ignore_paths,
+                    CancellationToken::new_scan(),
+                ) {
+                    emit_status_bar_update(app_handle, cache.get_total_files(), 0, 0);
+                    cache
+                } else if APP_QUIT.load(Ordering::Relaxed) {
+                    info!("Walk filesystem cancelled, app quitting");
+                    channels
+                        .finish_rx
+                        .recv()
+                        .expect("Failed to receive finish signal")
+                        .send(None)
+                        .expect("Failed to send None cache");
+                    return;
+                } else {
+                    info!("Initial scan cancelled by newer request, use noop cache");
+                    SearchCache::noop(path.clone(), ignore_paths.clone(), &APP_QUIT)
+                }
+            }
+        };
 
     let event_watcher = if cache.is_noop() {
         info!("Using noop event watcher due to cancelled initial scan");

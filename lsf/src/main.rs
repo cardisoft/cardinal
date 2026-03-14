@@ -10,11 +10,13 @@ use search_cancel::CancellationToken;
 use std::{
     io::Write,
     path::{Path, PathBuf},
+    sync::atomic::AtomicBool,
 };
 use tracing_subscriber::{EnvFilter, filter::LevelFilter};
 
 const CACHE_PATH: &str = "target/cache.zstd";
 const IGNORE_PATH: &str = "/System/Volumes/Data"; // macOS specific ignore path
+static NEVER_STOPPED: AtomicBool = AtomicBool::new(false);
 
 fn main() -> Result<()> {
     let builder = tracing_subscriber::fmt();
@@ -32,11 +34,16 @@ fn main() -> Result<()> {
         SearchCache::walk_fs_with_ignore(&path, &ignore_paths)
     } else {
         println!("Try reading cache...");
-        SearchCache::try_read_persistent_cache(&path, Path::new(CACHE_PATH), &ignore_paths, None)
-            .unwrap_or_else(|e| {
-                println!("Failed to read cache: {e:?}. Re-walking filesystem...");
-                SearchCache::walk_fs_with_ignore(&path, &ignore_paths)
-            })
+        SearchCache::try_read_persistent_cache(
+            &path,
+            Path::new(CACHE_PATH),
+            &ignore_paths,
+            &NEVER_STOPPED,
+        )
+        .unwrap_or_else(|e| {
+            println!("Failed to read cache: {e:?}. Re-walking filesystem...");
+            SearchCache::walk_fs_with_ignore(&path, &ignore_paths)
+        })
     };
 
     println!("Cache is: {cache:?}");

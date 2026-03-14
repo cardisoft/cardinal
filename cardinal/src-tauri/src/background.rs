@@ -436,7 +436,7 @@ pub(crate) fn build_search_cache(
                 std::thread::sleep(Duration::from_millis(100));
             }
         });
-        let cache = SearchCache::walk_fs_with_walk_data(&walk_data, Some(&APP_QUIT));
+        let cache = SearchCache::walk_fs_with_walk_data(&walk_data, &APP_QUIT);
         walking_done.store(true, Ordering::Relaxed);
         cache
     })

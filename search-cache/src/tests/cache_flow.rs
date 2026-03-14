@@ -1,5 +1,8 @@
 use super::prelude::*;
 use cardinal_sdk::{EventFlag, FsEvent};
+use std::sync::atomic::AtomicBool;
+
+static NEVER_STOPPED: AtomicBool = AtomicBool::new(false);
 
 #[test]
 fn test_search_empty_returns_all_nodes() {
@@ -88,7 +91,12 @@ fn test_persistent_roundtrip() {
     let cache = SearchCache::walk_fs(tmp.path());
     let original_total = cache.get_total_files();
     cache.flush_to_file(&cache_path).unwrap();
-    let loaded =
-        SearchCache::try_read_persistent_cache(tmp.path(), &cache_path, &Vec::new(), None).unwrap();
+    let loaded = SearchCache::try_read_persistent_cache(
+        tmp.path(),
+        &cache_path,
+        &Vec::new(),
+        &NEVER_STOPPED,
+    )
+    .unwrap();
     assert_eq!(loaded.get_total_files(), original_total);
 }

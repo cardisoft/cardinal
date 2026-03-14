@@ -28,13 +28,15 @@ use thin_vec::ThinVec;
 use tracing::{debug, info};
 use typed_num::Num;
 
+/// A flag that is never set
+static NEVER_STOPPED: AtomicBool = AtomicBool::new(false);
+
 pub struct SearchCache {
     pub(crate) file_nodes: FileNodes,
     last_event_id: u64,
     rescan_count: u64,
     pub(crate) name_index: NameIndex,
-    // TODO(ldm0): remove the Option later
-    stop: Option<&'static AtomicBool>,
+    stop: &'static AtomicBool,
 }
 
 #[derive(Debug, Clone)]
@@ -72,7 +74,7 @@ impl SearchCache {
         path: &Path,
         cache_path: &Path,
         current_ignore_paths: &Vec<PathBuf>,
-        cancel: Option<&'static AtomicBool>,
+        cancel: &'static AtomicBool,
     ) -> Result<Self> {
         read_cache_from_file(cache_path)
             .and_then(|x| {
@@ -124,19 +126,23 @@ impl SearchCache {
     }
 
     pub fn walk_fs_with_ignore(path: &Path, ignore_paths: &[PathBuf]) -> Self {
-        Self::walk_fs_with_walk_data(&WalkData::new(path, ignore_paths, false, || false), None)
-            .unwrap()
+        Self::walk_fs_with_walk_data(
+            &WalkData::new(path, ignore_paths, false, || false),
+            &NEVER_STOPPED,
+        )
+        .unwrap()
     }
 
     pub fn walk_fs(path: &Path) -> Self {
-        Self::walk_fs_with_walk_data(&WalkData::new(path, &[], false, || false), None).unwrap()
+        Self::walk_fs_with_walk_data(&WalkData::new(path, &[], false, || false), &NEVER_STOPPED)
+            .unwrap()
     }
 
     /// This function is expected to be called with WalkData which metadata is not fetched.
     /// If cancelled during walking, None is returned.
     pub fn walk_fs_with_walk_data<F>(
         walk_data: &WalkData<'_, F>,
-        cancel: Option<&'static AtomicBool>,
+        cancel: &'static AtomicBool,
     ) -> Option<Self>
     where
         F: Fn() -> bool + Send + Sync,
@@ -193,7 +199,7 @@ impl SearchCache {
         last_event_id: u64,
         rescan_count: u64,
         name_index: NameIndex,
-        cancel: Option<&'static AtomicBool>,
+        cancel: &'static AtomicBool,
     ) -> Self {
         Self {
             file_nodes: slab,
@@ -212,7 +218,7 @@ impl SearchCache {
             last_event_id: 0,
             rescan_count: 0,
             name_index: NameIndex::default(),
-            stop: Some(cancel),
+            stop: cancel,
         }
     }
 
@@ -399,9 +405,7 @@ impl SearchCache {
         }
         // For incremental data, we need metadata
         let walk_data = WalkData::new(path, self.file_nodes.ignore_paths(), true, || {
-            self.stop
-                .map(|x| x.load(Ordering::Relaxed))
-                .unwrap_or_default()
+            self.stop.load(Ordering::Relaxed)
         });
         walk_it_without_root_chain(&walk_data).map(|node| {
             let node = self.create_node_slab_update_name_index_and_name_pool(Some(parent), &node);
@@ -434,8 +438,7 @@ impl SearchCache {
         *phantom2 = self.file_nodes.ignore_paths().clone();
         let stop = self.stop;
         WalkData::new(phantom1, phantom2, false, move || {
-            stop.map(|x| x.load(Ordering::Relaxed)).unwrap_or_default()
-                || scan_cancellation_token.is_cancelled().is_none()
+            stop.load(Ordering::Relaxed) || scan_cancellation_token.is_cancelled().is_none()
         })
     }
 
@@ -458,11 +461,7 @@ impl SearchCache {
                 self.file_nodes.path(),
                 self.file_nodes.ignore_paths(),
                 false,
-                || {
-                    self.stop
-                        .map(|x| x.load(Ordering::Relaxed))
-                        .unwrap_or_default()
-                },
+                || self.stop.load(Ordering::Relaxed),
             ),
             self.stop,
         ) else {
@@ -958,7 +957,8 @@ mod tests {
         fs::File::create(root.join("beta/target.txt")).unwrap();
 
         let walk_data = WalkData::simple(root, false);
-        let cache = SearchCache::walk_fs_with_walk_data(&walk_data, None).expect("walk cache");
+        let cache =
+            SearchCache::walk_fs_with_walk_data(&walk_data, &NEVER_STOPPED).expect("walk cache");
 
         let entries = cache
             .name_index
