@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../../i18n/config';
+import { DEFAULT_SHORTCUTS } from '../../shortcuts';
 import { useContextMenu } from '../useContextMenu';
 
 const mocks = vi.hoisted(() => ({
@@ -49,7 +50,9 @@ describe('useContextMenu', () => {
   });
 
   it('uses plural Copy Paths label and shortcut when multiple paths are selected', async () => {
-    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+    const { result } = renderHook(() => useContextMenu(null, undefined, DEFAULT_SHORTCUTS), {
+      wrapper,
+    });
 
     result.current.showContextMenu(createEvent(), ['/a', '/b']);
 
@@ -63,12 +66,16 @@ describe('useContextMenu', () => {
       accelerator?: string;
     }>;
     const copyPaths = items.find((item) => item.id === 'context_menu.copy_paths');
+    const copyFilename = items.find((item) => item.id === 'context_menu.copy_filename');
     expect(copyPaths?.text).toBe('Copy Paths');
     expect(copyPaths?.accelerator).toBe('Cmd+Shift+C');
+    expect(copyFilename?.accelerator).toBe('Cmd+Shift+F');
   });
 
   it('uses singular Copy Path label when a single path is targeted', async () => {
-    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+    const { result } = renderHook(() => useContextMenu(null, undefined, DEFAULT_SHORTCUTS), {
+      wrapper,
+    });
 
     result.current.showContextMenu(createEvent(), ['/a']);
 
@@ -92,7 +99,9 @@ describe('useContextMenu', () => {
       configurable: true,
     });
 
-    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+    const { result } = renderHook(() => useContextMenu(null, undefined, DEFAULT_SHORTCUTS), {
+      wrapper,
+    });
 
     result.current.showContextMenu(createEvent(), ['', '/clicked']);
 
@@ -119,7 +128,9 @@ describe('useContextMenu', () => {
       configurable: true,
     });
 
-    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+    const { result } = renderHook(() => useContextMenu(null, undefined, DEFAULT_SHORTCUTS), {
+      wrapper,
+    });
 
     result.current.showContextMenu(createEvent(), ['/a', '/b']);
 

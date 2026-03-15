@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Menu, MenuItem, PredefinedMenuItem } from '@tauri-apps/api/menu';
 import { TrayIcon, type TrayIconOptions } from '@tauri-apps/api/tray';
 import i18n from './i18n/config';
-import { QUICK_LAUNCH_SHORTCUT } from './utils/globalShortcuts';
+import { getStoredShortcutAccelerators } from './shortcuts';
 
 const TRAY_ID = 'cardinal.tray';
 
@@ -42,22 +42,19 @@ export async function setTrayEnabled(enabled: boolean): Promise<void> {
   await Promise.allSettled([current?.close(), TrayIcon.removeById(TRAY_ID)]);
 }
 
+export async function refreshTrayMenu(): Promise<void> {
+  if (!trayIcon) {
+    return;
+  }
+
+  const menu = await createTrayMenu();
+  await trayIcon.setMenu(menu).catch((error) => {
+    console.error('Failed to refresh tray menu', error);
+  });
+}
+
 async function createTray(): Promise<void> {
-  const openItem = await MenuItem.new({
-    id: 'tray.open',
-    text: i18n.t('tray.open'),
-    accelerator: QUICK_LAUNCH_SHORTCUT,
-    action: () => {
-      void activateMainWindow();
-    },
-  });
-  const menu = await Menu.new({
-    items: [
-      openItem,
-      await PredefinedMenuItem.new({ item: 'Separator' }),
-      await PredefinedMenuItem.new({ item: 'Quit', text: i18n.t('tray.quit') }),
-    ],
-  });
+  const menu = await createTrayMenu();
   const options: TrayIconOptions = {
     id: TRAY_ID,
     tooltip: 'Cardinal',
@@ -66,6 +63,25 @@ async function createTray(): Promise<void> {
   };
 
   trayIcon = await TrayIcon.new(options);
+}
+
+async function createTrayMenu(): Promise<Menu> {
+  const shortcuts = getStoredShortcutAccelerators();
+  const openItem = await MenuItem.new({
+    id: 'tray.open',
+    text: i18n.t('tray.open'),
+    accelerator: shortcuts.quickLaunch,
+    action: () => {
+      void activateMainWindow();
+    },
+  });
+  return Menu.new({
+    items: [
+      openItem,
+      await PredefinedMenuItem.new({ item: 'Separator' }),
+      await PredefinedMenuItem.new({ item: 'Quit', text: i18n.t('tray.quit') }),
+    ],
+  });
 }
 
 async function activateMainWindow(): Promise<void> {

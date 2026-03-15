@@ -7,6 +7,7 @@ import LanguageSwitcher from './LanguageSwitcher';
 type PreferencesOverlayProps = {
   open: boolean;
   onClose: () => void;
+  onOpenShortcutSettings: () => void;
   sortThreshold: number;
   defaultSortThreshold: number;
   onSortThresholdChange: (value: number) => void;
@@ -24,6 +25,7 @@ type PreferencesOverlayProps = {
 export function PreferencesOverlay({
   open,
   onClose,
+  onOpenShortcutSettings,
   sortThreshold,
   defaultSortThreshold,
   onSortThresholdChange,
@@ -169,6 +171,16 @@ export function PreferencesOverlay({
           <div className="preferences-row">
             <p className="preferences-label">{t('preferences.language')}</p>
             <LanguageSwitcher className="preferences-control" />
+          </div>
+          <div className="preferences-row">
+            <p className="preferences-label">{t('preferences.shortcuts.label')}</p>
+            <button
+              className="preferences-manage-button"
+              type="button"
+              onClick={onOpenShortcutSettings}
+            >
+              {t('preferences.shortcuts.configure')}
+            </button>
           </div>
           <div className="preferences-row">
             <p className="preferences-label">{t('preferences.trayIcon.label')}</p>
