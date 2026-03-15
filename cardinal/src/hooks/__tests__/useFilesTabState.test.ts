@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_SHORTCUTS, type ShortcutMap } from '../../shortcuts';
 import { useFilesTabState } from '../useFilesTabState';
 import { useSearchHistory } from '../useSearchHistory';
 
@@ -19,6 +20,8 @@ type HookProps = {
       onSearchCommitted?: (query: string) => void;
     },
   ) => void;
+  shortcuts: ShortcutMap;
+  shortcutsEnabled: boolean;
 };
 
 describe('useFilesTabState', () => {
@@ -33,6 +36,8 @@ describe('useFilesTabState', () => {
       initialProps: {
         searchQuery: 'needle',
         queueSearch,
+        shortcuts: DEFAULT_SHORTCUTS,
+        shortcutsEnabled: true,
         ...overrides,
       },
     });
@@ -69,6 +74,8 @@ describe('useFilesTabState', () => {
     rerender({
       searchQuery: 'needle-updated',
       queueSearch,
+      shortcuts: DEFAULT_SHORTCUTS,
+      shortcutsEnabled: true,
     });
     expect(result.current.searchInputValue).toBe('evt');
 

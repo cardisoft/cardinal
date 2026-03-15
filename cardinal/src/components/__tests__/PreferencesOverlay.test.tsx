@@ -21,6 +21,7 @@ vi.mock('../LanguageSwitcher', () => ({
 const baseProps = {
   open: true,
   onClose: vi.fn(),
+  onOpenShortcutSettings: vi.fn(),
   sortThreshold: 200,
   defaultSortThreshold: 100,
   onSortThresholdChange: vi.fn(),
@@ -36,6 +37,15 @@ const baseProps = {
 };
 
 describe('PreferencesOverlay', () => {
+  it('opens shortcut settings from the dedicated row action', () => {
+    const onOpenShortcutSettings = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onOpenShortcutSettings={onOpenShortcutSettings} />);
+
+    fireEvent.click(screen.getByText('preferences.shortcuts.configure'));
+
+    expect(onOpenShortcutSettings).toHaveBeenCalledTimes(1);
+  });
+
   it('saves watch root updates via onWatchConfigChange', () => {
     const onWatchConfigChange = vi.fn();
     render(<PreferencesOverlay {...baseProps} onWatchConfigChange={onWatchConfigChange} />);
