@@ -1,69 +1,41 @@
 # FS Icon (macOS Icons & Thumbnails)
 
-This chapter documents the `fs-icon/` crate, which provides macOS file/folder icons and QuickLook thumbnails.
+`fs-icon/` provides best-effort PNG bytes for file and folder visuals on macOS.
 
----
+## Public API
+- `icon_of_path(path)` -> Quick Look first, then NSWorkspace fallback
+- `icon_of_path_ns(path)` -> Finder-style icon from `NSWorkspace`
+- `icon_of_path_ql(path)` -> Quick Look thumbnail for image-like files
+- `image_dimension(path)` -> cheap width/height probe via Image I/O
+- `scale_with_aspect_ratio(...)` -> shared size helper
 
-## Overview
+## NSWorkspace path
+`icon_of_path_ns(...)`:
+1. asks `NSWorkspace::sharedWorkspace().iconForFile(...)`
+2. prefers a representation already close to `32x32`
+3. otherwise scales the image to fit within a `32x32` box
+4. rasterizes through `NSBitmapImageRep`
+5. returns PNG bytes
 
-`fs-icon` exposes three main APIs:
-- `icon_of_path(path: &str) -> Option<Vec<u8>>` — best-effort icon as PNG bytes (QuickLook first, then NSWorkspace).
-- `icon_of_path_ns(path: &str) -> Option<Vec<u8>>` — icon from `NSWorkspace::iconForFile`.
-- `icon_of_path_ql(path: &str) -> Option<Vec<u8>>` — QuickLook-generated thumbnail for image-like files.
-- `image_dimension(path: &str) -> Option<(f64, f64)>` — lightweight width/height probe via Image I/O.
+Everything runs inside an autorelease pool.
 
-All image data is returned as PNG bytes, ready to be base64-encoded by the Tauri backend.
+## Quick Look path
+`icon_of_path_ql(...)` only proceeds if `image_dimension(...)` succeeds. That deliberately limits Quick Look thumbnails to image-like inputs.
 
----
+Flow:
+1. read intrinsic image size through `CGImageSource`
+2. scale into a `64x64` thumbnail box
+3. create `QLThumbnailGenerationRequest`
+4. bridge the async completion handler back to Rust through a bounded `crossbeam_channel`
+5. convert the returned `NSImage` into PNG bytes
 
-## NSWorkspace-based icons
+If any step fails, the function returns `None` and callers can fall back to `icon_of_path_ns(...)`.
 
-`icon_of_path_ns` uses the system icon for a file or folder:
+## Integration in Cardinal
+- `get_nodes_info` uses `icon_of_path_ns(...)` for baseline row icons.
+- Background viewport prefetch uses `icon_of_path_ql(...)` for richer thumbnails on visible rows.
+- The UI only consumes `data:image/png;base64,...` strings; it does not know or care which native path produced the bytes.
 
-1. Build an `NSString` from `path`.
-2. Call `NSWorkspace::sharedWorkspace().iconForFile(&path_ns)` to obtain an `NSImage`.
-3. Pick an appropriate representation:
-   - Prefer a representation near 32×32 for Finder-style icons.
-   - Fallback: scale the original image down to a 32×32 bounding box while preserving aspect ratio (via `scale_with_aspect_ratio`).
-4. Render into an `NSBitmapImageRep` and encode as PNG.
-
-The function runs inside an autorelease pool to avoid leaking Cocoa objects.
-
----
-
-## QuickLook thumbnails
-
-`icon_of_path_ql` uses QuickLook to generate thumbnails for image-like content:
-
-1. Use `image_dimension` to discover intrinsic width/height via `CGImageSource`.
-2. Compute a scaled target size within a 64×64 thumbnail box, preserving aspect ratio.
-3. Build a `QLThumbnailGenerationRequest` with:
-   - File URL (`NSURL::fileURLWithPath`),
-   - `NSSize` target dimensions,
-   - Scale (e.g. `1.0`),
-   - `QLThumbnailGenerationRequestRepresentationTypes::LowQualityThumbnail`.
-4. Submit the request using `QLThumbnailGenerator::sharedGenerator()` and capture the callback through a `crossbeam_channel`:
-   - On success, convert the representation to PNG via `NSBitmapImageRep`.
-   - On failure or unsupported file types, return `None`.
-
-QuickLook is generally used for richer, content-aware thumbnails and is tried first in `icon_of_path`.
-
----
-
-## Aspect ratio helper
-
-`scale_with_aspect_ratio(width, height, max_width, max_height)`:
-- Computes the X/Y scale ratios and picks the smaller one.
-- Returns `(scaled_width, scaled_height)` preserving aspect ratio and fitting within the bounding box.
-
-This helper is shared by both NSWorkspace and QuickLook code paths to keep icons visually consistent.
-
----
-
-## Integration notes
-
-- The Tauri backend uses:
-  - `icon_of_path_ns` in `get_nodes_info` to attach icons to rows from the name index.
-  - `icon_of_path_ql` in the icon viewport worker to load higher-fidelity thumbnails for visible rows.
-- UI code only ever sees base64 data URIs (`data:image/png;base64,...`); it is agnostic to the source (NSWorkspace vs QuickLook).
-- Non-image files passed to `icon_of_path_ql` will return `None`; tests enforce this behavior so callers can fall back gracefully.
+## Practical caveats
+- `icon_of_path_ql(...)` is intentionally narrow and will return `None` for many non-image files.
+- The crate does not cache results on its own; Cardinal handles batching and dedup higher up.

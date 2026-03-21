@@ -1,30 +1,36 @@
 # Runtime Lifecycle
 
-This chapter describes Cardinal’s lifecycle states and how they are surfaced to the UI.
-
----
+Cardinal exposes a small lifecycle state machine to the UI. The state is stored in `cardinal/src-tauri/src/lifecycle.rs` and broadcast as the `app_lifecycle_state` Tauri event.
 
 ## States
-- **Initializing**: initial scan or rebuilding; UI should expect partial data.
-- **Updating**: background loop is live after a scan/rebuild and is waiting for the FSEvents history boundary (HistoryDone) before marking Ready.
-- **Ready**: steady state; FSEvents-driven incremental updates.
+- **Initializing**: no usable steady-state watcher yet. This covers the initial filesystem walk, full rescans, and watch-config rebuilds.
+- **Updating**: a cache exists and the `EventWatcher` is running, but the app is still waiting for the FSEvents history boundary (`HistoryDone`).
+- **Ready**: steady state. Search, incremental updates, and periodic cache flushes all operate normally.
 
-Implementation: `cardinal/src-tauri/src/lifecycle.rs`
-- `APP_LIFECYCLE_STATE` is an atomic `u8`; helpers emit `app_lifecycle_state` events to the UI.
-- `APP_QUIT` and `EXIT_REQUESTED` are atomics that guard shutdown ordering.
+There is intentionally no separate `Stopped` or `Error` state. If background logic never starts because `start_logic` is not sent, the process simply remains at `Initializing`.
 
----
+## Where transitions happen
+- **Process boot**: `APP_LIFECYCLE_STATE` starts at `Initializing`.
+- **Initial startup**:
+  - cache loaded from disk or fresh walk completed -> `run_logic_thread` sets `Updating`
+  - first `HistoryDone` batch -> `handle_event_watcher_events` sets `Ready`
+- **Manual rescan or watch-config change**:
+  - `perform_rescan` / `handle_watch_config_update` set `Initializing`, reset counters, rebuild state, then move back to `Updating`
+  - the next `HistoryDone` promotes the app back to `Ready`
 
-## Emission
-- `load_app_state` reads the current `AppLifecycleState`.
-- `store_app_state` writes new values and establishes the ordering for the rest of the app.
-- `update_app_state` changes the state only when it actually differs, then calls `emit_app_state`.
-- `emit_app_state` sends the current state as a string over the `app_lifecycle_state` Tauri event.
+## Implementation details
+- `APP_LIFECYCLE_STATE: AtomicU8` stores the enum value.
+- `APP_QUIT` and `EXIT_REQUESTED` coordinate shutdown and cache-flush ordering.
+- `load_app_state()` returns the current state.
+- `store_app_state()` writes the atomic with release ordering.
+- `update_app_state()` is the guarded transition helper; it emits only when the state actually changes.
+- `emit_app_state()` publishes the string form (`"Initializing"`, `"Updating"`, `"Ready"`) over Tauri.
 
-The frontend can subscribe to `app_lifecycle_state` to gate features or show banners while indexing or rescans are underway.
+## Frontend consumers
+- `useFileSearch` fetches the current state once via `get_app_status()` on startup.
+- `useAppWindowListeners` subscribes to `app_lifecycle_state` and updates React state incrementally.
+- The UI combines lifecycle state with `status_bar_update` counters to decide when to show indexing/rebuild progress.
 
----
-
-## Debugging tips
-- If the UI appears stuck in “Initializing”, inspect logs for FSEvent errors or rescan loops.
-- Use the event stream for `app_lifecycle_state` to confirm transitions line up with status bar output and search readiness.
+## Shutdown and persistence
+- `flush_cache_to_file_once()` refuses to flush if the app never reached `Ready`.
+- On close/exit, `APP_QUIT` is set first, then the background loop is asked for the final cache snapshot.

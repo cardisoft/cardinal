@@ -1,136 +1,131 @@
 # SearchCache Deep Dive
 
-This chapter covers the Rust search/index engine in `search-cache/`.
+`search-cache/` is Cardinal's in-process search and indexing engine. It stores the watched filesystem in a compact slab, maintains a name index for fast lookup, and applies FSEvent-driven subtree rescans.
 
----
-
-## Core data structures
-```
-Walk root (PathBuf)
-└── FileNodes (slab of SlabNode)
-    ├─ root: SlabIndex
-    ├─ slab: ThinSlab<SlabNode>
-    │   SlabNode {
-    │     name_and_parent: NameAndParent { name: &'static str, parent: Option<SlabIndex> }
-    │     metadata: SlabNodeMetadataCompact (type/size/mtime/ctime, compact optional ints)
-    │     children: ThinVec<SlabIndex>
-    │   }
-    └─ helpers: node_path(index) builds absolute paths by climbing parents
-
-NameIndex (BTreeMap<&'static str, SortedSlabIndices>)
-└─ maps interned names → sorted list of SlabIndex ordered by full path
-   (keeps per-name hits sorted and deduplicated)
-
-NamePool (namepool crate)
-└─ interns strings to &'static str so NameIndex keys are stable and cheap to clone
-```
-
----
-
-### In-memory layout overview
-
+## Core structures
 ```text
 SearchCache
 ├─ file_nodes: FileNodes
-│  ├─ path: PathBuf       (watch root)
-│  ├─ root: SlabIndex     (root node in slab)
+│  ├─ path: PathBuf
+│  ├─ ignore_paths: Vec<PathBuf>
+│  ├─ root: SlabIndex
 │  └─ slab: ThinSlab<SlabNode>
-│      SlabNode {
-│        name_and_parent: NameAndParent { ptr, len, parent: OptionSlabIndex }
-│        children: ThinVec<SlabIndex>
-│        metadata: SlabNodeMetadataCompact
-│      }
 ├─ name_index: NameIndex
 │  └─ BTreeMap<&'static str, SortedSlabIndices>
-│        (indices sorted by full path)
-└─ last_event_id: u64
+├─ last_event_id: u64
+├─ rescan_count: u64
+└─ stop: &'static AtomicBool
 ```
 
-## Memory layout and compression
+`SlabNode` stores:
+- `NameAndParent`: interned name pointer + length + parent index
+- `children: ThinVec<SlabIndex>`
+- `metadata: SlabNodeMetadataCompact`
 
-To keep the in-memory mirror compact while still indexing millions of files, `SearchCache` uses several layout tricks:
+`SearchResultNode` is the lightweight expansion type returned to the Tauri layer:
+- `path: PathBuf`
+- `metadata: SlabNodeMetadataCompact`
 
-- `SlabIndex` is a 32-bit wrapper (`u32`), supporting up to ~4 billion nodes while halving index storage compared to `u64`.
-- `NameAndParent` stores:
-  - A pointer to an interned filename (`&'static str` from `NAME_POOL`),
-  - A 32-bit length (macOS/Unix filenames are limited to 255 characters),
-  - An `OptionSlabIndex` parent.
-  This replaces a full `&str` (pointer + `usize`) plus a separate parent field.
-- `SlabNodeMetadataCompact` packs:
-  - State (`None`/`Some`/`Unaccessible`) into 2 bits,
-  - File type (file/dir/symlink/unknown) into 2 bits,
-  - Size into 60 bits (saturating at `(1<<60)-1`, sufficient for multi‑TB volumes),
-  - `ctime`/`mtime` into `u32` seconds since Unix epoch.
-- `ThinVec<SlabIndex>` is used for `children` instead of `Vec<SlabIndex>`, so leaf nodes (the common case) pay only for a null pointer instead of a full `(ptr,len,cap)` triple.
+## Memory model
+- `SlabIndex` is a 32-bit wrapper.
+- Names are interned through the process-global `NAME_POOL: LazyLock<NamePool>`.
+- `NameIndex` stores one entry per unique basename, each mapping to slab indices sorted by full path.
+- `StateTypeSize` packs node state, file type, and size into a single `u64`.
+- Directory sizes are exposed as `-1` through `StateTypeSize::size()`, which is mainly useful for backend sorting.
 
-In combination, these choices roughly halve the memory footprint of the slab compared to a naive `String`/`Vec`/`u64` implementation, while keeping access patterns cache-friendly.
+## Build and persistence
+1. `walk_fs_with_walk_data(...)` captures `current_event_id()`.
+2. `fswalk::walk_it(...)` builds a sorted `Node` tree.
+3. `construct_node_slab_name_index(...)` converts that tree into `ThinSlab<SlabNode>` plus `NameIndex`.
+4. The cache starts with `rescan_count = 0`.
 
----
+Persistence uses `PersistentStorage` in `persistent.rs`:
+- encoded with `postcard`
+- compressed with `zstd`
+- written atomically via `path.with_extension(".sctmp")`
+- currently versioned as `5`
 
-## Lifecycle
-1. **Initial build** (`walk_fs*`): `fswalk::walk_it` produces a tree of `Node` with names only (file metadata is not collected during the initial walk); we then allocate a slab and `NameIndex` in one pass (`construct_node_slab_name_index`). The last FSEvent ID at build time is recorded for incremental updates.
-2. **Persistence**: `persistent::{write_cache_to_file, read_cache_from_file}` snapshot `{ path, ignore_paths, slab_root, slab, name_index, last_event_id }`. `NamePool` is *not* persisted; it is reconstructed from `name_index` on load because interning is fast.
-3. **Incremental updates**:
-   - FSEvents come from `cardinal_sdk::EventWatcher` with `FsEvent { path, flag, id }`.
-   - Adds/removes/renames call into `scan_path_recursive` (re-walk subtree) or `remove_node_path`.
-   - `ignore_paths` are honored both in initial walk and rescans.
-   - On error conditions (e.g., `HandleFSEError::Rescan`) the entire cache is rebuilt via `rescan_with_walk_data`.
+Persisted fields:
+- watch root
+- ignore paths
+- slab root and slab contents
+- name index
+- `last_event_id`
+- `rescan_count`
 
-```
-FSEvents -> handle_fs_events -> {remove | create_node_chain | scan_path_recursive}
-         -> update FileNodes + NameIndex
-         -> last_event_id advanced
-```
+`NamePool` itself is not persisted. `try_read_persistent_cache(...)` rebuilds it from persisted name-index keys.
 
----
-
-## Query path
-```
-UI query string
-   ↓ parse (cardinal-syntax::parse_query)
-   ↓ normalize paths (search-cache::expand_query_home_dirs)
-   ↓ optimize (cardinal-syntax::optimize_query)
-   ↓ highlight terms (highlight::derive_highlight_terms)
-   ↓ evaluate_expr (SearchCache)
-        - uses NameIndex for fast name term expansion
-        - uses type/size/time filters via metadata cache
-        - path segments via query-segmentation
-        - cancellation checks every CANCEL_CHECK_INTERVAL
-   ↓ SearchOutcome { nodes: Option<Vec<SlabIndex>>, highlights }
+## Query pipeline
+```text
+raw query
+  -> cardinal_syntax::parse_query
+  -> expand_query_home_dirs
+  -> strip_query_quotes
+  -> highlight::derive_highlight_terms
+  -> cardinal_syntax::optimize_query
+  -> SearchCache::evaluate_expr
 ```
 
-- Cancellation uses `search-cancel::CancellationToken` (versioned per request). When cancelled, `nodes` becomes `None`.
-- Empty query uses `NameIndex::all_indices` to return every node in name order, with per-name indices ordered by full path and cancellation checks.
+Two important details:
+- Search cancellation is represented as `SearchOutcome { nodes: None, .. }`.
+- If the input is Unicode-normalization-sensitive, `search_with_options(...)` runs one alternate NFC/NFD query and merges both result sets and highlight terms. This is a pragmatic APFS workaround, not a fully normalization-aware index.
 
----
+## Matching model
+- Slash-delimited search text is segmented by `query-segmentation`.
+- Plain case-sensitive segments stay as cheap string operations.
+- Case-insensitive or wildcard segments are compiled into regex matchers.
+- `GlobStar` (`**`) and `Star` (`*`) are handled explicitly so descendant scans and direct-child scans stay separate.
+- Empty query returns `NameIndex::all_indices(...)` in name/path order.
 
-## Metadata and type filters
-- Metadata is compacted into `SlabNodeMetadataCompact` for memory density (see above).
-- `type_and_size` (`StateTypeSize`) encodes state, type, and size together and exposes helpers to classify node type (file/dir/other) and obtain sizes.
-- Initial full scans are run without per-file metadata (`WalkData::new(..., need_metadata = false, ...)`) to avoid slow `lstat` calls on APFS; the cache lazily populates metadata when filters (size/date/type) require it.
-- `ensure_metadata` handles this lazy loading, updating `SlabNodeMetadataCompact` in-place the first time a node’s metadata is needed.
+## Supported filters
+Current `evaluate_filter(...)` support includes:
+- `file:`, `folder:`
+- `ext:`
+- `parent:`, `infolder:`, `nosubfolders:`
+- `type:`, plus the type macros `audio:`, `video:`, `doc:`, `exe:`
+- `size:`
+- `dm:` and `dc:` date filters
+- `content:`
+- `tag:`
 
----
+Notable implementation details:
+- `ext:` is lowercase-normalized and only matches file nodes.
+- `parent:` intersects against the target folder's direct children.
+- `infolder:` intersects against the full descendant set.
+- `nosubfolders:` keeps the folder itself plus non-directory direct children only.
+- `content:` scans files in `64 KiB` windows and supports ASCII case-insensitive matching by lowercasing the read chunk.
+- `tag:` uses per-file xattr reads for smaller base sets and switches to `mdfind` when the candidate set exceeds `TAG_FILTER_MDFIND_THRESHOLD` (`10000`).
 
-## Rescan logic
-```
-rescan_with_walk_data:
-  new_cache = walk_fs_with_walk_data(...)
-  if cancelled -> None (caller keeps old cache)
-  else replace self with new_cache
-```
+## Metadata behavior
+The initial full walk usually runs with `need_metadata = false`. That means many nodes start as `State::None` and only fetch metadata later.
 
-- Long rescans stream progress via `walk_data.num_dirs/num_files` (used by the background loop to emit status updates).
+Metadata is filled lazily by:
+- `ensure_metadata(...)` during size/date filtering
+- `expand_file_nodes(...)` when the UI asks for row data
 
----
+Unavailable metadata is cached as `State::Unaccessible` so failed lookups are not retried forever.
 
-## Stored vs computed
-- **Stored**: slab (tree), `NameIndex` (name → sorted indices), `last_event_id`.
-- **Computed on demand**: absolute paths (`node_path`), subtrees (`all_subnodes`), metadata lookups for filters (when not already cached).
+## Incremental updates
+`handle_fs_events(...)` works in two phases:
+1. `scan_paths(...)` reduces an event batch to the minimal set of paths that still covers every changed subtree.
+2. Each remaining path is sent through `scan_path_recursive(...)`.
 
----
+`scan_path_recursive(...)`:
+- ignores configured ignored paths
+- removes vanished paths from the slab
+- ensures the parent chain exists via `create_node_chain(...)`
+- removes the stale child subtree if present
+- re-walks the changed path with metadata enabled
+- re-inserts the rebuilt subtree and updates `NameIndex`
 
-## Extension tips
-- To add new query operators, update `cardinal-syntax` and ensure `highlight::derive_highlight_terms` covers them.
-- Keep `CANCEL_CHECK_INTERVAL` low enough for responsive cancels; avoid heavy work outside cancellable loops.
-- Slab indices are 32-bit; stay safely below `u32::MAX` nodes for a given cache.
+If any incoming event requires a full rebuild (`RootChanged` or a root-level mutation detected by `FsEvent::should_rescan(...)`), the cache increments `rescan_count` and returns `HandleFSEError::Rescan`.
+
+## Expansion and Tauri-facing API
+- `search_with_options(...)` returns slab indices plus highlight terms.
+- `query_files_with_options(...)` expands those indices into `SearchResultNode` values.
+- `expand_file_nodes(...)` preserves input order and always returns one output per requested index; missing nodes degrade to empty path + inaccessible metadata.
+
+## Practical constraints
+- Path order matters. `NameIndex` and many set operations assume indices are kept in lexicographic full-path order.
+- Cancellation checks are sparse but pervasive. New long-running loops should use `CancellationToken::is_cancelled_sparse(...)`.
+- `metadata_cache.rs` exists in the crate, but the current runtime path relies on per-node lazy metadata stored directly in `SlabNodeMetadataCompact`.

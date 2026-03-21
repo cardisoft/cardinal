@@ -1,56 +1,44 @@
 # NamePool (String Interning & Name Search)
 
-This chapter documents the `namepool/` crate, which interns path segments and supports name-level search.
+`namepool/` is the small interning crate behind `search_cache::NAME_POOL`.
 
----
+## Core idea
+`NamePool` stores unique names in `Mutex<BTreeSet<Box<str>>>`. Every distinct string is kept once, and callers can retrieve stable borrowed `&str` references backed by that set.
 
-## Design
+In Cardinal, the pool lives behind a process-global `LazyLock`, so interned names effectively stay valid for the lifetime of the app.
 
-`NamePool` wraps a `Mutex<BTreeSet<Box<str>>>`:
-- Each unique string is stored exactly once.
-- Callers receive `&'static str`-like references via `push`, which remain stable for the process lifetime.
-
-`Debug` is implemented to show only the pool size, which is useful when logging large caches.
-
----
-
-## push: interning names
-
+## `push`
 ```rust
 pub fn push<'c>(&'c self, name: &str) -> &'c str
 ```
 
-- If `name` is not present, it is inserted into the `BTreeSet`.
-- Returns a `&str` pointing to the stored `Box<str>` using `str::from_raw_parts`.
-- Subsequent `push` calls with the same contents return the same address.
+Behavior:
+- insert the name if it is not already present
+- look up the stored `Box<str>`
+- rebuild a borrowed `&str` with `str::from_raw_parts(...)`
 
-This interning is used heavily by `search-cache` to:
-- Deduplicate path segments stored in the slab.
-- Provide stable keys for `NameIndex` (BTreeMap<&'static str, SortedSlabIndices>).
+This is what lets `SearchCache` keep `SlabNode` names and `NameIndex` keys as cheap shared references instead of duplicating strings in every node.
 
----
+## Search helpers
+Available helpers:
+- `search_substr(...)`
+- `search_suffix(...)`
+- `search_prefix(...)`
+- `search_regex(...)`
+- `search_exact(...)`
 
-## Name-level search helpers
+All of them:
+- iterate the interned set in sorted order
+- return `Option<BTreeSet<&str>>`
+- use `CancellationToken::is_cancelled_sparse(...)` so large scans remain abortable
 
-NamePool supports several search modes, each taking a `CancellationToken`:
+`None` means the search was cancelled. `Some(set)` means the scan completed, even if the set is empty.
 
-- `search_substr(substr, token)` — names containing `substr`.
-- `search_suffix(suffix, token)` — names ending with `suffix`.
-- `search_prefix(prefix, token)` — names starting with `prefix`.
-- `search_regex(pattern, token)` — names matching a `Regex`.
-- `search_exact(exact, token)` — names equal to `exact`.
+## Integration with Cardinal
+- `search-cache` interns every basename through `NAME_POOL.push(...)`.
+- `NameIndex` maps each interned name to slab indices sorted by full path.
+- Query evaluation uses the pool as the fast first step for basename matching before path hierarchy constraints are applied.
 
-Shared behavior:
-- Results are returned as `Option<BTreeSet<&str>>`.
-  - `None` means the operation was cancelled.
-  - `Some(set)` contains borrowed references into the pool.
-- Each method iterates the pool and calls `token.is_cancelled_sparse(i)?;` so cancellation naturally propagates via `?`.
-
----
-
-## Integration notes
-
-- The search engine uses NamePool as a building block for higher-level query evaluation:
-  - `NameIndex` stores interned names for direct indexing.
-  - Path segmentation and Everything-style filters often reduce to name-level queries first.
-- Cancellation is shared with `search-cache` and other crates via `search-cancel` so the engine can abort work quickly when the user types a new query.
+## Practical notes
+- The pool is optimized for relatively infrequent inserts and very cheap repeated lookups.
+- `Debug` only prints the pool size, which keeps logs readable even when millions of names are interned.
