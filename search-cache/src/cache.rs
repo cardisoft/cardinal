@@ -457,7 +457,6 @@ impl SearchCache {
             {
                 index
             } else {
-                // TODO(ldm0): optimize: slab node children is empty, we can create a node chain directly.
                 let metadata = std::fs::symlink_metadata(&current_path)
                     .map(NodeMetadata::from)
                     .ok();
