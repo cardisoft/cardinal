@@ -4,17 +4,27 @@ import { invoke } from '@tauri-apps/api/core';
 import { Menu } from '@tauri-apps/api/menu';
 import type { MenuItemOptions } from '@tauri-apps/api/menu';
 import { useTranslation } from 'react-i18next';
+import type { ShortcutId, ShortcutMap } from '../shortcuts';
 import { openResultPath } from '../utils/openResultPath';
 import { splitPath } from '../utils/path';
+import { formatShortcutForDisplay } from '../utils/shortcutCapture';
 
 type UseContextMenuResult = {
   showContextMenu: (event: ReactMouseEvent<HTMLElement>, targetPaths: string[]) => void;
   showHeaderContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
 };
 
+type FileMenuActionDefinition = {
+  id: string;
+  text: string;
+  shortcutId: ShortcutId;
+  action: () => void;
+};
+
 export function useContextMenu(
   autoFitColumns: (() => void) | null = null,
-  onQuickLookRequest?: () => void | Promise<void>,
+  onQuickLookRequest: (() => void | Promise<void>) | undefined,
+  shortcuts: ShortcutMap,
 ): UseContextMenuResult {
   const { t } = useTranslation();
   const writeClipboard = useCallback((text: string) => {
@@ -30,17 +40,19 @@ export function useContextMenu(
       if (targetPaths.length === 0) {
         return [];
       }
+
       const copyLabel =
         targetPaths.length > 1 ? t('contextMenu.copyFiles') : t('contextMenu.copyFile');
       const copyFilenameLabel =
         targetPaths.length > 1 ? t('contextMenu.copyFilenames') : t('contextMenu.copyFilename');
       const copyPathLabel =
         targetPaths.length > 1 ? t('contextMenu.copyPaths') : t('contextMenu.copyPath');
-      const items: MenuItemOptions[] = [
+
+      const definitions: FileMenuActionDefinition[] = [
         {
           id: 'context_menu.open_item',
           text: t('contextMenu.openItem'),
-          accelerator: 'Cmd+O',
+          shortcutId: 'openResult',
           action: () => {
             targetPaths.forEach((itemPath) => openResultPath(itemPath));
           },
@@ -48,7 +60,7 @@ export function useContextMenu(
         {
           id: 'context_menu.open_in_finder',
           text: t('contextMenu.revealInFinder'),
-          accelerator: 'Cmd+R',
+          shortcutId: 'revealInFinder',
           action: () => {
             targetPaths.forEach((itemPath) => {
               void invoke('open_in_finder', { path: itemPath });
@@ -58,6 +70,7 @@ export function useContextMenu(
         {
           id: 'context_menu.copy_filename',
           text: copyFilenameLabel,
+          shortcutId: 'copyFilenames',
           action: () => {
             const filenames = targetPaths
               .map((itemPath) => splitPath(itemPath).name || itemPath)
@@ -68,7 +81,7 @@ export function useContextMenu(
         {
           id: 'context_menu.copy_paths',
           text: copyPathLabel,
-          accelerator: 'Cmd+Shift+C',
+          shortcutId: 'copyPaths',
           action: () => {
             writeClipboard(targetPaths.join('\n'));
           },
@@ -76,7 +89,7 @@ export function useContextMenu(
         {
           id: 'context_menu.copy_files',
           text: copyLabel,
-          accelerator: 'Cmd+C',
+          shortcutId: 'copyFiles',
           action: () => {
             void invoke('copy_files_to_clipboard', { paths: targetPaths }).catch((error) => {
               console.error('Failed to copy files to clipboard', error);
@@ -86,19 +99,24 @@ export function useContextMenu(
       ];
 
       if (onQuickLookRequest) {
-        items.push({
+        definitions.push({
           id: 'context_menu.quicklook',
           text: t('contextMenu.quickLook'),
-          accelerator: 'Space',
+          shortcutId: 'quickLook',
           action: () => {
             void onQuickLookRequest();
           },
         });
       }
 
-      return items;
+      return definitions.map((definition) => ({
+        id: definition.id,
+        text: definition.text,
+        accelerator: formatShortcutForDisplay(shortcuts[definition.shortcutId]),
+        action: definition.action,
+      }));
     },
-    [onQuickLookRequest, t, writeClipboard],
+    [onQuickLookRequest, shortcuts, t, writeClipboard],
   );
 
   const buildHeaderMenuItems = useCallback((): MenuItemOptions[] => {

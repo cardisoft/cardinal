@@ -1653,6 +1653,31 @@ button:active:not(:disabled) {
   outline-offset: 2px;
 }
 
+.preferences-manage-button {
+  border: 1px solid var(--color-elevated-border, var(--color-border));
+  background: var(--color-elevated-bg);
+  color: var(--color-text);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+
+.preferences-manage-button:hover {
+  border-color: var(--color-accent);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.preferences-manage-button:focus-visible {
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.4);
+  outline-offset: 2px;
+}
+
 .preferences-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1790,6 +1815,119 @@ button:active:not(:disabled) {
 :root[data-theme='dark'] .preferences-number-input:focus {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
   border-color: var(--color-accent);
+}
+
+/* === Shortcut Settings Modal === */
+.shortcut-settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2300;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(15, 17, 26, 0.84);
+  backdrop-filter: blur(8px);
+}
+
+.shortcut-settings-card {
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 96px);
+  background: var(--color-elevated-bg, var(--color-bg));
+  color: var(--color-text);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.36);
+  display: flex;
+  flex-direction: column;
+}
+
+.shortcut-settings-card__header {
+  padding-bottom: 12px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.shortcut-settings-card__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-header);
+}
+
+.shortcut-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.shortcut-settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.shortcut-settings-row__details {
+  min-width: 0;
+}
+
+.shortcut-settings-hint {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  color: var(--color-muted);
+}
+
+.shortcut-settings-capture-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-muted);
+}
+
+.shortcut-settings-capture-button {
+  min-width: 220px;
+  border: 1px solid var(--color-elevated-border, var(--color-border));
+  background: var(--color-elevated-bg);
+  color: var(--color-text);
+  border-radius: 8px;
+  padding: 7px 10px;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.shortcut-settings-capture-button:hover {
+  border-color: var(--color-accent);
+}
+
+.shortcut-settings-capture-button:focus-visible {
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.4);
+  outline-offset: 2px;
+}
+
+.shortcut-settings-capture-button--recording {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(var(--color-accent-rgb), 0.22);
+}
+
+.shortcut-settings-error {
+  margin: 0;
+}
+
+.shortcut-settings-card__footer {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 /* === Utilities (extracted from inline JSX styles) === */

@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import { subscribeQuickLookKeydown } from '../../runtime/tauriEventRuntime';
+import { DEFAULT_SHORTCUTS, type ShortcutMap } from '../../shortcuts';
 import { openResultPath } from '../../utils/openResultPath';
 import { useAppHotkeys } from '../useAppHotkeys';
 
@@ -25,6 +26,8 @@ type HookProps = {
   activeTab: 'files' | 'events';
   selectedPaths: string[];
   selectedIndicesRef: { current: number[] };
+  shortcuts: ShortcutMap;
+  enabled: boolean;
   focusSearchInput: () => void;
   navigateSelection: (delta: 1 | -1, options?: { extend?: boolean }) => void;
   triggerQuickLook: () => void;
@@ -44,6 +47,8 @@ describe('useAppHotkeys', () => {
         activeTab: 'files',
         selectedPaths: ['/tmp/a', '/tmp/b'],
         selectedIndicesRef: { current: [0] },
+        shortcuts: DEFAULT_SHORTCUTS,
+        enabled: true,
         focusSearchInput,
         navigateSelection,
         triggerQuickLook,
@@ -62,7 +67,13 @@ describe('useAppHotkeys', () => {
     });
   });
 
-  it('handles Meta+F, Meta+R, Meta+O, and Meta+C shortcuts on files tab', async () => {
+  it('handles Meta+F, Meta+R, Meta+O, Meta+Shift+F, and Meta+C shortcuts on files tab', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+
     renderHotkeys();
 
     const findEvent = new KeyboardEvent('keydown', {
@@ -109,6 +120,17 @@ describe('useAppHotkeys', () => {
     expect(mockedInvoke).toHaveBeenCalledWith('copy_files_to_clipboard', {
       paths: ['/tmp/a', '/tmp/b'],
     });
+
+    const copyFilenamesEvent = new KeyboardEvent('keydown', {
+      key: 'f',
+      metaKey: true,
+      shiftKey: true,
+      cancelable: true,
+    });
+    act(() => {
+      window.dispatchEvent(copyFilenamesEvent);
+    });
+    expect(writeText).toHaveBeenCalledWith('a b');
   });
 
   it('handles space and arrow navigation on files tab', () => {
@@ -169,6 +191,8 @@ describe('useAppHotkeys', () => {
       activeTab: 'events',
       selectedPaths: ['/tmp/a', '/tmp/b'],
       selectedIndicesRef: { current: [0] },
+      shortcuts: DEFAULT_SHORTCUTS,
+      enabled: true,
       focusSearchInput,
       navigateSelection,
       triggerQuickLook,

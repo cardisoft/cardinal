@@ -6,6 +6,7 @@ import { SearchBar } from './components/SearchBar';
 import { FilesTabContent } from './components/FilesTabContent';
 import { PermissionOverlay } from './components/PermissionOverlay';
 import PreferencesOverlay from './components/PreferencesOverlay';
+import ShortcutSettingsOverlay from './components/ShortcutSettingsOverlay';
 import StatusBar from './components/StatusBar';
 import type { SearchResultItem } from './types/search';
 import { useColumnResize } from './hooks/useColumnResize';
@@ -30,6 +31,7 @@ import { useAppPreferences } from './hooks/useAppPreferences';
 import { useAppWindowListeners } from './hooks/useAppWindowListeners';
 import { useFilesTabEffects } from './hooks/useFilesTabEffects';
 import { useFilesTabState } from './hooks/useFilesTabState';
+import { useShortcutSettingsController } from './hooks/useShortcutSettingsController';
 
 function App() {
   const {
@@ -66,6 +68,14 @@ function App() {
   const { caseSensitive } = searchParams;
   const { eventColWidths, onEventResizeStart, autoFitEventColumns } = useEventColumnWidths();
   const { t, i18n } = useTranslation();
+  const {
+    isShortcutSettingsOpen,
+    shortcuts,
+    defaultShortcuts,
+    openShortcutSettings,
+    closeShortcutSettings,
+    handleShortcutSettingsSave,
+  } = useShortcutSettingsController();
   // `resultsVersion` tracks raw backend search result-set changes.
   // `displayedResultsVersion` additionally tracks UI ordering/projection changes (e.g. sort toggle).
   const {
@@ -96,6 +106,8 @@ function App() {
   } = useFilesTabState({
     searchQuery: searchParams.query,
     queueSearch,
+    shortcuts,
+    shortcutsEnabled: !isShortcutSettingsOpen,
   });
   const { filteredEvents } = useRecentFSEvents({
     caseSensitive,
@@ -128,12 +140,12 @@ function App() {
   const {
     showContextMenu: showFilesContextMenu,
     showHeaderContextMenu: showFilesHeaderContextMenu,
-  } = useContextMenu(autoFitColumns, toggleQuickLook);
+  } = useContextMenu(autoFitColumns, toggleQuickLook, shortcuts);
 
   const {
     showContextMenu: showEventsContextMenu,
     showHeaderContextMenu: showEventsHeaderContextMenu,
-  } = useContextMenu(autoFitEventColumns);
+  } = useContextMenu(autoFitEventColumns, undefined, shortcuts);
 
   const {
     status: fullDiskAccessStatus,
@@ -193,6 +205,8 @@ function App() {
     activeTab,
     selectedPaths,
     selectedIndicesRef,
+    shortcuts,
+    enabled: !isShortcutSettingsOpen,
     focusSearchInput,
     navigateSelection,
     triggerQuickLook,
@@ -332,7 +346,10 @@ function App() {
 
   return (
     <>
-      <main className="container" aria-hidden={showFullDiskAccessOverlay || isPreferencesOpen}>
+      <main
+        className="container"
+        aria-hidden={showFullDiskAccessOverlay || isPreferencesOpen || isShortcutSettingsOpen}
+      >
         <SearchBar
           inputRef={searchInputRef}
           placeholder={searchPlaceholder}
@@ -396,6 +413,7 @@ function App() {
       <PreferencesOverlay
         open={isPreferencesOpen}
         onClose={closePreferences}
+        onOpenShortcutSettings={openShortcutSettings}
         sortThreshold={sortThreshold}
         defaultSortThreshold={DEFAULT_SORTABLE_RESULT_THRESHOLD}
         onSortThresholdChange={setSortThreshold}
@@ -408,6 +426,13 @@ function App() {
         defaultIgnorePaths={defaultIgnorePaths}
         onReset={handleResetPreferences}
         themeResetToken={preferencesResetToken}
+      />
+      <ShortcutSettingsOverlay
+        open={isShortcutSettingsOpen}
+        onClose={closeShortcutSettings}
+        shortcuts={shortcuts}
+        defaultShortcuts={defaultShortcuts}
+        onShortcutSettingsSave={handleShortcutSettingsSave}
       />
       {showFullDiskAccessOverlay && (
         <PermissionOverlay

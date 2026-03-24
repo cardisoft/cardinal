@@ -48,6 +48,8 @@ For the supported operator catalog—including boolean grouping, folder scoping,
 
 ### Keyboard shortcuts & previews
 
+All shortcuts below are configurable in `Preferences -> Shortcuts`. The list shows default bindings.
+
 - `Cmd+Shift+Space` – toggle the Cardinal window globally via the quick-launch hotkey.
 - `Cmd+,` – open Preferences.
 - `Esc` – hide the Cardinal window.
@@ -56,6 +58,7 @@ For the supported operator catalog—including boolean grouping, folder scoping,
 - `Space` – Quick Look the currently selected row without leaving Cardinal.
 - `Cmd+O` – open the highlighted result.
 - `Cmd+R` – reveal the highlighted result in Finder.
+- `Cmd+Shift+F` – copy selected file names.
 - `Cmd+C` – copy the selected files to the clipboard.
 - `Cmd+Shift+C` – copy the selected paths to the clipboard.
 - `Cmd+F` – jump focus back to the search bar.
