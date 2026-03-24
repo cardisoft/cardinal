@@ -2,11 +2,26 @@ import { useCallback } from 'react';
 import { useStoredState } from './useStoredState';
 
 const STORAGE_KEY = 'cardinal.ignorePaths';
-// Ignore /Volumes, ~/Library/CloudStorage, and ~/Library/Caches by default:
-// - `/Volumes` contains external drives and network mounts that can be large or slow to traverse.
-// - `~/Library/CloudStorage` contains cloud provider stubs (for example OneDrive) that may trigger network I/O on first traversal.
-// - `~/Library/Caches` is high-churn, disposable data that adds indexing cost with little search value.
-const DEFAULT_IGNORE_PATHS = ['/Volumes', '~/Library/CloudStorage', '~/Library/Caches'];
+// Ignore generated, disposable, or high-churn macOS paths by default:
+// - `/Volumes` can include external drives and network mounts that are large or slow to traverse.
+// - `~/Library/CloudStorage` can contain cloud stubs that trigger downloads or network I/O.
+// - `~/Library/Biome` stores system suggestions/activity data rather than user-authored files.
+// - `~/Library/Caches`, `~/Library/Logs`, and `~/Library/Metadata` are cache/log/metadata stores rather than user-authored files.
+// - `/Library/Caches` and `/System/Library/Caches` are transient system caches with low search value.
+// - `/private/var` is a broad system runtime area for temp files, caches, logs, and databases.
+// - `/private/tmp` is a temporary-file area with very high churn and little search value.
+const DEFAULT_IGNORE_PATHS = [
+  '/Volumes',
+  '~/Library/CloudStorage',
+  '~/Library/Biome',
+  '~/Library/Caches',
+  '~/Library/Logs',
+  '~/Library/Metadata',
+  '/Library/Caches',
+  '/System/Library/Caches',
+  '/private/var',
+  '/private/tmp',
+];
 
 const cleanPaths = (next: string[]): string[] =>
   next.map((item) => item.trim()).filter((item) => item.length > 0);
