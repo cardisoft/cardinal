@@ -4,6 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useIgnorePaths } from '../useIgnorePaths';
 
 const STORAGE_KEY = 'cardinal.ignorePaths';
+const EXPECTED_DEFAULT_IGNORE_PATHS = [
+  '/Volumes',
+  '~/Library/CloudStorage',
+  '~/Library/Biome',
+  '~/Library/Caches',
+  '~/Library/Logs',
+  '~/Library/Metadata',
+  '/Library/Caches',
+  '/System/Library/Caches',
+  '/private/var',
+  '/private/tmp',
+];
 
 const flushEffects = async () => {
   await act(async () => {});
@@ -36,21 +48,29 @@ describe('useIgnorePaths', () => {
 
     const { result } = renderHook(() => useIgnorePaths());
 
-    expect(result.current.ignorePaths).toEqual(result.current.defaultIgnorePaths);
+    expect(result.current.ignorePaths).toEqual(EXPECTED_DEFAULT_IGNORE_PATHS);
+    expect(result.current.defaultIgnorePaths).toEqual(EXPECTED_DEFAULT_IGNORE_PATHS);
 
     await flushEffects();
 
     expect(setItemSpy).toHaveBeenCalledWith(
       STORAGE_KEY,
-      JSON.stringify(result.current.defaultIgnorePaths),
+      JSON.stringify(EXPECTED_DEFAULT_IGNORE_PATHS),
     );
   });
 
-  it('includes CloudStorage and Caches in default ignore paths', () => {
+  it('includes cache, biome, logs, metadata, and system runtime folders in default ignore paths', () => {
     const { result } = renderHook(() => useIgnorePaths());
 
     expect(result.current.defaultIgnorePaths).toContain('~/Library/CloudStorage');
     expect(result.current.defaultIgnorePaths).toContain('~/Library/Caches');
+    expect(result.current.defaultIgnorePaths).toContain('/Library/Caches');
+    expect(result.current.defaultIgnorePaths).toContain('/System/Library/Caches');
+    expect(result.current.defaultIgnorePaths).toContain('~/Library/Biome');
+    expect(result.current.defaultIgnorePaths).toContain('~/Library/Logs');
+    expect(result.current.defaultIgnorePaths).toContain('~/Library/Metadata');
+    expect(result.current.defaultIgnorePaths).toContain('/private/var');
+    expect(result.current.defaultIgnorePaths).toContain('/private/tmp');
   });
 
   it('keeps an empty stored array without writing defaults', async () => {
