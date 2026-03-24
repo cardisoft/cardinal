@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.23 — 2026-03-25
+- Reduce power consumption by expanding the default ignored paths to cover more macOS cache, log, metadata, and runtime directories.
+- Further reduce background work by making the filesystem event watcher honor ignored paths.
+- Improve Unicode path matching by searching both NFC and NFD-equivalent query forms.
+
 ## 0.1.22 — 2026-03-08
 - Add `~/Library/CloudStorage` to default ignored paths to avoid initial indexing delays
 - Make index building cancellable
