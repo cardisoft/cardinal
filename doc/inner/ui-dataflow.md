@@ -1,89 +1,88 @@
 # UI Dataflow
 
-This chapter maps the React-side components and hooks to the IPC layer.
+This chapter maps the React-side state graph to the Tauri command/event layer.
 
----
-
-## Search execution
+## Search pipeline
+```text
+SearchBar / keyboard submit
+  -> useFilesTabState.queueSearch(...)
+  -> useFileSearch.handleSearch(...)
+  -> invoke('search', { query, options, version })
+  -> SearchResponse { results, highlights }
+  -> useRemoteSort(...)
+  -> <VirtualList results={displayedResults} ... />
 ```
-Search input change
-  -> debounce (unless immediate) -> invoke('search', { query, options, version })
-  -> receive { results: SlabIndex[], highlights }
-  -> store results in state and pass to <VirtualList>
-```
 
-- Each `search` call carries a `version` used to build a `CancellationToken`.
-- The UI can trigger immediate searches (initial load and Enter key) to bypass debounce.
-- When a new query starts, older tokens are considered cancelled inside the engine; loops exit early and the Tauri command returns an empty `results` list for those searches.
-- Independently, the React hook uses its own `searchVersionRef` to ignore any `search` responses whose `version` does not match the latest request.
+- `useFileSearch` owns the authoritative search state: raw `results`, `resultsVersion`, highlight terms, status counters, lifecycle state, loading UI, timing, and error state.
+- Each request increments `searchVersionRef` and passes that number as `version`.
+- The backend turns `version` into `CancellationToken::new(version)`.
+- React still discards stale responses locally if their request id is no longer current.
+- Loading UI is immediate for the first search and delayed by 150 ms for later searches.
 
----
+## Result projection and sorting
+- `useRemoteSort` decides whether sorting stays enabled based on `sortThreshold` (default `20000`).
+- When sorting is active, it calls `get_sorted_view` and receives a reordered `SlabIndex[]`.
+- The hook exposes two different version tokens:
+  - `resultsVersion`: raw backend result-set changes
+  - `displayedResultsVersion`: UI projection changes, including sort on/off flips
+- `VirtualList` uses both:
+  - `dataResultsVersion` resets hydrated row data
+  - `displayedResultsVersion` resets viewport/icon tracking
 
 ## Row hydration
-```
-<VirtualList> computes visible range [start,end] with overscan
-  -> useDataLoader.ensureRangeLoaded(start,end)
-      -> invoke('get_nodes_info', { results: slice })
-      -> cache rows by array index (guarded by versionRef)
-  -> renderRow uses cached item (path, metadata, icon)
-```
-
-- `useDataLoader` increments `versionRef` whenever the results array identity changes.
-- Responses for old versions are discarded to prevent stale rows from populating the cache.
-
-End-to-end path overview:
 ```text
-SearchBar (React)
-  └─ queueSearch(query)
-        ↓
-   useFileSearch.handleSearch
-        ↓
-   invoke('search', { query, options, version })
-        ↓
-   Tauri command → SearchCache::search_with_options
-        ↓
-   { results: Vec<SlabIndex>, highlights }
-        ↓
-VirtualList (results)
-  ├─ ensureRangeLoaded(start,end)
-  │     → invoke('get_nodes_info', { results: slice })
-  │     → cache rows
-  └─ useIconViewport(start,end)
-        → invoke('update_icon_viewport', { id, viewport })
-        → backend emits icon_update → useDataLoader patches icons
+VirtualList visible window [start, end]
+  -> useDataLoader.ensureRangeLoaded(start, end)
+  -> invoke('get_nodes_info', { results: slabIndices })
+  -> cache rows by SlabIndex
 ```
 
----
+- `useDataLoader` caches `SearchResultItem` by `SlabIndex`, not by visible row index.
+- `versionRef` is bumped when `dataResultsVersion` changes; old fetches are ignored.
+- `loadingRef` prevents duplicate fetches for the same slab index.
+- `fromNodeInfo(...)` normalizes both legacy top-level fields and nested `metadata`.
 
-## Icon pipeline
-```
-<VirtualList> useIconViewport(start,end)
-  -> invoke('update_icon_viewport', { id, viewport: slab indices })
-Backend QuickLook loads icons for those paths
-  -> emits icon_update [{ slabIndex, icon }]
-useDataLoader listens to icon_update
-  -> map slabIndex -> row index; patch cache with override icon
-```
-
-- Icon updates only override the `icon` field of cached rows; other metadata stays intact.
-- `iconOverridesRef` ensures that pushed icons win over older node-info results.
-
----
-
-## Window and shortcuts
-```
-Global shortcut (Cmd+Shift+Space)
-  -> invoke('toggle_main_window')
-  -> backend activates window and emits quick_launch
-  -> UI focuses search input upon quick_launch event
+## Icon updates
+```text
+VirtualList
+  -> useIconViewport({ results: displayedResults, start, end })
+  -> invoke('update_icon_viewport', { id, viewport })
+  -> backend emits icon_update[]
+  -> useDataLoader patches cached icons in place
 ```
 
-- `hide_main_window`, `activate_main_window`, and `toggle_main_window` are also bound to menu items and escape keys for full keyboard control.
+- `useIconViewport` batches updates with `requestAnimationFrame`.
+- It deduplicates unchanged ranges and sends an empty viewport once when the list becomes empty or unmounts.
+- `iconOverridesRef` ensures pushed Quick Look thumbnails win over older `get_nodes_info` responses.
 
----
+## Window-level event runtime
+`cardinal/src/runtime/tauriEventRuntime.ts` registers shared listeners for:
+- `status_bar_update`
+- `app_lifecycle_state`
+- `quick_launch`
+- `fs_events_batch`
+- `icon_update`
+- `quicklook-keydown`
+- Tauri drag-drop events from the current window
 
-## Adding new flows
-- Define Tauri commands first and document them in `ipc-commands.md`.
-- Create hooks that encapsulate IPC details and expose a clean React interface.
-- Use versioned state or tokens for any long-running or cancellable work.
-- Prefer event listeners for push-style updates to avoid polling loops in React.
+`useAppWindowListeners` wires those events into app state:
+- status counters -> `useFileSearch`
+- lifecycle -> `useFileSearch`
+- quick launch -> focus/select the search input
+- drag-drop -> quote the dropped path and route it to either file search or event filtering
+
+## Recent FSEvents tab
+- `useRecentFSEvents` keeps an in-memory buffer of up to `10000` recent events.
+- The hook only forces re-rendering while the Events tab is active; otherwise it keeps buffering silently.
+- Filtering happens in memory against both full path and basename, with optional case sensitivity.
+
+## Quick Look flow
+- `useSelection` owns the current file selection.
+- `useQuickLook` turns selected paths into `QuickLookItemPayload[]`, including screen-space icon rects when the corresponding row DOM exists.
+- `toggle_quicklook` / `update_quicklook` keep `QLPreviewPanel` in sync.
+- Native Up/Down arrow handling inside Quick Look is reflected back to the UI through `quicklook-keydown`.
+
+## Practical rule of thumb
+- Commands are used for request/response work (`search`, `get_nodes_info`, `get_sorted_view`).
+- Tauri events are used for push work (`status_bar_update`, `fs_events_batch`, `icon_update`, `quick_launch`).
+- Version tokens exist at both the backend and React layers because either side can observe stale work independently.
