@@ -136,6 +136,29 @@ describe('useAppHotkeys', () => {
     input.remove();
   });
 
+  it('still routes Meta+F to the app search input from editable fields', () => {
+    renderHotkeys();
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+
+    const findEvent = new KeyboardEvent('keydown', {
+      key: 'f',
+      metaKey: true,
+      cancelable: true,
+      bubbles: true,
+    });
+
+    act(() => {
+      input.dispatchEvent(findEvent);
+    });
+
+    expect(focusSearchInput).toHaveBeenCalledTimes(1);
+    expect(findEvent.defaultPrevented).toBe(true);
+
+    input.remove();
+  });
+
   it('handles space and arrow navigation on files tab', () => {
     renderHotkeys();
 
