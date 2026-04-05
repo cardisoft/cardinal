@@ -111,6 +111,31 @@ describe('useAppHotkeys', () => {
     });
   });
 
+  it('does not override native copy shortcuts inside editable fields', () => {
+    renderHotkeys();
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+
+    const copyEvent = new KeyboardEvent('keydown', {
+      key: 'c',
+      metaKey: true,
+      cancelable: true,
+      bubbles: true,
+    });
+
+    act(() => {
+      input.dispatchEvent(copyEvent);
+    });
+
+    expect(mockedInvoke).not.toHaveBeenCalledWith('copy_files_to_clipboard', {
+      paths: ['/tmp/a', '/tmp/b'],
+    });
+    expect(copyEvent.defaultPrevented).toBe(false);
+
+    input.remove();
+  });
+
   it('handles space and arrow navigation on files tab', () => {
     renderHotkeys();
 

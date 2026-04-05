@@ -56,6 +56,11 @@ export function useAppHotkeys({
       return true;
     }
 
+    // Preserve native copy/find/edit behavior when focus is inside an editable control.
+    if (isEditableTarget(event.target)) {
+      return false;
+    }
+
     if (currentTab !== 'files') {
       return false;
     }
