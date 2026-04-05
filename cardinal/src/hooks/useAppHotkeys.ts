@@ -56,6 +56,12 @@ export function useAppHotkeys({
       return true;
     }
 
+    // Preserve native copy/edit behavior when focus is inside an editable control.
+    // Meta+F is intentionally handled above to focus the app search input.
+    if (isEditableTarget(event.target)) {
+      return false;
+    }
+
     if (currentTab !== 'files') {
       return false;
     }

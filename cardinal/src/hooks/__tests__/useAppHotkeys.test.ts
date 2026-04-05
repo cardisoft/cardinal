@@ -111,6 +111,54 @@ describe('useAppHotkeys', () => {
     });
   });
 
+  it('does not override native copy shortcuts inside editable fields', () => {
+    renderHotkeys();
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+
+    const copyEvent = new KeyboardEvent('keydown', {
+      key: 'c',
+      metaKey: true,
+      cancelable: true,
+      bubbles: true,
+    });
+
+    act(() => {
+      input.dispatchEvent(copyEvent);
+    });
+
+    expect(mockedInvoke).not.toHaveBeenCalledWith('copy_files_to_clipboard', {
+      paths: ['/tmp/a', '/tmp/b'],
+    });
+    expect(copyEvent.defaultPrevented).toBe(false);
+
+    input.remove();
+  });
+
+  it('still routes Meta+F to the app search input from editable fields', () => {
+    renderHotkeys();
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+
+    const findEvent = new KeyboardEvent('keydown', {
+      key: 'f',
+      metaKey: true,
+      cancelable: true,
+      bubbles: true,
+    });
+
+    act(() => {
+      input.dispatchEvent(findEvent);
+    });
+
+    expect(focusSearchInput).toHaveBeenCalledTimes(1);
+    expect(findEvent.defaultPrevented).toBe(true);
+
+    input.remove();
+  });
+
   it('handles space and arrow navigation on files tab', () => {
     renderHotkeys();
 
