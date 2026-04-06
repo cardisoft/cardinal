@@ -20,7 +20,7 @@ typed-num = { version = "0.3.0", default-features = false, features = [
 ] }
 itertools = "0.14"
 tracing = "0.1"
-postcard = { version = "1", features = ["use-std"] }
+postcard = { version = "1", default-features = false, features = ["use-std"] }
 enumn = "0.1"
 thin-vec = { version = "0.2.14", features = ["serde"] }
 hashbrown = { version = "0.16.0", features = ["serde"] }
