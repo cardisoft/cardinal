@@ -11,5 +11,5 @@ serde = { version = "1", features = ["derive"] }
 [dev-dependencies]
 serde-value = "0.7"
 slab = { version = "0.4", features = ["serde"] }
-postcard = { version = "1", features = ["use-std"] }
+postcard = { version = "1", default-features = false, features = ["use-std"] }
 serde_json = "1"
