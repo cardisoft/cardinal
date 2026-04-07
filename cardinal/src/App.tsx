@@ -357,7 +357,7 @@ function App() {
               caseInsensitive={!caseSensitive}
             />
           ) : (
-            // `dataResultsVersion`: backend result-set changes (cache invalidation).
+            // `dataResultsVersion`: backend result-set changes (stale fetch invalidation).
             // `displayedResultsVersion`: visible-order/projection changes (viewport invalidation).
             <FilesTabContent
               headerRef={headerRef}

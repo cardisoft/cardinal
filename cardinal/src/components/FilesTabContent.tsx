@@ -19,7 +19,7 @@ type FilesTabContentProps = {
   currentQuery: string;
   virtualListRef: React.Ref<VirtualListHandle>;
   results: SlabIndex[];
-  // Bumps when backend search results change; invalidates row metadata cache.
+  // Bumps when backend search results change; useDataLoader uses it to reject stale fetches.
   dataResultsVersion: number;
   // Bumps when visible ordering changes; invalidates viewport-dependent state.
   displayedResultsVersion: number;

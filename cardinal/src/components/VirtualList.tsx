@@ -25,7 +25,7 @@ export type VirtualListHandle = {
 
 type VirtualListProps = {
   results: SlabIndex[];
-  // Raw data version from search responses; drives row-cache resets in useDataLoader.
+  // Raw data version from search responses; advances useDataLoader's request epoch.
   dataResultsVersion: number;
   // Visible ordering/version token; drives viewport/icon hydration refreshes.
   displayedResultsVersion: number;
