@@ -19,6 +19,8 @@ const fromNodeInfo = (node: NodeInfoResponse): SearchResultItem => ({
 
 export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) {
   const loadingRef = useRef<Set<SlabIndex>>(new Set());
+  // Monotonic epoch for range-load requests. A new search result-set bumps this value so
+  // late `get_nodes_info` responses from the previous result-set can be ignored safely.
   const versionRef = useRef(0);
   const cacheRef = useRef<DataLoaderCache>(new Map());
   const iconOverridesRef = useRef<Map<SlabIndex, IconOverrideValue>>(new Map());
@@ -30,14 +32,13 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
   const resultsRef = useRef<SlabIndex[]>([]);
   resultsRef.current = results;
 
-  // Reset loading state whenever the result source changes.
+  // Bump the request epoch whenever the backing result-set changes so late responses
+  // cannot write into the cache for a newer query. Cached rows stay reusable by slab index.
   useEffect(() => {
     versionRef.current += 1;
+    // Clear "currently loading" bookkeeping so the next visible range can request any slab
+    // indices that were pending for the previous result-set but never resolved into this one.
     loadingRef.current.clear();
-    iconOverridesRef.current.clear();
-    const nextCache = new Map<SlabIndex, SearchResultItem>();
-    cacheRef.current = nextCache;
-    setCache(nextCache);
   }, [dataResultsVersion]);
 
   useEffect(() => {
@@ -89,6 +90,8 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
       const needLoading: SlabIndex[] = [];
       for (let i = start; i <= end && i < total; i++) {
         const slabIndex = list[i];
+        // Reuse any cached row payloads we already have for this slab index; only request
+        // the misses in the current viewport.
         if (!cacheRef.current.has(slabIndex) && !loadingRef.current.has(slabIndex)) {
           needLoading.push(slabIndex);
           loadingRef.current.add(slabIndex);
@@ -98,6 +101,8 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
       const versionAtRequest = versionRef.current;
       const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', { results: needLoading });
       if (versionRef.current !== versionAtRequest) {
+        // The result-set changed while this request was in flight. Drop the payload instead of
+        // merging stale rows into the cache for the new query.
         releaseLoadingBatch(needLoading);
         return;
       }
@@ -115,6 +120,7 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
           const normalizedItem = fromNodeInfo(fetchedItem);
           const existing = prev.get(slabIndex);
           const hasOverride = iconOverridesRef.current.has(slabIndex);
+          // Preserve newer icon updates that may have arrived after the node snapshot was read.
           const preferredIcon = hasOverride
             ? iconOverridesRef.current.get(slabIndex)
             : (existing?.icon ?? normalizedItem.icon);
