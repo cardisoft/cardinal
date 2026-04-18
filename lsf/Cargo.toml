@@ -15,3 +15,5 @@ clap = { version = "4", features = ["derive"] }
 anyhow = "1.0.97"
 crossbeam-channel = "0.5.15"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap-verbosity-flag = {version = "3.0.4", features = ["tracing"]}
+rustyline = "18.0.0"

@@ -8,4 +8,6 @@ pub struct Cli {
     pub refresh: bool,
     #[clap(long, default_value = "/")]
     pub path: PathBuf,
+    #[command(flatten)]
+    pub verbosity: clap_verbosity_flag::Verbosity,
 }
