@@ -5,28 +5,29 @@ use cardinal_sdk::EventWatcher;
 use clap::Parser;
 use cli::Cli;
 use crossbeam_channel::{Sender, bounded, unbounded};
+use rustyline::{DefaultEditor, error::ReadlineError};
 use search_cache::{HandleFSEError, SearchCache, SearchResultNode};
 use search_cancel::CancellationToken;
 use std::{
-    io::Write,
     path::{Path, PathBuf},
     sync::atomic::AtomicBool,
 };
-use tracing_subscriber::{EnvFilter, filter::LevelFilter};
+use tracing_subscriber::EnvFilter;
 
 const CACHE_PATH: &str = "target/cache.zstd";
 const IGNORE_PATH: &str = "/System/Volumes/Data"; // macOS specific ignore path
 static NEVER_STOPPED: AtomicBool = AtomicBool::new(false);
 
 fn main() -> Result<()> {
+    let cli = Cli::parse();
+
     let builder = tracing_subscriber::fmt();
     if let Ok(filter) = EnvFilter::try_from_default_env() {
         builder.with_env_filter(filter).init();
     } else {
-        builder.with_max_level(LevelFilter::INFO).init();
+        builder.with_max_level(cli.verbosity.tracing_level()).init();
     }
 
-    let cli = Cli::parse();
     let path = cli.path;
     let ignore_paths = vec![PathBuf::from(IGNORE_PATH)];
     let mut cache = if cli.refresh {
@@ -105,34 +106,48 @@ fn main() -> Result<()> {
         println!("fsevent processing is done");
     });
 
-    let stdin = std::io::stdin();
-    let mut stdout = std::io::stdout();
+    let mut rl = DefaultEditor::new().expect("Failed to create rustyline editor");
     loop {
-        print!("> ");
-        stdout.flush().unwrap();
-        let mut line = String::new();
-        stdin.read_line(&mut line).unwrap();
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        } else if line == "/bye" {
-            break;
-        }
+        let readline = rl.readline("> ");
+        match readline {
+            Ok(line) => {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                } else if line == "/bye" {
+                    break;
+                }
 
-        search_tx
-            .send(line.to_string())
-            .context("search_tx is closed")?;
-        let search_result = search_result_rx
-            .recv()
-            .context("search_result_rx is closed")?;
-        match search_result {
-            Ok(path_set) => {
-                for (i, path) in path_set.into_iter().enumerate() {
-                    println!("[{i}] {:?} {:?}", path.path, path.metadata);
+                let _ = rl.add_history_entry(line);
+
+                search_tx
+                    .send(line.to_string())
+                    .context("search_tx is closed")?;
+                let search_result = search_result_rx
+                    .recv()
+                    .context("search_result_rx is closed")?;
+                match search_result {
+                    Ok(path_set) => {
+                        for (i, path) in path_set.into_iter().enumerate() {
+                            println!("[{i}] {:?} {:?}", path.path, path.metadata);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to search: {e:?}");
+                    }
                 }
             }
-            Err(e) => {
-                eprintln!("Failed to search: {e:?}");
+            Err(ReadlineError::Interrupted) => {
+                eprintln!("Interrupted (Ctrl-C)");
+                break;
+            }
+            Err(ReadlineError::Eof) => {
+                eprintln!("EOF (Ctrl-D)");
+                break;
+            }
+            Err(err) => {
+                eprintln!("Error: {:?}", err);
+                break;
             }
         }
     }
