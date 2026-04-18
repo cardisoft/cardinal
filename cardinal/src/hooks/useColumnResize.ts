@@ -59,6 +59,45 @@ const calculateAutoColumnWidths = (windowWidth: number): ColumnWidths => {
   return withAutoFilenameWidth(widths, getAvailableWidth(windowWidth));
 };
 
+const resizeForWindowWidth = (prev: ColumnResizeState, available: number): ColumnResizeState => {
+  // Manual mode means the user owns every column width. A window resize should
+  // not disturb those widths unless the viewport is resized back near the
+  // current total, which is our snap point for returning to autoFilename mode.
+  if (
+    prev.mode === 'manual' &&
+    Math.abs(available - getTotalWidth(prev.widths)) > AUTO_SNAP_THRESHOLD
+  ) {
+    return prev;
+  }
+
+  const widths = withAutoFilenameWidth(prev.widths, available);
+  // Avoid rerendering on resize events that do not actually change either the
+  // layout mode or the derived filename width.
+  if (prev.mode === 'autoFilename' && widths === prev.widths) {
+    return prev;
+  }
+
+  return { mode: 'autoFilename', widths };
+};
+
+const resizeColumnManually = (
+  prev: ColumnResizeState,
+  key: ColumnKey,
+  newWidth: number,
+): ColumnResizeState => {
+  // Dragging any column is a user override, so even a no-op width update should
+  // leave autoFilename mode and enter manual mode. Once already manual, preserve
+  // the previous state object when the width is unchanged; resizeDrag can emit
+  // repeated values during rAF coalescing, and returning prev avoids redundant
+  // React work.
+  const widths = prev.widths[key] === newWidth ? prev.widths : { ...prev.widths, [key]: newWidth };
+  if (prev.mode === 'manual' && widths === prev.widths) {
+    return prev;
+  }
+
+  return { mode: 'manual', widths };
+};
+
 export function useColumnResize() {
   const [state, setState] = useState<ColumnResizeState>(() => ({
     mode: 'autoFilename',
@@ -73,20 +112,7 @@ export function useColumnResize() {
     const handleResize = () => {
       setState((prev) => {
         const available = getAvailableWidth(window.innerWidth);
-
-        if (
-          prev.mode === 'manual' &&
-          Math.abs(available - getTotalWidth(prev.widths)) > AUTO_SNAP_THRESHOLD
-        ) {
-          return prev;
-        }
-
-        const widths = withAutoFilenameWidth(prev.widths, available);
-        if (prev.mode === 'autoFilename' && widths === prev.widths) {
-          return prev;
-        }
-
-        return { mode: 'autoFilename', widths };
+        return resizeForWindowWidth(prev, available);
       });
     };
     window.addEventListener('resize', handleResize);
@@ -106,15 +132,7 @@ export function useColumnResize() {
         startWidth,
         clampWidth,
         applyWidth: (newWidth) => {
-          setState((prev) => {
-            const widths =
-              prev.widths[key] === newWidth ? prev.widths : { ...prev.widths, [key]: newWidth };
-            if (prev.mode === 'manual' && widths === prev.widths) {
-              return prev;
-            }
-
-            return { mode: 'manual', widths };
-          });
+          setState((prev) => resizeColumnManually(prev, key, newWidth));
         },
       });
     },
