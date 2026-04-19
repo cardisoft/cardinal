@@ -55,6 +55,8 @@ struct TuiApp {
     pending_ctrl_w: bool,
     details_popup_open: bool,
     quit_confirm_open: bool,
+    help_open: bool,
+    help_scroll: u16,
     confirm_quit: bool,
     sort: Option<SortState>,
     runtime_status: RuntimeStatus,
@@ -116,6 +118,8 @@ impl TuiApp {
             pending_ctrl_w: false,
             details_popup_open: false,
             quit_confirm_open: false,
+            help_open: false,
+            help_scroll: 0,
             confirm_quit: true,
             sort: None,
             runtime_status: RuntimeStatus {
@@ -128,7 +132,8 @@ impl TuiApp {
         }
     }
 
-    fn apply_search(&mut self, response: SearchResponse) {
+    /// Apply search results to the app state
+    fn apply_search_result(&mut self, response: SearchResponse) {
         let selected_path = self.selected_result().map(|result| result.path.clone());
         self.results = response.results;
         self.total_indexed = response.total_indexed;
@@ -225,7 +230,13 @@ impl TuiApp {
 
     fn start_ctrl_w(&mut self) {
         self.pending_ctrl_w = true;
-        self.status = "Ctrl+W pending: press Up or Down to switch focus.".to_string();
+        self.status = "Ctrl+W pending: j/k or Up/Down to switch focus, ? for help.".to_string();
+    }
+
+    fn toggle_help(&mut self) {
+        self.help_open = !self.help_open;
+        self.help_scroll = 0;
+        self.pending_ctrl_w = false;
     }
 
     fn clear_ctrl_w_pending(&mut self) {
@@ -267,8 +278,9 @@ impl TuiApp {
                 );
                 return;
             }
+
             match runtime.search(self.query.clone()) {
-                Ok(response) => self.apply_search(response),
+                Ok(response) => self.apply_search_result(response),
                 Err(err) => {
                     self.results.clear();
                     self.selected = 0;
@@ -372,155 +384,158 @@ impl TuiApp {
         }
         self.selected = selected_index.min(self.results.len() - 1);
     }
+}
 
-    fn render(&self, frame: &mut Frame) {
-        let layout = layout_for_area(frame.area());
+fn render(app: &TuiApp, frame: &mut Frame) {
+    let layout = layout_for_area(frame.area());
 
-        // 1. query input box
-        let query_border = if self.focus == Focus::Query {
+    // 1. query input box
+    let query_border = if app.focus == Focus::Query {
+        Style::default().fg(Color::Cyan)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+    let search = Paragraph::new(app.query.as_str()).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Query")
+            .border_style(query_border),
+    );
+    frame.render_widget(search, layout.query);
+    if app.focus == Focus::Query {
+        frame.set_cursor_position((
+            layout.query.x + 1 + display_width(&app.query[..app.cursor]) as u16,
+            layout.query.y + 1,
+        ));
+    }
+
+    // 2. result table or indexing panel(the result is not ready yet)
+    if app.runtime_status.lifecycle == AppLifecycleStatus::Ready {
+        let rows: Vec<Row> = app
+            .results
+            .iter()
+            .map(|result| {
+                let columns = result_columns(result);
+                Row::new([
+                    Cell::from(columns.filename),
+                    Cell::from(columns.directory),
+                    Cell::from(columns.size),
+                    Cell::from(columns.modified),
+                    Cell::from(columns.created),
+                ])
+            })
+            .collect();
+
+        let mut table_state =
+            TableState::default().with_selected((!app.results.is_empty()).then_some(app.selected));
+        let header = Row::new([
+            header_label("Filename", SortKey::Filename, app.sort),
+            header_label("Path", SortKey::FullPath, app.sort),
+            header_label("Size", SortKey::Size, app.sort),
+            header_label("Modified", SortKey::Modified, app.sort),
+            header_label("Created", SortKey::Created, app.sort),
+        ])
+        .style(
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::BOLD),
+        );
+        let results_border = if app.focus == Focus::Results {
             Style::default().fg(Color::Cyan)
         } else {
             Style::default().fg(Color::DarkGray)
         };
-        let search = Paragraph::new(self.query.as_str()).block(
+        let table = Table::new(
+            rows,
+            [
+                Constraint::Percentage(22),
+                Constraint::Percentage(34),
+                Constraint::Length(10),
+                Constraint::Length(21),
+                Constraint::Length(21),
+            ],
+        )
+        .header(header)
+        .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("Query")
-                .border_style(query_border),
-        );
-        frame.render_widget(search, layout.query);
-        if self.focus == Focus::Query {
-            frame.set_cursor_position((
-                layout.query.x + 1 + display_width(&self.query[..self.cursor]) as u16,
-                layout.query.y + 1,
-            ));
-        }
+                .title("Results")
+                .border_style(results_border),
+        )
+        .row_highlight_style(
+            Style::default()
+                .bg(Color::Rgb(25, 52, 77))
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(">> ");
+        frame.render_stateful_widget(table, layout.results, &mut table_state);
+    } else {
+        frame.render_widget(indexing_panel(app), layout.results);
+    }
 
-        // 2. result table
-        if self.runtime_status.lifecycle == AppLifecycleStatus::Ready {
-            let rows: Vec<Row> = self
-                .results
-                .iter()
-                .map(|result| {
-                    let columns = result_columns(result);
-                    Row::new([
-                        Cell::from(columns.filename),
-                        Cell::from(columns.directory),
-                        Cell::from(columns.size),
-                        Cell::from(columns.modified),
-                        Cell::from(columns.created),
-                    ])
-                })
-                .collect();
+    // 3. status bar
+    let status = Paragraph::new(status_bar_line(app)).block(Block::default().borders(Borders::TOP));
+    frame.render_widget(status, layout.status);
 
-            let mut table_state = TableState::default()
-                .with_selected((!self.results.is_empty()).then_some(self.selected));
-            let header = Row::new([
-                header_label("Filename", SortKey::Filename, self.sort),
-                header_label("Path", SortKey::FullPath, self.sort),
-                header_label("Size", SortKey::Size, self.sort),
-                header_label("Modified", SortKey::Modified, self.sort),
-                header_label("Created", SortKey::Created, self.sort),
-            ])
-            .style(
-                Style::default()
-                    .fg(Color::Gray)
-                    .add_modifier(Modifier::BOLD),
-            );
-            let results_border = if self.focus == Focus::Results {
-                Style::default().fg(Color::Cyan)
+    if app.details_popup_open {
+        render_popup(frame, app);
+    }
+    if app.quit_confirm_open {
+        render_quit_confirm(frame);
+    }
+    if app.help_open {
+        render_help(frame, app.help_scroll);
+    }
+}
+
+/// Render the indexing panel with a progress bar and status text.
+fn indexing_panel(app: &TuiApp) -> Paragraph<'static> {
+    let lifecycle = match app.runtime_status.lifecycle {
+        AppLifecycleStatus::Initializing => "Initializing index",
+        AppLifecycleStatus::Updating => "Updating index",
+        _ => unreachable!(),
+    };
+    let width = 32usize;
+    let pos = (app.tick as usize) % (width + 6);
+    let bar: String = (0..width)
+        .map(|idx| {
+            if idx >= pos.saturating_sub(5) && idx <= pos.min(width.saturating_sub(1)) {
+                '='
             } else {
-                Style::default().fg(Color::DarkGray)
-            };
-            let table = Table::new(
-                rows,
-                [
-                    Constraint::Percentage(22),
-                    Constraint::Percentage(34),
-                    Constraint::Length(10),
-                    Constraint::Length(21),
-                    Constraint::Length(21),
-                ],
-            )
-            .header(header)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title("Results")
-                    .border_style(results_border),
-            )
-            .row_highlight_style(
-                Style::default()
-                    .bg(Color::Rgb(25, 52, 77))
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .highlight_symbol(">> ");
-            frame.render_stateful_widget(table, layout.results, &mut table_state);
-        } else {
-            frame.render_widget(self.indexing_panel(), layout.results);
-        }
+                ' '
+            }
+        })
+        .collect();
+    let text = format!(
+        "{lifecycle}\n\n[{}]\n\nScanned files: {}\n\nYou can type a query now; results will appear when indexing is ready.",
+        bar, app.runtime_status.scanned_files
+    );
+    Paragraph::new(text)
+        .block(Block::default().borders(Borders::ALL).title("Indexing"))
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: false })
+}
 
-        // 3. status bar
-        let status =
-            Paragraph::new(self.status_bar_line()).block(Block::default().borders(Borders::TOP));
-        frame.render_widget(status, layout.status);
-
-        if self.details_popup_open {
-            render_popup(frame, self);
-        }
-        if self.quit_confirm_open {
-            render_quit_confirm(frame);
-        }
-    }
-
-    fn indexing_panel(&self) -> Paragraph<'static> {
-        let lifecycle = match self.runtime_status.lifecycle {
-            AppLifecycleStatus::Initializing => "Initializing index",
-            AppLifecycleStatus::Updating => "Updating index",
-            AppLifecycleStatus::Ready => "Ready",
-        };
-        let width = 32usize;
-        let pos = (self.tick as usize) % (width + 6);
-        let bar: String = (0..width)
-            .map(|idx| {
-                if idx >= pos.saturating_sub(5) && idx <= pos.min(width.saturating_sub(1)) {
-                    '='
-                } else {
-                    ' '
-                }
-            })
-            .collect();
-        let text = format!(
-            "{lifecycle}\n\n[{}]\n\nScanned files: {}\n\nYou can type a query now; results will appear when indexing is ready.",
-            bar, self.runtime_status.scanned_files
-        );
-        Paragraph::new(text)
-            .block(Block::default().borders(Borders::ALL).title("Indexing"))
-            .alignment(Alignment::Center)
-            .wrap(Wrap { trim: false })
-    }
-
-    fn status_bar_line(&self) -> Line<'static> {
-        let lifecycle = match self.runtime_status.lifecycle {
-            AppLifecycleStatus::Initializing => "○ Initializing",
-            AppLifecycleStatus::Updating => "◑ Updating",
-            AppLifecycleStatus::Ready => "● Ready",
-        };
-        let results = if self.runtime_status.lifecycle == AppLifecycleStatus::Ready {
-            format!("results {}", self.results.len())
-        } else {
-            "results --".to_string()
-        };
-        let sort = match self.sort {
-            Some(sort) => format!("sort {} {}", sort.key.label(), sort.direction.label()),
-            None => "sort off".to_string(),
-        };
-        Line::from(format!(
-            "{} | indexed {} | {} | {} | {}",
-            lifecycle, self.runtime_status.scanned_files, results, sort, self.status
-        ))
-    }
+fn status_bar_line(app: &TuiApp) -> Line<'static> {
+    let lifecycle = match app.runtime_status.lifecycle {
+        AppLifecycleStatus::Initializing => "○ Initializing",
+        AppLifecycleStatus::Updating => "◑ Updating",
+        AppLifecycleStatus::Ready => "● Ready",
+    };
+    let results = if app.runtime_status.lifecycle == AppLifecycleStatus::Ready {
+        format!("results {}", app.results.len())
+    } else {
+        "results --".to_string()
+    };
+    let sort = match app.sort {
+        Some(sort) => format!("sort {} {}", sort.key.label(), sort.direction.label()),
+        None => "sort off".to_string(),
+    };
+    Line::from(format!(
+        "{} | indexed {} | {} | {} | {}",
+        lifecycle, app.runtime_status.scanned_files, results, sort, app.status
+    ))
 }
 
 impl SortKey {
@@ -567,7 +582,7 @@ fn run_app(terminal: &mut DefaultTerminal, runtime: &AppRuntime, confirm_quit: b
         {
             app.search_if_ready(runtime);
         }
-        terminal.draw(|frame| app.render(frame))?;
+        terminal.draw(|frame| render(&app, frame))?;
         if event::poll(Duration::from_millis(100))? {
             match event::read()? {
                 Event::Key(key) => {
@@ -613,10 +628,31 @@ fn run_app(terminal: &mut DefaultTerminal, runtime: &AppRuntime, confirm_quit: b
                         continue;
                     }
 
+                    if app.help_open {
+                        match key.code {
+                            KeyCode::Char('q')
+                            | KeyCode::Char('?')
+                            | KeyCode::Esc
+                            | KeyCode::Enter => {
+                                app.help_open = false;
+                                app.help_scroll = 0;
+                            }
+                            KeyCode::Char('j') | KeyCode::Down => {
+                                app.help_scroll = app.help_scroll.saturating_add(1);
+                            }
+                            KeyCode::Char('k') | KeyCode::Up => {
+                                app.help_scroll = app.help_scroll.saturating_sub(1);
+                            }
+                            _ => {}
+                        }
+                        continue;
+                    }
+
                     if app.pending_ctrl_w {
                         match key.code {
-                            KeyCode::Up => app.set_focus(Focus::Query),
-                            KeyCode::Down => app.set_focus(Focus::Results),
+                            KeyCode::Char('j') | KeyCode::Up => app.set_focus(Focus::Query),
+                            KeyCode::Char('k') | KeyCode::Down => app.set_focus(Focus::Results),
+                            KeyCode::Char('?') => app.toggle_help(),
                             _ => {}
                         }
                         app.clear_ctrl_w_pending();
@@ -855,6 +891,56 @@ fn render_popup(frame: &mut Frame, app: &TuiApp) {
                 .border_style(Style::default().fg(Color::Cyan)),
         )
         .wrap(Wrap { trim: false });
+    frame.render_widget(popup, area);
+}
+
+fn render_help(frame: &mut Frame, scroll: u16) {
+    let area = centered_rect(64, 80, frame.area());
+    frame.render_widget(Clear, area);
+    let text = "\
+Keyboard Shortcuts
+
+── Query box ───────────────────────────────
+  Type          Edit search query (live search)
+  Enter         Save query to history & search
+  Esc           Clear query (or quit if empty)
+  Ctrl+U        Clear query
+  ←  →          Move cursor left / right
+  Home / End    Move cursor to start / end
+  ↑  ↓          Browse query history
+
+── Results table ───────────────────────────
+  j / ↓         Move selection down
+  k / ↑         Move selection up
+  Enter         Open item details popup
+  v             Open selected file in editor
+  1             Sort by filename
+  2             Sort by path
+  3             Sort by size
+  4             Sort by modified date
+  5             Sort by created date
+
+── Global ──────────────────────────────────
+  Ctrl+W  j/↑   Switch focus to query box
+  Ctrl+W  k/↓   Switch focus to results table
+  Ctrl+W  ?     Toggle this help panel
+  q             Quit lsf
+
+── Popups ──────────────────────────────────
+  Esc / Enter   Close popup
+  q             Close details popup
+  v             Open file in editor (details)
+
+Press q, ?, Esc or Enter to close.";
+    let popup = Paragraph::new(text)
+        .block(
+            Block::default()
+                .title(" Help ")
+                .title_alignment(Alignment::Center)
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Green)),
+        )
+        .scroll((scroll, 0));
     frame.render_widget(popup, area);
 }
 
