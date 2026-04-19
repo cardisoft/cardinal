@@ -357,8 +357,9 @@ function App() {
               caseInsensitive={!caseSensitive}
             />
           ) : (
-            // `dataResultsVersion`: backend result-set changes (cache invalidation).
-            // `displayedResultsVersion`: visible-order/projection changes (viewport invalidation).
+            // `dataResultsVersion`: backend result-set changes. This resets row metadata cache.
+            // `displayedResultsVersion`: visible-order/projection changes. This refreshes viewport
+            // work such as icon hydration and frozen-view handoff in VirtualList.
             <FilesTabContent
               headerRef={headerRef}
               onResizeStart={onResizeStart}

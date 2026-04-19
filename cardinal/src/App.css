@@ -1805,6 +1805,15 @@ button:active:not(:disabled) {
   right: 0;
 }
 
+.virtual-list-overlay {
+  position: absolute;
+  inset: 0;
+  /* Overlay the frozen previous viewport above the live row layer while the next viewport
+     batch loads underneath it. */
+  pointer-events: none;
+  z-index: 1;
+}
+
 /* === Virtual List Styles === */
 .virtual-list {
   position: relative;
