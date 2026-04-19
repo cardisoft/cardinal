@@ -21,8 +21,11 @@ const MAX_HISTORY_ENTRIES: usize = 200;
 static NEVER_STOPPED: AtomicBool = AtomicBool::new(false);
 
 pub struct AppConfig {
+    /// The root path to watch and search.
     pub path: PathBuf,
+    /// The path to store the search cache.
     pub cache_path: PathBuf,
+    /// If we should refresh the cache by full re-scan.
     pub refresh: bool,
 }
 
@@ -41,8 +44,12 @@ pub struct SearchResponse {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppLifecycleStatus {
+    /// Initializing the cache by restoring the previous
+    /// cache or walking the filesystem if no cache is available.
     Initializing,
+    /// Handling filesystem events and updating the cache accordingly.
     Updating,
+    /// Cache is ready and search requests can be handled.
     Ready,
 }
 
