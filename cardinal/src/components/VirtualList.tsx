@@ -12,6 +12,7 @@ import React, {
 import type { CSSProperties, UIEvent as ReactUIEvent } from 'react';
 import Scrollbar from './Scrollbar';
 import { useDataLoader } from '../hooks/useDataLoader';
+import { useFrozenViewport } from '../hooks/useFrozenViewport';
 import type { SearchResultItem } from '../types/search';
 import type { SlabIndex } from '../types/slab';
 import { useIconViewport } from '../hooks/useIconViewport';
@@ -25,9 +26,10 @@ export type VirtualListHandle = {
 
 type VirtualListProps = {
   results: SlabIndex[];
-  // Raw data version from search responses; drives row-cache resets in useDataLoader.
+  // Raw data version from search responses; resets useDataLoader's row cache.
   dataResultsVersion: number;
-  // Visible ordering/version token; drives viewport/icon hydration refreshes.
+  // Visible ordering/version token; drives viewport/icon hydration refreshes and frozen-view
+  // transitions even when the underlying row payloads are unchanged.
   displayedResultsVersion: number;
   rowHeight: number;
   overscan: number;
@@ -39,7 +41,8 @@ type VirtualListProps = {
   onScrollSync: (scrollLeft: number) => void;
 };
 
-// Virtualized list with lazy row hydration and synchronized column scrolling
+// Virtualized list with lazy row hydration plus a short-lived frozen viewport during
+// result-set swaps so the old screen stays visible until the next viewport is ready.
 export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(function VirtualList(
   {
     results,
@@ -194,6 +197,21 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     [cache, results],
   );
 
+  // The frozen viewport can be dropped once every row in the active window has fresh data.
+  const viewportReady = useMemo(() => {
+    if (end < start || rowCount === 0) {
+      return true;
+    }
+
+    for (let rowIndex = start; rowIndex <= end; rowIndex += 1) {
+      if (!getItemByRowIndex(rowIndex)) {
+        return false;
+      }
+    }
+
+    return true;
+  }, [end, getItemByRowIndex, rowCount, start]);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -206,9 +224,10 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   );
 
   // ----- rendered items memo -----
-  // Memoize rendered rows so virtualization only re-renders what it must
+  // Live rows for the current result-set. Right after a version swap these may still be
+  // placeholders/empty while the next viewport batch is loading.
   const renderedItems = useMemo(() => {
-    if (end < start) return null;
+    if (end < start) return [];
 
     const baseTop = start * rowHeight - scrollTop;
     return Array.from({ length: end - start + 1 }, (_, i) => {
@@ -223,6 +242,12 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
       });
     });
   }, [start, end, scrollTop, rowHeight, renderRow, getItemByRowIndex]);
+  const frozenViewport = useFrozenViewport({
+    dataVersion: dataResultsVersion,
+    scrollTop,
+    renderedItems,
+    viewportReady,
+  });
 
   // ----- render -----
   return (
@@ -235,6 +260,14 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     >
       <div className="virtual-list-viewport" onScroll={handleHorizontalScroll}>
         <div className="virtual-list-items">{renderedItems}</div>
+        {frozenViewport ? (
+          // This sits above the live layer and visually "freezes" the previous viewport.
+          // The live layer keeps loading underneath; once the new viewport is ready we remove
+          // the overlay and the user sees the new rows without an empty-frame transition.
+          <div className="virtual-list-overlay" aria-hidden="true">
+            {frozenViewport.items}
+          </div>
+        ) : null}
       </div>
       <Scrollbar
         totalHeight={totalHeight}
