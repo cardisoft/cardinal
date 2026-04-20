@@ -179,6 +179,7 @@ function App() {
 
   useAppWindowListeners({
     activeTab,
+    searchInputRef,
     focusSearchInput,
     handleStatusUpdate,
     setLifecycleState,

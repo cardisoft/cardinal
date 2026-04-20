@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { RefObject } from 'react';
 import type { StatusTabKey } from '../components/StatusBar';
 import {
   subscribeLifecycleState,
@@ -16,6 +17,7 @@ type QueueSearchOptions = {
 
 type UseAppWindowListenersOptions = {
   activeTab: StatusTabKey;
+  searchInputRef: RefObject<HTMLInputElement | null>;
   focusSearchInput: () => void;
   handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
   setLifecycleState: (status: AppLifecycleStatus) => void;
@@ -33,6 +35,7 @@ type UseAppWindowListenersResult = {
  */
 export function useAppWindowListeners({
   activeTab,
+  searchInputRef,
   focusSearchInput,
   handleStatusUpdate,
   setLifecycleState,
@@ -93,6 +96,21 @@ export function useAppWindowListeners({
   const handleWindowDragDrop = useStableEvent((event: WindowDragDropEvent) => {
     const payload = event.payload;
     if (payload.type !== 'drop') {
+      return;
+    }
+    if (typeof document === 'undefined') {
+      return;
+    }
+    const searchInput = searchInputRef.current;
+    if (!searchInput) {
+      return;
+    }
+    const scale = window.devicePixelRatio || 1;
+    const dropTarget = document.elementFromPoint(
+      payload.position.x / scale,
+      payload.position.y / scale,
+    );
+    if (dropTarget !== searchInput) {
       return;
     }
     const nextValue = payload.paths[0]?.trim();

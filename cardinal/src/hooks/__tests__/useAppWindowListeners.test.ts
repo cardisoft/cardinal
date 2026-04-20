@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
+import type { RefObject } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   subscribeLifecycleState,
@@ -22,6 +23,7 @@ const mockedSubscribeWindowDragDrop = vi.mocked(subscribeWindowDragDrop);
 
 type HookProps = {
   activeTab: 'files' | 'events';
+  searchInputRef: RefObject<HTMLInputElement | null>;
   focusSearchInput: () => void;
   handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
   setLifecycleState: (status: 'Initializing' | 'Updating' | 'Ready') => void;
@@ -40,6 +42,9 @@ describe('useAppWindowListeners', () => {
   const setLifecycleState = vi.fn();
   const submitFilesQuery = vi.fn();
   const setEventFilterQuery = vi.fn();
+  const searchInputRef: { current: HTMLInputElement | null } = { current: null };
+  let searchInputElement: HTMLInputElement;
+  let elementFromPointMock: ReturnType<typeof vi.fn>;
 
   let statusCallback:
     | ((payload: { scannedFiles: number; processedEvents: number; rescanErrors: number }) => void)
@@ -52,6 +57,7 @@ describe('useAppWindowListeners', () => {
     renderHook((props: HookProps) => useAppWindowListeners(props), {
       initialProps: {
         activeTab: 'files',
+        searchInputRef,
         focusSearchInput,
         handleStatusUpdate,
         setLifecycleState,
@@ -68,6 +74,13 @@ describe('useAppWindowListeners', () => {
     quickLaunchCallback = null;
     dragDropCallback = null;
     document.documentElement.removeAttribute('data-window-focused');
+    searchInputElement = document.createElement('input');
+    searchInputRef.current = searchInputElement;
+    elementFromPointMock = vi.fn(() => searchInputElement);
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: elementFromPointMock,
+    });
 
     mockedSubscribeStatusBarUpdate.mockImplementation((listener) => {
       statusCallback = listener;
@@ -122,15 +135,17 @@ describe('useAppWindowListeners', () => {
 
     act(() => {
       dragDropCallback?.({
-        payload: { type: 'drop', paths: [' /tmp/file-a '] },
+        payload: { type: 'drop', paths: [' /tmp/file-a '], position: { x: 40, y: 80 } },
       });
     });
+    expect(elementFromPointMock).toHaveBeenCalledWith(40, 80);
     expect(submitFilesQuery).toHaveBeenCalledWith('"/tmp/file-a"', {
       immediate: true,
     });
 
     rerender({
       activeTab: 'events',
+      searchInputRef,
       focusSearchInput,
       handleStatusUpdate,
       setLifecycleState,
@@ -140,10 +155,29 @@ describe('useAppWindowListeners', () => {
 
     act(() => {
       dragDropCallback?.({
-        payload: { type: 'drop', paths: [' /tmp/file-b '] },
+        payload: { type: 'drop', paths: [' /tmp/file-b '], position: { x: 20, y: 30 } },
       });
     });
     expect(setEventFilterQuery).toHaveBeenCalledWith('"/tmp/file-b"');
+  });
+
+  it('ignores drops outside the search input', async () => {
+    renderWindowListeners();
+
+    await waitFor(() => {
+      expect(dragDropCallback).not.toBeNull();
+    });
+
+    elementFromPointMock.mockReturnValue(document.createElement('div'));
+
+    act(() => {
+      dragDropCallback?.({
+        payload: { type: 'drop', paths: [' /tmp/file-a '], position: { x: 10, y: 15 } },
+      });
+    });
+
+    expect(submitFilesQuery).not.toHaveBeenCalled();
+    expect(setEventFilterQuery).not.toHaveBeenCalled();
   });
 
   it('syncs window focus attribute and cleans up runtime subscriptions on unmount', async () => {
