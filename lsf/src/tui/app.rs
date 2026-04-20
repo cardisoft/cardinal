@@ -57,6 +57,24 @@ pub enum AppLifecycleStatus {
 pub struct RuntimeStatus {
     pub lifecycle: AppLifecycleStatus,
     pub scanned_files: usize,
+    pub processed_events: usize,
+}
+
+fn set_status(
+    status: &Arc<RwLock<RuntimeStatus>>,
+    lifecycle: AppLifecycleStatus,
+    scanned_files: usize,
+) {
+    if let Ok(mut state) = status.write() {
+        state.lifecycle = lifecycle;
+        state.scanned_files = scanned_files;
+    }
+}
+
+fn add_processed_events(status: &Arc<RwLock<RuntimeStatus>>, count: usize) {
+    if let Ok(mut state) = status.write() {
+        state.processed_events += count;
+    }
 }
 
 enum Command {
@@ -76,6 +94,7 @@ impl AppRuntime {
         let status = Arc::new(RwLock::new(RuntimeStatus {
             lifecycle: AppLifecycleStatus::Initializing,
             scanned_files: 0,
+            processed_events: 0,
         }));
         let history = Arc::new(RwLock::new(load_history(Path::new(HISTORY_PATH))?));
         let worker_status = Arc::clone(&status);
@@ -207,6 +226,7 @@ fn worker_loop(
             recv(event_watcher) -> events => {
                 let cache = cache.as_mut().expect("cache must exist before shutdown");
                 let events = events.context("event stream is closed")?;
+                add_processed_events(&status, events.len());
                 if let Err(HandleFSEError::Rescan) = cache.handle_fs_events(events) {
                     set_status(&status, AppLifecycleStatus::Updating, cache.get_total_files());
                     #[allow(unused_assignments)]
@@ -252,17 +272,6 @@ pub fn resolve_cache_path(path: &Path) -> Result<PathBuf> {
         Ok(expanded)
     } else {
         Ok(path.to_path_buf())
-    }
-}
-
-fn set_status(
-    status: &Arc<RwLock<RuntimeStatus>>,
-    lifecycle: AppLifecycleStatus,
-    scanned_files: usize,
-) {
-    if let Ok(mut state) = status.write() {
-        state.lifecycle = lifecycle;
-        state.scanned_files = scanned_files;
     }
 }
 

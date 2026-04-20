@@ -19,3 +19,4 @@ clap-verbosity-flag = {version = "3.0.4", features = ["tracing"]}
 ratatui = "0.29.0"
 crossterm = "0.28.1"
 jiff = "0.2"
+toml = "0.8"

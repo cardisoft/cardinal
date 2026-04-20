@@ -17,6 +17,10 @@ pub struct Cli {
     pub cache_path: PathBuf,
     #[clap(long, default_value = "/")]
     pub path: PathBuf,
+    /// Path to a TOML keybinding file. Defaults to ~/.cardinal/lsf-keys.toml
+    /// if the file exists; built-in defaults are used otherwise.
+    #[clap(long)]
+    pub keymap: Option<PathBuf>,
     #[command(flatten)]
     pub verbosity: clap_verbosity_flag::Verbosity,
 }

@@ -3,11 +3,15 @@ mod cli;
 use anyhow::Result;
 use clap::Parser;
 use cli::Cli;
-use lsf::{
+use lsf::tui::{
     app::{AppConfig, AppRuntime, resolve_cache_path},
-    tui,
+    keymap::Keymap,
+    run_with_options,
 };
-use std::io::{self, Write};
+use std::{
+    io::{self, Write},
+    path::PathBuf,
+};
 use tracing_subscriber::EnvFilter;
 
 fn main() -> Result<()> {
@@ -27,7 +31,8 @@ fn main() -> Result<()> {
     })?;
 
     if cli.tui {
-        let tui_result = tui::run_with_options(&runtime, !cli.no_quit_confirm);
+        let keymap = load_keymap(cli.keymap)?;
+        let tui_result = run_with_options(&runtime, !cli.no_quit_confirm, keymap);
         runtime.shutdown()?;
         return tui_result;
     }
@@ -66,4 +71,16 @@ fn main() -> Result<()> {
     }
 
     runtime.shutdown()
+}
+
+/// Resolve and load the keymap. Explicit `--keymap` path is required to exist;
+/// the default path is tried silently and falls back to built-in defaults.
+fn load_keymap(explicit: Option<PathBuf>) -> Result<Keymap> {
+    if let Some(path) = explicit {
+        return Keymap::load(&path);
+    }
+    let default_path = std::env::var_os("HOME")
+        .map(|h| PathBuf::from(h).join(".cardinal").join("lsf-keys.toml"))
+        .unwrap_or_default();
+    Keymap::load(&default_path)
 }
