@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SHORTCUT_DEFINITIONS, type ShortcutId, type ShortcutMap } from '../shortcuts';
+import {
+  DEFAULT_SHORTCUTS,
+  SHORTCUT_DEFINITIONS,
+  type ShortcutId,
+  type ShortcutMap,
+} from '../shortcuts';
 import {
   captureShortcutFromKeydown,
   formatShortcutForDisplay,
@@ -11,7 +16,6 @@ type ShortcutSettingsOverlayProps = {
   open: boolean;
   onClose: () => void;
   shortcuts: ShortcutMap;
-  defaultShortcuts: ShortcutMap;
   onShortcutSettingsSave: (shortcuts: ShortcutMap) => Promise<void>;
 };
 
@@ -25,7 +29,6 @@ export function ShortcutSettingsOverlay({
   open,
   onClose,
   shortcuts,
-  defaultShortcuts,
   onShortcutSettingsSave,
 }: ShortcutSettingsOverlayProps): React.JSX.Element | null {
   const { t } = useTranslation();
@@ -101,7 +104,7 @@ export function ShortcutSettingsOverlay({
     setCaptureError(null);
     setSubmitError(null);
     setRecordingShortcutId(null);
-    setDraftShortcuts(defaultShortcuts);
+    setDraftShortcuts(DEFAULT_SHORTCUTS);
   };
 
   const handleCaptureButtonClick = useCallback((shortcutId: ShortcutId): void => {

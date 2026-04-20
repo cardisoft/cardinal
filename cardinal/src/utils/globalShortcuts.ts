@@ -16,13 +16,6 @@ const registerQuickLaunchShortcut = async (shortcut: string): Promise<void> => {
   registeredQuickLaunchShortcut = shortcut;
 };
 
-const saveQuickLaunchShortcut = (shortcut: string): void => {
-  persistShortcuts({
-    ...getStoredShortcuts(),
-    quickLaunch: shortcut,
-  });
-};
-
 export async function initializeGlobalShortcuts(): Promise<void> {
   const preferredShortcut = getStoredShortcuts().quickLaunch;
 
@@ -33,7 +26,10 @@ export async function initializeGlobalShortcuts(): Promise<void> {
     if (preferredShortcut !== DEFAULT_QUICK_LAUNCH_SHORTCUT) {
       try {
         await registerQuickLaunchShortcut(DEFAULT_QUICK_LAUNCH_SHORTCUT);
-        saveQuickLaunchShortcut(DEFAULT_QUICK_LAUNCH_SHORTCUT);
+        persistShortcuts({
+          ...getStoredShortcuts(),
+          quickLaunch: DEFAULT_QUICK_LAUNCH_SHORTCUT,
+        });
       } catch (fallbackError) {
         console.error('Failed to register fallback global shortcut', fallbackError);
       }
@@ -54,7 +50,6 @@ export async function updateQuickLaunchShortcut(shortcut: string): Promise<void>
 
   if (globalShortcutsPaused) {
     registeredQuickLaunchShortcut = nextShortcut;
-    saveQuickLaunchShortcut(nextShortcut);
     return;
   }
 
@@ -64,7 +59,6 @@ export async function updateQuickLaunchShortcut(shortcut: string): Promise<void>
 
   try {
     await registerQuickLaunchShortcut(nextShortcut);
-    saveQuickLaunchShortcut(nextShortcut);
   } catch (error) {
     if (previousShortcut) {
       try {

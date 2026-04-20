@@ -71,7 +71,6 @@ function App() {
   const {
     isShortcutSettingsOpen,
     shortcuts,
-    defaultShortcuts,
     openShortcutSettings,
     closeShortcutSettings,
     handleShortcutSettingsSave,
@@ -433,7 +432,6 @@ function App() {
         open={isShortcutSettingsOpen}
         onClose={closeShortcutSettings}
         shortcuts={shortcuts}
-        defaultShortcuts={defaultShortcuts}
         onShortcutSettingsSave={handleShortcutSettingsSave}
       />
       {showFullDiskAccessOverlay && (

@@ -17,7 +17,6 @@ describe('ShortcutSettingsOverlay', () => {
         open
         onClose={vi.fn()}
         shortcuts={DEFAULT_SHORTCUTS}
-        defaultShortcuts={DEFAULT_SHORTCUTS}
         onShortcutSettingsSave={onShortcutSettingsSave}
       />,
     );
@@ -44,7 +43,6 @@ describe('ShortcutSettingsOverlay', () => {
         open
         onClose={vi.fn()}
         shortcuts={DEFAULT_SHORTCUTS}
-        defaultShortcuts={DEFAULT_SHORTCUTS}
         onShortcutSettingsSave={vi.fn().mockResolvedValue(undefined)}
       />,
     );

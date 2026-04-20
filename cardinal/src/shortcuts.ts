@@ -72,14 +72,16 @@ export const getStoredShortcuts = (): ShortcutMap => {
   }
 };
 
-export const getStoredShortcutAccelerators = () => {
-  const { quickLaunch, openPreferences, hideWindow } = getStoredShortcuts();
+export const getShortcutAccelerators = (shortcuts: ShortcutMap) => {
+  const { quickLaunch, openPreferences, hideWindow } = shortcuts;
   return {
     quickLaunch,
     openPreferences: toMenuAccelerator(openPreferences),
     hideWindow: toMenuAccelerator(hideWindow),
   };
 };
+
+export const getStoredShortcutAccelerators = () => getShortcutAccelerators(getStoredShortcuts());
 
 export const persistShortcuts = (shortcuts: ShortcutMap): void => {
   if (typeof window === 'undefined') {

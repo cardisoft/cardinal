@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { refreshAppMenu, setMenuShortcutsEnabled } from '../menu';
-import {
-  DEFAULT_SHORTCUTS,
-  getStoredShortcuts,
-  persistShortcuts,
-  type ShortcutMap,
-} from '../shortcuts';
+import { getStoredShortcuts, persistShortcuts, type ShortcutMap } from '../shortcuts';
 import { refreshTrayMenu } from '../tray';
 import { setGlobalShortcutsPaused, updateQuickLaunchShortcut } from '../utils/globalShortcuts';
 
 type UseShortcutSettingsControllerResult = {
   isShortcutSettingsOpen: boolean;
   shortcuts: ShortcutMap;
-  defaultShortcuts: ShortcutMap;
   openShortcutSettings: () => void;
   closeShortcutSettings: () => void;
   handleShortcutSettingsSave: (nextShortcuts: ShortcutMap) => Promise<void>;
@@ -51,7 +45,6 @@ export function useShortcutSettingsController(): UseShortcutSettingsControllerRe
   return {
     isShortcutSettingsOpen,
     shortcuts,
-    defaultShortcuts: DEFAULT_SHORTCUTS,
     openShortcutSettings,
     closeShortcutSettings,
     handleShortcutSettingsSave,
