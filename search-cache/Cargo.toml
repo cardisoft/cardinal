@@ -35,3 +35,8 @@ unicode-normalization = "0.1"
 tempdir = "0.3"
 plist = "1.7"
 xattr = "1.4"
+criterion = { version = "0.8", features = ["html_reports"] }
+
+[[bench]]
+name = "walk_and_search"
+harness = false

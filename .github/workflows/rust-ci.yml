@@ -46,6 +46,59 @@ jobs:
       - name: Run ${{ matrix.name }}
         run: ${{ matrix.command }}
 
+  bench:
+    name: search-cache bench (large corpus)
+    runs-on: macos-14
+    # Run only on master push, manual trigger, or PRs with "perf:" title
+    if: |
+      github.event_name == 'push' || 
+      github.event_name == 'workflow_dispatch' || 
+      (github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'perf:'))
+    defaults:
+      run:
+        working-directory: search-cache
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache cargo build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: search-cache
+
+      # Blobless shallow clone: downloads tree objects + commits only,
+      # so every file path exists on disk but no file content is fetched.
+      # Result: ~60 MB instead of ~4 GB for a full linux clone.
+      - name: Clone Linux kernel (blobless)
+        run: |
+          git clone \
+            --depth=1 \
+            --filter=blob:none \
+            --no-tags \
+            https://github.com/torvalds/linux \
+            linux-corpus
+
+      - name: Run benchmarks
+        env:
+          BENCH_CORPUS_DIR: ${{ github.workspace }}/search-cache/linux-corpus
+        run: cargo bench --quiet --bench walk_and_search -- --output-format bencher | tee bench-output.txt
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: |
+            search-cache/bench-output.txt
+            search-cache/target/criterion/
+
   tauri:
     name: Tauri ${{ matrix.name }}
     runs-on: macos-14
