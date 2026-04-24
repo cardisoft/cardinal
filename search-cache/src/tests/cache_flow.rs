@@ -66,7 +66,7 @@ fn test_expand_file_nodes_fetch_metadata() {
     assert_eq!(idxs.len(), 1);
     // First query_files returns metadata None
     let q1 = cache
-        .query_files("meta.txt".into(), CancellationToken::noop())
+        .query_files("meta.txt", CancellationToken::noop())
         .expect("query should succeed")
         .expect("noop cancellation token should not cancel");
     assert_eq!(q1.len(), 1);

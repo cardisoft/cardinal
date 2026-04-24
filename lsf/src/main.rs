@@ -70,7 +70,7 @@ fn main() -> Result<()> {
                 }
                 recv(search_rx) -> query => {
                     let query = query.expect("search_tx is closed");
-                    let files = cache.query_files(query, CancellationToken::noop()).map(|x| x.unwrap());
+                    let files = cache.query_files(&query, CancellationToken::noop()).map(|x| x.unwrap());
                     search_result_tx
                         .send(files)
                         .expect("search_result_tx is closed");

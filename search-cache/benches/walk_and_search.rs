@@ -47,23 +47,20 @@ const QUERIES: &[&str] = &[
     "ffffffff_no_match_xyzzy",
 ];
 
-// measures search latency including walk time, but with a fresh cache for each iteration.
+// Measures search latency on a fresh cache per iteration. Cache construction is
+// done outside the timed region so this isolates the query hot path.
 fn bench_query_files(c: &mut Criterion) {
     let path = corpus();
     let mut group = c.benchmark_group("query_files");
     group.measurement_time(Duration::from_secs(10));
 
     for query in QUERIES {
-        group.bench_with_input(BenchmarkId::new("query", query), query, |b, q| {
+        group.bench_with_input(BenchmarkId::new("query", query), query, |b, &q| {
             // Build a fresh cache once per *batch*, not per iteration, so we
             // measure only the search hot-path and not directory traversal.
             b.iter_batched(
                 || SearchCache::walk_fs(&path),
-                |mut cache| {
-                    cache
-                        .query_files(q.to_string(), CancellationToken::noop())
-                        .ok()
-                },
+                |mut cache| cache.query_files(q, CancellationToken::noop()).ok(),
                 BatchSize::PerIteration,
             );
         });
@@ -81,12 +78,8 @@ fn bench_query_files_warm(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(10));
 
     for query in QUERIES {
-        group.bench_with_input(BenchmarkId::new("query", query), query, |b, q| {
-            b.iter(|| {
-                cache
-                    .query_files(q.to_string(), CancellationToken::noop())
-                    .ok()
-            });
+        group.bench_with_input(BenchmarkId::new("query", query), query, |b, &q| {
+            b.iter(|| cache.query_files(q, CancellationToken::noop()).ok());
         });
     }
 

@@ -49,7 +49,7 @@ fn test_handle_single_file_creation() {
 
     // Verify the file is now searchable
     let search_result = cache
-        .query_files("new_file".to_string(), CancellationToken::noop())
+        .query_files("new_file", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     let nodes = search_result.unwrap();
@@ -69,7 +69,7 @@ fn test_handle_file_removal() {
 
     // Verify file exists initially
     let search_result = cache
-        .query_files("file2".to_string(), CancellationToken::noop())
+        .query_files("file2", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(search_result.unwrap().len(), 1);
@@ -89,7 +89,7 @@ fn test_handle_file_removal() {
 
     // Verify file is no longer searchable
     let search_result = cache
-        .query_files("file2".to_string(), CancellationToken::noop())
+        .query_files("file2", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(
@@ -120,7 +120,7 @@ fn test_handle_directory_creation() {
 
     // Search for the nested file
     let search_result = cache
-        .query_files("nested".to_string(), CancellationToken::noop())
+        .query_files("nested", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(
@@ -137,7 +137,7 @@ fn test_handle_directory_removal() {
 
     // Verify files in directory are searchable
     let search_result = cache
-        .query_files("file1".to_string(), CancellationToken::noop())
+        .query_files("file1", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(search_result.unwrap().len(), 1);
@@ -157,7 +157,7 @@ fn test_handle_directory_removal() {
 
     // Verify files are no longer searchable
     let search_result = cache
-        .query_files("file1".to_string(), CancellationToken::noop())
+        .query_files("file1", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(
@@ -168,7 +168,7 @@ fn test_handle_directory_removal() {
 
     // Other file should still be there
     let search_result = cache
-        .query_files("other".to_string(), CancellationToken::noop())
+        .query_files("other", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(search_result.unwrap().len(), 1);
@@ -181,7 +181,7 @@ fn test_handle_file_rename() {
 
     // Verify old name is searchable
     let search_result = cache
-        .query_files("old_name".to_string(), CancellationToken::noop())
+        .query_files("old_name", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(search_result.unwrap().len(), 1);
@@ -210,14 +210,14 @@ fn test_handle_file_rename() {
 
     // Old name should not be found
     let search_result = cache
-        .query_files("old_name".to_string(), CancellationToken::noop())
+        .query_files("old_name", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(search_result.unwrap().len(), 0);
 
     // New name should be found
     let search_result = cache
-        .query_files("new_name".to_string(), CancellationToken::noop())
+        .query_files("new_name", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(search_result.unwrap().len(), 1);
@@ -244,7 +244,7 @@ fn test_handle_modified_event() {
 
     // File should still be searchable
     let search_result = cache
-        .query_files("modified".to_string(), CancellationToken::noop())
+        .query_files("modified", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(search_result.unwrap().len(), 1);
@@ -283,7 +283,7 @@ fn test_batch_events_same_directory() {
 
     // All files should be searchable
     let search_result = cache
-        .query_files("file_".to_string(), CancellationToken::noop())
+        .query_files("file_", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     let nodes = search_result.unwrap();
@@ -311,7 +311,7 @@ fn test_nested_directory_operations() {
 
     // Deep file should be found
     let search_result = cache
-        .query_files("deep".to_string(), CancellationToken::noop())
+        .query_files("deep", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(search_result.unwrap().len(), 1);
@@ -330,7 +330,7 @@ fn test_nested_directory_operations() {
 
     // Deep file should no longer be found
     let search_result = cache
-        .query_files("deep".to_string(), CancellationToken::noop())
+        .query_files("deep", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(search_result.unwrap().len(), 0);
@@ -433,7 +433,7 @@ fn test_duplicate_events_deduplicated() {
 
     // Should still only find one file
     let search_result = cache
-        .query_files("duplicate".to_string(), CancellationToken::noop())
+        .query_files("duplicate", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(
@@ -473,7 +473,7 @@ fn test_events_for_ignored_paths() {
     // File in ignored path may or may not be indexed depending on implementation
     // Just verify it doesn't panic
     let search_result = cache
-        .query_files("should_not_index".to_string(), CancellationToken::noop())
+        .query_files("should_not_index", CancellationToken::noop())
         .unwrap();
     assert!(
         search_result.is_some(),
@@ -509,7 +509,7 @@ fn test_rapid_create_delete_cycle() {
 
     // File should not exist after cycle
     let search_result = cache
-        .query_files("temp".to_string(), CancellationToken::noop())
+        .query_files("temp", CancellationToken::noop())
         .unwrap();
     assert!(search_result.is_some());
     assert_eq!(
