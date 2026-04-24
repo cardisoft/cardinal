@@ -275,7 +275,7 @@ fn default_focus_out() -> Vec<KeySpec> {
 // ── Keymap ────────────────────────────────────────────────────────────────────
 
 /// Top-level keymap with four sections.
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 #[serde(default)]
 pub struct Keymap {
     pub global: GlobalKeys,
@@ -365,19 +365,6 @@ pub struct ResultKeys {
     pub sort_created: Vec<KeySpec>,
     #[serde(deserialize_with = "deser_key_list", default = "default_focus_out")]
     pub focus_out: Vec<KeySpec>, // TODO: add default?
-}
-
-// ── Default impls ─────────────────────────────────────────────────────────────
-
-impl Default for Keymap {
-    fn default() -> Self {
-        Self {
-            global: GlobalKeys::default(),
-            leader: LeaderKeys::default(),
-            query: QueryKeys::default(),
-            results: ResultKeys::default(),
-        }
-    }
 }
 
 impl Default for GlobalKeys {

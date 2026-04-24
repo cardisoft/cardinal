@@ -177,11 +177,11 @@ pub(super) fn run_app(
                             app.move_cursor_home();
                         } else if match_key(&app.keymap.query.cursor_end, key.code, key.modifiers) {
                             app.move_cursor_end();
-                        } else if let KeyCode::Char(ch) = key.code {
-                            if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT {
-                                app.insert_char(ch);
-                                app.schedule_search();
-                            }
+                        } else if let KeyCode::Char(ch) = key.code
+                            && (key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT)
+                        {
+                            app.insert_char(ch);
+                            app.schedule_search();
                         }
                     } else {
                         // Focus::Results
