@@ -3,6 +3,7 @@ mod commands;
 mod lifecycle;
 mod quicklook;
 mod search_activity;
+mod server;
 mod sort;
 mod window_controls;
 
@@ -114,8 +115,8 @@ pub fn run() -> Result<()> {
 
     let app = builder
         .manage(SearchState::new(
-            search_tx,
-            node_info_tx,
+            search_tx.clone(),
+            node_info_tx.clone(),
             icon_viewport_tx.clone(),
             rescan_tx.clone(),
             watch_config_tx.clone(),
@@ -161,6 +162,12 @@ pub fn run() -> Result<()> {
     };
     emit_app_state(app_handle);
     let icon_update_rx = &icon_update_rx;
+    let server_state =
+        server::ServerState::new(search_tx.clone(), result_rx.clone(), node_info_tx.clone());
+    std::thread::spawn(move || {
+        server::start_server(server_state, "127.0.0.1:3388");
+    });
+
     std::thread::scope(move |s| {
         s.spawn(|| {
             while let Ok(icon) = icon_update_rx.recv() {

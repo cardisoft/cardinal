@@ -230,7 +230,7 @@ impl SearchResponse {
     pub const CANCELLED: u8 = 1;
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct NodeInfoMetadata {
     pub r#type: u8,
     pub size: i64,
