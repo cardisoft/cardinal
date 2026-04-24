@@ -263,7 +263,7 @@ fn test_date_created_filter() {
 
     // Query for files created today
     let result = cache
-        .query_files("dm:today", CancellationToken::noop())
+        .query_files("dc:today", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
