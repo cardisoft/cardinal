@@ -661,7 +661,7 @@ impl SearchCache {
         self.rescan_count
     }
 
-    /// Note that this function doesn't fetch metadata(even if it's not cahced) for the nodes.
+    /// Note that this function doesn't fetch metadata (even if it's not cached) for the nodes.
     pub fn query_files(
         &mut self,
         query: &str,
