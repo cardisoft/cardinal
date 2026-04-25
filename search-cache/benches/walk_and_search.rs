@@ -56,8 +56,11 @@ fn bench_query_files(c: &mut Criterion) {
 
     for query in QUERIES {
         group.bench_with_input(BenchmarkId::new("query", query), query, |b, &q| {
-            // Build a fresh cache once per *batch*, not per iteration, so we
-            // measure only the search hot-path and not directory traversal.
+            // Use `PerIteration` on purpose: the setup value is a full
+            // `SearchCache`, not a small input. With `SmallInput` or
+            // `LargeInput`, Criterion would hold multiple caches in memory at
+            // once for a batch. `PerIteration` keeps only one cache alive at a
+            // time, and Criterion still excludes setup from the timed region.
             b.iter_batched(
                 || SearchCache::walk_fs(&path),
                 |mut cache| cache.query_files(q, CancellationToken::noop()).ok(),
