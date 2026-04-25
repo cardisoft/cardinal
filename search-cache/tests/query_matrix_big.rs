@@ -49,7 +49,7 @@ fn build_cache() -> SearchCache {
 
 fn run(cache: &mut SearchCache, q: &str) -> usize {
     // Use public query_files API (search() helper is unit-test only).
-    match cache.query_files(q.to_string(), CancellationToken::noop()) {
+    match cache.query_files(q, CancellationToken::noop()) {
         Ok(Some(nodes)) => nodes.len(),
         Ok(None) => 0,
         Err(_) => 0,

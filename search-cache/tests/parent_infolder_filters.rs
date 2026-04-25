@@ -58,7 +58,7 @@ fn test_parent_filter_direct_children() {
     let query = format!("parent:{}", src_path.display());
 
     let result = cache
-        .query_files(query, CancellationToken::noop())
+        .query_files(&query, CancellationToken::noop())
         .expect("Query should succeed");
 
     let nodes = result.expect("Should return results");
@@ -87,7 +87,7 @@ fn test_infolder_filter_recursive() {
     let query = format!("infolder:{}", src_path.display());
 
     let result = cache
-        .query_files(query, CancellationToken::noop())
+        .query_files(&query, CancellationToken::noop())
         .expect("Query should succeed");
 
     let nodes = result.expect("Should return results");
@@ -119,7 +119,7 @@ fn test_parent_filter_with_pattern() {
     let query = format!("parent:{} *.rs", src_path.display());
 
     let result = cache
-        .query_files(query, CancellationToken::noop())
+        .query_files(&query, CancellationToken::noop())
         .expect("Query should succeed");
 
     let nodes = result.expect("Should return results");
@@ -148,7 +148,7 @@ fn test_infolder_filter_with_pattern() {
     let query = format!("infolder:{} *.rs", src_path.display());
 
     let result = cache
-        .query_files(query, CancellationToken::noop())
+        .query_files(&query, CancellationToken::noop())
         .expect("Query should succeed");
 
     let nodes = result.expect("Should return results");
@@ -176,7 +176,7 @@ fn test_parent_filter_nonexistent_path() {
     let nonexistent = root.join("nonexistent");
     let query = format!("parent:{}", nonexistent.display());
 
-    let result = cache.query_files(query, CancellationToken::noop());
+    let result = cache.query_files(&query, CancellationToken::noop());
 
     // Should return error for non-existent path
     assert!(result.is_err(), "Should error for non-existent parent path");
@@ -190,7 +190,7 @@ fn test_infolder_filter_nonexistent_path() {
     let nonexistent = root.join("nonexistent");
     let query = format!("infolder:{}", nonexistent.display());
 
-    let result = cache.query_files(query, CancellationToken::noop());
+    let result = cache.query_files(&query, CancellationToken::noop());
 
     // Should return error for non-existent path
     assert!(
@@ -207,7 +207,7 @@ fn test_parent_filter_root() {
     let query = format!("parent:{}", root.display());
 
     let result = cache
-        .query_files(query, CancellationToken::noop())
+        .query_files(&query, CancellationToken::noop())
         .expect("Query should succeed");
 
     let nodes = result.expect("Should return results");
@@ -232,7 +232,7 @@ fn test_infolder_filter_empty_directory() {
     let query = format!("infolder:{}", empty_dir.display());
 
     let result = cache
-        .query_files(query, CancellationToken::noop())
+        .query_files(&query, CancellationToken::noop())
         .expect("Query should succeed");
 
     // Should return empty or None for directory with no children
@@ -251,14 +251,14 @@ fn test_parent_infolder_difference() {
     // Get parent results
     let parent_query = format!("parent:{}", src_path.display());
     let parent_result = cache
-        .query_files(parent_query, CancellationToken::noop())
+        .query_files(&parent_query, CancellationToken::noop())
         .expect("Query should succeed")
         .expect("Should return results");
 
     // Get infolder results
     let infolder_query = format!("infolder:{}", src_path.display());
     let infolder_result = cache
-        .query_files(infolder_query, CancellationToken::noop())
+        .query_files(&infolder_query, CancellationToken::noop())
         .expect("Query should succeed")
         .expect("Should return results");
 
@@ -292,7 +292,7 @@ fn test_parent_filter_path_validation() {
     let outside_path = PathBuf::from("/some/random/path");
     let query = format!("parent:{}", outside_path.display());
 
-    let result = cache.query_files(query, CancellationToken::noop());
+    let result = cache.query_files(&query, CancellationToken::noop());
 
     assert!(
         result.is_err(),
@@ -308,7 +308,7 @@ fn test_infolder_filter_path_validation() {
     let outside_path = PathBuf::from("/some/random/path");
     let query = format!("infolder:{}", outside_path.display());
 
-    let result = cache.query_files(query, CancellationToken::noop());
+    let result = cache.query_files(&query, CancellationToken::noop());
 
     assert!(
         result.is_err(),
@@ -331,7 +331,7 @@ fn test_parent_with_boolean_operators() {
     );
 
     let result = cache
-        .query_files(query, CancellationToken::noop())
+        .query_files(&query, CancellationToken::noop())
         .expect("Query should succeed");
 
     let nodes = result.expect("Should return results");
@@ -355,7 +355,7 @@ fn test_infolder_with_negation() {
     let query = format!("infolder:{} ! ext:rs", src_path.display());
 
     let result = cache
-        .query_files(query, CancellationToken::noop())
+        .query_files(&query, CancellationToken::noop())
         .expect("Query should succeed");
 
     let nodes = result.expect("Should return results");

@@ -25,7 +25,7 @@ fn test_large_file_count() {
     // Test search on large cache
     let mut cache_mut = cache;
     let result = cache_mut
-        .query_files("file_005000".to_string(), CancellationToken::noop())
+        .query_files("file_005000", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(
@@ -50,7 +50,7 @@ fn test_maximum_filename_length() {
         let mut cache = SearchCache::walk_fs(&root_path);
 
         let result = cache
-            .query_files(long_name, CancellationToken::noop())
+            .query_files(&long_name, CancellationToken::noop())
             .unwrap();
         assert!(result.is_some());
         assert_eq!(
@@ -79,7 +79,7 @@ fn test_very_deep_directory_nesting() {
         let mut cache = SearchCache::walk_fs(&root_path);
 
         let result = cache
-            .query_files("deep_file".to_string(), CancellationToken::noop())
+            .query_files("deep_file", CancellationToken::noop())
             .unwrap();
         assert!(result.is_some());
         assert_eq!(result.unwrap().len(), 1, "Should handle very deep nesting");
@@ -102,7 +102,7 @@ fn test_many_files_same_name_different_dirs() {
     let mut cache = SearchCache::walk_fs(&root_path);
 
     let result = cache
-        .query_files("duplicate.txt".to_string(), CancellationToken::noop())
+        .query_files("duplicate.txt", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -129,14 +129,14 @@ fn test_name_index_with_many_unique_names() {
 
     // Search for a specific unique name
     let result = cache
-        .query_files("unique_file_03456".to_string(), CancellationToken::noop())
+        .query_files("unique_file_03456", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 1);
 
     // Search for a pattern that matches many files
     let result = cache
-        .query_files("unique_file".to_string(), CancellationToken::noop())
+        .query_files("unique_file", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 5000, "Should find all unique files");
@@ -158,7 +158,7 @@ fn test_empty_directory_structures() {
 
     // Search for directories
     let result = cache
-        .query_files("empty_dir".to_string(), CancellationToken::noop())
+        .query_files("empty_dir", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -208,7 +208,7 @@ fn test_slab_index_sequential_allocation() {
     // Verify we can get slab indices
     let mut cache_mut = cache;
     let result = cache_mut
-        .query_files("file_".to_string(), CancellationToken::noop())
+        .query_files("file_", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -237,12 +237,12 @@ fn test_query_complexity_boolean_operations() {
 
     // Very complex query with nested boolean operations
     let complex_query = "(alpha | beta) gamma ! delta";
-    let result = cache.query_files(complex_query.to_string(), CancellationToken::noop());
+    let result = cache.query_files(complex_query, CancellationToken::noop());
     assert!(result.is_ok(), "Complex query should not crash");
 
     // Another complex query
     let complex_query2 = "((alpha | beta) gamma) | (epsilon ! zeta)";
-    let result = cache.query_files(complex_query2.to_string(), CancellationToken::noop());
+    let result = cache.query_files(complex_query2, CancellationToken::noop());
     assert!(result.is_ok(), "Nested boolean query should not crash");
 }
 
@@ -265,7 +265,7 @@ fn test_extremely_long_query_string() {
         long_query.push_str(&format!("term{i}"));
     }
 
-    let result = cache.query_files(long_query, CancellationToken::noop());
+    let result = cache.query_files(&long_query, CancellationToken::noop());
     // Should handle or error gracefully, not panic
     assert!(result.is_ok() || result.is_err());
 }
@@ -291,7 +291,7 @@ fn test_many_extensions_filter() {
     // Query with many extensions
     let ext_query = "ext:txt;rs;md;toml;json;yaml;xml;html;css;js";
     let result = cache
-        .query_files(ext_query.to_string(), CancellationToken::noop())
+        .query_files(ext_query, CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -317,14 +317,14 @@ fn test_zero_byte_files() {
 
     // Search should work on empty files
     let result = cache
-        .query_files("empty_".to_string(), CancellationToken::noop())
+        .query_files("empty_", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 100);
 
     // Size filter for zero bytes
     let result = cache
-        .query_files("size:0".to_string(), CancellationToken::noop())
+        .query_files("size:0", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -348,15 +348,13 @@ fn test_special_filenames_dot_files() {
 
     // Search for hidden files
     let result = cache
-        .query_files(".hidden".to_string(), CancellationToken::noop())
+        .query_files(".hidden", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 1);
 
     // Search for all dot files
-    let result = cache
-        .query_files(".".to_string(), CancellationToken::noop())
-        .unwrap();
+    let result = cache.query_files(".", CancellationToken::noop()).unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
     assert!(nodes.len() >= 5, "Should find all dot files");
@@ -380,7 +378,7 @@ fn test_path_with_consecutive_dots() {
     let mut cache = SearchCache::walk_fs(&root_path);
 
     // Search should handle these gracefully
-    let result = cache.query_files("file".to_string(), CancellationToken::noop());
+    let result = cache.query_files("file", CancellationToken::noop());
     assert!(result.is_ok());
 }
 
@@ -400,7 +398,7 @@ fn test_directory_and_file_same_prefix() {
 
     // Search for "test" should find both
     let result = cache
-        .query_files("test".to_string(), CancellationToken::noop())
+        .query_files("test", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -428,7 +426,7 @@ fn test_cancel_large_search_operation() {
     let _token_v2 = CancellationToken::new(2); // This cancels v1
 
     // Large search should be cancelled
-    let result = cache.query_files("file_".to_string(), token_v1);
+    let result = cache.query_files("file_", token_v1);
     assert!(result.is_ok());
     // Depending on timing, might return None (cancelled) or partial results
 }
@@ -450,7 +448,7 @@ fn test_metadata_filter_on_large_set() {
 
     // Filter by size range
     let result = cache
-        .query_files("size:>50k".to_string(), CancellationToken::noop())
+        .query_files("size:>50k", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -458,7 +456,7 @@ fn test_metadata_filter_on_large_set() {
 
     // Combined filter
     let result = cache
-        .query_files("file_ size:<10k".to_string(), CancellationToken::noop())
+        .query_files("file_ size:<10k", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
 }
@@ -488,6 +486,6 @@ fn test_unicode_in_paths() {
     let mut cache = SearchCache::walk_fs(&root_path);
 
     // Try to search for unicode content
-    let result = cache.query_files("测试".to_string(), CancellationToken::noop());
+    let result = cache.query_files("测试", CancellationToken::noop());
     assert!(result.is_ok(), "Unicode search should not crash");
 }

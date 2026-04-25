@@ -661,10 +661,10 @@ impl SearchCache {
         self.rescan_count
     }
 
-    /// Note that this function doesn't fetch metadata(even if it's not cahced) for the nodes.
+    /// Note that this function doesn't fetch metadata (even if it's not cached) for the nodes.
     pub fn query_files(
         &mut self,
-        query: String,
+        query: &str,
         cancellation_token: CancellationToken,
     ) -> Result<Option<Vec<SearchResultNode>>> {
         self.query_files_with_options(query, SearchOptions::default(), cancellation_token)
@@ -672,11 +672,11 @@ impl SearchCache {
 
     pub fn query_files_with_options(
         &mut self,
-        query: String,
+        query: &str,
         options: SearchOptions,
         cancellation_token: CancellationToken,
     ) -> Result<Option<Vec<SearchResultNode>>> {
-        self.search_with_options(&query, options, cancellation_token)
+        self.search_with_options(query, options, cancellation_token)
             .map(|outcome| {
                 outcome
                     .nodes
@@ -941,8 +941,8 @@ mod tests {
             .expect("noop cancellation token should not cancel")
     }
 
-    fn query(cache: &mut SearchCache, query: impl Into<String>) -> Vec<SearchResultNode> {
-        guard_nodes(cache.query_files(query.into(), CancellationToken::noop()))
+    fn query(cache: &mut SearchCache, query: &str) -> Vec<SearchResultNode> {
+        guard_nodes(cache.query_files(query, CancellationToken::noop()))
     }
 
     fn make_node(name: &str, children: Vec<Node>) -> Node {
@@ -2113,7 +2113,7 @@ mod tests {
         let token = CancellationToken::new(3000);
         let _ = CancellationToken::new(3001);
 
-        let result = cache.query_files("item.txt".to_string(), token);
+        let result = cache.query_files("item.txt", token);
         assert!(matches!(result, Ok(None)));
     }
 
@@ -2658,7 +2658,7 @@ mod tests {
         let mut cache = SearchCache::walk_fs(root_path);
         let root_dir_name = root_path.file_name().unwrap().to_str().unwrap();
 
-        let results = query(&mut cache, root_dir_name.to_string());
+        let results = query(&mut cache, root_dir_name);
         assert_eq!(results.len(), 1, "Should find the root directory itself");
         let expected_path = root_path;
         assert_eq!(
@@ -2677,7 +2677,7 @@ mod tests {
         let temp_dir = TempDir::new("test_query_files_empty_q").unwrap();
         let mut cache = SearchCache::walk_fs(temp_dir.path());
         // Empty queries match everything.
-        let result = cache.query_files("".to_string(), CancellationToken::noop());
+        let result = cache.query_files("", CancellationToken::noop());
         assert!(result.is_ok(), "empty query should succeed");
     }
 
@@ -2949,7 +2949,7 @@ mod tests {
         );
 
         let parent_query = format!(r#"parent:"{}""#, root.to_string_lossy());
-        let direct_children = query(&mut cache, parent_query);
+        let direct_children = query(&mut cache, &parent_query);
         let mut child_names: Vec<_> = direct_children
             .into_iter()
             .filter_map(|node| {
@@ -2966,7 +2966,7 @@ mod tests {
         );
 
         let infolder_query = format!(r#"infolder:"{}""#, nested.to_string_lossy());
-        let infolder_results = query(&mut cache, infolder_query);
+        let infolder_results = query(&mut cache, &infolder_query);
         assert_eq!(infolder_results.len(), 1);
         assert!(infolder_results[0].path.ends_with("nested/child.txt"));
     }

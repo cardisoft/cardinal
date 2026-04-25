@@ -35,7 +35,7 @@ fn test_size_filter_exact_match() {
 
     // Exact size match
     let result = cache
-        .query_files("size:100".to_string(), CancellationToken::noop())
+        .query_files("size:100", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -54,7 +54,7 @@ fn test_size_filter_greater_than() {
 
     // Greater than 100 bytes
     let result = cache
-        .query_files("size:>100".to_string(), CancellationToken::noop())
+        .query_files("size:>100", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -72,7 +72,7 @@ fn test_size_filter_less_than() {
 
     // Less than 200 bytes
     let result = cache
-        .query_files("size:<200".to_string(), CancellationToken::noop())
+        .query_files("size:<200", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -91,7 +91,7 @@ fn test_size_filter_range() {
 
     // Range: 200 to 1500 bytes
     let result = cache
-        .query_files("size:200..1500".to_string(), CancellationToken::noop())
+        .query_files("size:200..1500", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -110,7 +110,7 @@ fn test_size_filter_with_units() {
 
     // Size in KB
     let result = cache
-        .query_files("size:>5k".to_string(), CancellationToken::noop())
+        .query_files("size:>5k", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -118,7 +118,7 @@ fn test_size_filter_with_units() {
 
     // Size in MB
     let result = cache
-        .query_files("size:<2m".to_string(), CancellationToken::noop())
+        .query_files("size:<2m", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -139,7 +139,7 @@ fn test_file_type_filter_file() {
 
     // Filter only files
     let result = cache
-        .query_files("file:".to_string(), CancellationToken::noop())
+        .query_files("file:", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -160,7 +160,7 @@ fn test_folder_type_filter() {
 
     // Filter only folders
     let result = cache
-        .query_files("folder:".to_string(), CancellationToken::noop())
+        .query_files("folder:", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -181,7 +181,7 @@ fn test_combined_size_and_type_filter() {
 
     // Files larger than 1000 bytes
     let result = cache
-        .query_files("file: size:>1000".to_string(), CancellationToken::noop())
+        .query_files("file: size:>1000", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -199,7 +199,7 @@ fn test_size_filter_zero_bytes() {
 
     // Exact zero size
     let result = cache
-        .query_files("size:0".to_string(), CancellationToken::noop())
+        .query_files("size:0", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -216,14 +216,14 @@ fn test_size_filter_edge_values() {
 
     // Single byte
     let result = cache
-        .query_files("size:1".to_string(), CancellationToken::noop())
+        .query_files("size:1", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 1);
 
     // 255 bytes
     let result = cache
-        .query_files("size:255".to_string(), CancellationToken::noop())
+        .query_files("size:255", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 1);
@@ -244,7 +244,7 @@ fn test_date_modified_filter_recent() {
 
     // Query for files modified today
     let result = cache
-        .query_files("dm:today".to_string(), CancellationToken::noop())
+        .query_files("dm:today", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -263,7 +263,7 @@ fn test_date_created_filter() {
 
     // Query for files created today
     let result = cache
-        .query_files("dm:today".to_string(), CancellationToken::noop())
+        .query_files("dc:today", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -283,14 +283,14 @@ fn test_metadata_lazy_loading() {
 
     // First size query should trigger metadata fetch
     let result = cache
-        .query_files("size:>500".to_string(), CancellationToken::noop())
+        .query_files("size:>500", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 1);
 
     // Second query should use cached metadata
     let result = cache
-        .query_files("size:<2000".to_string(), CancellationToken::noop())
+        .query_files("size:<2000", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 1);
@@ -306,7 +306,7 @@ fn test_expand_file_nodes_with_metadata() {
 
     // Get file nodes
     let result = cache
-        .query_files("file".to_string(), CancellationToken::noop())
+        .query_files("file", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -328,7 +328,7 @@ fn test_size_comparison_operators() {
 
     // >= operator
     let result = cache
-        .query_files("size:>=200".to_string(), CancellationToken::noop())
+        .query_files("size:>=200", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -336,14 +336,14 @@ fn test_size_comparison_operators() {
 
     // <= operator
     let result = cache
-        .query_files("size:<=200".to_string(), CancellationToken::noop())
+        .query_files("size:<=200", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
     assert_eq!(nodes.len(), 2, "Should find 100 and 200 byte files");
 
     // != operator (if supported)
-    let result = cache.query_files("size:!=200".to_string(), CancellationToken::noop());
+    let result = cache.query_files("size:!=200", CancellationToken::noop());
     // May or may not be supported, just ensure no panic
     assert!(result.is_ok() || result.is_err());
 }
@@ -370,7 +370,7 @@ fn test_type_macro_filters() {
 
     // Test video macro
     let result = cache
-        .query_files("video:".to_string(), CancellationToken::noop())
+        .query_files("video:", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -378,7 +378,7 @@ fn test_type_macro_filters() {
 
     // Test audio macro
     let result = cache
-        .query_files("audio:".to_string(), CancellationToken::noop())
+        .query_files("audio:", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -386,7 +386,7 @@ fn test_type_macro_filters() {
 
     // Test doc macro
     let result = cache
-        .query_files("doc:".to_string(), CancellationToken::noop())
+        .query_files("doc:", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -408,7 +408,7 @@ fn test_size_units_case_insensitive() {
     ];
 
     for query in &queries {
-        let result = cache.query_files(query.to_string(), CancellationToken::noop());
+        let result = cache.query_files(query, CancellationToken::noop());
         assert!(result.is_ok(), "Query {query} should succeed");
     }
 }
@@ -428,7 +428,7 @@ fn test_metadata_for_inaccessible_files() {
     std::fs::remove_file(&test_file).unwrap();
 
     // Query should handle missing file gracefully
-    let result = cache.query_files("test".to_string(), CancellationToken::noop());
+    let result = cache.query_files("test", CancellationToken::noop());
     assert!(result.is_ok(), "Should handle missing files gracefully");
 }
 
@@ -443,7 +443,7 @@ fn test_date_filter_with_ranges() {
     let mut cache = SearchCache::walk_fs(&root_path);
 
     // Date range query (specific dates would depend on implementation)
-    let result = cache.query_files("dm:2020..2030".to_string(), CancellationToken::noop());
+    let result = cache.query_files("dm:2020..2030", CancellationToken::noop());
     // Should handle gracefully
     assert!(result.is_ok() || result.is_err());
 }
@@ -463,7 +463,7 @@ fn test_combined_metadata_filters() {
     // Multiple filters: file type, extension, size, date
     let result = cache
         .query_files(
-            "file: ext:txt size:>500 dm:today".to_string(),
+            "file: ext:txt size:>500 dm:today",
             CancellationToken::noop(),
         )
         .unwrap();
@@ -485,13 +485,13 @@ fn test_size_filter_with_decimal_units() {
 
     // Decimal size
     let result = cache
-        .query_files("size:>1.2k".to_string(), CancellationToken::noop())
+        .query_files("size:>1.2k", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 1);
 
     let result = cache
-        .query_files("size:<2k".to_string(), CancellationToken::noop())
+        .query_files("size:<2k", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 1);

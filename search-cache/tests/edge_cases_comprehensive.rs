@@ -38,12 +38,12 @@ fn test_empty_cache() {
     let mut cache = SearchCache::walk_fs(&root_path);
 
     // Search for anything should return empty or small result
-    let result = cache.query_files("test".to_string(), CancellationToken::noop());
+    let result = cache.query_files("test", CancellationToken::noop());
     assert!(result.is_ok());
     // Just verify it doesn't crash - empty cache behavior may vary
 
     // Empty query on empty cache
-    let result = cache.query_files("".to_string(), CancellationToken::noop());
+    let result = cache.query_files("", CancellationToken::noop());
     assert!(result.is_ok());
 }
 
@@ -62,7 +62,7 @@ fn test_cancellation_during_search() {
     let _token_v2 = CancellationToken::new(2);
 
     // Search should return None due to cancellation
-    let result = cache.query_files("file".to_string(), token_v1);
+    let result = cache.query_files("file", token_v1);
     assert!(result.is_ok());
     assert!(
         result.unwrap().is_none(),
@@ -93,7 +93,7 @@ fn test_cancellation_with_stop_flag() {
     let token_v1 = CancellationToken::new(1);
     let _token_v2 = CancellationToken::new(2);
 
-    let result = cache.query_files("test".to_string(), token_v1);
+    let result = cache.query_files("test", token_v1);
     assert!(result.is_ok());
     assert!(
         result.unwrap().is_none(),
@@ -127,7 +127,7 @@ fn test_special_characters_in_filenames() {
 
     // Test searching for files with spaces
     let result = cache
-        .query_files("spaces".to_string(), CancellationToken::noop())
+        .query_files("spaces", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -136,21 +136,21 @@ fn test_special_characters_in_filenames() {
 
     // Test searching for files with dashes
     let result = cache
-        .query_files("dashes".to_string(), CancellationToken::noop())
+        .query_files("dashes", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 1);
 
     // Test Unicode filenames
     let result = cache
-        .query_files("café".to_string(), CancellationToken::noop())
+        .query_files("café", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 1);
 
     // Test Chinese characters
     let result = cache
-        .query_files("文件".to_string(), CancellationToken::noop())
+        .query_files("文件", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 1);
@@ -175,7 +175,7 @@ fn test_deeply_nested_paths() {
 
     // Test searching deep nested file
     let result = cache
-        .query_files("file10".to_string(), CancellationToken::noop())
+        .query_files("file10", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 1);
@@ -183,7 +183,9 @@ fn test_deeply_nested_paths() {
     // Test infolder at various levels
     let deep_path = root.join("a/b/c/d/e");
     let query = format!("infolder:{}", deep_path.display());
-    let result = cache.query_files(query, CancellationToken::noop()).unwrap();
+    let result = cache
+        .query_files(&query, CancellationToken::noop())
+        .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
     // Should find file5.txt through file10.txt and their parent directories
@@ -195,7 +197,9 @@ fn test_deeply_nested_paths() {
     // Test parent at deep level
     let parent_path = root.join("a/b/c/d/e/f/g/h/i");
     let query = format!("parent:{}", parent_path.display());
-    let result = cache.query_files(query, CancellationToken::noop()).unwrap();
+    let result = cache
+        .query_files(&query, CancellationToken::noop())
+        .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
     // parent: returns direct children, which includes both file and directory j
@@ -211,7 +215,7 @@ fn test_empty_query_returns_all() {
     let (mut cache, _root) = build_test_cache(&files);
 
     // Empty query should return all nodes (or specific behavior)
-    let result = cache.query_files("".to_string(), CancellationToken::noop());
+    let result = cache.query_files("", CancellationToken::noop());
     assert!(result.is_ok());
     // Based on implementation, empty query might return all or none
     // This tests the behavior is consistent
@@ -224,10 +228,7 @@ fn test_no_results_found() {
 
     // Search for non-existent pattern
     let result = cache
-        .query_files(
-            "nonexistent_pattern_xyz".to_string(),
-            CancellationToken::noop(),
-        )
+        .query_files("nonexistent_pattern_xyz", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(
@@ -243,17 +244,13 @@ fn test_single_character_searches() {
     let (mut cache, _root) = build_test_cache(&files);
 
     // Search for single character
-    let result = cache
-        .query_files("a".to_string(), CancellationToken::noop())
-        .unwrap();
+    let result = cache.query_files("a", CancellationToken::noop()).unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
     assert!(!nodes.is_empty(), "Should find files starting with 'a'");
 
     // Search for single character 'b'
-    let result = cache
-        .query_files("b".to_string(), CancellationToken::noop())
-        .unwrap();
+    let result = cache.query_files("b", CancellationToken::noop()).unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
     assert!(!nodes.is_empty());
@@ -315,7 +312,7 @@ fn test_extension_filter_edge_cases() {
 
     // Test single extension
     let result = cache
-        .query_files("ext:txt".to_string(), CancellationToken::noop())
+        .query_files("ext:txt", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -324,7 +321,7 @@ fn test_extension_filter_edge_cases() {
 
     // Test multiple extensions
     let result = cache
-        .query_files("ext:txt;gz".to_string(), CancellationToken::noop())
+        .query_files("ext:txt;gz", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -332,7 +329,7 @@ fn test_extension_filter_edge_cases() {
 
     // Test non-existent extension
     let result = cache
-        .query_files("ext:xyz123".to_string(), CancellationToken::noop())
+        .query_files("ext:xyz123", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(result.unwrap().len(), 0);
@@ -352,7 +349,7 @@ fn test_boolean_operations_edge_cases() {
 
     // Test AND with no results
     let result = cache
-        .query_files("apple banana".to_string(), CancellationToken::noop())
+        .query_files("apple banana", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     assert_eq!(
@@ -363,7 +360,7 @@ fn test_boolean_operations_edge_cases() {
 
     // Test OR with results
     let result = cache
-        .query_files("apple | banana".to_string(), CancellationToken::noop())
+        .query_files("apple | banana", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -372,7 +369,7 @@ fn test_boolean_operations_edge_cases() {
     // Test NOT with all excluded
     let result = cache
         .query_files(
-            "txt ! apple ! banana ! cherry ! apricot ! blueberry".to_string(),
+            "txt ! apple ! banana ! cherry ! apricot ! blueberry",
             CancellationToken::noop(),
         )
         .unwrap();
@@ -382,7 +379,7 @@ fn test_boolean_operations_edge_cases() {
 
     // Test complex: (A OR B) AND C
     let result = cache
-        .query_files("(ap | blu) txt".to_string(), CancellationToken::noop())
+        .query_files("(ap | blu) txt", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -407,10 +404,7 @@ fn test_regex_edge_cases() {
 
     // Test anchor patterns
     let result = cache
-        .query_files(
-            r"regex:^test\d+\.txt$".to_string(),
-            CancellationToken::noop(),
-        )
+        .query_files(r"regex:^test\d+\.txt$", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -418,15 +412,12 @@ fn test_regex_edge_cases() {
 
     // Test negative patterns
     let result = cache
-        .query_files(
-            r"regex:test[^0-9]+\.txt".to_string(),
-            CancellationToken::noop(),
-        )
+        .query_files(r"regex:test[^0-9]+\.txt", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
 
     // Test empty regex (should be handled)
-    let result = cache.query_files(r"regex:".to_string(), CancellationToken::noop());
+    let result = cache.query_files(r"regex:", CancellationToken::noop());
     // Should either error or handle gracefully
     assert!(result.is_ok() || result.is_err());
 }
@@ -446,7 +437,7 @@ fn test_wildcard_edge_cases() {
 
     // Test single asterisk at start
     let result = cache
-        .query_files("*file.txt".to_string(), CancellationToken::noop())
+        .query_files("*file.txt", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -457,7 +448,7 @@ fn test_wildcard_edge_cases() {
 
     // Test single asterisk at end
     let result = cache
-        .query_files("file*".to_string(), CancellationToken::noop())
+        .query_files("file*", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -465,7 +456,7 @@ fn test_wildcard_edge_cases() {
 
     // Test asterisk in middle
     let result = cache
-        .query_files("file*.txt".to_string(), CancellationToken::noop())
+        .query_files("file*.txt", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -473,7 +464,7 @@ fn test_wildcard_edge_cases() {
 
     // Test multiple asterisks
     let result = cache
-        .query_files("*file*txt*".to_string(), CancellationToken::noop())
+        .query_files("*file*txt*", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
 }
@@ -491,7 +482,9 @@ fn test_path_filter_boundary_cases() {
 
     // Test parent with root directory
     let query = format!("parent:{}", root.display());
-    let result = cache.query_files(query, CancellationToken::noop()).unwrap();
+    let result = cache
+        .query_files(&query, CancellationToken::noop())
+        .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
     assert!(nodes.len() >= 3, "Should find root.txt, dir, and dir2");
@@ -499,7 +492,7 @@ fn test_path_filter_boundary_cases() {
     // Test infolder with non-existent path - should handle gracefully
     let fake_path = root.join("nonexistent");
     let query = format!("infolder:{}", fake_path.display());
-    let result = cache.query_files(query, CancellationToken::noop());
+    let result = cache.query_files(&query, CancellationToken::noop());
     // Non-existent folder might error or return empty
     assert!(
         result.is_ok() || result.is_err(),
@@ -509,7 +502,9 @@ fn test_path_filter_boundary_cases() {
     // Test nosubfolders
     let dir_path = root.join("dir");
     let query = format!("nosubfolders:{}", dir_path.display());
-    let result = cache.query_files(query, CancellationToken::noop()).unwrap();
+    let result = cache
+        .query_files(&query, CancellationToken::noop())
+        .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
     // Should only include direct children, not subdir/file.txt
@@ -529,7 +524,7 @@ fn test_duplicate_filenames_different_paths() {
 
     // Search for common filename
     let result = cache
-        .query_files("file.txt".to_string(), CancellationToken::noop())
+        .query_files("file.txt", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -556,7 +551,7 @@ fn test_size_filter_edge_cases() {
 
     // Test exact size 0
     let result = cache
-        .query_files("size:0".to_string(), CancellationToken::noop())
+        .query_files("size:0", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -564,7 +559,7 @@ fn test_size_filter_edge_cases() {
 
     // Test size greater than
     let result = cache
-        .query_files("size:>1k".to_string(), CancellationToken::noop())
+        .query_files("size:>1k", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -572,7 +567,7 @@ fn test_size_filter_edge_cases() {
 
     // Test size less than
     let result = cache
-        .query_files("size:<100".to_string(), CancellationToken::noop())
+        .query_files("size:<100", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
     let nodes = result.unwrap();
@@ -580,7 +575,7 @@ fn test_size_filter_edge_cases() {
 
     // Test size range
     let result = cache
-        .query_files("size:100..2000".to_string(), CancellationToken::noop())
+        .query_files("size:100..2000", CancellationToken::noop())
         .unwrap();
     assert!(result.is_some());
 }
@@ -638,7 +633,7 @@ fn test_query_with_home_directory_expansion() {
 
     // Test with tilde (should be expanded or handled)
     // This might fail or be handled depending on implementation
-    let result = cache.query_files("~/test.txt".to_string(), CancellationToken::noop());
+    let result = cache.query_files("~/test.txt", CancellationToken::noop());
     // Just ensure it doesn't panic
     assert!(result.is_ok() || result.is_err());
 }
@@ -660,7 +655,7 @@ fn test_malformed_queries() {
     ];
 
     for query in malformed {
-        let result = cache.query_files(query.to_string(), CancellationToken::noop());
+        let result = cache.query_files(query, CancellationToken::noop());
         // Should either return error or empty results, not panic
         assert!(
             result.is_ok() || result.is_err(),
