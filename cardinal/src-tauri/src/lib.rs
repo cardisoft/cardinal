@@ -164,8 +164,8 @@ pub fn run() -> Result<()> {
     let icon_update_rx = &icon_update_rx;
     let server_state =
         server::ServerState::new(search_tx.clone(), result_rx.clone(), node_info_tx.clone());
-    std::thread::spawn(move || {
-        server::start_server(server_state, "127.0.0.1:3388");
+    tauri::async_runtime::spawn(async move {
+        server::start_server(server_state, 3388).await;
     });
 
     std::thread::scope(move |s| {
