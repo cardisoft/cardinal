@@ -475,7 +475,12 @@ fn perform_rescan(
     let mut phantom1 = PathBuf::new();
     let mut phantom2 = Vec::new();
     let mut phantom3 = Vec::new();
-    let walk_data = cache.walk_data(&mut phantom1, &mut phantom2, &mut phantom3, scan_cancellation_token);
+    let walk_data = cache.walk_data(
+        &mut phantom1,
+        &mut phantom2,
+        &mut phantom3,
+        scan_cancellation_token,
+    );
     let walking_done = AtomicBool::new(false);
     let stopped = std::thread::scope(|s| {
         s.spawn(|| {

@@ -436,7 +436,11 @@ pub async fn open_path(path: String) {
 }
 
 #[tauri::command]
-pub async fn start_logic(watch_root: String, ignore_paths: Vec<String>, include_paths: Vec<String>) {
+pub async fn start_logic(
+    watch_root: String,
+    ignore_paths: Vec<String>,
+    include_paths: Vec<String>,
+) {
     if let Some(sender) = LOGIC_START.get() {
         let _ = sender.try_send(LogicStartConfig {
             watch_root,

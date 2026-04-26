@@ -230,9 +230,12 @@ fn run_logic_thread(
     channels: BackgroundLoopChannels,
     config: LogicStartConfig,
 ) {
-    let Some((watch_root, ignore_paths, include_paths)) =
-        normalize_watch_config(&config.watch_root, config.ignore_paths, config.include_paths, Some("/"))
-    else {
+    let Some((watch_root, ignore_paths, include_paths)) = normalize_watch_config(
+        &config.watch_root,
+        config.ignore_paths,
+        config.include_paths,
+        Some("/"),
+    ) else {
         warn!("Invalid watch root in start config; skipping background startup");
         return;
     };
@@ -274,7 +277,12 @@ fn run_logic_thread(
                 return;
             } else {
                 info!("Initial scan cancelled by newer request, use noop cache");
-                SearchCache::noop(path.clone(), ignore_paths.clone(), include_paths.clone(), &APP_QUIT)
+                SearchCache::noop(
+                    path.clone(),
+                    ignore_paths.clone(),
+                    include_paths.clone(),
+                    &APP_QUIT,
+                )
             }
         }
     };
