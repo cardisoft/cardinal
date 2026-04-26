@@ -119,11 +119,16 @@ impl SearchCache {
         self.file_nodes.ignore_paths().clone().into_boxed_slice()
     }
 
+    pub fn include_paths(&self) -> Box<[PathBuf]> {
+        self.file_nodes.include_paths().clone().into_boxed_slice()
+    }
+
     /// The `path` is the root path of the constructed cache and fsevent watch path.
     pub fn try_read_persistent_cache(
         path: &Path,
         cache_path: &Path,
         current_ignore_paths: &Vec<PathBuf>,
+        current_include_paths: &Vec<PathBuf>,
         cancel: &'static AtomicBool,
     ) -> Result<Self> {
         read_cache_from_file(cache_path)
@@ -151,11 +156,24 @@ impl SearchCache {
                     })
                     .map(|()| x)
             })
+            .and_then(|x| {
+                (&x.include_paths == current_include_paths)
+                    .then_some(())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "Inconsistent include paths: expected: {:?}, actual: {:?}",
+                            &current_include_paths,
+                            &x.include_paths
+                        )
+                    })
+                    .map(|()| x)
+            })
             .map(
                 |PersistentStorage {
                      version: _,
                      path,
                      ignore_paths,
+                     include_paths,
                      slab_root,
                      slab,
                      name_index,
@@ -164,7 +182,7 @@ impl SearchCache {
                  }| {
                     // name pool construction speed is fast enough that caching it doesn't worth it.
                     let name_index = NameIndex::construct_name_pool(name_index);
-                    let slab = FileNodes::new(path, ignore_paths, slab, slab_root);
+                    let slab = FileNodes::new(path, ignore_paths, include_paths, slab, slab_root);
                     Self::new(slab, last_event_id, rescan_count, name_index, cancel)
                 },
             )
@@ -177,15 +195,18 @@ impl SearchCache {
 
     pub fn walk_fs_with_ignore(path: &Path, ignore_paths: &[PathBuf]) -> Self {
         Self::walk_fs_with_walk_data(
-            &WalkData::new(path, ignore_paths, false, || false),
+            &WalkData::new(path, ignore_paths, &[], false, || false),
             &NEVER_STOPPED,
         )
         .unwrap()
     }
 
     pub fn walk_fs(path: &Path) -> Self {
-        Self::walk_fs_with_walk_data(&WalkData::new(path, &[], false, || false), &NEVER_STOPPED)
-            .unwrap()
+        Self::walk_fs_with_walk_data(
+            &WalkData::new(path, &[], &[], false, || false),
+            &NEVER_STOPPED,
+        )
+        .unwrap()
     }
 
     /// This function is expected to be called with WalkData which metadata is not fetched.
@@ -237,6 +258,7 @@ impl SearchCache {
         let slab = FileNodes::new(
             walk_data.root_path.to_path_buf(),
             walk_data.ignore_directories.to_vec(),
+            walk_data.include_paths.to_vec(),
             slab,
             slab_root,
         );
@@ -262,9 +284,20 @@ impl SearchCache {
 
     /// Create a simple SearchCache which doesn't contain any file node and is
     /// expected to be used when walk_fs is cancelled.
-    pub fn noop(path: PathBuf, ignore_paths: Vec<PathBuf>, cancel: &'static AtomicBool) -> Self {
+    pub fn noop(
+        path: PathBuf,
+        ignore_paths: Vec<PathBuf>,
+        include_paths: Vec<PathBuf>,
+        cancel: &'static AtomicBool,
+    ) -> Self {
         Self {
-            file_nodes: FileNodes::new(path, ignore_paths, ThinSlab::new(), SlabIndex::new(0)),
+            file_nodes: FileNodes::new(
+                path,
+                ignore_paths,
+                include_paths,
+                ThinSlab::new(),
+                SlabIndex::new(0),
+            ),
             last_event_id: 0,
             rescan_count: 0,
             name_index: NameIndex::default(),
@@ -478,7 +511,11 @@ impl SearchCache {
     }
 
     fn should_ignore(&self, path: &Path) -> bool {
-        should_ignore_path(path, self.file_nodes.ignore_paths())
+        should_ignore_path(
+            path,
+            self.file_nodes.ignore_paths(),
+            self.file_nodes.include_paths(),
+        )
     }
 
     // `Self::scan_path_recursive`function returns index of the constructed node(with metadata provided).
@@ -507,9 +544,13 @@ impl SearchCache {
             self.remove_node(old_node);
         }
         // For incremental data, we need metadata
-        let walk_data = WalkData::new(path, self.file_nodes.ignore_paths(), true, || {
-            self.stop.load(Ordering::Relaxed)
-        });
+        let walk_data = WalkData::new(
+            path,
+            self.file_nodes.ignore_paths(),
+            self.file_nodes.include_paths(),
+            true,
+            || self.stop.load(Ordering::Relaxed),
+        );
         walk_it_without_root_chain(&walk_data).map(|node| {
             let node = self.create_node_slab_update_name_index_and_name_pool(Some(parent), &node);
             // Push the newly created node to the parent's children
@@ -535,12 +576,14 @@ impl SearchCache {
         &self,
         phantom1: &'p mut PathBuf,
         phantom2: &'p mut Vec<PathBuf>,
+        phantom3: &'p mut Vec<PathBuf>,
         scan_cancellation_token: CancellationToken,
     ) -> WalkData<'p, impl Fn() -> bool + Send + Sync + Copy + 'static> {
         *phantom1 = self.file_nodes.path().to_path_buf();
         *phantom2 = self.file_nodes.ignore_paths().clone();
+        *phantom3 = self.file_nodes.include_paths().clone();
         let stop = self.stop;
-        WalkData::new(phantom1, phantom2, false, move || {
+        WalkData::new(phantom1, phantom2, phantom3, false, move || {
             stop.load(Ordering::Relaxed) || scan_cancellation_token.is_cancelled().is_none()
         })
     }
@@ -563,6 +606,7 @@ impl SearchCache {
             &WalkData::new(
                 self.file_nodes.path(),
                 self.file_nodes.ignore_paths(),
+                self.file_nodes.include_paths(),
                 false,
                 || self.stop.load(Ordering::Relaxed),
             ),
@@ -604,6 +648,7 @@ impl SearchCache {
             rescan_count: self.rescan_count,
             path: self.file_nodes.path().to_path_buf(),
             ignore_paths: self.file_nodes.ignore_paths().clone(),
+            include_paths: self.file_nodes.include_paths().clone(),
             slab_root: self.file_nodes.root(),
             name_index,
             slab,
@@ -626,7 +671,7 @@ impl SearchCache {
             name_index,
             stop: _,
         } = self;
-        let (path, ignore_paths, slab_root, slab) = file_nodes.into_parts();
+        let (path, ignore_paths, include_paths, slab_root, slab) = file_nodes.into_parts();
         let name_index = name_index.into_persistent();
         write_cache_to_file(
             cache_path,
@@ -634,6 +679,7 @@ impl SearchCache {
                 version: Num,
                 path,
                 ignore_paths,
+                include_paths,
                 slab_root,
                 slab,
                 name_index,
@@ -993,7 +1039,13 @@ mod tests {
         let root_target = push_child(&mut slab, root_idx, "target.txt");
         let alpha_target = push_child(&mut slab, alpha, "target.txt");
         let beta_target = push_child(&mut slab, beta, "target.txt");
-        let file_nodes = FileNodes::new(PathBuf::from("/virtual/root"), Vec::new(), slab, root_idx);
+        let file_nodes = FileNodes::new(
+            PathBuf::from("/virtual/root"),
+            Vec::new(),
+            Vec::new(),
+            slab,
+            root_idx,
+        );
         (file_nodes, [root_target, alpha_target, beta_target])
     }
 
@@ -1010,7 +1062,13 @@ mod tests {
         let mut slab = ThinSlab::new();
         let mut name_index = NameIndex::default();
         let root = construct_node_slab_name_index(None, &tree, &mut slab, &mut name_index);
-        let file_nodes = FileNodes::new(PathBuf::from("/virtual/root"), Vec::new(), slab, root);
+        let file_nodes = FileNodes::new(
+            PathBuf::from("/virtual/root"),
+            Vec::new(),
+            Vec::new(),
+            slab,
+            root,
+        );
 
         let shared_entries = name_index.get("shared").expect("shared entries");
         assert_eq!(shared_entries.len(), 3);

@@ -95,6 +95,7 @@ fn test_persistent_roundtrip() {
         tmp.path(),
         &cache_path,
         &Vec::new(),
+        &Vec::new(),
         &NEVER_STOPPED,
     )
     .unwrap();

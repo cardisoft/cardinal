@@ -80,10 +80,25 @@ impl From<fs::FileType> for NodeFileType {
     }
 }
 
-pub fn should_ignore_path(path: &Path, ignore_directories: &[PathBuf]) -> bool {
-    ignore_directories
+/// A path is ignored when an `ignore_directories` entry is its prefix and no
+/// `include_paths` entry overlaps in either direction. The bidirectional check
+/// matters during traversal: an ignored ancestor must still be visited if an
+/// include path lives below it, and a descendant of an include path must be
+/// kept even when its ancestor is in the ignore list.
+pub fn should_ignore_path(
+    path: &Path,
+    ignore_directories: &[PathBuf],
+    include_paths: &[PathBuf],
+) -> bool {
+    let is_ignored = ignore_directories
         .iter()
-        .any(|ignore| path.starts_with(ignore))
+        .any(|ignore| path.starts_with(ignore));
+    if !is_ignored {
+        return false;
+    }
+    !include_paths
+        .iter()
+        .any(|include| path.starts_with(include) || include.starts_with(path))
 }
 
 pub struct WalkData<'w, F: Fn() -> bool> {
@@ -93,6 +108,8 @@ pub struct WalkData<'w, F: Fn() -> bool> {
     cancel: F,
     pub root_path: &'w Path,
     pub ignore_directories: &'w [PathBuf],
+    /// Paths to include even when they fall under an ignored directory.
+    pub include_paths: &'w [PathBuf],
     /// If set, metadata will be collected for each file node(folder node will get free metadata).
     need_metadata: bool,
 }
@@ -108,6 +125,7 @@ where
             .field("cancel", &((self.cancel)()))
             .field("root_path", &self.root_path)
             .field("ignore_directories", &self.ignore_directories)
+            .field("include_paths", &self.include_paths)
             .field("need_metadata", &self.need_metadata)
             .finish()
     }
@@ -125,6 +143,7 @@ impl<'w> WalkData<'w, fn() -> bool> {
             cancel: never_cancel,
             root_path,
             ignore_directories: &[],
+            include_paths: &[],
             need_metadata,
         }
     }
@@ -134,6 +153,7 @@ impl<'w, F: Fn() -> bool> WalkData<'w, F> {
     pub fn new(
         root_path: &'w Path,
         ignore_directories: &'w [PathBuf],
+        include_paths: &'w [PathBuf],
         need_metadata: bool,
         cancel: F,
     ) -> Self {
@@ -143,12 +163,13 @@ impl<'w, F: Fn() -> bool> WalkData<'w, F> {
             cancel,
             root_path,
             ignore_directories,
+            include_paths,
             need_metadata,
         }
     }
 
     fn should_ignore(&self, path: &Path) -> bool {
-        should_ignore_path(path, self.ignore_directories)
+        should_ignore_path(path, self.ignore_directories, self.include_paths)
     }
 
     fn is_cancelled(&self) -> bool {
@@ -496,14 +517,14 @@ mod tests {
     #[test]
     fn should_ignore_exact_match() {
         let ignore = vec![PathBuf::from("/a/b/c")];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
+        let wd = WalkData::new(Path::new("/"), &ignore, &[], false, || false);
         assert!(wd.should_ignore(Path::new("/a/b/c")));
     }
 
     #[test]
     fn should_ignore_child_of_ignored_dir() {
         let ignore = vec![PathBuf::from("/a/b")];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
+        let wd = WalkData::new(Path::new("/"), &ignore, &[], false, || false);
         // direct child
         assert!(wd.should_ignore(Path::new("/a/b/c")));
         // deeply nested
@@ -515,7 +536,7 @@ mod tests {
         // "/tmp/abc" is NOT a child of "/tmp/ab" — Path::starts_with is
         // component-aware, not string-prefix.
         let ignore = vec![PathBuf::from("/tmp/ab")];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
+        let wd = WalkData::new(Path::new("/"), &ignore, &[], false, || false);
         assert!(!wd.should_ignore(Path::new("/tmp/abc")));
         assert!(!wd.should_ignore(Path::new("/tmp/abc/d")));
     }
@@ -523,7 +544,7 @@ mod tests {
     #[test]
     fn should_ignore_unrelated_path() {
         let ignore = vec![PathBuf::from("/a/b")];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
+        let wd = WalkData::new(Path::new("/"), &ignore, &[], false, || false);
         assert!(!wd.should_ignore(Path::new("/x/y")));
         assert!(!wd.should_ignore(Path::new("/a")));
     }
@@ -531,14 +552,14 @@ mod tests {
     #[test]
     fn should_ignore_empty_ignore_list() {
         let ignore: Vec<PathBuf> = vec![];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
+        let wd = WalkData::new(Path::new("/"), &ignore, &[], false, || false);
         assert!(!wd.should_ignore(Path::new("/anything")));
     }
 
     #[test]
     fn should_ignore_multiple_ignore_dirs() {
         let ignore = vec![PathBuf::from("/a"), PathBuf::from("/x/y")];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
+        let wd = WalkData::new(Path::new("/"), &ignore, &[], false, || false);
         assert!(wd.should_ignore(Path::new("/a")));
         assert!(wd.should_ignore(Path::new("/a/b/c")));
         assert!(wd.should_ignore(Path::new("/x/y")));
@@ -550,9 +571,48 @@ mod tests {
     #[test]
     fn should_ignore_parent_of_ignored_dir_is_not_ignored() {
         let ignore = vec![PathBuf::from("/a/b/c")];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, || false);
+        let wd = WalkData::new(Path::new("/"), &ignore, &[], false, || false);
         assert!(!wd.should_ignore(Path::new("/a")));
         assert!(!wd.should_ignore(Path::new("/a/b")));
+    }
+
+    // ── include_paths (exception) tests ──────────────────────────────────
+
+    #[test]
+    fn include_path_carves_out_subtree_from_ignored_dir() {
+        let ignore = vec![PathBuf::from("/a")];
+        let include = vec![PathBuf::from("/a/b")];
+        let wd = WalkData::new(Path::new("/"), &ignore, &include, false, || false);
+        // ancestor must be traversable to reach the include
+        assert!(!wd.should_ignore(Path::new("/a")));
+        // included subtree
+        assert!(!wd.should_ignore(Path::new("/a/b")));
+        assert!(!wd.should_ignore(Path::new("/a/b/c")));
+        assert!(!wd.should_ignore(Path::new("/a/b/c/d")));
+        // siblings of the include remain ignored
+        assert!(wd.should_ignore(Path::new("/a/x")));
+        assert!(wd.should_ignore(Path::new("/a/x/y")));
+    }
+
+    #[test]
+    fn include_path_does_not_rescue_unrelated_ignored_dirs() {
+        let ignore = vec![PathBuf::from("/a"), PathBuf::from("/z")];
+        let include = vec![PathBuf::from("/a/b")];
+        let wd = WalkData::new(Path::new("/"), &ignore, &include, false, || false);
+        // /z has no overlapping include, so it stays ignored
+        assert!(wd.should_ignore(Path::new("/z")));
+        assert!(wd.should_ignore(Path::new("/z/q")));
+    }
+
+    #[test]
+    fn multiple_include_paths_under_same_ignored_dir() {
+        let ignore = vec![PathBuf::from("/a")];
+        let include = vec![PathBuf::from("/a/b"), PathBuf::from("/a/c")];
+        let wd = WalkData::new(Path::new("/"), &ignore, &include, false, || false);
+        assert!(!wd.should_ignore(Path::new("/a")));
+        assert!(!wd.should_ignore(Path::new("/a/b")));
+        assert!(!wd.should_ignore(Path::new("/a/c")));
+        assert!(wd.should_ignore(Path::new("/a/d")));
     }
 
     // ── other unit tests ─────────────────────────────────────────────────
@@ -560,7 +620,7 @@ mod tests {
     #[test]
     fn walk_data_debug_shows_cancel_state() {
         let ignore = vec![PathBuf::from("/a")];
-        let wd = WalkData::new(Path::new("/root"), &ignore, true, || false);
+        let wd = WalkData::new(Path::new("/root"), &ignore, &[], true, || false);
         let dbg = format!("{wd:?}");
         assert!(
             dbg.contains("cancel: false"),
@@ -575,7 +635,7 @@ mod tests {
             "Debug output should include need_metadata: {dbg}"
         );
 
-        let wd_cancelled = WalkData::new(Path::new("/root"), &ignore, false, || true);
+        let wd_cancelled = WalkData::new(Path::new("/root"), &ignore, &[], false, || true);
         let dbg2 = format!("{wd_cancelled:?}");
         assert!(
             dbg2.contains("cancel: true"),
@@ -587,7 +647,7 @@ mod tests {
     fn walk_data_closure_cancellation_is_dynamic() {
         let flag = AtomicBool::new(false);
         let ignore: Vec<PathBuf> = vec![];
-        let wd = WalkData::new(Path::new("/"), &ignore, false, || {
+        let wd = WalkData::new(Path::new("/"), &ignore, &[], false, || {
             flag.load(Ordering::Relaxed)
         });
         assert!(
@@ -651,7 +711,7 @@ mod tests {
         drop(tmp);
 
         let ignore: Vec<PathBuf> = vec![];
-        let walk_data = WalkData::new(&root, &ignore, false, || false);
+        let walk_data = WalkData::new(&root, &ignore, &[], false, || false);
         let node = match walk_it_without_root_chain(&walk_data) {
             Some(node) => node,
             None => panic!("current behavior regression: expected Some, got None"),
@@ -679,7 +739,7 @@ mod tests {
         drop(tmp); // remove the directory
 
         let ignore: Vec<PathBuf> = vec![];
-        let walk_data = WalkData::new(&root, &ignore, true, || false);
+        let walk_data = WalkData::new(&root, &ignore, &[], true, || false);
         let node = walk_it(&walk_data).expect("walk_it should return Some even for missing root");
 
         // Navigate to the leaf that represents the (now-missing) root.
@@ -702,7 +762,7 @@ mod tests {
 
         for need_metadata in [false, true] {
             let ignore: Vec<PathBuf> = vec![];
-            let walk_data = WalkData::new(&root, &ignore, need_metadata, || false);
+            let walk_data = WalkData::new(&root, &ignore, &[], need_metadata, || false);
             let node = walk_it_without_root_chain(&walk_data)
                 .expect("walk should return Some for missing path");
             assert!(
@@ -724,7 +784,7 @@ mod tests {
         drop(tmp);
 
         let ignore: Vec<PathBuf> = vec![];
-        let walk_data = WalkData::new(&root, &ignore, false, || false);
+        let walk_data = WalkData::new(&root, &ignore, &[], false, || false);
         let node = walk_it_without_root_chain(&walk_data)
             .expect("walk should return Some for missing path");
         assert_eq!(
@@ -738,7 +798,7 @@ mod tests {
     fn test_search_root() {
         let done = AtomicBool::new(false);
         let path = [PathBuf::from("/System/Volumes/Data")];
-        let walk_data = WalkData::new(Path::new("/"), &path, false, || false);
+        let walk_data = WalkData::new(Path::new("/"), &path, &[], false, || false);
         std::thread::scope(|s| {
             s.spawn(|| {
                 let node = walk_it(&walk_data).unwrap();
@@ -764,6 +824,7 @@ mod tests {
         let walk_data = WalkData::new(
             Path::new("/Library/Developer/CoreSimulator/Volumes/iOS_23A343"),
             &ignore,
+            &[],
             true,
             || false,
         );
@@ -789,7 +850,7 @@ mod tests {
         let cancel = AtomicBool::new(false);
         let done = AtomicBool::new(false);
         let ignore = vec![PathBuf::from("/System/Volumes/Data")];
-        let walk_data = WalkData::new(Path::new("/"), &ignore, false, || {
+        let walk_data = WalkData::new(Path::new("/"), &ignore, &[], false, || {
             cancel.load(Ordering::Relaxed)
         });
         std::thread::scope(|s| {

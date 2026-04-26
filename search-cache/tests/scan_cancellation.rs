@@ -30,7 +30,7 @@ fn build_cache() -> (TempDir, SearchCache) {
 
 #[test]
 fn noop_cache_is_noop_returns_true() {
-    let cache = SearchCache::noop(PathBuf::from("/some/path"), vec![], &NEVER_STOPPED);
+    let cache = SearchCache::noop(PathBuf::from("/some/path"), vec![], vec![], &NEVER_STOPPED);
     assert!(
         cache.is_noop(),
         "noop() constructor must produce a cache that reports is_noop() == true"
@@ -48,7 +48,12 @@ fn noop_cache_preserves_ignore_paths() {
         PathBuf::from("/some/path/node_modules"),
         PathBuf::from("/some/path/.git"),
     ];
-    let cache = SearchCache::noop(PathBuf::from("/some/path"), ignore.clone(), &NEVER_STOPPED);
+    let cache = SearchCache::noop(
+        PathBuf::from("/some/path"),
+        ignore.clone(),
+        vec![],
+        &NEVER_STOPPED,
+    );
     assert_eq!(
         cache.ignore_paths(),
         ignore.into_boxed_slice(),
@@ -58,7 +63,7 @@ fn noop_cache_preserves_ignore_paths() {
 
 #[test]
 fn noop_cache_empty_ignore_paths_is_preserved() {
-    let cache = SearchCache::noop(PathBuf::from("/x"), vec![], &NEVER_STOPPED);
+    let cache = SearchCache::noop(PathBuf::from("/x"), vec![], vec![], &NEVER_STOPPED);
     assert!(
         cache.ignore_paths().is_empty(),
         "noop() with empty ignore_paths should store an empty vec"
@@ -96,7 +101,13 @@ fn stale_scan_token_cancels_rescan_walk_data() {
 
     let mut scan_root = PathBuf::new();
     let mut scan_ignore_paths = Vec::new();
-    let walk_data = cache.walk_data(&mut scan_root, &mut scan_ignore_paths, stale);
+    let mut scan_include_paths = Vec::new();
+    let walk_data = cache.walk_data(
+        &mut scan_root,
+        &mut scan_ignore_paths,
+        &mut scan_include_paths,
+        stale,
+    );
 
     let rescan_result = cache.rescan_with_walk_data(&walk_data);
     assert!(
@@ -119,14 +130,15 @@ fn stale_token_on_noop_cache_stays_noop() {
     let tmp = TempDir::new("stale_on_noop").expect("failed to create tempdir");
     fs::write(tmp.path().join("file.txt"), "data").expect("failed to create fixture");
 
-    let mut cache = SearchCache::noop(tmp.path().to_path_buf(), vec![], &NEVER_STOPPED);
+    let mut cache = SearchCache::noop(tmp.path().to_path_buf(), vec![], vec![], &NEVER_STOPPED);
 
     let stale = CancellationToken::new_scan();
     let _newer = CancellationToken::new_scan();
 
     let mut p1 = PathBuf::new();
     let mut p2 = Vec::new();
-    let walk_data = cache.walk_data(&mut p1, &mut p2, stale);
+    let mut p3 = Vec::new();
+    let walk_data = cache.walk_data(&mut p1, &mut p2, &mut p3, stale);
     let result = cache.rescan_with_walk_data(&walk_data);
 
     assert!(
@@ -156,7 +168,13 @@ fn active_scan_token_allows_rescan_to_complete() {
 
     let mut scan_root = PathBuf::new();
     let mut scan_ignore_paths = Vec::new();
-    let walk_data = cache.walk_data(&mut scan_root, &mut scan_ignore_paths, active);
+    let mut scan_include_paths = Vec::new();
+    let walk_data = cache.walk_data(
+        &mut scan_root,
+        &mut scan_ignore_paths,
+        &mut scan_include_paths,
+        active,
+    );
 
     let result = cache.rescan_with_walk_data(&walk_data);
     assert!(
@@ -183,13 +201,14 @@ fn is_noop_false_after_rescan_of_noop_cache() {
     fs::create_dir_all(tmp.path().join("sub")).expect("failed to create sub");
     fs::write(tmp.path().join("sub/a.rs"), "fn f() {}").expect("failed to create file");
 
-    let mut cache = SearchCache::noop(tmp.path().to_path_buf(), vec![], &NEVER_STOPPED);
+    let mut cache = SearchCache::noop(tmp.path().to_path_buf(), vec![], vec![], &NEVER_STOPPED);
     assert!(cache.is_noop(), "precondition: starts as noop");
 
     let active = CancellationToken::new_scan();
     let mut p1 = PathBuf::new();
     let mut p2 = Vec::new();
-    let walk_data = cache.walk_data(&mut p1, &mut p2, active);
+    let mut p3 = Vec::new();
+    let walk_data = cache.walk_data(&mut p1, &mut p2, &mut p3, active);
     let result = cache.rescan_with_walk_data(&walk_data);
 
     assert!(result.is_some(), "rescan with active token should succeed");
@@ -215,13 +234,14 @@ fn stop_flag_cancels_rescan_independently_of_scan_token() {
     fs::write(tmp.path().join("b.txt"), "hi").expect("failed to create fixture");
 
     // noop cache tied to ALWAYS_STOPPED — its stop flag is already true.
-    let mut cache = SearchCache::noop(tmp.path().to_path_buf(), vec![], &ALWAYS_STOPPED);
+    let mut cache = SearchCache::noop(tmp.path().to_path_buf(), vec![], vec![], &ALWAYS_STOPPED);
 
     // Use an *active* scan token so that only the stop flag drives cancellation.
     let active = CancellationToken::new_scan();
     let mut p1 = PathBuf::new();
     let mut p2 = Vec::new();
-    let walk_data = cache.walk_data(&mut p1, &mut p2, active);
+    let mut p3 = Vec::new();
+    let walk_data = cache.walk_data(&mut p1, &mut p2, &mut p3, active);
     let result = cache.rescan_with_walk_data(&walk_data);
 
     assert!(
@@ -241,7 +261,7 @@ fn noop_cache_signals_do_not_persist() {
     // Mirrors the logic in background.rs:
     //   tx.send((!cache.is_noop()).then(|| cache))
     // A noop cache should produce None (skip write); a real cache should produce Some.
-    let noop = SearchCache::noop(PathBuf::from("/p"), vec![], &NEVER_STOPPED);
+    let noop = SearchCache::noop(PathBuf::from("/p"), vec![], vec![], &NEVER_STOPPED);
     let persist_noop: Option<()> = (!noop.is_noop()).then_some(());
     assert!(
         persist_noop.is_none(),
@@ -260,7 +280,7 @@ fn noop_cache_signals_do_not_persist() {
 
 #[test]
 fn noop_cache_last_event_id_is_zero() {
-    let mut cache = SearchCache::noop(PathBuf::from("/w"), vec![], &NEVER_STOPPED);
+    let mut cache = SearchCache::noop(PathBuf::from("/w"), vec![], vec![], &NEVER_STOPPED);
     assert_eq!(
         cache.last_event_id(),
         0,
@@ -270,7 +290,7 @@ fn noop_cache_last_event_id_is_zero() {
 
 #[test]
 fn noop_cache_rescan_count_is_zero() {
-    let cache = SearchCache::noop(PathBuf::from("/w"), vec![], &NEVER_STOPPED);
+    let cache = SearchCache::noop(PathBuf::from("/w"), vec![], vec![], &NEVER_STOPPED);
     assert_eq!(
         cache.rescan_count(),
         0,
@@ -281,7 +301,7 @@ fn noop_cache_rescan_count_is_zero() {
 #[test]
 fn noop_cache_search_returns_empty_results() {
     use search_cache::SearchOptions;
-    let mut cache = SearchCache::noop(PathBuf::from("/w"), vec![], &NEVER_STOPPED);
+    let mut cache = SearchCache::noop(PathBuf::from("/w"), vec![], vec![], &NEVER_STOPPED);
     let outcome = cache
         .search_with_options(
             "anything",
@@ -298,7 +318,7 @@ fn noop_cache_search_returns_empty_results() {
 
 #[test]
 fn noop_cache_search_empty_returns_empty_vec() {
-    let cache = SearchCache::noop(PathBuf::from("/w"), vec![], &NEVER_STOPPED);
+    let cache = SearchCache::noop(PathBuf::from("/w"), vec![], vec![], &NEVER_STOPPED);
     let result = cache
         .search_empty(CancellationToken::noop())
         .expect("search_empty on noop should not be cancelled");
@@ -311,19 +331,26 @@ fn noop_cache_search_empty_returns_empty_vec() {
 // ── noop cache walk_data propagation ─────────────────────────────────────────
 
 #[test]
-fn noop_cache_walk_data_propagates_path_and_ignore() {
+fn noop_cache_walk_data_propagates_paths_and_filters() {
     let _guard = SCAN_TOKEN_LOCK
         .lock()
         .expect("scan token lock should not be poisoned");
 
     let path = PathBuf::from("/my/root");
     let ignore = vec![PathBuf::from("/my/root/.git")];
-    let cache = SearchCache::noop(path.clone(), ignore.clone(), &NEVER_STOPPED);
+    let include = vec![PathBuf::from("/my/root/.git/info")];
+    let cache = SearchCache::noop(
+        path.clone(),
+        ignore.clone(),
+        include.clone(),
+        &NEVER_STOPPED,
+    );
 
     let mut p1 = PathBuf::new();
     let mut p2 = Vec::new();
+    let mut p3 = Vec::new();
     let token = CancellationToken::new_scan();
-    let wd = cache.walk_data(&mut p1, &mut p2, token);
+    let wd = cache.walk_data(&mut p1, &mut p2, &mut p3, token);
 
     assert_eq!(
         wd.root_path, &path,
@@ -333,13 +360,17 @@ fn noop_cache_walk_data_propagates_path_and_ignore() {
         wd.ignore_directories, &ignore,
         "walk_data from noop must propagate ignore paths"
     );
+    assert_eq!(
+        wd.include_paths, &include,
+        "walk_data from noop must propagate include paths"
+    );
 }
 
 // ── handle_fs_events on noop cache ───────────────────────────────────────────
 
 #[test]
 fn noop_cache_handle_fs_events_with_empty_events_is_ok() {
-    let mut cache = SearchCache::noop(PathBuf::from("/w"), vec![], &NEVER_STOPPED);
+    let mut cache = SearchCache::noop(PathBuf::from("/w"), vec![], vec![], &NEVER_STOPPED);
     let result = cache.handle_fs_events(vec![]);
     assert!(
         result.is_ok(),
@@ -350,7 +381,7 @@ fn noop_cache_handle_fs_events_with_empty_events_is_ok() {
 #[test]
 fn noop_cache_handle_fs_events_with_create_event_panics_on_invalid_slab() {
     use cardinal_sdk::{EventFlag, FsEvent};
-    let mut cache = SearchCache::noop(PathBuf::from("/w"), vec![], &NEVER_STOPPED);
+    let mut cache = SearchCache::noop(PathBuf::from("/w"), vec![], vec![], &NEVER_STOPPED);
     let event = FsEvent {
         path: PathBuf::from("/w/new_file.txt"),
         id: 42,

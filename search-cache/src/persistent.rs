@@ -12,7 +12,7 @@ use std::{
 use tracing::info;
 use typed_num::Num;
 
-const LSF_VERSION: i64 = 5;
+const LSF_VERSION: i64 = 6;
 
 #[derive(Serialize, Deserialize)]
 pub struct PersistentStorage {
@@ -23,6 +23,8 @@ pub struct PersistentStorage {
     pub path: PathBuf,
     /// Ignore paths
     pub ignore_paths: Vec<PathBuf>,
+    /// Paths to include even when they fall under an ignored directory.
+    pub include_paths: Vec<PathBuf>,
     /// Root index of the slab
     pub slab_root: SlabIndex,
     pub slab: ThinSlab<SlabNode>,

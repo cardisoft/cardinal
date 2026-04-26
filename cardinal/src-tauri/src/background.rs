@@ -108,10 +108,15 @@ fn handle_watch_config_update(
     let WatchConfigUpdate {
         watch_root: next_watch_root,
         ignore_paths,
+        include_paths,
         scan_cancellation_token,
     } = update;
 
     let next_ignore_paths = ignore_paths
+        .into_iter()
+        .map(PathBuf::from)
+        .collect::<Vec<_>>();
+    let next_include_paths = include_paths
         .into_iter()
         .map(PathBuf::from)
         .collect::<Vec<_>>();
@@ -126,6 +131,7 @@ fn handle_watch_config_update(
         app_handle,
         &next_watch_root,
         &next_ignore_paths,
+        &next_include_paths,
         scan_cancellation_token,
     ) {
         Some(cache) => {
@@ -144,6 +150,7 @@ fn handle_watch_config_update(
             SearchCache::noop(
                 PathBuf::from(&next_watch_root),
                 next_ignore_paths,
+                next_include_paths,
                 &APP_QUIT,
             )
         }
@@ -418,10 +425,11 @@ pub(crate) fn build_search_cache(
     app_handle: &AppHandle,
     watch_root: &str,
     ignore_paths: &[PathBuf],
+    include_paths: &[PathBuf],
     scan_cancellation_token: CancellationToken,
 ) -> Option<SearchCache> {
     let path = Path::new(watch_root);
-    let walk_data = WalkData::new(path, ignore_paths, false, move || {
+    let walk_data = WalkData::new(path, ignore_paths, include_paths, false, move || {
         APP_QUIT.load(Ordering::Relaxed) || scan_cancellation_token.is_cancelled().is_none()
     });
     let walking_done = AtomicBool::new(false);
@@ -466,7 +474,8 @@ fn perform_rescan(
 
     let mut phantom1 = PathBuf::new();
     let mut phantom2 = Vec::new();
-    let walk_data = cache.walk_data(&mut phantom1, &mut phantom2, scan_cancellation_token);
+    let mut phantom3 = Vec::new();
+    let walk_data = cache.walk_data(&mut phantom1, &mut phantom2, &mut phantom3, scan_cancellation_token);
     let walking_done = AtomicBool::new(false);
     let stopped = std::thread::scope(|s| {
         s.spawn(|| {

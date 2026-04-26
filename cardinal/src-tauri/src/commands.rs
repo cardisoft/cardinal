@@ -30,6 +30,7 @@ use tracing::{error, info, warn};
 pub struct WatchConfigUpdate {
     pub watch_root: String,
     pub ignore_paths: Vec<String>,
+    pub include_paths: Vec<String>,
     pub scan_cancellation_token: CancellationToken,
 }
 
@@ -179,8 +180,9 @@ fn normalize_path_input(raw: &str) -> Option<String> {
 pub(crate) fn normalize_watch_config(
     watch_root: &str,
     ignore_paths: Vec<String>,
+    include_paths: Vec<String>,
     fallback_watch_root: Option<&str>,
-) -> Option<(String, Vec<String>)> {
+) -> Option<(String, Vec<String>, Vec<String>)> {
     let watch_root = normalize_path_input(watch_root)
         .or_else(|| fallback_watch_root.and_then(normalize_path_input))?;
     let mut ignore_paths = ignore_paths
@@ -199,7 +201,17 @@ pub(crate) fn normalize_watch_config(
     {
         ignore_paths.push(DEFAULT_SYSTEM_IGNORE_PATH.to_string());
     }
-    Some((watch_root, ignore_paths))
+    let include_paths = include_paths
+        .into_iter()
+        .filter_map(|path| {
+            let normalized = normalize_path_input(&path);
+            if normalized.is_none() {
+                warn!("Ignoring invalid include path: {path:?}");
+            }
+            normalized
+        })
+        .collect::<Vec<_>>();
+    Some((watch_root, ignore_paths, include_paths))
 }
 
 #[derive(Serialize)]
@@ -389,9 +401,11 @@ pub fn trigger_rescan(state: State<'_, SearchState>) {
 pub fn set_watch_config(
     watch_root: String,
     ignore_paths: Vec<String>,
+    include_paths: Vec<String>,
     state: State<'_, SearchState>,
 ) {
-    let Some((watch_root, ignore_paths)) = normalize_watch_config(&watch_root, ignore_paths, None)
+    let Some((watch_root, ignore_paths, include_paths)) =
+        normalize_watch_config(&watch_root, ignore_paths, include_paths, None)
     else {
         warn!("Ignoring invalid watch_root: {watch_root:?}");
         return;
@@ -400,6 +414,7 @@ pub fn set_watch_config(
     if let Err(e) = state.watch_config_tx.send(WatchConfigUpdate {
         watch_root,
         ignore_paths,
+        include_paths,
         scan_cancellation_token: CancellationToken::new_scan(),
     }) {
         error!("Failed to request watch config change: {e:?}");
@@ -421,11 +436,12 @@ pub async fn open_path(path: String) {
 }
 
 #[tauri::command]
-pub async fn start_logic(watch_root: String, ignore_paths: Vec<String>) {
+pub async fn start_logic(watch_root: String, ignore_paths: Vec<String>, include_paths: Vec<String>) {
     if let Some(sender) = LOGIC_START.get() {
         let _ = sender.try_send(LogicStartConfig {
             watch_root,
             ignore_paths,
+            include_paths,
         });
     }
 }
