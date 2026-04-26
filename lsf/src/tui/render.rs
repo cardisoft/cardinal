@@ -2,12 +2,13 @@ use super::{
     app::AppLifecycleStatus,
     state::{Focus, SortDirection, SortKey, SortState, TuiApp, display_width},
 };
+use crate::tui::keymap::ResultKeys;
 use jiff::Timestamp;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table, TableState, Wrap},
 };
 use search_cache::SearchResultNode;
@@ -108,8 +109,48 @@ pub(super) fn render(app: &TuiApp, frame: &mut Frame) {
     }
 
     // 3. status bar
-    let status = Paragraph::new(status_bar_line(app)).block(Block::default().borders(Borders::TOP));
-    frame.render_widget(status, layout.status);
+    let status_block = Block::default().borders(Borders::TOP);
+    let status_inner = status_block.inner(layout.status);
+    frame.render_widget(status_block, layout.status);
+
+    let status_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Min(0), Constraint::Length(24)])
+        .split(status_inner);
+
+    let status_left = Paragraph::new(status_bar_line(app));
+    frame.render_widget(status_left, status_layout[0]);
+
+    let leader_keys = format_keys(&app.keymap.global.leader);
+    let help_keys = format_keys(&app.keymap.leader.help);
+
+    let status_right_line = if app.pending_ctrl_w {
+        Line::from(vec![
+            Span::styled(
+                format!(" {} ", leader_keys),
+                Style::default()
+                    .bg(Color::Yellow)
+                    .fg(Color::Black)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" pending ", Style::default().fg(Color::Yellow)),
+        ])
+    } else {
+        Line::from(vec![
+            Span::styled(leader_keys, Style::default().fg(Color::DarkGray)),
+            Span::styled(" + ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                help_keys,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" help", Style::default().fg(Color::Gray)),
+        ])
+    };
+
+    let status_right = Paragraph::new(status_right_line).alignment(Alignment::Right);
+    frame.render_widget(status_right, status_layout[1]);
 
     if app.details_popup_open {
         render_popup(frame, app);
@@ -118,7 +159,7 @@ pub(super) fn render(app: &TuiApp, frame: &mut Frame) {
         render_quit_confirm(frame);
     }
     if app.help_open {
-        render_help(frame, app.help_scroll);
+        render_help(frame, app);
     }
 }
 
@@ -217,7 +258,15 @@ fn result_columns(result: &SearchResultNode) -> ResultColumns {
     }
 }
 
-pub(super) fn popup_details(result: &SearchResultNode) -> String {
+fn format_keys(specs: &[crate::tui::keymap::KeySpec]) -> String {
+    specs
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+pub(super) fn popup_details(result: &SearchResultNode, result_keys: &ResultKeys) -> String {
     let kind = result
         .metadata
         .as_ref()
@@ -244,12 +293,30 @@ pub(super) fn popup_details(result: &SearchResultNode) -> String {
         .unwrap_or_else(|| "n/a".to_string());
 
     format!(
-        "Path: {}\nType: {}\nSize: {}\nModified: {}\nCreated: {}\n\nPress Enter or Esc to close.",
+        r#"Path: {}
+Type: {}
+Size: {}
+Modified: {}
+Created: {}
+
+Press {} to close. Other key bindings:
+[{}] Open item (default app)
+[{}] Open selected file in editor
+[{}] Reveal in Finder
+[{}] Copy filename to clipboard
+[{}] Copy path to clipboard
+"#,
         result.path.display(),
         kind,
         size,
         modified,
-        created
+        created,
+        format_keys(&result_keys.open_details),
+        format_keys(&result_keys.open_item),
+        format_keys(&result_keys.open_editor),
+        format_keys(&result_keys.reveal_in_finder),
+        format_keys(&result_keys.copy_filename),
+        format_keys(&result_keys.copy_path),
     )
 }
 
@@ -259,7 +326,7 @@ fn render_popup(frame: &mut Frame, app: &TuiApp) {
     };
     let area = centered_rect(70, 55, frame.area());
     frame.render_widget(Clear, area);
-    let popup = Paragraph::new(popup_details(result))
+    let popup = Paragraph::new(popup_details(result, &app.keymap.results))
         .block(
             Block::default()
                 .title("Item Details")
@@ -271,57 +338,104 @@ fn render_popup(frame: &mut Frame, app: &TuiApp) {
     frame.render_widget(popup, area);
 }
 
-fn render_help(frame: &mut Frame, scroll: u16) {
+fn render_help(frame: &mut Frame, app: &TuiApp) {
     let area = centered_rect(64, 80, frame.area());
     frame.render_widget(Clear, area);
-    let text = "\
+
+    let k = &app.keymap;
+    let leader = format_keys(&k.global.leader);
+
+    let text = format!(
+        "\
 Keyboard Shortcuts
 
 ── Query box ───────────────────────────────
-  Type          Edit search query (live search)
-  Enter         Save query to history & search
-  Esc           Clear query (or quit if empty)
-  Ctrl+U        Clear query
-  ←  →          Move cursor left / right
-  Home / End    Move cursor to start / end
-  ↑  ↓          Browse query history / move to results
-  Tab           Switch focus to results
+  Type                  Edit search query (live search)
+  {:20} Save query to history & search
+  {:20} Clear query (or quit if empty)
+  {:20} Move cursor left / right
+  {:20} Move cursor to start / end
+  {:20} Browse query history / move to results
+  Tab                  Switch focus to results
 
 ── Results table ───────────────────────────
-  j / ↓         Move selection down
-  k / ↑         Move selection up / move to query at top
-  Tab           Switch focus to query
-  Enter         Open item details popup
-  o             Open item (default app)
-  v             Open selected file in editor
-  r             Reveal in Finder
-  y             Copy filename to clipboard
-  c             Copy path to clipboard
-  Space         Quick Look preview
-  1             Sort by filename
-  2             Sort by path
-  3             Sort by size
-  4             Sort by modified date
-  5             Sort by created date
+  {:20} Move selection down
+  {:20} Move selection up / move to query at top
+  Tab                  Switch focus to query
+  {:20} Open item details popup
+  {:20} Open item (default app)
+  {:20} Open selected file in editor
+  {:20} Reveal in Finder
+  {:20} Copy filename to clipboard
+  {:20} Copy path to clipboard
+  {:20} Quick Look preview
+  {:20} Sort by filename
+  {:20} Sort by path
+  {:20} Sort by size
+  {:20} Sort by modified date
+  {:20} Sort by created date
 
 ── Global ──────────────────────────────────
-  Ctrl+W  j/↑   Switch focus to query box
-  Ctrl+W  k/↓   Switch focus to results table
-  Ctrl+W  ?     Toggle this help panel
-  Ctrl+F        Switch focus to query box
-  q             Quit lsf
+  {:10}  {:8} Switch focus to query box
+  {:10}  {:8} Switch focus to results table
+  {:10}  {:8} Toggle this help panel
+  {:20} Switch focus to query box
+  {:20} Quit lsf
 
 ── Popups ──────────────────────────────────
-  Esc / Enter   Close popup
-  q             Close details popup
-  o             Open item (default app)
-  v             Open file in editor (details)
-  r             Reveal in Finder
-  y             Copy filename to clipboard
-  c             Copy path to clipboard
-  Space         Quick Look preview
+  {:20} Close popup
+  {:20} Open item (default app)
+  {:20} Open file in editor (details)
+  {:20} Reveal in Finder
+  {:20} Copy filename to clipboard
+  {:20} Copy path to clipboard
+  {:20} Quick Look preview
 
-Press q, ?, Esc or Enter to close.";
+Press {}, ?, {} or {} to close.",
+        // Query Box
+        format_keys(&k.query.submit),
+        format_keys(&k.query.clear),
+        format_keys(&k.query.cursor_left) + " " + &format_keys(&k.query.cursor_right),
+        format_keys(&k.query.cursor_home) + " " + &format_keys(&k.query.cursor_end),
+        format_keys(&k.query.history_older) + " " + &format_keys(&k.query.history_newer),
+        // Results table
+        format_keys(&k.results.scroll_down),
+        format_keys(&k.results.scroll_up),
+        format_keys(&k.results.open_details),
+        format_keys(&k.results.open_item),
+        format_keys(&k.results.open_editor),
+        format_keys(&k.results.reveal_in_finder),
+        format_keys(&k.results.copy_filename),
+        format_keys(&k.results.copy_path),
+        format_keys(&k.results.quick_look),
+        format_keys(&k.results.sort_filename),
+        format_keys(&k.results.sort_path),
+        format_keys(&k.results.sort_size),
+        format_keys(&k.results.sort_modified),
+        format_keys(&k.results.sort_created),
+        // Global
+        leader,
+        format_keys(&k.leader.focus_query),
+        leader,
+        format_keys(&k.leader.focus_results),
+        leader,
+        format_keys(&k.leader.help),
+        format_keys(&k.global.focus_query),
+        format_keys(&k.global.quit),
+        // Popups
+        format_keys(&k.results.open_details) + ", Esc",
+        format_keys(&k.results.open_item),
+        format_keys(&k.results.open_editor),
+        format_keys(&k.results.reveal_in_finder),
+        format_keys(&k.results.copy_filename),
+        format_keys(&k.results.copy_path),
+        format_keys(&k.results.quick_look),
+        // Footer
+        format_keys(&k.global.quit),
+        format_keys(&k.leader.help),
+        format_keys(&k.results.open_details),
+    );
+
     let popup = Paragraph::new(text)
         .block(
             Block::default()
@@ -330,7 +444,7 @@ Press q, ?, Esc or Enter to close.";
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Green)),
         )
-        .scroll((scroll, 0));
+        .scroll((app.help_scroll, 0));
     frame.render_widget(popup, area);
 }
 

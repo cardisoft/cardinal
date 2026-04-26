@@ -198,7 +198,6 @@ impl TuiApp {
 
     pub fn start_ctrl_w(&mut self) {
         self.pending_ctrl_w = true;
-        self.status = "Ctrl+W pending: j/k or Up/Down to switch focus, ? for help.".to_string();
     }
 
     pub fn toggle_help(&mut self) {

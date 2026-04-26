@@ -133,6 +133,40 @@ impl FromStr for KeySpec {
     }
 }
 
+impl core::fmt::Display for KeySpec {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.mods.contains(KeyModifiers::CONTROL) {
+            write!(f, "ctrl+")?;
+        }
+        if self.mods.contains(KeyModifiers::ALT) {
+            write!(f, "alt+")?;
+        }
+        if self.mods.contains(KeyModifiers::SHIFT) {
+            write!(f, "shift+")?;
+        }
+
+        match self.code {
+            KeyCode::Char(' ') => write!(f, "space"),
+            KeyCode::Char(c) => write!(f, "{c}"),
+            KeyCode::Enter => write!(f, "enter"),
+            KeyCode::Esc => write!(f, "esc"),
+            KeyCode::Backspace => write!(f, "backspace"),
+            KeyCode::Delete => write!(f, "delete"),
+            KeyCode::Left => write!(f, "left"),
+            KeyCode::Right => write!(f, "right"),
+            KeyCode::Up => write!(f, "up"),
+            KeyCode::Down => write!(f, "down"),
+            KeyCode::Home => write!(f, "home"),
+            KeyCode::End => write!(f, "end"),
+            KeyCode::PageUp => write!(f, "pageup"),
+            KeyCode::PageDown => write!(f, "pagedown"),
+            KeyCode::Tab => write!(f, "tab"),
+            KeyCode::F(n) => write!(f, "f{n}"),
+            _ => write!(f, "{:?}", self.code),
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for KeySpec {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
