@@ -80,25 +80,39 @@ impl From<fs::FileType> for NodeFileType {
     }
 }
 
-/// A path is ignored when an `ignore_directories` entry is its prefix and no
-/// `include_paths` entry overlaps in either direction. The bidirectional check
-/// matters during traversal: an ignored ancestor must still be visited if an
-/// include path lives below it, and a descendant of an include path must be
-/// kept even when its ancestor is in the ignore list.
+/// `path` is ignored under longest-prefix-match: among the entries in
+/// `ignore_directories` and `include_paths` that contain `path`, whichever
+/// sits deeper wins. Ties keep the path. This lets nested overrides compose
+/// (e.g. ignore `/a`, include `/a/b`, re-ignore `/a/b/c`).
+///
+/// One traversal-specific exception: if `path` is a strict ancestor of any
+/// include entry, it is kept regardless of ignores so the walker can recurse
+/// down to reach the include subtree.
 pub fn should_ignore_path(
     path: &Path,
     ignore_directories: &[PathBuf],
     include_paths: &[PathBuf],
 ) -> bool {
-    let is_ignored = ignore_directories
+    if include_paths
         .iter()
-        .any(|ignore| path.starts_with(ignore));
-    if !is_ignored {
+        .any(|include| include.starts_with(path) && include != path)
+    {
         return false;
     }
-    !include_paths
-        .iter()
-        .any(|include| path.starts_with(include) || include.starts_with(path))
+
+    let deepest = |entries: &[PathBuf]| -> Option<usize> {
+        entries
+            .iter()
+            .filter(|entry| path.starts_with(entry))
+            .map(|entry| entry.components().count())
+            .max()
+    };
+
+    match (deepest(ignore_directories), deepest(include_paths)) {
+        (None, _) => false,
+        (Some(_), None) => true,
+        (Some(ignore_depth), Some(include_depth)) => ignore_depth > include_depth,
+    }
 }
 
 pub struct WalkData<'w, F: Fn() -> bool> {
@@ -613,6 +627,30 @@ mod tests {
         assert!(!wd.should_ignore(Path::new("/a/b")));
         assert!(!wd.should_ignore(Path::new("/a/c")));
         assert!(wd.should_ignore(Path::new("/a/d")));
+    }
+
+    #[test]
+    fn deeper_ignore_re_ignores_subtree_of_an_include() {
+        // ignore /a, then include /a/b, then re-ignore /a/b/c.
+        // longest-prefix wins: /a/b/c (depth 4) > /a/b (depth 3) > /a (depth 2).
+        let ignore = vec![PathBuf::from("/a"), PathBuf::from("/a/b/c")];
+        let include = vec![PathBuf::from("/a/b")];
+        let wd = WalkData::new(Path::new("/"), &ignore, &include, false, || false);
+
+        // ancestor of the include is still walkable
+        assert!(!wd.should_ignore(Path::new("/a")));
+
+        // include subtree is kept (depth 3 beats /a's depth 2)
+        assert!(!wd.should_ignore(Path::new("/a/b")));
+        assert!(!wd.should_ignore(Path::new("/a/b/file.txt")));
+
+        // the re-ignore (depth 4) beats the include (depth 3)
+        assert!(wd.should_ignore(Path::new("/a/b/c")));
+        assert!(wd.should_ignore(Path::new("/a/b/c/sub")));
+        assert!(wd.should_ignore(Path::new("/a/b/c/sub/file.txt")));
+
+        // sibling outside both override layers is still ignored by /a
+        assert!(wd.should_ignore(Path::new("/a/x")));
     }
 
     // ── other unit tests ─────────────────────────────────────────────────
