@@ -401,12 +401,15 @@ pub fn trigger_rescan(state: State<'_, SearchState>) {
 pub fn set_watch_config(
     watch_root: String,
     ignore_paths: Vec<String>,
-    include_paths: Vec<String>,
+    include_paths: Option<Vec<String>>,
     state: State<'_, SearchState>,
 ) {
-    let Some((watch_root, ignore_paths, include_paths)) =
-        normalize_watch_config(&watch_root, ignore_paths, include_paths, None)
-    else {
+    let Some((watch_root, ignore_paths, include_paths)) = normalize_watch_config(
+        &watch_root,
+        ignore_paths,
+        include_paths.unwrap_or_default(),
+        None,
+    ) else {
         warn!("Ignoring invalid watch_root: {watch_root:?}");
         return;
     };
@@ -439,13 +442,13 @@ pub async fn open_path(path: String) {
 pub async fn start_logic(
     watch_root: String,
     ignore_paths: Vec<String>,
-    include_paths: Vec<String>,
+    include_paths: Option<Vec<String>>,
 ) {
     if let Some(sender) = LOGIC_START.get() {
         let _ = sender.try_send(LogicStartConfig {
             watch_root,
             ignore_paths,
-            include_paths,
+            include_paths: include_paths.unwrap_or_default(),
         });
     }
 }
