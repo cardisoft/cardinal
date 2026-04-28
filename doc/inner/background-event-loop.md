@@ -9,8 +9,8 @@
 
 ## Channels
 ```text
-search_rx             query + SearchOptionsPayload + CancellationToken
-result_tx             SearchOutcome back to the command handler
+search_rx             query + SearchOptionsPayload + CancellationToken + result_tx
+                      result_tx returns SearchOutcome back to the command handler
 
 node_info_rx          slab indices -> SearchResultNode expansion
 icon_viewport_rx      visible slab indices for thumbnail prefetch

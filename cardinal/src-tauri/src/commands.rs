@@ -11,7 +11,7 @@ use crate::{
 use anyhow::{Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
-use crossbeam_channel::{Receiver, Sender, bounded};
+use crossbeam_channel::{Sender, bounded};
 use objc2::{
     rc::{Retained, autoreleasepool},
     runtime::ProtocolObject,
@@ -51,6 +51,7 @@ pub struct SearchJob {
     pub query: String,
     pub options: SearchOptionsPayload,
     pub cancellation_token: CancellationToken,
+    pub result_tx: Sender<Result<SearchOutcome>>,
 }
 
 #[derive(Debug, Clone)]
@@ -67,10 +68,7 @@ struct SortedViewCache {
 
 pub struct SearchState {
     search_tx: Sender<SearchJob>,
-    result_rx: Receiver<Result<SearchOutcome>>,
-
     node_info_tx: Sender<NodeInfoRequest>,
-
     icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
     rescan_tx: Sender<CancellationToken>,
     watch_config_tx: Sender<WatchConfigUpdate>,
@@ -81,7 +79,6 @@ pub struct SearchState {
 impl SearchState {
     pub fn new(
         search_tx: Sender<SearchJob>,
-        result_rx: Receiver<Result<SearchOutcome>>,
         node_info_tx: Sender<NodeInfoRequest>,
         icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
         rescan_tx: Sender<CancellationToken>,
@@ -90,7 +87,6 @@ impl SearchState {
     ) -> Self {
         Self {
             search_tx,
-            result_rx,
             node_info_tx,
             icon_viewport_tx,
             rescan_tx,
@@ -275,16 +271,18 @@ pub async fn search(
 
     let options = options.unwrap_or_default();
     let cancellation_token = CancellationToken::new(version);
+    let (result_tx, result_rx) = bounded(1);
     if let Err(e) = state.search_tx.send(SearchJob {
         query,
         options,
         cancellation_token,
+        result_tx,
     }) {
         error!("Failed to send search request: {e:?}");
         return Ok(SearchResponse::default());
     }
 
-    match state.result_rx.recv() {
+    match result_rx.recv() {
         Ok(res) => res,
         Err(e) => {
             error!("Failed to receive search result: {e:?}");

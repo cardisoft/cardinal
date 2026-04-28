@@ -12,8 +12,7 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rayon::spawn;
 use search_cache::{
-    HandleFSEError, SearchCache, SearchOptions, SearchOutcome, SearchResultNode, SlabIndex,
-    WalkData,
+    HandleFSEError, SearchCache, SearchOptions, SearchResultNode, SlabIndex, WalkData,
 };
 use search_cancel::CancellationToken;
 use serde::Serialize;
@@ -44,7 +43,6 @@ pub struct BackgroundLoopChannels {
     pub finish_rx: Receiver<Sender<Option<SearchCache>>>,
     pub update_window_state_rx: Receiver<()>,
     pub search_rx: Receiver<SearchJob>,
-    pub result_tx: Sender<Result<SearchOutcome>>,
     pub node_info_rx: Receiver<NodeInfoRequest>,
     pub icon_viewport_rx: Receiver<(u64, Vec<SlabIndex>)>,
     pub rescan_rx: Receiver<CancellationToken>,
@@ -309,7 +307,6 @@ pub fn run_background_event_loop(
         finish_rx,
         update_window_state_rx,
         search_rx,
-        result_tx,
         node_info_rx,
         icon_viewport_rx,
         rescan_rx,
@@ -355,6 +352,7 @@ pub fn run_background_event_loop(
                     query,
                     options,
                     cancellation_token,
+                    result_tx
                 } = job.expect("Search channel closed");
                 let opts = SearchOptions::from(options);
                 let payload = cache.search_with_options(&query, opts, cancellation_token);
