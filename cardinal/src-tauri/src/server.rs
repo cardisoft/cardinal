@@ -1,5 +1,4 @@
 use crate::commands::{NodeInfoMetadata, NodeInfoRequest, SearchJob, SearchOptionsPayload};
-use anyhow::Result;
 use axum::{
     Json, Router,
     extract::{Query, State},
@@ -7,14 +6,13 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
-use crossbeam_channel::{Receiver, Sender, bounded};
-use search_cache::SearchOutcome;
+use crossbeam_channel::{Sender, bounded};
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
 use std::{
     net::SocketAddr,
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicU64, Ordering},
     },
 };
@@ -25,22 +23,14 @@ static SEARCH_VERSION: AtomicU64 = AtomicU64::new(1000000);
 #[derive(Clone)]
 pub struct ServerState {
     pub search_tx: Sender<SearchJob>,
-    pub result_rx: Receiver<Result<SearchOutcome>>,
     pub node_info_tx: Sender<NodeInfoRequest>,
-    search_lock: Arc<Mutex<()>>,
 }
 
 impl ServerState {
-    pub fn new(
-        search_tx: Sender<SearchJob>,
-        result_rx: Receiver<Result<SearchOutcome>>,
-        node_info_tx: Sender<NodeInfoRequest>,
-    ) -> Self {
+    pub fn new(search_tx: Sender<SearchJob>, node_info_tx: Sender<NodeInfoRequest>) -> Self {
         Self {
             search_tx,
-            result_rx,
             node_info_tx,
-            search_lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -103,23 +93,21 @@ async fn search_handler(
 async fn handle_search(state: Arc<ServerState>, req: SearchRequest) -> impl IntoResponse {
     let result = tokio::task::spawn_blocking(move || {
         let (slab_indices, highlights) = {
-            let _lock = state.search_lock.lock().unwrap();
-
-            while let Ok(_) = state.result_rx.try_recv() {}
-
             let version = SEARCH_VERSION.fetch_add(1, Ordering::Relaxed);
             let cancellation_token = CancellationToken::new(version);
 
+            let (result_tx, result_rx) = bounded(1);
             if let Err(e) = state.search_tx.send(SearchJob {
                 query: req.query,
                 options: req.options,
                 cancellation_token,
+                result_tx,
             }) {
                 tracing::error!("Failed to send search job: {:?}", e);
                 return Err(StatusCode::INTERNAL_SERVER_ERROR);
             }
 
-            let outcome = match state.result_rx.recv() {
+            let outcome = match result_rx.recv() {
                 Ok(Ok(outcome)) => outcome,
                 Ok(Err(e)) => {
                     tracing::error!("Search error: {:?}", e);

@@ -162,8 +162,7 @@ pub fn run() -> Result<()> {
     };
     emit_app_state(app_handle);
     let icon_update_rx = &icon_update_rx;
-    let server_state =
-        server::ServerState::new(search_tx.clone(), result_rx.clone(), node_info_tx.clone());
+    let server_state = server::ServerState::new(search_tx.clone(), node_info_tx.clone());
     tauri::async_runtime::spawn(async move {
         server::start_server(server_state, 3388).await;
     });
