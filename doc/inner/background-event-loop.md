@@ -9,15 +9,13 @@
 
 ## Channels
 ```text
-search_rx             SearchJob { query, options, cancellation_token, result_tx }
+search_rx             query + SearchOptionsPayload + CancellationToken + result_tx
                       result_tx returns SearchOutcome back to the command handler
 
-node_info_rx          NodeInfoRequest { slab_indices, response_tx }
-                      response_tx returns SearchResultNode expansion
-
+node_info_rx          slab indices -> SearchResultNode expansion
 icon_viewport_rx      visible slab indices for thumbnail prefetch
 icon_update_tx        IconPayload batches back to the UI
-```
+
 rescan_rx             manual full-rescan requests
 watch_config_rx       watch-root / ignore-path changes
 update_window_state_rx
