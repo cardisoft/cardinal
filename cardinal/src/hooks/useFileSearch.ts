@@ -210,6 +210,9 @@ export function useFileSearch(): UseFileSearchResult {
   const handleSearch = useCallback(async (overrides: Partial<SearchParams> = {}) => {
     const nextSearch = { ...latestSearchRef.current, ...overrides };
     latestSearchRef.current = nextSearch;
+    // the backend already has search version cancellation
+    // but we keep the check at frontend to make sure that
+    // the UI always reflects the latest request
     const requestVersion = searchVersionRef.current + 1;
     searchVersionRef.current = requestVersion;
 
@@ -233,17 +236,16 @@ export function useFileSearch(): UseFileSearchResult {
         options: {
           caseInsensitive: !caseSensitive,
         },
-        version: requestVersion,
       });
 
-      const searchResults = rawResults?.results as SlabIndex[];
-      const highlightTerms = Array.isArray(rawResults?.highlights)
-        ? rawResults.highlights.filter((term): term is string => typeof term === 'string')
-        : [];
-
-      if (searchVersionRef.current !== requestVersion) {
+      if (rawResults.results === null || searchVersionRef.current !== requestVersion) {
         return;
       }
+
+      const searchResults = rawResults.results as SlabIndex[];
+      const highlightTerms = Array.isArray(rawResults.highlights)
+        ? rawResults.highlights.filter((term): term is string => typeof term === 'string')
+        : [];
 
       cancelTimer(loadingDelayTimerRef);
 

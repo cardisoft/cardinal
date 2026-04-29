@@ -32,6 +32,17 @@ impl CancellationToken {
         }
     }
 
+    /// create a token for search, different with `CancellationToken::new`
+    /// it uses global version's current version number
+    /// user don't need to specify a version number
+    pub fn new_search() -> Self {
+        let version = self::ACTIVE_SEARCH_VERSION.fetch_add(1, Ordering::SeqCst) + 1;
+        Self {
+            version,
+            active_version: &ACTIVE_SEARCH_VERSION,
+        }
+    }
+
     pub fn new_scan() -> Self {
         let version = self::ACTIVE_SCAN_VERSION.fetch_add(1, Ordering::SeqCst) + 1;
         Self {
@@ -54,6 +65,10 @@ impl CancellationToken {
         } else {
             Some(())
         }
+    }
+
+    pub fn version(&self) -> u64 {
+        self.version
     }
 }
 

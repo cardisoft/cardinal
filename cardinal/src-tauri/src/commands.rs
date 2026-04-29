@@ -207,7 +207,7 @@ pub struct NodeInfo {
 
 #[derive(Serialize, Default)]
 pub struct SearchResponse {
-    pub results: Vec<SlabIndex>,
+    pub results: Option<Vec<SlabIndex>>,
     pub highlights: Vec<String>,
 }
 
@@ -264,13 +264,12 @@ pub async fn toggle_quicklook(app_handle: AppHandle, items: Vec<QuickLookItemInp
 pub async fn search(
     query: String,
     options: Option<SearchOptionsPayload>,
-    version: u64,
     state: State<'_, SearchState>,
 ) -> Result<SearchResponse, String> {
     search_activity::note_search_activity();
 
     let options = options.unwrap_or_default();
-    let cancellation_token = CancellationToken::new(version);
+    let cancellation_token = CancellationToken::new_search();
     let (result_tx, result_rx) = bounded(1);
     if let Err(e) = state.search_tx.send(SearchJob {
         query,
@@ -291,10 +290,11 @@ pub async fn search(
     }
     .map(|SearchOutcome { nodes, highlights }| {
         let results = match nodes {
-            Some(list) => list,
+            Some(list) => Some(list),
             None => {
+                let version = cancellation_token.version();
                 info!("Search {version} was cancelled");
-                Vec::new()
+                None
             }
         };
         SearchResponse {
