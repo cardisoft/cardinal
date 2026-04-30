@@ -2,7 +2,11 @@ import { useReducer, useRef, useCallback, useEffect } from 'react';
 import type { MutableRefObject } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { SEARCH_DEBOUNCE_MS } from '../constants';
-import type { AppLifecycleStatus, SearchResponsePayload } from '../types/ipc';
+import {
+  SearchStatusCode,
+  type AppLifecycleStatus,
+  type SearchResponsePayload,
+} from '../types/ipc';
 import type { SlabIndex } from '../types/slab';
 
 type SearchError = string | Error | null;
@@ -238,7 +242,10 @@ export function useFileSearch(): UseFileSearchResult {
         },
       });
 
-      if (rawResults.results === null || searchVersionRef.current !== requestVersion) {
+      if (
+        rawResults.status_code === SearchStatusCode.CANCELLED ||
+        searchVersionRef.current !== requestVersion
+      ) {
         return;
       }
 
