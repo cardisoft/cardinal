@@ -24,7 +24,8 @@ impl CancellationToken {
         }
     }
 
-    /// Creates a token for a search, unlike `CancellationToken::new`.
+    /// Creates a token for a search
+    ///
     /// It increments the global search version and returns a token for
     /// that new version, so the caller does not need to specify one.
     pub fn new_search() -> Self {
