@@ -15,7 +15,7 @@ Search and scan cancellation are intentionally separate so a new rescan does not
 - the version captured at creation time
 
 Constructors:
-- `CancellationToken::new(version)` -> marks that search version as current
+- `CancellationToken::new_search()` -> increments and captures the search version
 - `CancellationToken::new_scan()` -> increments and captures the scan version
 - `CancellationToken::noop()` -> token backed by a private static atomic that never changes
 

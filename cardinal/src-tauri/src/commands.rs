@@ -206,6 +206,7 @@ pub struct NodeInfo {
 }
 
 #[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct SearchResponse {
     pub results: Vec<SlabIndex>,
     pub highlights: Vec<String>,
@@ -214,16 +215,7 @@ pub struct SearchResponse {
 
 impl SearchResponse {
     pub const OK: u8 = 0;
-    pub const ERROR: u8 = 1;
-    pub const CANCELLED: u8 = 2;
-
-    pub fn new_error() -> Self {
-        Self {
-            results: Default::default(),
-            highlights: Default::default(),
-            status_code: Self::ERROR,
-        }
-    }
+    pub const CANCELLED: u8 = 1;
 }
 
 #[derive(Serialize)]
@@ -293,14 +285,14 @@ pub async fn search(
         result_tx,
     }) {
         error!("Failed to send search request: {e:?}");
-        return Ok(SearchResponse::new_error());
+        return Err(format!("Failed to send search request: {e:?}"));
     }
 
     match result_rx.recv() {
         Ok(res) => res,
         Err(e) => {
             error!("Failed to receive search result: {e:?}");
-            return Ok(SearchResponse::new_error());
+            return Err(format!("Failed to receive search result: {e:?}"));
         }
     }
     .map(|SearchOutcome { nodes, highlights }| {

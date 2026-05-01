@@ -7,16 +7,15 @@ This chapter maps the React-side state graph to the Tauri command/event layer.
 SearchBar / keyboard submit
   -> useFilesTabState.queueSearch(...)
   -> useFileSearch.handleSearch(...)
-  -> invoke('search', { query, options, version })
-  -> SearchResponse { results, highlights }
+  -> invoke('search', { query, options })
+  -> SearchResponse { results, highlights, statusCode }
   -> useRemoteSort(...)
   -> <VirtualList results={displayedResults} ... />
 ```
 
-- `useFileSearch` owns the authoritative search state: raw `results`, `resultsVersion`, highlight terms, status counters, lifecycle state, loading UI, timing, and error state.
-- Each request increments `searchVersionRef` and passes that number as `version`.
-- The backend turns `version` into `CancellationToken::new(version)`.
-- React still discards stale responses locally if their request id is no longer current.
+- `useFileSearch` owns the authoritative search state: raw `results`, highlight terms, status counters, lifecycle state, loading UI, timing, and error state.
+- The backend owns the search version: each `invoke('search', ...)` call increments `ACTIVE_SEARCH_VERSION` via `CancellationToken::new_search()`, automatically cancelling any in-flight search. Cancelled searches return `statusCode: CANCELLED`; transport/processing failures return as `Err` (caught by the frontend `catch` path).
+- The frontend also tracks a local `searchVersionRef` as defence-in-depth: if a response arrives after a newer request was already fired, it is discarded regardless of `statusCode`.
 - Loading UI is immediate for the first search and delayed by 150 ms for later searches.
 
 ## Result projection and sorting
@@ -85,4 +84,4 @@ VirtualList
 ## Practical rule of thumb
 - Commands are used for request/response work (`search`, `get_nodes_info`, `get_sorted_view`).
 - Tauri events are used for push work (`status_bar_update`, `fs_events_batch`, `icon_update`, `quick_launch`).
-- Version tokens exist at both the backend and React layers because either side can observe stale work independently.
+- Cancellation is two-layered: the backend's `ACTIVE_SEARCH_VERSION` atomic is the primary mechanism (signals via `statusCode: CANCELLED`); the frontend's `searchVersionRef` is a secondary guard for responses that arrive after a newer request was issued but before the backend's cancellation is reflected.

@@ -179,16 +179,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn search_token_cancelled_after_new_search_version2() {
-        let _guard = lock_versions();
-        reset_versions();
-
-        let search_v1 = CancellationToken::new_search();
-        assert!(search_v1.is_cancelled().is_some());
-
-        let search_v2 = CancellationToken::new_search();
-        assert!(search_v2.is_cancelled().is_some());
-        assert!(search_v1.is_cancelled().is_none()); // search_v1 is now cancelled
-    }
 }

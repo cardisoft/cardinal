@@ -27,7 +27,7 @@ describe('useFileSearch', () => {
         return Promise.resolve({
           results: backendResults,
           highlights: [],
-          status_code: SearchStatusCode.OK,
+          statusCode: SearchStatusCode.OK,
         });
       }
       return Promise.resolve(null);
@@ -41,7 +41,7 @@ describe('useFileSearch', () => {
     expect(result.current.state.resultCount).toBe(backendResults.length);
   });
 
-  it('ignores results when backend returns null (cancelled)', async () => {
+  it('ignores results when backend returns CANCELLED status', async () => {
     const initialResults = [1, 2, 3] as SlabIndex[];
 
     mockedInvoke.mockImplementation((command: string) => {
@@ -53,7 +53,7 @@ describe('useFileSearch', () => {
         return Promise.resolve({
           results: initialResults,
           highlights: [],
-          status_code: SearchStatusCode.OK,
+          statusCode: SearchStatusCode.OK,
         });
       }
       return Promise.resolve(null);
@@ -65,13 +65,13 @@ describe('useFileSearch', () => {
     await waitFor(() => expect(result.current.state.initialFetchCompleted).toBe(true));
     expect(result.current.state.results).toBe(initialResults);
 
-    // Mock search to return null for the next call
+    // Mock search to return CANCELLED status for the next call
     mockedInvoke.mockImplementation((command: string) => {
       if (command === 'search') {
         return Promise.resolve({
           results: [],
           highlights: [],
-          status_code: SearchStatusCode.CANCELLED,
+          statusCode: SearchStatusCode.CANCELLED,
         });
       }
       return Promise.resolve('Ready');

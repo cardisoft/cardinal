@@ -27,12 +27,11 @@ export type AppLifecycleStatus = 'Initializing' | 'Updating' | 'Ready';
 
 export enum SearchStatusCode {
   OK = 0,
-  ERROR = 1,
-  CANCELLED = 2,
+  CANCELLED = 1,
 }
 
 export type SearchResponsePayload = {
   results: number[];
   highlights?: string[];
-  status_code: SearchStatusCode;
+  statusCode: SearchStatusCode;
 };

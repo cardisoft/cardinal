@@ -163,6 +163,9 @@ type UseFileSearchResult = {
 export function useFileSearch(): UseFileSearchResult {
   const [state, dispatch] = useReducer(reducer, initialSearchState);
   const latestSearchRef = useRef<SearchParams>(initialSearchParams);
+  // `search-cancellation` maintains an atomic counter
+  // and will auto-increment for each search request
+  // so this only serves as a defence-in-depth
   const searchVersionRef = useRef(0);
   const hasInitialSearchRunRef = useRef(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -243,7 +246,7 @@ export function useFileSearch(): UseFileSearchResult {
       });
 
       if (
-        rawResults.status_code === SearchStatusCode.CANCELLED ||
+        rawResults.statusCode === SearchStatusCode.CANCELLED ||
         searchVersionRef.current !== requestVersion
       ) {
         return;
