@@ -56,10 +56,10 @@ fn test_cancellation_during_search() {
     let (mut cache, _root) = build_test_cache(&file_refs);
 
     // Create a cancellation token with version 1
-    let token_v1 = CancellationToken::new(1);
+    let token_v1 = CancellationToken::new_search();
 
     // Create a new version to cancel the old one
-    let _token_v2 = CancellationToken::new(2);
+    let _token_v2 = CancellationToken::new_search();
 
     // Search should return None due to cancellation
     let result = cache.query_files("file", token_v1);
@@ -90,8 +90,8 @@ fn test_cancellation_with_stop_flag() {
 
     // Set stop flag during search, then create new token to cancel previous
     stop.store(true, Ordering::SeqCst);
-    let token_v1 = CancellationToken::new(1);
-    let _token_v2 = CancellationToken::new(2);
+    let token_v1 = CancellationToken::new_search();
+    let _token_v2 = CancellationToken::new_search();
 
     let result = cache.query_files("test", token_v1);
     assert!(result.is_ok());

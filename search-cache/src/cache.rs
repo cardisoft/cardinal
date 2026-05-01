@@ -1732,8 +1732,8 @@ mod tests {
         fs::File::create(dir.join("bar.txt")).unwrap();
 
         let mut cache = SearchCache::walk_fs(dir);
-        let token = CancellationToken::new(10);
-        let _ = CancellationToken::new(11); // cancel previous token
+        let token = CancellationToken::new_search();
+        let _ = CancellationToken::new_search(); // cancel previous token
 
         let result = cache.search_with_options(
             "bar !foo",
@@ -1976,8 +1976,8 @@ mod tests {
         fs::File::create(temp_dir.path().join("alpha.txt")).unwrap();
         let cache = SearchCache::walk_fs(temp_dir.path());
 
-        let token = CancellationToken::new(1000);
-        let _ = CancellationToken::new(1001);
+        let token = CancellationToken::new_search();
+        let _ = CancellationToken::new_search();
 
         assert!(cache.search_empty(token).is_none());
     }
@@ -1988,8 +1988,8 @@ mod tests {
         fs::File::create(temp_dir.path().join("file_a.txt")).unwrap();
         let mut cache = SearchCache::walk_fs(temp_dir.path());
 
-        let token = CancellationToken::new(2000);
-        let _ = CancellationToken::new(2001);
+        let token = CancellationToken::new_search();
+        let _ = CancellationToken::new_search();
 
         let result = cache.search_with_options(
             "file_a",
@@ -2110,8 +2110,8 @@ mod tests {
         fs::File::create(temp_dir.path().join("item.txt")).unwrap();
         let mut cache = SearchCache::walk_fs(temp_dir.path());
 
-        let token = CancellationToken::new(3000);
-        let _ = CancellationToken::new(3001);
+        let token = CancellationToken::new_search();
+        let _ = CancellationToken::new_search();
 
         let result = cache.query_files("item.txt", token);
         assert!(matches!(result, Ok(None)));

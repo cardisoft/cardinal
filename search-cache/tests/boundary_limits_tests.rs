@@ -422,8 +422,8 @@ fn test_cancel_large_search_operation() {
     let mut cache = SearchCache::walk_fs(&root_path);
 
     // Create cancellation token and cancel it
-    let token_v1 = CancellationToken::new(1);
-    let _token_v2 = CancellationToken::new(2); // This cancels v1
+    let token_v1 = CancellationToken::new_search();
+    let _token_v2 = CancellationToken::new_search(); // This cancels v1
 
     // Large search should be cancelled
     let result = cache.query_files("file_", token_v1);

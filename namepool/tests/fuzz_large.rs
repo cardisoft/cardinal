@@ -178,8 +178,8 @@ fn regex_search_varied_patterns() {
 #[test]
 fn cancellation_simulation() {
     let pool = build_pool();
-    let token = CancellationToken::new(7777);
-    let _ = CancellationToken::new(7778); // cancel previous
+    let token = CancellationToken::new_search();
+    let _ = CancellationToken::new_search(); // cancel previous
     // All searches should return None due to cancellation.
     assert!(pool.search_substr("alpha", token).is_none());
     assert!(pool.search_prefix("alpha", token).is_none());

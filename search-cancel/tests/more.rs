@@ -18,12 +18,12 @@ fn lock_and_reset_versions() -> MutexGuard<'static, ()> {
 fn multiple_tokens_cancelled_independently() {
     let _guard = lock_and_reset_versions();
 
-    let t1 = CancellationToken::new(1);
+    let t1 = CancellationToken::new_search();
     assert!(t1.is_cancelled().is_some());
-    let t2 = CancellationToken::new(2);
+    let t2 = CancellationToken::new_search();
     assert!(t1.is_cancelled().is_none());
     assert!(t2.is_cancelled().is_some());
-    let t3 = CancellationToken::new(3);
+    let t3 = CancellationToken::new_search();
     assert!(t2.is_cancelled().is_none());
     assert!(t3.is_cancelled().is_some());
 }
@@ -49,8 +49,8 @@ fn search_version_changes_do_not_cancel_scan_token() {
     let _guard = lock_and_reset_versions();
 
     let scan = CancellationToken::new_scan();
-    let _search_v1 = CancellationToken::new(1);
-    let _search_v2 = CancellationToken::new(2);
+    let _search_v1 = CancellationToken::new_search();
+    let _search_v2 = CancellationToken::new_search();
     assert!(
         scan.is_cancelled().is_some(),
         "scan token should not be affected by search version updates"
@@ -114,8 +114,8 @@ fn active_scan_token_survives_many_search_bumps() {
     let _guard = lock_and_reset_versions();
 
     let scan = CancellationToken::new_scan();
-    for v in 1..=10_u64 {
-        let _search = CancellationToken::new(v);
+    for _ in 1..=10_u64 {
+        let _search = CancellationToken::new_search();
     }
     assert!(
         scan.is_cancelled().is_some(),

@@ -113,8 +113,8 @@ fn test_all_subnodes_cancellation() {
     let root_idx = cache.file_nodes.root();
 
     // Create a cancelled token by creating a newer version
-    let token = CancellationToken::new(1);
-    let _newer_token = CancellationToken::new(2); // This cancels the first token
+    let token = CancellationToken::new_search();
+    let _newer_token = CancellationToken::new_search(); // This cancels the first token
 
     // Should return None when cancelled
     let result = cache.all_subnodes(root_idx, token);

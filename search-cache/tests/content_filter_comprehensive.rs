@@ -587,8 +587,8 @@ fn content_filter_respects_cancellation() {
     let mut cache = SearchCache::walk_fs(dir);
 
     // Create a cancelled token
-    let token = CancellationToken::new(999);
-    let _ = CancellationToken::new(1000); // This cancels token 999
+    let token = CancellationToken::new_search();
+    let _ = CancellationToken::new_search(); // This cancels token 999
 
     let result = cache.search_with_options(
         "content:needle",

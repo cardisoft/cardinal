@@ -172,9 +172,9 @@ mod tests {
         pool.push("alpha");
         pool.push("beta");
 
-        let token = CancellationToken::new(1);
+        let token = CancellationToken::new_search();
         // Move global active version forward so the token becomes cancelled.
-        let _ = CancellationToken::new(2);
+        let _ = CancellationToken::new_search();
 
         assert!(pool.search_substr("a", token).is_none());
     }
@@ -185,8 +185,8 @@ mod tests {
         for idx in 0..5 {
             pool.push(&format!("item{idx}"));
         }
-        let token = CancellationToken::new(10);
-        let _ = CancellationToken::new(11);
+        let token = CancellationToken::new_search();
+        let _ = CancellationToken::new_search();
         let regex = Regex::new("item\\d").unwrap();
 
         assert!(pool.search_regex(&regex, token).is_none());
