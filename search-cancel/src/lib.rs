@@ -170,5 +170,4 @@ mod tests {
             "search token should still be governed by search version updates"
         );
     }
-
 }
