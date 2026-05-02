@@ -109,12 +109,6 @@ export function PreferencesOverlay({
   const { errorKey: watchRootErrorKey } = getWatchRootValidation(watchRootInput);
   const watchRootErrorMessage = watchRootErrorKey ? t(watchRootErrorKey) : null;
 
-  const handleWatchRootKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (event.key === 'Escape') {
-      setWatchRootInput(watchRoot);
-    }
-  };
-
   const parsedIgnorePaths = ignorePathsInput
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -124,12 +118,6 @@ export function PreferencesOverlay({
     return invalid ? t('ignorePaths.errors.absolute') : null;
   })();
 
-  const handleIgnorePathsKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (event.key === 'Escape') {
-      setIgnorePathsInput(ignorePaths.join('\n'));
-    }
-  };
-
   const parsedIncludePaths = includePathsInput
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -138,12 +126,6 @@ export function PreferencesOverlay({
     const invalid = parsedIncludePaths.find((line) => !isPathInputValid(line));
     return invalid ? t('includePaths.errors.absolute') : null;
   })();
-
-  const handleIncludePathsKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (event.key === 'Escape') {
-      setIncludePathsInput(includePaths.join('\n'));
-    }
-  };
 
   const handleSave = (): void => {
     if (watchRootErrorMessage || ignorePathsErrorMessage || includePathsErrorMessage) {
@@ -244,7 +226,6 @@ export function PreferencesOverlay({
                 type="text"
                 value={watchRootInput}
                 onChange={(event) => setWatchRootInput(event.target.value)}
-                onKeyDown={handleWatchRootKeyDown}
                 aria-label={t('watchRoot.label')}
                 autoComplete="off"
                 spellCheck={false}
@@ -271,7 +252,6 @@ export function PreferencesOverlay({
                 className="preferences-field preferences-textarea"
                 value={ignorePathsInput}
                 onChange={(event) => setIgnorePathsInput(event.target.value)}
-                onKeyDown={handleIgnorePathsKeyDown}
                 aria-label={t('ignorePaths.label')}
                 autoComplete="off"
                 spellCheck={false}
@@ -298,7 +278,6 @@ export function PreferencesOverlay({
                 className="preferences-field preferences-textarea"
                 value={includePathsInput}
                 onChange={(event) => setIncludePathsInput(event.target.value)}
-                onKeyDown={handleIncludePathsKeyDown}
                 aria-label={t('includePaths.label')}
                 autoComplete="off"
                 spellCheck={false}
