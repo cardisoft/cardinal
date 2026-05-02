@@ -9,11 +9,13 @@ import { getStoredTrayIconEnabled, persistTrayIconEnabled } from '../trayIconPre
 import { setWatchConfig } from '../utils/watchConfig';
 import type { FullDiskAccessStatus } from './useFullDiskAccessPermission';
 import { useIgnorePaths } from './useIgnorePaths';
+import { useIncludePaths } from './useIncludePaths';
 import { useWatchRoot } from './useWatchRoot';
 
 type WatchConfigChangePayload = {
   watchRoot: string;
   ignorePaths: string[];
+  includePaths: string[];
 };
 
 type UseAppPreferencesOptions = {
@@ -32,6 +34,8 @@ type UseAppPreferencesResult = {
   defaultWatchRoot: string;
   ignorePaths: string[];
   defaultIgnorePaths: string[];
+  includePaths: string[];
+  defaultIncludePaths: string[];
   preferencesResetToken: number;
   handleWatchConfigChange: (next: WatchConfigChangePayload) => void;
   handleResetPreferences: () => void;
@@ -52,6 +56,7 @@ export function useAppPreferences({
 }: UseAppPreferencesOptions): UseAppPreferencesResult {
   const { watchRoot, setWatchRoot, defaultWatchRoot } = useWatchRoot();
   const { ignorePaths, setIgnorePaths, defaultIgnorePaths } = useIgnorePaths();
+  const { includePaths, setIncludePaths, defaultIncludePaths } = useIncludePaths();
   const logicStartedRef = useRef(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [trayIconEnabled, setTrayIconEnabled] = useState<boolean>(() => getStoredTrayIconEnabled());
@@ -87,13 +92,15 @@ export function useAppPreferences({
     }
 
     logicStartedRef.current = true;
-    void invoke('start_logic', { watchRoot, ignorePaths });
-  }, [fullDiskAccessStatus, ignorePaths, isCheckingFullDiskAccess, watchRoot]);
+    void invoke('start_logic', { watchRoot, ignorePaths, includePaths });
+  }, [fullDiskAccessStatus, ignorePaths, includePaths, isCheckingFullDiskAccess, watchRoot]);
 
   const applyWatchConfig = useCallback(
-    (nextWatchRoot: string, nextIgnorePaths: string[]) => {
+    (nextWatchRoot: string, nextIgnorePaths: string[], nextIncludePaths: string[]) => {
       const watchConfigChanged =
-        nextWatchRoot !== watchRoot || !areStringArraysEqual(nextIgnorePaths, ignorePaths);
+        nextWatchRoot !== watchRoot ||
+        !areStringArraysEqual(nextIgnorePaths, ignorePaths) ||
+        !areStringArraysEqual(nextIncludePaths, includePaths);
 
       if (!watchConfigChanged) {
         return;
@@ -101,20 +108,30 @@ export function useAppPreferences({
 
       setWatchRoot(nextWatchRoot);
       setIgnorePaths(nextIgnorePaths);
+      setIncludePaths(nextIncludePaths);
       if (logicStartedRef.current && nextWatchRoot) {
         void setWatchConfig({
           watchRoot: nextWatchRoot,
           ignorePaths: nextIgnorePaths,
+          includePaths: nextIncludePaths,
         });
       }
       refreshSearchResults();
     },
-    [ignorePaths, refreshSearchResults, setIgnorePaths, setWatchRoot, watchRoot],
+    [
+      ignorePaths,
+      includePaths,
+      refreshSearchResults,
+      setIgnorePaths,
+      setIncludePaths,
+      setWatchRoot,
+      watchRoot,
+    ],
   );
 
   const handleWatchConfigChange = useCallback(
     (next: WatchConfigChangePayload) => {
-      applyWatchConfig(next.watchRoot, next.ignorePaths);
+      applyWatchConfig(next.watchRoot, next.ignorePaths, next.includePaths);
     },
     [applyWatchConfig],
   );
@@ -139,6 +156,8 @@ export function useAppPreferences({
     defaultWatchRoot,
     ignorePaths,
     defaultIgnorePaths,
+    includePaths,
+    defaultIncludePaths,
     preferencesResetToken,
     handleWatchConfigChange,
     handleResetPreferences,

@@ -14,9 +14,15 @@ type PreferencesOverlayProps = {
   onTrayIconEnabledChange: (enabled: boolean) => void;
   watchRoot: string;
   defaultWatchRoot: string;
-  onWatchConfigChange: (next: { watchRoot: string; ignorePaths: string[] }) => void;
+  onWatchConfigChange: (next: {
+    watchRoot: string;
+    ignorePaths: string[];
+    includePaths: string[];
+  }) => void;
   ignorePaths: string[];
   defaultIgnorePaths: string[];
+  includePaths: string[];
+  defaultIncludePaths: string[];
   onReset: () => void;
   themeResetToken: number;
 };
@@ -34,6 +40,8 @@ export function PreferencesOverlay({
   onWatchConfigChange,
   ignorePaths,
   defaultIgnorePaths,
+  includePaths,
+  defaultIncludePaths,
   onReset,
   themeResetToken,
 }: PreferencesOverlayProps): React.JSX.Element | null {
@@ -41,6 +49,7 @@ export function PreferencesOverlay({
   const [thresholdInput, setThresholdInput] = useState<string>(() => sortThreshold.toString());
   const [watchRootInput, setWatchRootInput] = useState<string>(() => watchRoot);
   const [ignorePathsInput, setIgnorePathsInput] = useState<string>(() => ignorePaths.join('\n'));
+  const [includePathsInput, setIncludePathsInput] = useState<string>(() => includePaths.join('\n'));
 
   useEffect(() => {
     if (!open) {
@@ -71,7 +80,8 @@ export function PreferencesOverlay({
     }
     setWatchRootInput(watchRoot);
     setIgnorePathsInput(ignorePaths.join('\n'));
-  }, [open, watchRoot, ignorePaths]);
+    setIncludePathsInput(includePaths.join('\n'));
+  }, [open, watchRoot, ignorePaths, includePaths]);
 
   const commitThreshold = useCallback(() => {
     const numericText = thresholdInput.replace(/[^\d]/g, '');
@@ -120,15 +130,35 @@ export function PreferencesOverlay({
     }
   };
 
+  const parsedIncludePaths = includePathsInput
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const includePathsErrorMessage = (() => {
+    const invalid = parsedIncludePaths.find((line) => !isPathInputValid(line));
+    return invalid ? t('includePaths.errors.absolute') : null;
+  })();
+
+  const handleIncludePathsKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (event.key === 'Escape') {
+      setIncludePathsInput(includePaths.join('\n'));
+    }
+  };
+
   const handleSave = (): void => {
-    if (watchRootErrorMessage || ignorePathsErrorMessage) {
+    if (watchRootErrorMessage || ignorePathsErrorMessage || includePathsErrorMessage) {
       return;
     }
     commitThreshold();
     const trimmedWatchRoot = watchRootInput.trim();
-    onWatchConfigChange({ watchRoot: trimmedWatchRoot, ignorePaths: parsedIgnorePaths });
+    onWatchConfigChange({
+      watchRoot: trimmedWatchRoot,
+      ignorePaths: parsedIgnorePaths,
+      includePaths: parsedIncludePaths,
+    });
     setWatchRootInput(trimmedWatchRoot);
     setIgnorePathsInput(parsedIgnorePaths.join('\n'));
+    setIncludePathsInput(parsedIncludePaths.join('\n'));
     onClose();
   };
 
@@ -136,6 +166,7 @@ export function PreferencesOverlay({
     setThresholdInput(defaultSortThreshold.toString());
     setWatchRootInput(defaultWatchRoot);
     setIgnorePathsInput(defaultIgnorePaths.join('\n'));
+    setIncludePathsInput(defaultIncludePaths.join('\n'));
     onReset();
   };
 
@@ -256,13 +287,42 @@ export function PreferencesOverlay({
               ) : null}
             </div>
           </div>
+          <div className="preferences-row">
+            <div className="preferences-row__details">
+              <p className="preferences-label" title={t('includePaths.help')}>
+                {t('includePaths.label')}
+              </p>
+            </div>
+            <div className="preferences-control">
+              <textarea
+                className="preferences-field preferences-textarea"
+                value={includePathsInput}
+                onChange={(event) => setIncludePathsInput(event.target.value)}
+                onKeyDown={handleIncludePathsKeyDown}
+                aria-label={t('includePaths.label')}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {includePathsErrorMessage ? (
+                <p
+                  className="permission-status permission-status--error preferences-field-error"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {includePathsErrorMessage}
+                </p>
+              ) : null}
+            </div>
+          </div>
         </div>
         <footer className="preferences-card__footer">
           <button
             className="preferences-save"
             type="button"
             onClick={handleSave}
-            disabled={Boolean(watchRootErrorMessage || ignorePathsErrorMessage)}
+            disabled={Boolean(
+              watchRootErrorMessage || ignorePathsErrorMessage || includePathsErrorMessage,
+            )}
           >
             {t('preferences.save')}
           </button>

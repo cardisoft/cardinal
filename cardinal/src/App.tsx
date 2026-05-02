@@ -167,6 +167,8 @@ function App() {
     defaultWatchRoot,
     ignorePaths,
     defaultIgnorePaths,
+    includePaths,
+    defaultIncludePaths,
     preferencesResetToken,
     handleWatchConfigChange,
     handleResetPreferences,
@@ -408,6 +410,8 @@ function App() {
         onWatchConfigChange={handleWatchConfigChange}
         ignorePaths={ignorePaths}
         defaultIgnorePaths={defaultIgnorePaths}
+        includePaths={includePaths}
+        defaultIncludePaths={defaultIncludePaths}
         onReset={handleResetPreferences}
         themeResetToken={preferencesResetToken}
       />
