@@ -166,5 +166,12 @@
     "errors": {
       "absolute": "Ogni percorso deve iniziare con '/' o '~'."
     }
+  },
+  "includePaths": {
+    "label": "Percorsi inclusi",
+    "help": "Un percorso per riga; i percorsi inclusi restano indicizzati anche se un livello superiore è ignorato.",
+    "errors": {
+      "absolute": "Ogni percorso deve iniziare con '/' o '~'."
+    }
   }
 }

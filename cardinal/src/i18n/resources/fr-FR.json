@@ -166,5 +166,12 @@
     "errors": {
       "absolute": "Chaque chemin doit commencer par '/' ou '~'."
     }
+  },
+  "includePaths": {
+    "label": "Chemins inclus",
+    "help": "Un chemin par ligne ; les chemins inclus restent indexés même si un parent est ignoré.",
+    "errors": {
+      "absolute": "Chaque chemin doit commencer par '/' ou '~'."
+    }
   }
 }

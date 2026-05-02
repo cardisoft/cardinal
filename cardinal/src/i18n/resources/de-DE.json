@@ -166,5 +166,12 @@
     "errors": {
       "absolute": "Jeder Pfad muss mit '/' oder '~' beginnen."
     }
+  },
+  "includePaths": {
+    "label": "Pfade einschließen",
+    "help": "Ein Pfad pro Zeile; eingeschlossene Pfade bleiben indexiert, auch wenn ein übergeordneter Pfad ignoriert wird.",
+    "errors": {
+      "absolute": "Jeder Pfad muss mit '/' oder '~' beginnen."
+    }
   }
 }

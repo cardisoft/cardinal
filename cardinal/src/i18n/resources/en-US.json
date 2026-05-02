@@ -166,5 +166,12 @@
     "errors": {
       "absolute": "Each path must start with '/' or '~'."
     }
+  },
+  "includePaths": {
+    "label": "Include paths",
+    "help": "One path per line; included paths stay indexed even under an ignored parent.",
+    "errors": {
+      "absolute": "Each path must start with '/' or '~'."
+    }
   }
 }

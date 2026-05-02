@@ -166,5 +166,12 @@
     "errors": {
       "absolute": "Cada caminho deve começar com '/' ou '~'."
     }
+  },
+  "includePaths": {
+    "label": "Caminhos incluídos",
+    "help": "Um caminho por linha; caminhos incluídos permanecem indexados mesmo quando um ancestral é ignorado.",
+    "errors": {
+      "absolute": "Cada caminho deve começar com '/' ou '~'."
+    }
   }
 }

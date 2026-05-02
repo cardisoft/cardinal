@@ -166,5 +166,12 @@
     "errors": {
       "absolute": "Cada ruta debe empezar por '/' o '~'."
     }
+  },
+  "includePaths": {
+    "label": "Rutas incluidas",
+    "help": "Una ruta por línea; las rutas incluidas se mantienen indexadas aunque un ancestro esté ignorado.",
+    "errors": {
+      "absolute": "Cada ruta debe empezar por '/' o '~'."
+    }
   }
 }

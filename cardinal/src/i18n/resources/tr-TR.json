@@ -166,5 +166,12 @@
     "errors": {
       "absolute": "Her yol '/' veya '~' ile başlamalıdır."
     }
+  },
+  "includePaths": {
+    "label": "Dahil edilen yollar",
+    "help": "Her satıra bir yol; dahil edilen yollar, üst dizini yok sayılsa bile dizinde kalır.",
+    "errors": {
+      "absolute": "Her yol '/' veya '~' ile başlamalıdır."
+    }
   }
 }
