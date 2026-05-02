@@ -39,6 +39,7 @@ fn main() -> Result<()> {
             &path,
             Path::new(CACHE_PATH),
             &ignore_paths,
+            &Vec::new(),
             &NEVER_STOPPED,
         )
         .unwrap_or_else(|e| {
@@ -86,9 +87,11 @@ fn main() -> Result<()> {
                         }
                         let mut scan_root = PathBuf::new();
                         let mut scan_ignore_paths = Vec::new();
+                        let mut scan_include_paths = Vec::new();
                         let walk_data = cache.walk_data(
                             &mut scan_root,
                             &mut scan_ignore_paths,
+                            &mut scan_include_paths,
                             CancellationToken::new_scan(),
                         );
                         let _ = cache.rescan_with_walk_data(&walk_data);

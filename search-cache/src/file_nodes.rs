@@ -9,6 +9,7 @@ use std::{
 pub struct FileNodes {
     path: PathBuf,
     ignore_paths: Vec<PathBuf>,
+    include_paths: Vec<PathBuf>,
     slab: ThinSlab<SlabNode>,
     root: SlabIndex,
 }
@@ -17,12 +18,14 @@ impl FileNodes {
     pub(crate) fn new(
         path: PathBuf,
         ignore_paths: Vec<PathBuf>,
+        include_paths: Vec<PathBuf>,
         slab: ThinSlab<SlabNode>,
         root: SlabIndex,
     ) -> Self {
         Self {
             path,
             ignore_paths,
+            include_paths,
             slab,
             root,
         }
@@ -55,6 +58,10 @@ impl FileNodes {
         &self.ignore_paths
     }
 
+    pub(crate) fn include_paths(&self) -> &Vec<PathBuf> {
+        &self.include_paths
+    }
+
     pub(crate) fn take_slab(&mut self) -> ThinSlab<SlabNode> {
         std::mem::take(&mut self.slab)
     }
@@ -63,14 +70,23 @@ impl FileNodes {
         self.slab = slab;
     }
 
-    pub(crate) fn into_parts(self) -> (PathBuf, Vec<PathBuf>, SlabIndex, ThinSlab<SlabNode>) {
+    pub(crate) fn into_parts(
+        self,
+    ) -> (
+        PathBuf,
+        Vec<PathBuf>,
+        Vec<PathBuf>,
+        SlabIndex,
+        ThinSlab<SlabNode>,
+    ) {
         let Self {
             path,
             ignore_paths,
+            include_paths,
             slab,
             root,
         } = self;
-        (path, ignore_paths, root, slab)
+        (path, ignore_paths, include_paths, root, slab)
     }
 }
 
