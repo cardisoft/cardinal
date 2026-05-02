@@ -130,4 +130,37 @@ describe('PreferencesOverlay', () => {
     expect(onSortThresholdChange).not.toHaveBeenCalled();
     expect(onWatchConfigChange).not.toHaveBeenCalled();
   });
+
+  it('applies staged reset values when saved', () => {
+    const onWatchConfigChange = vi.fn();
+    const onSortThresholdChange = vi.fn();
+    render(
+      <PreferencesOverlay
+        {...baseProps}
+        onWatchConfigChange={onWatchConfigChange}
+        onSortThresholdChange={onSortThresholdChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('preferences.reset'));
+    fireEvent.click(screen.getByText('preferences.save'));
+
+    expect(onSortThresholdChange).toHaveBeenCalledWith(baseProps.defaultSortThreshold);
+    expect(onWatchConfigChange).toHaveBeenCalledWith({
+      watchRoot: baseProps.defaultWatchRoot,
+      ignorePaths: baseProps.defaultIgnorePaths,
+      includePaths: baseProps.defaultIncludePaths,
+    });
+  });
+
+  it('closes preferences on Escape while editing a field', () => {
+    const onClose = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onClose={onClose} />);
+
+    const includePathsInput = screen.getByLabelText('includePaths.label');
+    fireEvent.change(includePathsInput, { target: { value: '/tmp/changed' } });
+    fireEvent.keyDown(includePathsInput, { key: 'Escape' });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
