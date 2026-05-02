@@ -21,7 +21,7 @@ export function useIncludePaths() {
     },
     write: (value) => JSON.stringify(value),
     readErrorMessage: 'Unable to read saved include paths',
-    writeErrorMessage: 'Unable to persist default include paths',
+    writeErrorMessage: 'Unable to persist include paths',
   });
 
   const setIncludePaths = useCallback(
