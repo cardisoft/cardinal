@@ -30,6 +30,8 @@ const baseProps = {
   defaultWatchRoot: '/default/root',
   ignorePaths: ['/ignore/a', '/ignore/b'],
   defaultIgnorePaths: ['/default/ignore'],
+  includePaths: ['/include/a'],
+  defaultIncludePaths: [] as string[],
   onReset: vi.fn(),
   themeResetToken: 0,
   onWatchConfigChange: vi.fn(),
@@ -48,6 +50,7 @@ describe('PreferencesOverlay', () => {
     expect(onWatchConfigChange).toHaveBeenCalledWith({
       watchRoot: '/new/root',
       ignorePaths: baseProps.ignorePaths,
+      includePaths: baseProps.includePaths,
     });
   });
 
@@ -63,7 +66,39 @@ describe('PreferencesOverlay', () => {
     expect(onWatchConfigChange).toHaveBeenCalledWith({
       watchRoot: baseProps.watchRoot,
       ignorePaths: ['/tmp/one', '/tmp/two'],
+      includePaths: baseProps.includePaths,
     });
+  });
+
+  it('saves include path updates via onWatchConfigChange', () => {
+    const onWatchConfigChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onWatchConfigChange={onWatchConfigChange} />);
+
+    const includePathsInput = screen.getByLabelText('includePaths.label');
+    fireEvent.change(includePathsInput, {
+      target: { value: '/Volumes/media\n/Volumes/work' },
+    });
+
+    fireEvent.click(screen.getByText('preferences.save'));
+
+    expect(onWatchConfigChange).toHaveBeenCalledWith({
+      watchRoot: baseProps.watchRoot,
+      ignorePaths: baseProps.ignorePaths,
+      includePaths: ['/Volumes/media', '/Volumes/work'],
+    });
+  });
+
+  it('blocks save when an include path is not absolute', () => {
+    const onWatchConfigChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onWatchConfigChange={onWatchConfigChange} />);
+
+    const includePathsInput = screen.getByLabelText('includePaths.label');
+    fireEvent.change(includePathsInput, { target: { value: 'relative/path' } });
+
+    const saveButton = screen.getByText('preferences.save') as HTMLButtonElement;
+    expect(saveButton.disabled).toBe(true);
+    fireEvent.click(saveButton);
+    expect(onWatchConfigChange).not.toHaveBeenCalled();
   });
 
   it('resets inputs to defaults before invoking onReset', () => {
@@ -87,6 +122,9 @@ describe('PreferencesOverlay', () => {
     expect(screen.getByLabelText('watchRoot.label')).toHaveValue(baseProps.defaultWatchRoot);
     expect(screen.getByLabelText('ignorePaths.label')).toHaveValue(
       baseProps.defaultIgnorePaths.join('\n'),
+    );
+    expect(screen.getByLabelText('includePaths.label')).toHaveValue(
+      baseProps.defaultIncludePaths.join('\n'),
     );
     expect(onReset).toHaveBeenCalledTimes(1);
     expect(onSortThresholdChange).not.toHaveBeenCalled();

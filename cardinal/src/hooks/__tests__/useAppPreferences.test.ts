@@ -7,6 +7,7 @@ import { getStoredTrayIconEnabled, persistTrayIconEnabled } from '../../trayIcon
 import { setWatchConfig } from '../../utils/watchConfig';
 import { getBrowserLanguage } from '../../i18n/config';
 import { useIgnorePaths } from '../useIgnorePaths';
+import { useIncludePaths } from '../useIncludePaths';
 import { useWatchRoot } from '../useWatchRoot';
 import { useAppPreferences } from '../useAppPreferences';
 import { invoke } from '@tauri-apps/api/core';
@@ -21,6 +22,10 @@ vi.mock('../useWatchRoot', () => ({
 
 vi.mock('../useIgnorePaths', () => ({
   useIgnorePaths: vi.fn(),
+}));
+
+vi.mock('../useIncludePaths', () => ({
+  useIncludePaths: vi.fn(),
 }));
 
 vi.mock('../../trayIconPreference', () => ({
@@ -48,6 +53,7 @@ vi.mock('../../i18n/config', () => ({
 const mockedInvoke = vi.mocked(invoke);
 const mockedUseWatchRoot = vi.mocked(useWatchRoot);
 const mockedUseIgnorePaths = vi.mocked(useIgnorePaths);
+const mockedUseIncludePaths = vi.mocked(useIncludePaths);
 const mockedGetStoredTrayIconEnabled = vi.mocked(getStoredTrayIconEnabled);
 const mockedPersistTrayIconEnabled = vi.mocked(persistTrayIconEnabled);
 const mockedSetTrayEnabled = vi.mocked(setTrayEnabled);
@@ -59,6 +65,7 @@ const mockedGetBrowserLanguage = vi.mocked(getBrowserLanguage);
 describe('useAppPreferences', () => {
   const setWatchRoot = vi.fn();
   const setIgnorePaths = vi.fn();
+  const setIncludePaths = vi.fn();
   const changeLanguage = vi.fn().mockResolvedValue(undefined);
   const refreshSearchResults = vi.fn();
 
@@ -74,6 +81,11 @@ describe('useAppPreferences', () => {
       ignorePaths: ['/Volumes'],
       setIgnorePaths,
       defaultIgnorePaths: ['/Volumes'],
+    });
+    mockedUseIncludePaths.mockReturnValue({
+      includePaths: [],
+      setIncludePaths,
+      defaultIncludePaths: [],
     });
     mockedGetStoredTrayIconEnabled.mockReturnValue(true);
     mockedSetTrayEnabled.mockResolvedValue(undefined);
@@ -96,6 +108,7 @@ describe('useAppPreferences', () => {
       expect(mockedInvoke).toHaveBeenCalledWith('start_logic', {
         watchRoot: '/workspace',
         ignorePaths: ['/Volumes'],
+        includePaths: [],
       });
     });
 
@@ -123,6 +136,7 @@ describe('useAppPreferences', () => {
       expect(mockedInvoke).toHaveBeenCalledWith('start_logic', {
         watchRoot: '/workspace',
         ignorePaths: ['/Volumes'],
+        includePaths: [],
       });
     });
 
@@ -133,6 +147,7 @@ describe('useAppPreferences', () => {
       result.current.handleWatchConfigChange({
         watchRoot: '/tmp',
         ignorePaths: ['/tmp/ignore'],
+        includePaths: [],
       });
     });
 
@@ -141,6 +156,7 @@ describe('useAppPreferences', () => {
     expect(mockedSetWatchConfig).toHaveBeenCalledWith({
       watchRoot: '/tmp',
       ignorePaths: ['/tmp/ignore'],
+      includePaths: [],
     });
     expect(refreshSearchResults).toHaveBeenCalledTimes(1);
   });
@@ -159,6 +175,7 @@ describe('useAppPreferences', () => {
       expect(mockedInvoke).toHaveBeenCalledWith('start_logic', {
         watchRoot: '/workspace',
         ignorePaths: ['/Volumes'],
+        includePaths: [],
       });
     });
 
@@ -171,6 +188,7 @@ describe('useAppPreferences', () => {
       result.current.handleWatchConfigChange({
         watchRoot: '/workspace',
         ignorePaths: ['/Volumes'],
+        includePaths: [],
       });
     });
 
@@ -194,6 +212,7 @@ describe('useAppPreferences', () => {
       expect(mockedInvoke).toHaveBeenCalledWith('start_logic', {
         watchRoot: '/workspace',
         ignorePaths: ['/Volumes'],
+        includePaths: [],
       });
     });
 
@@ -206,6 +225,7 @@ describe('useAppPreferences', () => {
       result.current.handleWatchConfigChange({
         watchRoot: '/new-root',
         ignorePaths: ['/Volumes'], // same as before
+        includePaths: [],
       });
     });
 
@@ -214,6 +234,7 @@ describe('useAppPreferences', () => {
     expect(mockedSetWatchConfig).toHaveBeenCalledWith({
       watchRoot: '/new-root',
       ignorePaths: ['/Volumes'],
+      includePaths: [],
     });
     expect(refreshSearchResults).toHaveBeenCalledTimes(1);
   });
@@ -232,6 +253,7 @@ describe('useAppPreferences', () => {
       expect(mockedInvoke).toHaveBeenCalledWith('start_logic', {
         watchRoot: '/workspace',
         ignorePaths: ['/Volumes'],
+        includePaths: [],
       });
     });
 
@@ -244,6 +266,7 @@ describe('useAppPreferences', () => {
       result.current.handleWatchConfigChange({
         watchRoot: '/workspace', // same as before
         ignorePaths: ['/tmp/ignore'], // different
+        includePaths: [],
       });
     });
 
@@ -252,6 +275,7 @@ describe('useAppPreferences', () => {
     expect(mockedSetWatchConfig).toHaveBeenCalledWith({
       watchRoot: '/workspace',
       ignorePaths: ['/tmp/ignore'],
+      includePaths: [],
     });
     expect(refreshSearchResults).toHaveBeenCalledTimes(1);
   });
@@ -278,6 +302,7 @@ describe('useAppPreferences', () => {
       expect(mockedInvoke).toHaveBeenCalledWith('start_logic', {
         watchRoot: '/workspace',
         ignorePaths: ['/Volumes', '/System'],
+        includePaths: [],
       });
     });
 
@@ -290,12 +315,55 @@ describe('useAppPreferences', () => {
       result.current.handleWatchConfigChange({
         watchRoot: '/workspace',
         ignorePaths: ['/System', '/Volumes'], // same items, different order
+        includePaths: [],
       });
     });
 
     expect(mockedSetWatchConfig).toHaveBeenCalledWith({
       watchRoot: '/workspace',
       ignorePaths: ['/System', '/Volumes'],
+      includePaths: [],
+    });
+    expect(refreshSearchResults).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates watch config when only includePaths changes', async () => {
+    const { result } = renderHook(() =>
+      useAppPreferences({
+        fullDiskAccessStatus: 'granted',
+        isCheckingFullDiskAccess: false,
+        refreshSearchResults,
+        i18n: { changeLanguage },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenCalledWith('start_logic', {
+        watchRoot: '/workspace',
+        ignorePaths: ['/Volumes'],
+        includePaths: [],
+      });
+    });
+
+    mockedSetWatchConfig.mockClear();
+    refreshSearchResults.mockClear();
+    setWatchRoot.mockClear();
+    setIgnorePaths.mockClear();
+    setIncludePaths.mockClear();
+
+    act(() => {
+      result.current.handleWatchConfigChange({
+        watchRoot: '/workspace',
+        ignorePaths: ['/Volumes'],
+        includePaths: ['/Volumes/media'],
+      });
+    });
+
+    expect(setIncludePaths).toHaveBeenCalledWith(['/Volumes/media']);
+    expect(mockedSetWatchConfig).toHaveBeenCalledWith({
+      watchRoot: '/workspace',
+      ignorePaths: ['/Volumes'],
+      includePaths: ['/Volumes/media'],
     });
     expect(refreshSearchResults).toHaveBeenCalledTimes(1);
   });
