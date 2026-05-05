@@ -121,6 +121,10 @@
     "themeHint": "选择浅色、深色或跟随系统。",
     "language": "语言",
     "languageHint": "立即切换界面语言。",
+    "shortcuts": {
+      "label": "快捷键",
+      "configure": "设置"
+    },
     "trayIcon": {
       "label": "显示托盘图标"
     },
@@ -130,6 +134,86 @@
     "save": "保存",
     "reset": "恢复默认设置",
     "close": "关闭"
+  },
+  "shortcutSettings": {
+    "title": "快捷键设置",
+    "captureHint": "点击下方某个快捷键按钮，然后按下新的组合键。",
+    "recording": "请按键...",
+    "save": "保存",
+    "saving": "保存中...",
+    "reset": "恢复默认",
+    "items": {
+      "quickLaunch": {
+        "label": "全局唤起",
+        "description": "全局显示或隐藏 Cardinal。"
+      },
+      "openPreferences": {
+        "label": "打开偏好设置",
+        "description": "打开偏好设置面板。"
+      },
+      "hideWindow": {
+        "label": "隐藏窗口",
+        "description": "隐藏 Cardinal 主窗口。"
+      },
+      "focusSearch": {
+        "label": "聚焦搜索框",
+        "description": "将焦点切回搜索输入框。"
+      },
+      "openResult": {
+        "label": "打开结果",
+        "description": "打开当前选中的结果。"
+      },
+      "revealInFinder": {
+        "label": "在 Finder 中显示",
+        "description": "在 Finder 中定位所选结果。"
+      },
+      "copyFiles": {
+        "label": "复制文件",
+        "description": "将所选文件复制到剪贴板。"
+      },
+      "copyFilenames": {
+        "label": "复制文件名",
+        "description": "复制所选文件名。"
+      },
+      "copyPaths": {
+        "label": "复制路径",
+        "description": "复制所选文件路径。"
+      },
+      "quickLook": {
+        "label": "快速预览",
+        "description": "使用 Quick Look 预览当前选择。"
+      },
+      "moveSelectionUp": {
+        "label": "上移选择",
+        "description": "选择上一个条目。"
+      },
+      "moveSelectionDown": {
+        "label": "下移选择",
+        "description": "选择下一个条目。"
+      },
+      "extendSelectionUp": {
+        "label": "向上扩展选择",
+        "description": "向上扩展多选范围。"
+      },
+      "extendSelectionDown": {
+        "label": "向下扩展选择",
+        "description": "向下扩展多选范围。"
+      },
+      "searchHistoryUp": {
+        "label": "上一条历史",
+        "description": "切换到更早的搜索历史。"
+      },
+      "searchHistoryDown": {
+        "label": "下一条历史",
+        "description": "切换到更新的搜索历史。"
+      }
+    },
+    "errors": {
+      "modifierRequired": "快捷键必须包含至少一个修饰键。",
+      "keyRequired": "请同时按下修饰键和一个非修饰键。",
+      "unsupportedKey": "该按键暂不支持作为全局快捷键。",
+      "registerFailed": "注册快捷键失败，可能已被其他应用占用。"
+    }
   },
   "language": {
     "label": "语言",

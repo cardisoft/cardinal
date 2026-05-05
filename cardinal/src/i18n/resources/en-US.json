@@ -122,6 +122,10 @@
     "themeHint": "Choose light, dark, or follow the system.",
     "language": "Language",
     "languageHint": "Switch the interface language instantly.",
+    "shortcuts": {
+      "label": "Shortcuts",
+      "configure": "Configure"
+    },
     "trayIcon": {
       "label": "Show tray icon"
     },
@@ -131,6 +135,86 @@
     "save": "Save",
     "reset": "Restore defaults",
     "close": "Close"
+  },
+  "shortcutSettings": {
+    "title": "Shortcut Settings",
+    "captureHint": "Click a shortcut button below, then press the new key combination.",
+    "recording": "Press keys...",
+    "save": "Save",
+    "saving": "Saving...",
+    "reset": "Use default",
+    "items": {
+      "quickLaunch": {
+        "label": "Quick launch",
+        "description": "Toggle Cardinal globally."
+      },
+      "openPreferences": {
+        "label": "Open preferences",
+        "description": "Open Preferences panel."
+      },
+      "hideWindow": {
+        "label": "Hide window",
+        "description": "Hide Cardinal window."
+      },
+      "focusSearch": {
+        "label": "Focus search",
+        "description": "Jump to the search input."
+      },
+      "openResult": {
+        "label": "Open result",
+        "description": "Open the selected result."
+      },
+      "revealInFinder": {
+        "label": "Reveal in Finder",
+        "description": "Reveal selected result in Finder."
+      },
+      "copyFiles": {
+        "label": "Copy files",
+        "description": "Copy selected files to clipboard."
+      },
+      "copyFilenames": {
+        "label": "Copy filenames",
+        "description": "Copy selected file names."
+      },
+      "copyPaths": {
+        "label": "Copy paths",
+        "description": "Copy selected file paths."
+      },
+      "quickLook": {
+        "label": "Quick Look",
+        "description": "Preview selection with Quick Look."
+      },
+      "moveSelectionUp": {
+        "label": "Move selection up",
+        "description": "Select previous item."
+      },
+      "moveSelectionDown": {
+        "label": "Move selection down",
+        "description": "Select next item."
+      },
+      "extendSelectionUp": {
+        "label": "Extend selection up",
+        "description": "Expand selection upward."
+      },
+      "extendSelectionDown": {
+        "label": "Extend selection down",
+        "description": "Expand selection downward."
+      },
+      "searchHistoryUp": {
+        "label": "History previous",
+        "description": "Navigate to older search history."
+      },
+      "searchHistoryDown": {
+        "label": "History next",
+        "description": "Navigate to newer search history."
+      }
+    },
+    "errors": {
+      "modifierRequired": "Shortcut must include at least one modifier key.",
+      "keyRequired": "Press a non-modifier key together with modifiers.",
+      "unsupportedKey": "That key is not supported for global shortcuts.",
+      "registerFailed": "Unable to register this shortcut. It may already be in use."
+    }
   },
   "language": {
     "label": "Language",

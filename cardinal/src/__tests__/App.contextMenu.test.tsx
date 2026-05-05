@@ -78,8 +78,21 @@ vi.mock('../components/PreferencesOverlay', () => ({
   default: () => null,
 }));
 
+vi.mock('../components/ShortcutSettingsOverlay', () => ({
+  default: () => null,
+}));
+
 vi.mock('../components/StatusBar', () => ({
   default: () => null,
+}));
+
+vi.mock('../tray', () => ({
+  refreshTrayMenu: vi.fn(),
+}));
+
+vi.mock('../menu', () => ({
+  refreshAppMenu: vi.fn(),
+  setMenuShortcutsEnabled: vi.fn(),
 }));
 
 vi.mock('../components/FSEventsPanel', () => ({

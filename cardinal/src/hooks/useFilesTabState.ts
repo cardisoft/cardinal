@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { StatusTabKey } from '../components/StatusBar';
+import type { ShortcutMap } from '../shortcuts';
+import { shortcutMatchesKeydown } from '../utils/shortcutCapture';
 import { useSearchHistory } from './useSearchHistory';
 
 type QueueSearchOptions = {
@@ -11,7 +13,8 @@ type QueueSearchOptions = {
 type UseFilesTabStateOptions = {
   searchQuery: string;
   queueSearch: (query: string, options?: QueueSearchOptions) => void;
-  maxSearchHistoryEntries?: number;
+  shortcuts: ShortcutMap;
+  shortcutsEnabled: boolean;
 };
 
 type UseFilesTabStateResult = {
@@ -35,7 +38,8 @@ type UseFilesTabStateResult = {
 export function useFilesTabState({
   searchQuery,
   queueSearch,
-  maxSearchHistoryEntries = 50,
+  shortcuts,
+  shortcutsEnabled,
 }: UseFilesTabStateOptions): UseFilesTabStateResult {
   const [activeTab, setActiveTab] = useState<StatusTabKey>('files');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -45,7 +49,7 @@ export function useFilesTabState({
     navigate: navigateSearchHistory,
     ensureTailValue: ensureHistoryBuffer,
     resetCursorToTail,
-  } = useSearchHistory({ maxEntries: maxSearchHistoryEntries });
+  } = useSearchHistory();
 
   const handleSearchFocus = useCallback(() => {
     setIsSearchFocused(true);
@@ -92,18 +96,20 @@ export function useFilesTabState({
         return;
       }
 
-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
+      if (!shortcutsEnabled) {
         return;
       }
 
-      if (event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) {
+      const isHistoryUp = shortcutMatchesKeydown(event, shortcuts.searchHistoryUp);
+      const isHistoryDown = shortcutMatchesKeydown(event, shortcuts.searchHistoryDown);
+      if (!isHistoryUp && !isHistoryDown) {
         return;
       }
 
       event.preventDefault();
-      handleHistoryNavigation(event.key === 'ArrowUp' ? 'older' : 'newer');
+      handleHistoryNavigation(isHistoryUp ? 'older' : 'newer');
     },
-    [activeTab, handleHistoryNavigation, submitFilesQuery],
+    [activeTab, handleHistoryNavigation, shortcuts, shortcutsEnabled, submitFilesQuery],
   );
 
   const onQueryChange = useCallback(

@@ -3,11 +3,13 @@ import { invoke } from '@tauri-apps/api/core';
 import { Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import i18n from './i18n/config';
+import { getStoredShortcutAccelerators } from './shortcuts';
 import { openPreferences } from './utils/openPreferences';
 
 const HELP_UPDATES_URL = 'https://github.com/cardisoft/cardinal/releases';
 
 let menuInitPromise: Promise<void> | null = null;
+let menuShortcutsEnabled = true;
 
 export function initializeAppMenu(): Promise<void> {
   if (!menuInitPromise) {
@@ -17,8 +19,22 @@ export function initializeAppMenu(): Promise<void> {
   return menuInitPromise ?? Promise.resolve();
 }
 
+export function setMenuShortcutsEnabled(enabled: boolean): void {
+  if (menuShortcutsEnabled === enabled) {
+    return;
+  }
+  menuShortcutsEnabled = enabled;
+  scheduleMenuBuild();
+}
+
+export function refreshAppMenu(): Promise<void> {
+  scheduleMenuBuild();
+  return menuInitPromise ?? Promise.resolve();
+}
+
 async function buildAppMenu(): Promise<void> {
   const name = (await getName().catch(() => null)) ?? 'Cardinal';
+  const shortcuts = getStoredShortcutAccelerators();
   const aboutItem = await PredefinedMenuItem.new({
     item: { About: null },
     text: i18n.t('menu.about', { appName: name }),
@@ -26,7 +42,7 @@ async function buildAppMenu(): Promise<void> {
   const preferencesItem = await MenuItem.new({
     id: 'menu.preferences',
     text: i18n.t('menu.preferences'),
-    accelerator: 'CmdOrCtrl+,',
+    accelerator: menuShortcutsEnabled ? shortcuts.openPreferences : undefined,
     action: () => {
       openPreferences();
     },
@@ -34,7 +50,7 @@ async function buildAppMenu(): Promise<void> {
   const hideItem = await MenuItem.new({
     id: 'menu.hide',
     text: i18n.t('menu.hide'),
-    accelerator: 'Esc',
+    accelerator: menuShortcutsEnabled ? shortcuts.hideWindow : undefined,
     action: () => {
       void invoke('hide_main_window');
     },
