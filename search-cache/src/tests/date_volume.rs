@@ -486,7 +486,7 @@ fn segment_10_stress_queries() {
     let _ = cache.search("dm:pastmonth").unwrap();
     let _ = cache.search("dm:thisyear").unwrap();
     // ensure no cancellation
-    let token = CancellationToken::new_search(); // never cancelled
+    let token = CancellationToken::noop(); // never cancelled
     let outcome = cache
         .search_with_options(
             "dm:2024-01-01-2024-03-01",
