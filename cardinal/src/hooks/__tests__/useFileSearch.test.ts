@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import type { SlabIndex } from '../../types/slab';
@@ -78,12 +78,16 @@ describe('useFileSearch', () => {
     });
 
     // Trigger a new search
-    result.current.queueSearch('new query', { immediate: true });
+    act(() => {
+      result.current.queueSearch('new query', { immediate: true });
+    });
 
-    // The results should still be the initial results, not updated or cleared
-    // We wait a bit to ensure it had time to process if it were going to
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(result.current.state.results).toBe(initialResults);
-    expect(result.current.state.currentQuery).toBe(''); // Query doesn't update on cancelled search
+    // Cancelled results should not overwrite state, and loading should settle.
+    await waitFor(() => {
+      expect(result.current.state.results).toBe(initialResults);
+      expect(result.current.state.currentQuery).toBe(''); // Query doesn't update on cancelled search
+      expect(result.current.state.showLoadingUI).toBe(false);
+      expect(result.current.state.initialFetchCompleted).toBe(true);
+    });
   });
 });
