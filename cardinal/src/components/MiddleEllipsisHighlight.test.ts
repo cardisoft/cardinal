@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import React from 'react';
 
-import { splitTextWithHighlights } from './MiddleEllipsisHighlight';
+import { MiddleEllipsisHighlight, splitTextWithHighlights } from './MiddleEllipsisHighlight';
 
 describe('splitTextWithHighlights', () => {
   it('returns entire string as plain text when no needles are provided', () => {
@@ -44,5 +46,38 @@ describe('splitTextWithHighlights', () => {
       { text: ' ', isHighlight: false },
       { text: 'abc', isHighlight: true },
     ]);
+  });
+});
+
+describe('MiddleEllipsisHighlight', () => {
+  it('uses layout measurement before the rendered text is observed', () => {
+    const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = () =>
+      ({
+        width: 80,
+        height: 20,
+        top: 0,
+        right: 80,
+        bottom: 20,
+        left: 0,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    try {
+      render(
+        React.createElement(MiddleEllipsisHighlight, {
+          text: 'abcdefghijklmnopqrstuvwxyz',
+          className: 'test-middle-ellipsis',
+        }),
+      );
+
+      const rendered = screen.getByTitle('abcdefghijklmnopqrstuvwxyz');
+      expect(rendered.textContent).toContain('…');
+      expect(rendered.textContent).not.toBe('abcdefghijklmnopqrstuvwxyz');
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    }
   });
 });
