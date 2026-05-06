@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 
+const TRUNCATE_THRES: usize = 10000;
+
 #[derive(Clone)]
 pub struct ServerState {
     pub search_tx: Sender<SearchJob>,
@@ -147,6 +149,11 @@ async fn handle_search(state: Arc<ServerState>, req: SearchRequest) -> impl Into
         }
         if let Some(limit) = req.limit {
             results.truncate(limit);
+        }
+
+        // prevent the runtime from getting stuck with a massive number of results.
+        if results.len() > TRUNCATE_THRES {
+            results.truncate(TRUNCATE_THRES);
         }
 
         let (node_info_reply_tx, node_info_reply_rx) = bounded(1);
