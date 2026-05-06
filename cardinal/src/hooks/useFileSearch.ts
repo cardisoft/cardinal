@@ -61,6 +61,7 @@ type SearchAction =
         duration: number;
       };
     }
+  | { type: 'SEARCH_CANCELLED' }
   | { type: 'SET_LIFECYCLE_STATE'; payload: { status: AppLifecycleStatus } };
 
 const initialSearchState: SearchState = {
@@ -134,6 +135,12 @@ function reducer(state: SearchState, action: SearchAction): SearchState {
         durationMs: action.payload.duration,
         resultCount: 0,
         highlightTerms: [],
+      };
+    case 'SEARCH_CANCELLED':
+      return {
+        ...state,
+        showLoadingUI: false,
+        initialFetchCompleted: true,
       };
     case 'SET_LIFECYCLE_STATE':
       return {
@@ -245,10 +252,13 @@ export function useFileSearch(): UseFileSearchResult {
         },
       });
 
-      if (
-        rawResults.statusCode === SearchStatusCode.CANCELLED ||
-        searchVersionRef.current !== requestVersion
-      ) {
+      if (searchVersionRef.current !== requestVersion) {
+        return;
+      }
+
+      if (rawResults.statusCode === SearchStatusCode.CANCELLED) {
+        cancelTimer(loadingDelayTimerRef);
+        dispatch({ type: 'SEARCH_CANCELLED' });
         return;
       }
 
