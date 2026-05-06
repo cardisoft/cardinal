@@ -9,16 +9,8 @@ use axum::{
 use crossbeam_channel::{Sender, bounded};
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
-use std::{
-    net::SocketAddr,
-    sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
-    },
-};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
-
-static SEARCH_VERSION: AtomicU64 = AtomicU64::new(1000000);
 
 #[derive(Clone)]
 pub struct ServerState {
@@ -93,8 +85,7 @@ async fn search_handler(
 async fn handle_search(state: Arc<ServerState>, req: SearchRequest) -> impl IntoResponse {
     let result = tokio::task::spawn_blocking(move || {
         let (slab_indices, highlights) = {
-            let version = SEARCH_VERSION.fetch_add(1, Ordering::Relaxed);
-            let cancellation_token = CancellationToken::new(version);
+            let cancellation_token = CancellationToken::new_search();
 
             let (result_tx, result_rx) = bounded(1);
             if let Err(e) = state.search_tx.send(SearchJob {
