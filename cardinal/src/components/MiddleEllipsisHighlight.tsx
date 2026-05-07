@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useLayoutEffect, useRef, useState, useMemo } from 'react';
 
 const CHAR_WIDTH = 8; // Approximate monospace character width in pixels – used for quick truncation math.
 
@@ -160,8 +160,9 @@ export function MiddleEllipsisHighlight({
     return applyMiddleEllipsis(highlightedParts, maxChars);
   }, [highlightedParts, containerWidth]);
 
-  // Prefer a ResizeObserver so truncation reacts quickly to layout shifts.
-  useEffect(() => {
+  // Measure before paint so result refreshes do not flash the full text before truncation.
+  // ResizeObserver keeps truncation in sync with later layout shifts.
+  useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) {
       return;
