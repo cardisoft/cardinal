@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 
-import { useServerConfig } from '../useServerConfig';
+import { isValidEndpoint, useServerConfig } from '../useServerConfig';
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
@@ -89,5 +89,11 @@ describe('useServerConfig', () => {
         endpoint: '0.0.0.0:3390',
       }),
     );
+  });
+
+  it('rejects ports with non-digit suffixes', () => {
+    expect(isValidEndpoint('127.0.0.1:3388abc')).toBe(false);
+    expect(isValidEndpoint('127.0.0.1:33 88')).toBe(false);
+    expect(isValidEndpoint('127.0.0.1:3388')).toBe(true);
   });
 });

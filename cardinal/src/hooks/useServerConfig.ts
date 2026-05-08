@@ -28,7 +28,12 @@ export const isValidEndpoint = (endpoint: string): boolean => {
     return false;
   }
 
-  const port = Number.parseInt(trimmed.slice(portSeparator + 1), 10);
+  const portText = trimmed.slice(portSeparator + 1);
+  if (!/^\d+$/.test(portText)) {
+    return false;
+  }
+
+  const port = Number.parseInt(portText, 10);
   return Number.isInteger(port) && port >= 1 && port <= 65535;
 };
 

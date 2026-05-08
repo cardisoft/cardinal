@@ -147,6 +147,20 @@ describe('PreferencesOverlay', () => {
     expect(onPreferencesChange).not.toHaveBeenCalled();
   });
 
+  it('blocks save when server endpoint contains a non-digit port suffix', () => {
+    const onPreferencesChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onPreferencesChange={onPreferencesChange} />);
+
+    fireEvent.change(screen.getByLabelText('preferences.server.endpoint'), {
+      target: { value: '127.0.0.1:3388abc' },
+    });
+
+    const saveButton = screen.getByText('preferences.save') as HTMLButtonElement;
+    expect(saveButton.disabled).toBe(true);
+    fireEvent.click(saveButton);
+    expect(onPreferencesChange).not.toHaveBeenCalled();
+  });
+
   it('resets inputs to defaults before invoking onReset', () => {
     const onReset = vi.fn();
     const onPreferencesChange = vi.fn();
