@@ -23,7 +23,7 @@ use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, Sl
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
 use std::{cell::LazyCell, process::Command};
-use tauri::{ActivationPolicy, AppHandle, Emitter, State};
+use tauri::{ActivationPolicy, AppHandle, Emitter, Manager, State};
 use tracing::{error, info, warn};
 
 #[derive(Debug, Clone)]
@@ -52,6 +52,24 @@ impl From<SearchOptionsPayload> for SearchOptions {
 pub struct ServerConfig {
     pub enabled: bool,
     pub endpoint: String,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            endpoint: "127.0.0.1:3388".to_string(),
+        }
+    }
+}
+
+/// Load `ServerConfig` from a JSON file previously written by `set_server_config`.
+/// Returns `ServerConfig::default()` if the file is absent or malformed.
+pub(crate) fn load_server_config_from_file(path: &std::path::Path) -> ServerConfig {
+    let Ok(contents) = std::fs::read_to_string(path) else {
+        return ServerConfig::default();
+    };
+    serde_json::from_str::<ServerConfig>(&contents).unwrap_or_default()
 }
 
 #[derive(Debug, Clone)]
@@ -453,6 +471,19 @@ pub fn set_server_config(app: AppHandle, config: ServerConfig, state: State<'_, 
     {
         let mut current = state.server_config.lock();
         *current = config.clone();
+    }
+
+    // Persist so the server can start from the correct config on next launch.
+    if let Ok(config_dir) = app.path().app_config_dir() {
+        let path = config_dir.join("server_config.json");
+        match serde_json::to_string(&config) {
+            Ok(json) => {
+                if let Err(e) = std::fs::write(&path, json) {
+                    error!("Failed to persist server config: {e:?}");
+                }
+            }
+            Err(e) => error!("Failed to serialize server config: {e:?}"),
+        }
     }
 
     if let Err(e) = state.server_config_tx.send(config.clone()) {

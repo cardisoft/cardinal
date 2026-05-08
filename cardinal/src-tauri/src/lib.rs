@@ -16,9 +16,10 @@ use cardinal_sdk::EventWatcher;
 use commands::{
     NodeInfoRequest, SearchJob, SearchState, ServerConfig, WatchConfigUpdate, activate_main_window,
     close_quicklook, copy_files_to_clipboard, get_app_status, get_nodes_info, get_server_config,
-    get_sorted_view, hide_main_window, normalize_watch_config, open_in_finder, open_path, search,
-    set_server_config, set_tray_activation_policy, set_watch_config, start_logic,
-    toggle_main_window, toggle_quicklook, trigger_rescan, update_icon_viewport, update_quicklook,
+    get_sorted_view, hide_main_window, load_server_config_from_file, normalize_watch_config,
+    open_in_finder, open_path, search, set_server_config, set_tray_activation_policy,
+    set_watch_config, start_logic, toggle_main_window, toggle_quicklook, trigger_rescan,
+    update_icon_viewport, update_quicklook,
 };
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, bounded, unbounded};
 use lifecycle::{
@@ -121,10 +122,7 @@ pub fn run() -> Result<()> {
             icon_viewport_tx.clone(),
             rescan_tx.clone(),
             watch_config_tx.clone(),
-            ServerConfig {
-                enabled: false,
-                endpoint: "127.0.0.1:3388".to_string(),
-            },
+            ServerConfig::default(),
             server_config_tx.clone(),
             update_window_state_tx.clone(),
         ))
@@ -157,6 +155,12 @@ pub fn run() -> Result<()> {
         .get_or_try_init(|| app.path().app_config_dir().map(|p| p.join("cardinal.db")))
         .expect("Failed to initialize database path");
 
+    let initial_server_config = app
+        .path()
+        .app_config_dir()
+        .map(|p| load_server_config_from_file(&p.join("server_config.json")))
+        .unwrap_or_default();
+
     let app_handle = &app.handle().to_owned();
     let channels = BackgroundLoopChannels {
         finish_rx,
@@ -176,12 +180,7 @@ pub fn run() -> Result<()> {
     tauri::async_runtime::spawn(async move {
         let mut current_server_handle: Option<tokio::sync::oneshot::Sender<()>> = None;
         let server_config_rx = server_config_rx;
-
-        // Default configuration
-        let mut current_config = ServerConfig {
-            enabled: false,
-            endpoint: "127.0.0.1:3388".to_string(),
-        };
+        let mut current_config = initial_server_config;
 
         loop {
             // If enabled and not running, start it
