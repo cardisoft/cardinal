@@ -31,9 +31,7 @@ const readStoredServerConfig = (raw: string): ServerConfig | null => {
   return normalizeServerConfig({
     enabled: Boolean(parsed.enabled),
     endpoint:
-      typeof parsed.port === 'number'
-        ? `127.0.0.1:${parsed.port}`
-        : DEFAULT_SERVER_CONFIG.endpoint,
+      typeof parsed.port === 'number' ? `127.0.0.1:${parsed.port}` : DEFAULT_SERVER_CONFIG.endpoint,
   });
 };
 
