@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getWatchRootValidation, isPathInputValid } from '../utils/watchRoot';
+import { isValidEndpoint } from '../hooks/useServerConfig';
 import type { ServerConfig } from '../hooks/useServerConfig';
 import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -140,22 +141,11 @@ export function PreferencesOverlay({
   })();
 
   const trimmedServerEndpoint = serverEndpointInput.trim();
-  const serverPortSeparatorIndex = trimmedServerEndpoint.lastIndexOf(':');
-  const parsedServerPort =
-    serverPortSeparatorIndex >= 0
-      ? Number.parseInt(trimmedServerEndpoint.slice(serverPortSeparatorIndex + 1), 10)
-      : Number.NaN;
-  const serverEndpointErrorMessage =
-    trimmedServerEndpoint.length === 0 ||
-    serverPortSeparatorIndex <= 0 ||
-    serverPortSeparatorIndex === trimmedServerEndpoint.length - 1 ||
-    Number.isNaN(parsedServerPort) ||
-    parsedServerPort < 1 ||
-    parsedServerPort > 65535
-      ? t('preferences.server.endpointError', {
-          defaultValue: 'Enter an endpoint like 127.0.0.1:3388 or 0.0.0.0:3388.',
-        })
-      : null;
+  const serverEndpointErrorMessage = !isValidEndpoint(trimmedServerEndpoint)
+    ? t('preferences.server.endpointError', {
+        defaultValue: 'Enter an endpoint like 127.0.0.1:3388 or 0.0.0.0:3388.',
+      })
+    : null;
 
   const handleSave = (): void => {
     if (

@@ -16,7 +16,7 @@ const DEFAULT_SERVER_CONFIG: ServerConfig = {
   endpoint: '127.0.0.1:3388',
 };
 
-const isValidEndpoint = (endpoint: string): boolean => {
+export const isValidEndpoint = (endpoint: string): boolean => {
   const trimmed = endpoint.trim();
   if (!trimmed) {
     return false;
