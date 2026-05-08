@@ -8,6 +8,7 @@ import { setWatchConfig } from '../../utils/watchConfig';
 import { getBrowserLanguage } from '../../i18n/config';
 import { useIgnorePaths } from '../useIgnorePaths';
 import { useIncludePaths } from '../useIncludePaths';
+import { useServerConfig } from '../useServerConfig';
 import { useWatchRoot } from '../useWatchRoot';
 import { useAppPreferences } from '../useAppPreferences';
 import { invoke } from '@tauri-apps/api/core';
@@ -26,6 +27,10 @@ vi.mock('../useIgnorePaths', () => ({
 
 vi.mock('../useIncludePaths', () => ({
   useIncludePaths: vi.fn(),
+}));
+
+vi.mock('../useServerConfig', () => ({
+  useServerConfig: vi.fn(),
 }));
 
 vi.mock('../../trayIconPreference', () => ({
@@ -54,6 +59,7 @@ const mockedInvoke = vi.mocked(invoke);
 const mockedUseWatchRoot = vi.mocked(useWatchRoot);
 const mockedUseIgnorePaths = vi.mocked(useIgnorePaths);
 const mockedUseIncludePaths = vi.mocked(useIncludePaths);
+const mockedUseServerConfig = vi.mocked(useServerConfig);
 const mockedGetStoredTrayIconEnabled = vi.mocked(getStoredTrayIconEnabled);
 const mockedPersistTrayIconEnabled = vi.mocked(persistTrayIconEnabled);
 const mockedSetTrayEnabled = vi.mocked(setTrayEnabled);
@@ -66,6 +72,7 @@ describe('useAppPreferences', () => {
   const setWatchRoot = vi.fn();
   const setIgnorePaths = vi.fn();
   const setIncludePaths = vi.fn();
+  const setServerConfig = vi.fn();
   const changeLanguage = vi.fn().mockResolvedValue(undefined);
   const refreshSearchResults = vi.fn();
 
@@ -86,6 +93,17 @@ describe('useAppPreferences', () => {
       includePaths: [],
       setIncludePaths,
       defaultIncludePaths: [],
+    });
+    mockedUseServerConfig.mockReturnValue({
+      serverConfig: {
+        enabled: false,
+        endpoint: '127.0.0.1:3388',
+      },
+      setServerConfig,
+      defaultServerConfig: {
+        enabled: false,
+        endpoint: '127.0.0.1:3388',
+      },
     });
     mockedGetStoredTrayIconEnabled.mockReturnValue(true);
     mockedSetTrayEnabled.mockResolvedValue(undefined);
@@ -119,7 +137,41 @@ describe('useAppPreferences', () => {
       i18n: { changeLanguage },
     });
 
-    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+    expect(mockedInvoke.mock.calls.filter(([command]) => command === 'start_logic')).toHaveLength(
+      1,
+    );
+  });
+
+  it('syncs stored server config to the backend on startup', async () => {
+    mockedUseServerConfig.mockReturnValue({
+      serverConfig: {
+        enabled: true,
+        endpoint: '0.0.0.0:3390',
+      },
+      setServerConfig,
+      defaultServerConfig: {
+        enabled: false,
+        endpoint: '127.0.0.1:3388',
+      },
+    });
+
+    renderHook(() =>
+      useAppPreferences({
+        fullDiskAccessStatus: 'denied',
+        isCheckingFullDiskAccess: false,
+        refreshSearchResults,
+        i18n: { changeLanguage },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenCalledWith('set_server_config', {
+        config: {
+          enabled: true,
+          endpoint: '0.0.0.0:3390',
+        },
+      });
+    });
   });
 
   it('updates watch config and refreshes search when preferences change', async () => {
@@ -144,10 +196,14 @@ describe('useAppPreferences', () => {
     refreshSearchResults.mockClear();
 
     act(() => {
-      result.current.handleWatchConfigChange({
+      result.current.handlePreferencesChange({
         watchRoot: '/tmp',
         ignorePaths: ['/tmp/ignore'],
         includePaths: [],
+        serverConfig: {
+          enabled: false,
+          endpoint: '127.0.0.1:3388',
+        },
       });
     });
 
@@ -185,10 +241,14 @@ describe('useAppPreferences', () => {
     setIgnorePaths.mockClear();
 
     act(() => {
-      result.current.handleWatchConfigChange({
+      result.current.handlePreferencesChange({
         watchRoot: '/workspace',
         ignorePaths: ['/Volumes'],
         includePaths: [],
+        serverConfig: {
+          enabled: false,
+          endpoint: '127.0.0.1:3388',
+        },
       });
     });
 
@@ -222,10 +282,14 @@ describe('useAppPreferences', () => {
     setIgnorePaths.mockClear();
 
     act(() => {
-      result.current.handleWatchConfigChange({
+      result.current.handlePreferencesChange({
         watchRoot: '/new-root',
         ignorePaths: ['/Volumes'], // same as before
         includePaths: [],
+        serverConfig: {
+          enabled: false,
+          endpoint: '127.0.0.1:3388',
+        },
       });
     });
 
@@ -263,10 +327,14 @@ describe('useAppPreferences', () => {
     setIgnorePaths.mockClear();
 
     act(() => {
-      result.current.handleWatchConfigChange({
+      result.current.handlePreferencesChange({
         watchRoot: '/workspace', // same as before
         ignorePaths: ['/tmp/ignore'], // different
         includePaths: [],
+        serverConfig: {
+          enabled: false,
+          endpoint: '127.0.0.1:3388',
+        },
       });
     });
 
@@ -312,10 +380,14 @@ describe('useAppPreferences', () => {
     setIgnorePaths.mockClear();
 
     act(() => {
-      result.current.handleWatchConfigChange({
+      result.current.handlePreferencesChange({
         watchRoot: '/workspace',
         ignorePaths: ['/System', '/Volumes'], // same items, different order
         includePaths: [],
+        serverConfig: {
+          enabled: false,
+          endpoint: '127.0.0.1:3388',
+        },
       });
     });
 
@@ -352,10 +424,14 @@ describe('useAppPreferences', () => {
     setIncludePaths.mockClear();
 
     act(() => {
-      result.current.handleWatchConfigChange({
+      result.current.handlePreferencesChange({
         watchRoot: '/workspace',
         ignorePaths: ['/Volumes'],
         includePaths: ['/Volumes/media'],
+        serverConfig: {
+          enabled: false,
+          endpoint: '127.0.0.1:3388',
+        },
       });
     });
 
@@ -366,6 +442,35 @@ describe('useAppPreferences', () => {
       includePaths: ['/Volumes/media'],
     });
     expect(refreshSearchResults).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates server config when preferences change', async () => {
+    const { result } = renderHook(() =>
+      useAppPreferences({
+        fullDiskAccessStatus: 'denied',
+        isCheckingFullDiskAccess: false,
+        refreshSearchResults,
+        i18n: { changeLanguage },
+      }),
+    );
+
+    act(() => {
+      result.current.handlePreferencesChange({
+        watchRoot: '/workspace',
+        ignorePaths: ['/Volumes'],
+        includePaths: [],
+        serverConfig: {
+          enabled: true,
+          endpoint: '0.0.0.0:3390',
+        },
+      });
+    });
+
+    expect(setServerConfig).toHaveBeenCalledWith({
+      enabled: true,
+      endpoint: '0.0.0.0:3390',
+    });
+    expect(refreshSearchResults).not.toHaveBeenCalled();
   });
 
   it('opens and closes preferences, and resets user preferences', async () => {
@@ -404,6 +509,7 @@ describe('useAppPreferences', () => {
       expect(mockedSetTrayEnabled).toHaveBeenCalledWith(false);
     });
     expect(mockedPersistTrayIconEnabled).toHaveBeenCalledWith(false);
+    expect(setServerConfig).not.toHaveBeenCalled();
     expect(mockedPersistThemePreference).toHaveBeenCalledWith('system');
     expect(mockedApplyThemePreference).toHaveBeenCalledWith('system');
     expect(changeLanguage).toHaveBeenCalledWith('fr-FR');

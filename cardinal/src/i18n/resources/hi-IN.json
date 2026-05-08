@@ -115,6 +115,11 @@
     "trayIcon": {
       "label": "ट्रे आइकन दिखाएँ"
     },
+    "server": {
+      "enabled": "HTTP खोज सर्वर",
+      "endpoint": "HTTP सर्वर एंडपॉइंट",
+      "endpointError": "127.0.0.1:3388 या 0.0.0.0:3388 जैसा एंडपॉइंट दर्ज करें।"
+    },
     "sortingLimit": {
       "label": "सॉर्टिंग सीमा"
     },

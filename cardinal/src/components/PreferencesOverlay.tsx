@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getWatchRootValidation, isPathInputValid } from '../utils/watchRoot';
+import type { ServerConfig } from '../hooks/useServerConfig';
 import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSwitcher from './LanguageSwitcher';
 
@@ -14,15 +15,18 @@ type PreferencesOverlayProps = {
   onTrayIconEnabledChange: (enabled: boolean) => void;
   watchRoot: string;
   defaultWatchRoot: string;
-  onWatchConfigChange: (next: {
+  onPreferencesChange: (next: {
     watchRoot: string;
     ignorePaths: string[];
     includePaths: string[];
+    serverConfig: ServerConfig;
   }) => void;
   ignorePaths: string[];
   defaultIgnorePaths: string[];
   includePaths: string[];
   defaultIncludePaths: string[];
+  serverConfig: ServerConfig;
+  defaultServerConfig: ServerConfig;
   onReset: () => void;
   themeResetToken: number;
 };
@@ -37,11 +41,13 @@ export function PreferencesOverlay({
   onTrayIconEnabledChange,
   watchRoot,
   defaultWatchRoot,
-  onWatchConfigChange,
+  onPreferencesChange,
   ignorePaths,
   defaultIgnorePaths,
   includePaths,
   defaultIncludePaths,
+  serverConfig,
+  defaultServerConfig,
   onReset,
   themeResetToken,
 }: PreferencesOverlayProps): React.JSX.Element | null {
@@ -50,6 +56,10 @@ export function PreferencesOverlay({
   const [watchRootInput, setWatchRootInput] = useState<string>(() => watchRoot);
   const [ignorePathsInput, setIgnorePathsInput] = useState<string>(() => ignorePaths.join('\n'));
   const [includePathsInput, setIncludePathsInput] = useState<string>(() => includePaths.join('\n'));
+  const [serverEnabledInput, setServerEnabledInput] = useState<boolean>(() => serverConfig.enabled);
+  const [serverEndpointInput, setServerEndpointInput] = useState<string>(
+    () => serverConfig.endpoint,
+  );
 
   useEffect(() => {
     if (!open) {
@@ -81,7 +91,9 @@ export function PreferencesOverlay({
     setWatchRootInput(watchRoot);
     setIgnorePathsInput(ignorePaths.join('\n'));
     setIncludePathsInput(includePaths.join('\n'));
-  }, [open, watchRoot, ignorePaths, includePaths]);
+    setServerEnabledInput(serverConfig.enabled);
+    setServerEndpointInput(serverConfig.endpoint);
+  }, [open, watchRoot, ignorePaths, includePaths, serverConfig]);
 
   const commitThreshold = useCallback(() => {
     const numericText = thresholdInput.replace(/[^\d]/g, '');
@@ -127,20 +139,48 @@ export function PreferencesOverlay({
     return invalid ? t('includePaths.errors.absolute') : null;
   })();
 
+  const trimmedServerEndpoint = serverEndpointInput.trim();
+  const serverPortSeparatorIndex = trimmedServerEndpoint.lastIndexOf(':');
+  const parsedServerPort =
+    serverPortSeparatorIndex >= 0
+      ? Number.parseInt(trimmedServerEndpoint.slice(serverPortSeparatorIndex + 1), 10)
+      : Number.NaN;
+  const serverEndpointErrorMessage =
+    trimmedServerEndpoint.length === 0 ||
+    serverPortSeparatorIndex <= 0 ||
+    serverPortSeparatorIndex === trimmedServerEndpoint.length - 1 ||
+    Number.isNaN(parsedServerPort) ||
+    parsedServerPort < 1 ||
+    parsedServerPort > 65535
+      ? t('preferences.server.endpointError', {
+          defaultValue: 'Enter an endpoint like 127.0.0.1:3388 or 0.0.0.0:3388.',
+        })
+      : null;
+
   const handleSave = (): void => {
-    if (watchRootErrorMessage || ignorePathsErrorMessage || includePathsErrorMessage) {
+    if (
+      watchRootErrorMessage ||
+      ignorePathsErrorMessage ||
+      includePathsErrorMessage ||
+      serverEndpointErrorMessage
+    ) {
       return;
     }
     commitThreshold();
     const trimmedWatchRoot = watchRootInput.trim();
-    onWatchConfigChange({
+    onPreferencesChange({
       watchRoot: trimmedWatchRoot,
       ignorePaths: parsedIgnorePaths,
       includePaths: parsedIncludePaths,
+      serverConfig: {
+        enabled: serverEnabledInput,
+        endpoint: trimmedServerEndpoint,
+      },
     });
     setWatchRootInput(trimmedWatchRoot);
     setIgnorePathsInput(parsedIgnorePaths.join('\n'));
     setIncludePathsInput(parsedIncludePaths.join('\n'));
+    setServerEndpointInput(trimmedServerEndpoint);
     onClose();
   };
 
@@ -149,6 +189,8 @@ export function PreferencesOverlay({
     setWatchRootInput(defaultWatchRoot);
     setIgnorePathsInput(defaultIgnorePaths.join('\n'));
     setIncludePathsInput(defaultIncludePaths.join('\n'));
+    setServerEnabledInput(defaultServerConfig.enabled);
+    setServerEndpointInput(defaultServerConfig.endpoint);
     onReset();
   };
 
@@ -196,6 +238,58 @@ export function PreferencesOverlay({
                 />
                 <span className="preferences-switch__track" aria-hidden="true" />
               </label>
+            </div>
+          </div>
+          <div className="preferences-row">
+            <p className="preferences-label">
+              {t('preferences.server.enabled', {
+                defaultValue: 'HTTP search server',
+              })}
+            </p>
+            <div className="preferences-control">
+              <label className="preferences-switch">
+                <input
+                  className="preferences-switch__input"
+                  type="checkbox"
+                  checked={serverEnabledInput}
+                  onChange={(event) => setServerEnabledInput(event.target.checked)}
+                  aria-label={t('preferences.server.enabled', {
+                    defaultValue: 'HTTP search server',
+                  })}
+                />
+                <span className="preferences-switch__track" aria-hidden="true" />
+              </label>
+            </div>
+          </div>
+          <div className="preferences-row">
+            <div className="preferences-row__details">
+              <p className="preferences-label">
+                {t('preferences.server.endpoint', {
+                  defaultValue: 'HTTP server endpoint',
+                })}
+              </p>
+            </div>
+            <div className="preferences-control">
+              <input
+                className="preferences-field preferences-number-input preferences-watch-root-input"
+                type="text"
+                value={serverEndpointInput}
+                onChange={(event) => setServerEndpointInput(event.target.value)}
+                aria-label={t('preferences.server.endpoint', {
+                  defaultValue: 'HTTP server endpoint',
+                })}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {serverEndpointErrorMessage ? (
+                <p
+                  className="permission-status permission-status--error preferences-field-error"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {serverEndpointErrorMessage}
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="preferences-row">
@@ -300,7 +394,10 @@ export function PreferencesOverlay({
             type="button"
             onClick={handleSave}
             disabled={Boolean(
-              watchRootErrorMessage || ignorePathsErrorMessage || includePathsErrorMessage,
+              watchRootErrorMessage ||
+              ignorePathsErrorMessage ||
+              includePathsErrorMessage ||
+              serverEndpointErrorMessage,
             )}
           >
             {t('preferences.save')}

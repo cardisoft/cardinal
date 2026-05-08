@@ -187,8 +187,10 @@ function App() {
     defaultIgnorePaths,
     includePaths,
     defaultIncludePaths,
+    serverConfig,
+    defaultServerConfig,
     preferencesResetToken,
-    handleWatchConfigChange,
+    handlePreferencesChange,
     handleResetPreferences,
   } = useAppPreferences({
     fullDiskAccessStatus,
@@ -428,11 +430,13 @@ function App() {
         onTrayIconEnabledChange={setTrayIconEnabled}
         watchRoot={watchRoot ?? defaultWatchRoot}
         defaultWatchRoot={defaultWatchRoot}
-        onWatchConfigChange={handleWatchConfigChange}
+        onPreferencesChange={handlePreferencesChange}
         ignorePaths={ignorePaths}
         defaultIgnorePaths={defaultIgnorePaths}
         includePaths={includePaths}
         defaultIncludePaths={defaultIncludePaths}
+        serverConfig={serverConfig}
+        defaultServerConfig={defaultServerConfig}
         onReset={handleResetPreferences}
         themeResetToken={preferencesResetToken}
       />

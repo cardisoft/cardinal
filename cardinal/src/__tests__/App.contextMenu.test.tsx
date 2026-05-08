@@ -228,8 +228,12 @@ vi.mock('../hooks/useAppPreferences', () => ({
     defaultWatchRoot: '/',
     ignorePaths: ['/Volumes'],
     defaultIgnorePaths: ['/Volumes'],
+    includePaths: [],
+    defaultIncludePaths: [],
+    serverConfig: { enabled: false, endpoint: '127.0.0.1:3388' },
+    defaultServerConfig: { enabled: false, endpoint: '127.0.0.1:3388' },
     preferencesResetToken: 0,
-    handleWatchConfigChange: vi.fn(),
+    handlePreferencesChange: vi.fn(),
     handleResetPreferences: vi.fn(),
   }),
 }));

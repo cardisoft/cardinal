@@ -125,6 +125,11 @@
     "trayIcon": {
       "label": "إظهار أيقونة العلبة"
     },
+    "server": {
+      "enabled": "خادم بحث HTTP",
+      "endpoint": "نقطة نهاية خادم HTTP",
+      "endpointError": "أدخل نقطة نهاية مثل 127.0.0.1:3388 أو 0.0.0.0:3388."
+    },
     "sortingLimit": {
       "label": "حد الفرز"
     },

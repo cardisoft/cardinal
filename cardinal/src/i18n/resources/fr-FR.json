@@ -125,6 +125,11 @@
     "trayIcon": {
       "label": "Afficher l’icône dans la barre d’état"
     },
+    "server": {
+      "enabled": "Serveur de recherche HTTP",
+      "endpoint": "Point d’accès du serveur HTTP",
+      "endpointError": "Saisissez un point d’accès comme 127.0.0.1:3388 ou 0.0.0.0:3388."
+    },
     "sortingLimit": {
       "label": "Limite de tri"
     },

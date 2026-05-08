@@ -125,6 +125,11 @@
     "trayIcon": {
       "label": "Tray-Symbol anzeigen"
     },
+    "server": {
+      "enabled": "HTTP-Suchserver",
+      "endpoint": "HTTP-Server-Endpunkt",
+      "endpointError": "Gib einen Endpunkt wie 127.0.0.1:3388 oder 0.0.0.0:3388 ein."
+    },
     "sortingLimit": {
       "label": "Sortierlimit"
     },
