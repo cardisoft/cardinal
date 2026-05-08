@@ -142,7 +142,7 @@ describe('useAppPreferences', () => {
     );
   });
 
-  it('syncs stored server config to the backend on startup', async () => {
+  it('does not push server config to the backend on startup', async () => {
     mockedUseServerConfig.mockReturnValue({
       serverConfig: {
         enabled: true,
@@ -165,13 +165,10 @@ describe('useAppPreferences', () => {
     );
 
     await waitFor(() => {
-      expect(mockedInvoke).toHaveBeenCalledWith('set_server_config', {
-        config: {
-          enabled: true,
-          endpoint: '0.0.0.0:3390',
-        },
-      });
+      expect(mockedSetTrayEnabled).toHaveBeenCalledWith(true);
     });
+
+    expect(mockedInvoke).not.toHaveBeenCalledWith('set_server_config', expect.anything());
   });
 
   it('updates watch config and refreshes search when preferences change', async () => {
@@ -470,10 +467,28 @@ describe('useAppPreferences', () => {
       enabled: true,
       endpoint: '0.0.0.0:3390',
     });
+    expect(mockedInvoke).toHaveBeenCalledWith('set_server_config', {
+      config: {
+        enabled: true,
+        endpoint: '0.0.0.0:3390',
+      },
+    });
     expect(refreshSearchResults).not.toHaveBeenCalled();
   });
 
   it('opens and closes preferences, and resets user preferences', async () => {
+    mockedUseServerConfig.mockReturnValue({
+      serverConfig: {
+        enabled: true,
+        endpoint: '0.0.0.0:3390',
+      },
+      setServerConfig,
+      defaultServerConfig: {
+        enabled: false,
+        endpoint: '127.0.0.1:3388',
+      },
+    });
+
     const { result } = renderHook(() =>
       useAppPreferences({
         fullDiskAccessStatus: 'denied',
@@ -509,7 +524,16 @@ describe('useAppPreferences', () => {
       expect(mockedSetTrayEnabled).toHaveBeenCalledWith(false);
     });
     expect(mockedPersistTrayIconEnabled).toHaveBeenCalledWith(false);
-    expect(setServerConfig).not.toHaveBeenCalled();
+    expect(setServerConfig).toHaveBeenCalledWith({
+      enabled: false,
+      endpoint: '127.0.0.1:3388',
+    });
+    expect(mockedInvoke).toHaveBeenCalledWith('set_server_config', {
+      config: {
+        enabled: false,
+        endpoint: '127.0.0.1:3388',
+      },
+    });
     expect(mockedPersistThemePreference).toHaveBeenCalledWith('system');
     expect(mockedApplyThemePreference).toHaveBeenCalledWith('system');
     expect(changeLanguage).toHaveBeenCalledWith('fr-FR');

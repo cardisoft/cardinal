@@ -151,15 +151,19 @@ pub fn run() -> Result<()> {
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
-    let db_path = DB_PATH
-        .get_or_try_init(|| app.path().app_config_dir().map(|p| p.join("cardinal.db")))
-        .expect("Failed to initialize database path");
-
     let initial_server_config = app
         .path()
         .app_config_dir()
         .map(|p| load_server_config_from_file(&p.join("server_config.json")))
         .unwrap_or_default();
+    {
+        let state = app.state::<SearchState>();
+        *state.server_config.lock() = initial_server_config.clone();
+    }
+
+    let db_path = DB_PATH
+        .get_or_try_init(|| app.path().app_config_dir().map(|p| p.join("cardinal.db")))
+        .expect("Failed to initialize database path");
 
     let app_handle = &app.handle().to_owned();
     let channels = BackgroundLoopChannels {

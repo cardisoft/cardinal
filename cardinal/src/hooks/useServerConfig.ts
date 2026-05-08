@@ -1,4 +1,5 @@
-import { useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { useCallback, useEffect } from 'react';
 import { useStoredState } from './useStoredState';
 
 export type ServerConfig = Readonly<{
@@ -77,6 +78,24 @@ export function useServerConfig(): {
     },
     [setServerConfigState],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void invoke<ServerConfig>('get_server_config')
+      .then((config) => {
+        if (!cancelled) {
+          setServerConfigState(config);
+        }
+      })
+      .catch((error) => {
+        console.warn('Failed to read server config from backend', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setServerConfigState]);
 
   return {
     serverConfig,

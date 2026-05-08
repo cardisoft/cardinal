@@ -79,10 +79,6 @@ export function useAppPreferences({
   }, [trayIconEnabled]);
 
   useEffect(() => {
-    void invoke('set_server_config', { config: serverConfig });
-  }, [serverConfig]);
-
-  useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
@@ -151,6 +147,7 @@ export function useAppPreferences({
       }
 
       setServerConfig(next);
+      void invoke('set_server_config', { config: next });
     },
     [serverConfig.enabled, serverConfig.endpoint, setServerConfig],
   );
