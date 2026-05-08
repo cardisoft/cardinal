@@ -23,7 +23,7 @@ use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, Sl
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
 use std::{cell::LazyCell, process::Command};
-use tauri::{ActivationPolicy, AppHandle, State};
+use tauri::{ActivationPolicy, AppHandle, Emitter, State};
 use tracing::{error, info, warn};
 
 #[derive(Debug, Clone)]
@@ -47,6 +47,13 @@ impl From<SearchOptionsPayload> for SearchOptions {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerConfig {
+    pub enabled: bool,
+    pub endpoint: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct SearchJob {
     pub query: String,
@@ -68,11 +75,13 @@ struct SortedViewCache {
 }
 
 pub struct SearchState {
-    search_tx: Sender<SearchJob>,
-    node_info_tx: Sender<NodeInfoRequest>,
+    pub(crate) search_tx: Sender<SearchJob>,
+    pub(crate) node_info_tx: Sender<NodeInfoRequest>,
     icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
     rescan_tx: Sender<CancellationToken>,
     watch_config_tx: Sender<WatchConfigUpdate>,
+    pub(crate) server_config: Mutex<ServerConfig>,
+    pub(crate) server_config_tx: Sender<ServerConfig>,
     sorted_view_cache: Mutex<Option<SortedViewCache>>,
     pub(crate) update_window_state_tx: Sender<()>,
 }
@@ -84,6 +93,8 @@ impl SearchState {
         icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
         rescan_tx: Sender<CancellationToken>,
         watch_config_tx: Sender<WatchConfigUpdate>,
+        server_config: ServerConfig,
+        server_config_tx: Sender<ServerConfig>,
         update_window_state_tx: Sender<()>,
     ) -> Self {
         Self {
@@ -92,6 +103,8 @@ impl SearchState {
             icon_viewport_tx,
             rescan_tx,
             watch_config_tx,
+            server_config: Mutex::new(server_config),
+            server_config_tx,
             sorted_view_cache: Mutex::new(None),
             update_window_state_tx,
         }
@@ -427,6 +440,27 @@ pub fn set_watch_config(
         scan_cancellation_token: CancellationToken::new_scan(),
     }) {
         error!("Failed to request watch config change: {e:?}");
+    }
+}
+
+#[tauri::command]
+pub fn get_server_config(state: State<'_, SearchState>) -> ServerConfig {
+    state.server_config.lock().clone()
+}
+
+#[tauri::command(async)]
+pub fn set_server_config(app: AppHandle, config: ServerConfig, state: State<'_, SearchState>) {
+    {
+        let mut current = state.server_config.lock();
+        *current = config.clone();
+    }
+
+    if let Err(e) = state.server_config_tx.send(config.clone()) {
+        error!("Failed to request server config change: {e:?}");
+    }
+
+    if let Err(e) = app.emit("server-config-changed", config) {
+        error!("Failed to emit server-config-changed event: {e:?}");
     }
 }
 

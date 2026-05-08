@@ -9,7 +9,7 @@ use axum::{
 use crossbeam_channel::{Sender, bounded};
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, sync::Arc};
+use std::{future::Future, sync::Arc};
 use tokio::net::TcpListener;
 
 const TRUNCATE_THRES: usize = 10000;
@@ -55,18 +55,29 @@ pub struct ServerSearchResponse {
     pub highlights: Vec<String>,
 }
 
-pub async fn start_server(state: ServerState, port: u16) {
+pub async fn start_server<F>(state: ServerState, endpoint: String, shutdown_signal: F)
+where
+    F: Future<Output = ()> + Send + 'static,
+{
     let app = Router::new()
         .route("/search", get(search_handler_get))
         .route("/search", post(search_handler))
         .with_state(Arc::new(state));
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    if let Ok(listener) = TcpListener::bind(addr).await {
-        tracing::info!("Starting axum HTTP server on {}", addr);
-        if let Err(e) = axum::serve(listener, app).await {
-            tracing::error!("Server error: {}", e);
+    let listener = match TcpListener::bind(endpoint.as_str()).await {
+        Ok(l) => l,
+        Err(e) => {
+            tracing::error!("Failed to bind to {}: {}", endpoint, e);
+            return;
         }
+    };
+
+    tracing::info!("Starting axum HTTP server on {}", endpoint);
+    if let Err(e) = axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal)
+        .await
+    {
+        tracing::error!("Server error: {}", e);
     }
 }
 
