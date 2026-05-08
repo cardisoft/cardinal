@@ -105,6 +105,7 @@ pub struct SearchState {
 }
 
 impl SearchState {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         search_tx: Sender<SearchJob>,
         node_info_tx: Sender<NodeInfoRequest>,
