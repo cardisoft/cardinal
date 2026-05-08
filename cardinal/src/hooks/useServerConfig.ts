@@ -17,6 +17,29 @@ const DEFAULT_SERVER_CONFIG: ServerConfig = {
   endpoint: '127.0.0.1:3388',
 };
 
+const readStoredServerConfig = (raw: string): ServerConfig | null => {
+  const parsed = JSON.parse(raw) as StoredServerConfig;
+  if (typeof parsed !== 'object' || parsed == null) {
+    return null;
+  }
+  if (typeof parsed.endpoint === 'string') {
+    return normalizeServerConfig({
+      enabled: Boolean(parsed.enabled),
+      endpoint: parsed.endpoint,
+    });
+  }
+  return normalizeServerConfig({
+    enabled: Boolean(parsed.enabled),
+    endpoint:
+      typeof parsed.port === 'number'
+        ? `127.0.0.1:${parsed.port}`
+        : DEFAULT_SERVER_CONFIG.endpoint,
+  });
+};
+
+const writeStoredServerConfig = (value: ServerConfig): string =>
+  JSON.stringify(normalizeServerConfig(value));
+
 export const isValidEndpoint = (endpoint: string): boolean => {
   const trimmed = endpoint.trim();
   if (!trimmed) {
@@ -52,26 +75,8 @@ export function useServerConfig(): {
   const [serverConfig, setServerConfigState] = useStoredState<ServerConfig>({
     key: STORAGE_KEY,
     defaultValue: DEFAULT_SERVER_CONFIG,
-    read: (raw) => {
-      const parsed = JSON.parse(raw) as StoredServerConfig;
-      if (typeof parsed !== 'object' || parsed == null) {
-        return null;
-      }
-      if (typeof parsed.endpoint === 'string') {
-        return normalizeServerConfig({
-          enabled: Boolean(parsed.enabled),
-          endpoint: parsed.endpoint,
-        });
-      }
-      return normalizeServerConfig({
-        enabled: Boolean(parsed.enabled),
-        endpoint:
-          typeof parsed.port === 'number'
-            ? `127.0.0.1:${parsed.port}`
-            : DEFAULT_SERVER_CONFIG.endpoint,
-      });
-    },
-    write: (value) => JSON.stringify(normalizeServerConfig(value)),
+    read: readStoredServerConfig,
+    write: writeStoredServerConfig,
     normalize: normalizeServerConfig,
     readErrorMessage: 'Failed to read stored server config preference',
     writeErrorMessage: 'Failed to persist server config preference',

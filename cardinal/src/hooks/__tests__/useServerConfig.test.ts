@@ -91,6 +91,20 @@ describe('useServerConfig', () => {
     );
   });
 
+  it('hydrates from the backend only once across rerenders', async () => {
+    const { rerender } = renderHook(() => useServerConfig());
+
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenCalledWith('get_server_config');
+    });
+
+    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+
+    rerender();
+
+    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects ports with non-digit suffixes', () => {
     expect(isValidEndpoint('127.0.0.1:3388abc')).toBe(false);
     expect(isValidEndpoint('127.0.0.1:33 88')).toBe(false);
