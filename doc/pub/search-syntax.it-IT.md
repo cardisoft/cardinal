@@ -12,14 +12,14 @@ Il linguaggio di query di Cardinal è volutamente vicino alla sintassi di Everyt
   - **Parole / frasi** (testo semplice, stringhe tra virgolette, caratteri jolly),
   - **Filtri** (`ext:`, `type:`, `dm:`, `content:`, …),
   - **Operatori booleani** (`AND`, `OR`, `NOT` / `!`).
-- La corrispondenza avviene sul **percorso completo** di ogni file indicizzato, non solo sul basename.
+- La corrispondenza è orientata ai **componenti del percorso**: parole, frasi e caratteri jolly corrispondono al nome proprio del file o della cartella; i token separati da `/` corrispondono a una catena contigua di componenti e restituiscono l'elemento che corrisponde all'ultimo segmento.
 - La distinzione tra maiuscole/minuscole è controllata dal toggle della UI:
   - Quando è **insensibile al maiuscolo/minuscolo**, il motore converte in minuscolo sia la query sia i candidati per il matching di nome/contenuto.
   - Quando è **sensibile al maiuscolo/minuscolo**, il motore confronta i byte così come sono.
 
 Esempi rapidi:
 ```text
-report draft                  # file il cui percorso contiene sia “report” sia “draft”
+report draft                  # file o cartelle il cui nome proprio contiene sia “report” sia “draft”
 ext:pdf briefing              # file PDF il cui nome contiene “briefing”
 parent:/Users demo!.psd       # sotto /Users, escludi file .psd
 regex:^Report.*2025$          # nomi che corrispondono a una regex
@@ -32,10 +32,11 @@ ext:png;jpg travel|vacation   # PNG o JPG i cui nomi contengono “travel” o �
 
 ### 2.1 Token semplici e frasi
 
-- Un token senza virgolette è una **corrispondenza per sottostringa** nel percorso:
-  - `demo` corrisponde a `/Users/demo/Projects/cardinal.md`.
+- Un token senza virgolette è una **corrispondenza per sottostringa** su un componente del percorso:
+  - `demo` corrisponde alla cartella `/Users/demo` e a `/Users/alice/demo-notes.md`.
+  - Non corrisponde a `/Users/demo/Projects/cardinal.md` solo perché un antenato si chiama `demo`; usa `demo/**` per cercare i discendenti.
 - Le frasi tra virgolette doppie corrispondono alla sequenza esatta, inclusi gli spazi:
-  - `"Application Support"` corrisponde a `/Library/Application Support/...`.
+  - `"Application Support"` corrisponde a `/Library/Application Support`.
 - Il toggle di maiuscole/minuscole della UI si applica a entrambi.
 
 ### 2.2 Caratteri jolly (`*`, `?`, `**`)
@@ -310,7 +311,7 @@ in:/Users/demo/Projects ext:log dm:pastweek
 #  Script di shell direttamente sotto la cartella Scripts
 parent:/Users/demo/Scripts *.sh
 
-#  Tutto con “Application Support” nel percorso
+#  Elementi il cui nome proprio contiene “Application Support”
 "Application Support"
 
 #  Corrispondenza di un nome file specifico via regex

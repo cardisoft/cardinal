@@ -12,14 +12,17 @@ Cardinal’s query language is intentionally close to Everything’s syntax, whi
   - **Words / phrases** (plain text, quoted strings, wildcards),
   - **Filters** (`ext:`, `type:`, `dm:`, `content:`, …),
   - **Boolean operators** (`AND`, `OR`, `NOT` / `!`).
-- Matching runs against the **full path** of every indexed file, not just the basename.
+- Matching is **path-component oriented**:
+  - Plain words, phrases, and wildcard tokens match a file or folder's own name.
+  - Slash-separated tokens match a contiguous chain of path components and return the item that matches the final segment.
+  - Boolean operators combine result sets for the same indexed item; `foo bar` means one item must match both tokens, not that its ancestors may satisfy one token and its basename another.
 - Case sensitivity is controlled by the UI toggle:
   - When **case-insensitive**, the engine lowercases both query and candidates for name/content matching.
   - When **case-sensitive**, the engine compares bytes as‑is.
 
 Quick examples:
 ```text
-report draft                  # files whose path contains both “report” and “draft”
+report draft                  # files or folders whose own name contains both “report” and “draft”
 ext:pdf briefing              # PDF files whose name contains “briefing”
 parent:/Users demo!.psd       # under /Users, exclude .psd files
 regex:^Report.*2025$          # names matching a regex
@@ -32,10 +35,11 @@ ext:png;jpg travel|vacation   # PNG or JPG whose names contain “travel” or �
 
 ### 2.1 Plain tokens and phrases
 
-- An unquoted token is a **substring match** on the path:
-  - `demo` matches `/Users/demo/Projects/cardinal.md`.
-- Double‑quoted phrases match the exact sequence including spaces:
-  - `"Application Support"` matches `/Library/Application Support/...`.
+- An unquoted token is a **substring match** on one path component:
+  - `demo` matches the `/Users/demo` folder and `/Users/alice/demo-notes.md`.
+  - It does not match `/Users/demo/Projects/cardinal.md` merely because an ancestor is named `demo`; use `demo/**` when you want descendants.
+- Double‑quoted phrases match the exact sequence including spaces within one path component:
+  - `"Application Support"` matches the `/Library/Application Support` folder.
 - The UI case‑sensitivity toggle applies to both.
 
 ### 2.2 Wildcards (`*`, `?`, `**`)
@@ -48,6 +52,7 @@ ext:png;jpg travel|vacation   # PNG or JPG whose names contain “travel” or �
   - `report-??.txt` — `report-01.txt`, `report-AB.txt`, etc.
   - `a*b` — names starting with `a` and ending with `b`.
   - `src/**/Cargo.toml` — `Cargo.toml` anywhere below `src/`.
+- Like plain tokens, wildcard tokens match path components. A slash-separated wildcard chain such as `src/**/Cargo.toml` returns matching `Cargo.toml` items, while `src/**` returns descendants below matching `src` folders.
 - If you need literal `*` or `?`, quote the token: `"*.rs"`. Globstars must be standalone slash segments (`foo/**/bar`, `/Users/**`, `**/notes`).
 
 ### 2.3 Path‑style segmentation with `/`
@@ -71,6 +76,8 @@ This lets you express:
 - “Folder must end with X” (`foo/`),
 - “Folder must start with X” (`/foo`),
 - “Exact folder name in the middle of the path” (`gaea/lil/bee/`).
+
+The matched result is the item that satisfies the final segment. For example, `ers/demo/Proj` can match `/Users/demo/Projects` itself. It will not also return every child under `Projects`; use `ers/demo/Proj*/**` to search descendants.
 
 ---
 
@@ -310,7 +317,7 @@ in:/Users/demo/Projects ext:log dm:pastweek
 #  Shell scripts directly under Scripts folder
 parent:/Users/demo/Scripts *.sh
 
-#  Everything with “Application Support” in the path
+#  Items whose own name contains “Application Support”
 "Application Support"
 
 #  Matching a specific filename via regex

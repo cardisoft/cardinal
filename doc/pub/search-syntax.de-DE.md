@@ -12,14 +12,14 @@ Die Abfragesprache von Cardinal ist bewusst an die Syntax von Everything angeleh
   - **Wörter / Phrasen** (Plaintext, Anführungszeichen-Strings, Wildcards),
   - **Filter** (`ext:`, `type:`, `dm:`, `content:`, …),
   - **Boolesche Operatoren** (`AND`, `OR`, `NOT` / `!`).
-- Das Matching erfolgt gegen den **vollständigen Pfad** jeder indizierten Datei, nicht nur gegen den Basisnamen.
+- Das Matching ist **pfadkomponentenorientiert**: Wörter, Phrasen und Wildcards matchen den eigenen Namen einer Datei oder eines Ordners; durch `/` getrennte Tokens matchen eine zusammenhängende Kette von Pfadkomponenten und geben das Element zurück, das zum letzten Segment passt.
 - Die Groß-/Kleinschreibung wird durch den UI-Schalter gesteuert:
   - Bei **nicht case-sensitiv** konvertiert die Engine sowohl Abfrage als auch Kandidaten für Name-/Inhaltsabgleich in Kleinbuchstaben.
   - Bei **case-sensitiv** vergleicht die Engine die Bytes unverändert.
 
 Schnelle Beispiele:
 ```text
-report draft                  # Dateien, deren Pfad sowohl “report” als auch “draft” enthält
+report draft                  # Dateien oder Ordner, deren eigener Name “report” und “draft” enthält
 ext:pdf briefing              # PDF-Dateien, deren Name “briefing” enthält
 parent:/Users demo!.psd       # unter /Users, .psd-Dateien ausschließen
 regex:^Report.*2025$          # Namen, die einer Regex entsprechen
@@ -32,10 +32,11 @@ ext:png;jpg travel|vacation   # PNG oder JPG, deren Namen “travel” oder “v
 
 ### 2.1 Einfache Tokens und Phrasen
 
-- Ein Token ohne Anführungszeichen ist ein **Substring-Match** auf dem Pfad:
-  - `demo` matcht `/Users/demo/Projects/cardinal.md`.
+- Ein Token ohne Anführungszeichen ist ein **Substring-Match** auf einer Pfadkomponente:
+  - `demo` matcht den Ordner `/Users/demo` und `/Users/alice/demo-notes.md`.
+  - Es matcht `/Users/demo/Projects/cardinal.md` nicht nur deshalb, weil ein übergeordneter Ordner `demo` heißt; verwenden Sie `demo/**`, um Nachfahren zu suchen.
 - Phrasen in doppelten Anführungszeichen matchen die exakte Sequenz inklusive Leerzeichen:
-  - `"Application Support"` matcht `/Library/Application Support/...`.
+  - `"Application Support"` matcht `/Library/Application Support`.
 - Der UI-Schalter für Groß-/Kleinschreibung gilt für beide.
 
 ### 2.2 Wildcards (`*`, `?`, `**`)
@@ -310,7 +311,7 @@ in:/Users/demo/Projects ext:log dm:pastweek
 #  Shell-Skripte direkt unter dem Ordner Scripts
 parent:/Users/demo/Scripts *.sh
 
-#  Alles mit „Application Support" im Pfad
+#  Elemente, deren eigener Name „Application Support" enthält
 "Application Support"
 
 #  Einen bestimmten Dateinamen per Regex matchen

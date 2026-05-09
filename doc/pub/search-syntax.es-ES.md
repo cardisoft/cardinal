@@ -12,14 +12,14 @@ El lenguaje de consulta de Cardinal es intencionalmente cercano a la sintaxis de
   - **Palabras / frases** (texto plano, cadenas entre comillas, comodines),
   - **Filtros** (`ext:`, `type:`, `dm:`, `content:`, …),
   - **Operadores booleanos** (`AND`, `OR`, `NOT` / `!`).
-- La coincidencia se evalúa contra la **ruta completa** de cada archivo indexado, no solo el nombre base.
+- La coincidencia se evalúa por **componentes de ruta**: las palabras, frases y comodines coinciden con el nombre propio del archivo o carpeta; los tokens separados por `/` coinciden con una cadena contigua de componentes y devuelven el elemento que coincide con el último segmento.
 - La sensibilidad a mayúsculas se controla con el interruptor de la UI:
   - Cuando es **insensible a mayúsculas**, el motor convierte a minúsculas tanto la consulta como los candidatos para coincidencias de nombre/contenido.
   - Cuando es **sensible a mayúsculas**, el motor compara los bytes tal cual.
 
 Ejemplos rápidos:
 ```text
-report draft                  # archivos cuya ruta contiene tanto “report” como “draft”
+report draft                  # archivos o carpetas cuyo propio nombre contiene “report” y “draft”
 ext:pdf briefing              # archivos PDF cuyo nombre contiene “briefing”
 parent:/Users demo!.psd       # bajo /Users, excluir archivos .psd
 regex:^Report.*2025$          # nombres que coinciden con una regex
@@ -32,10 +32,11 @@ ext:png;jpg travel|vacation   # PNG o JPG cuyos nombres contienen “travel” o
 
 ### 2.1 Tokens y frases sin comillas
 
-- Un token sin comillas es una **coincidencia por subcadena** en la ruta:
-  - `demo` coincide con `/Users/demo/Projects/cardinal.md`.
+- Un token sin comillas es una **coincidencia por subcadena** en un componente de ruta:
+  - `demo` coincide con la carpeta `/Users/demo` y con `/Users/alice/demo-notes.md`.
+  - No coincide con `/Users/demo/Projects/cardinal.md` solo porque un ancestro se llame `demo`; usa `demo/**` para buscar descendientes.
 - Las frases entre comillas dobles coinciden con la secuencia exacta, incluidos los espacios:
-  - `"Application Support"` coincide con `/Library/Application Support/...`.
+  - `"Application Support"` coincide con `/Library/Application Support`.
 - El interruptor de sensibilidad a mayúsculas de la UI se aplica a ambos.
 
 ### 2.2 Comodines (`*`, `?`, `**`)
@@ -310,7 +311,7 @@ in:/Users/demo/Projects ext:log dm:pastweek
 #  Scripts de shell directamente bajo la carpeta Scripts
 parent:/Users/demo/Scripts *.sh
 
-#  Todo con “Application Support” en la ruta
+#  Elementos cuyo propio nombre contiene “Application Support”
 "Application Support"
 
 #  Coincidir un nombre de archivo específico vía regex

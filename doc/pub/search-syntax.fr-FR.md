@@ -12,14 +12,14 @@ Le langage de requête de Cardinal est volontairement proche de la syntaxe d’E
   - **Mots / phrases** (texte brut, chaînes entre guillemets, jokers),
   - **Filtres** (`ext:`, `type:`, `dm:`, `content:`, …),
   - **Opérateurs booléens** (`AND`, `OR`, `NOT` / `!`).
-- La correspondance s’effectue sur le **chemin complet** de chaque fichier indexé, pas uniquement sur le nom de base.
+- La correspondance est orientée **composants de chemin**: les mots, phrases et jokers correspondent au nom propre du fichier ou dossier; les jetons séparés par `/` correspondent à une chaîne contiguë de composants et renvoient l’élément qui correspond au dernier segment.
 - La sensibilité à la casse est contrôlée par le basculeur de l’UI:
   - En mode **insensible à la casse**, le moteur met en minuscules la requête et les candidats pour le matching nom/contenu.
   - En mode **sensible à la casse**, le moteur compare les octets tels quels.
 
 Exemples rapides:
 ```text
-report draft                  # fichiers dont le chemin contient “report” et “draft”
+report draft                  # fichiers ou dossiers dont le nom propre contient “report” et “draft”
 ext:pdf briefing              # fichiers PDF dont le nom contient “briefing”
 parent:/Users demo!.psd       # sous /Users, exclure les fichiers .psd
 regex:^Report.*2025$          # noms correspondant à une regex
@@ -32,10 +32,11 @@ ext:png;jpg travel|vacation   # PNG ou JPG dont le nom contient “travel” ou 
 
 ### 2.1 Jetons simples et phrases
 
-- Un jeton sans guillemets est une **correspondance par sous-chaîne** sur le chemin:
-  - `demo` correspond à `/Users/demo/Projects/cardinal.md`.
+- Un jeton sans guillemets est une **correspondance par sous-chaîne** sur un composant de chemin:
+  - `demo` correspond au dossier `/Users/demo` et à `/Users/alice/demo-notes.md`.
+  - Il ne correspond pas à `/Users/demo/Projects/cardinal.md` uniquement parce qu’un ancêtre s’appelle `demo`; utilisez `demo/**` pour rechercher les descendants.
 - Les phrases entre guillemets doubles correspondent à la séquence exacte, espaces compris:
-  - `"Application Support"` correspond à `/Library/Application Support/...`.
+  - `"Application Support"` correspond à `/Library/Application Support`.
 - Le basculeur de casse de l’UI s’applique aux deux.
 
 ### 2.2 Jokers (`*`, `?`, `**`)
@@ -310,7 +311,7 @@ in:/Users/demo/Projects ext:log dm:pastweek
 #  Scripts shell directement sous le dossier Scripts
 parent:/Users/demo/Scripts *.sh
 
-#  Tout avec “Application Support” dans le chemin
+#  Éléments dont le nom propre contient “Application Support”
 "Application Support"
 
 #  Correspondre à un nom de fichier précis via regex
