@@ -374,7 +374,6 @@ fn test_infolder_with_negation() {
 fn scope_filters_follow_case_insensitive_option() {
     let temp_dir = TempDir::new("scope_filters_case_insensitive").unwrap();
     let root = temp_dir.path().to_path_buf();
-    std::mem::forget(temp_dir);
 
     let scope = root.join("CaseScope");
     std::fs::create_dir_all(scope.join("Nested")).unwrap();
