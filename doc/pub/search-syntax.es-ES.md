@@ -12,7 +12,10 @@ El lenguaje de consulta de Cardinal es intencionalmente cercano a la sintaxis de
   - **Palabras / frases** (texto plano, cadenas entre comillas, comodines),
   - **Filtros** (`ext:`, `type:`, `dm:`, `content:`, …),
   - **Operadores booleanos** (`AND`, `OR`, `NOT` / `!`).
-- La coincidencia se evalúa por **componentes de ruta**: las palabras, frases y comodines coinciden con el nombre propio del archivo o carpeta; los tokens separados por `/` coinciden con una cadena contigua de componentes y devuelven el elemento que coincide con el último segmento.
+- La coincidencia se evalúa por **componentes de ruta**:
+  - Las palabras, frases y comodines sin `/` coinciden con el nombre propio del archivo o carpeta.
+  - Los tokens separados por `/` coinciden con una cadena contigua de componentes de ruta y devuelven el elemento que coincide con el último segmento.
+  - Los operadores booleanos combinan conjuntos de resultados para el mismo elemento indexado; `foo bar` significa que un mismo elemento debe coincidir con ambos tokens, no que sus ancestros puedan satisfacer uno y su nombre base el otro.
 - La sensibilidad a mayúsculas se controla con el interruptor de la UI:
   - Cuando es **insensible a mayúsculas**, el motor convierte a minúsculas tanto la consulta como los candidatos para coincidencias de nombre/contenido.
   - Cuando es **sensible a mayúsculas**, el motor compara los bytes tal cual.
@@ -32,7 +35,7 @@ ext:png;jpg travel|vacation   # PNG o JPG cuyos nombres contienen “travel” o
 
 ### 2.1 Tokens y frases sin comillas
 
-- Un token sin comillas es una **coincidencia por subcadena** en un componente de ruta:
+- Un token sin comillas y sin `/` es una **coincidencia por subcadena** en un componente de ruta:
   - `demo` coincide con la carpeta `/Users/demo` y con `/Users/alice/demo-notes.md`.
   - No coincide con `/Users/demo/Projects/cardinal.md` solo porque un ancestro se llame `demo`; usa `demo/**` para buscar descendientes.
 - Las frases entre comillas dobles coinciden con la secuencia exacta, incluidos los espacios:
@@ -49,6 +52,7 @@ ext:png;jpg travel|vacation   # PNG o JPG cuyos nombres contienen “travel” o
   - `report-??.txt` — `report-01.txt`, `report-AB.txt`, etc.
   - `a*b` — nombres que empiezan con `a` y terminan con `b`.
   - `src/**/Cargo.toml` — `Cargo.toml` en cualquier lugar bajo `src/`.
+- Como los tokens simples, los comodines sin `/` coinciden con componentes de ruta. Una cadena de comodines separada por barras como `src/**/Cargo.toml` devuelve los elementos `Cargo.toml` coincidentes, mientras que `src/**` devuelve descendientes bajo las carpetas `src` coincidentes.
 - Si necesitas un `*` o `?` literal, pon el token entre comillas: `"*.rs"`. Los globstar deben ser segmentos de barra independientes (`foo/**/bar`, `/Users/**`, `**/notes`).
 
 ### 2.3 Segmentación estilo ruta con `/`

@@ -12,7 +12,10 @@ Il linguaggio di query di Cardinal è volutamente vicino alla sintassi di Everyt
   - **Parole / frasi** (testo semplice, stringhe tra virgolette, caratteri jolly),
   - **Filtri** (`ext:`, `type:`, `dm:`, `content:`, …),
   - **Operatori booleani** (`AND`, `OR`, `NOT` / `!`).
-- La corrispondenza è orientata ai **componenti del percorso**: parole, frasi e caratteri jolly corrispondono al nome proprio del file o della cartella; i token separati da `/` corrispondono a una catena contigua di componenti e restituiscono l'elemento che corrisponde all'ultimo segmento.
+- La corrispondenza è orientata ai **componenti del percorso**:
+  - Parole, frasi e caratteri jolly senza `/` corrispondono al nome proprio del file o della cartella.
+  - I token separati da `/` corrispondono a una catena contigua di componenti del percorso e restituiscono l'elemento che corrisponde all'ultimo segmento.
+  - Gli operatori booleani combinano insiemi di risultati per lo stesso elemento indicizzato; `foo bar` significa che un elemento deve corrispondere a entrambi i token, non che i suoi antenati possano soddisfarne uno e il suo nome base l'altro.
 - La distinzione tra maiuscole/minuscole è controllata dal toggle della UI:
   - Quando è **insensibile al maiuscolo/minuscolo**, il motore converte in minuscolo sia la query sia i candidati per il matching di nome/contenuto.
   - Quando è **sensibile al maiuscolo/minuscolo**, il motore confronta i byte così come sono.
@@ -32,7 +35,7 @@ ext:png;jpg travel|vacation   # PNG o JPG i cui nomi contengono “travel” o �
 
 ### 2.1 Token semplici e frasi
 
-- Un token senza virgolette è una **corrispondenza per sottostringa** su un componente del percorso:
+- Un token senza virgolette e senza `/` è una **corrispondenza per sottostringa** su un componente del percorso:
   - `demo` corrisponde alla cartella `/Users/demo` e a `/Users/alice/demo-notes.md`.
   - Non corrisponde a `/Users/demo/Projects/cardinal.md` solo perché un antenato si chiama `demo`; usa `demo/**` per cercare i discendenti.
 - Le frasi tra virgolette doppie corrispondono alla sequenza esatta, inclusi gli spazi:
@@ -49,6 +52,7 @@ ext:png;jpg travel|vacation   # PNG o JPG i cui nomi contengono “travel” o �
   - `report-??.txt` — `report-01.txt`, `report-AB.txt`, ecc.
   - `a*b` — nomi che iniziano con `a` e finiscono con `b`.
   - `src/**/Cargo.toml` — `Cargo.toml` ovunque sotto `src/`.
+- Come i token semplici, i token con caratteri jolly senza `/` corrispondono a componenti del percorso. Una catena di caratteri jolly separata da barre come `src/**/Cargo.toml` restituisce gli elementi `Cargo.toml` corrispondenti, mentre `src/**` restituisce i discendenti sotto le cartelle `src` corrispondenti.
 - Se ti serve un `*` o `?` letterale, racchiudi il token tra virgolette: `"*.rs"`. I globstar devono essere segmenti di barra autonomi (`foo/**/bar`, `/Users/**`, `**/notes`).
 
 ### 2.3 Segmentazione in stile percorso con `/`

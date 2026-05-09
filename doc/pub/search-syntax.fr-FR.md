@@ -12,7 +12,10 @@ Le langage de requête de Cardinal est volontairement proche de la syntaxe d’E
   - **Mots / phrases** (texte brut, chaînes entre guillemets, jokers),
   - **Filtres** (`ext:`, `type:`, `dm:`, `content:`, …),
   - **Opérateurs booléens** (`AND`, `OR`, `NOT` / `!`).
-- La correspondance est orientée **composants de chemin**: les mots, phrases et jokers correspondent au nom propre du fichier ou dossier; les jetons séparés par `/` correspondent à une chaîne contiguë de composants et renvoient l’élément qui correspond au dernier segment.
+- La correspondance est orientée **composants de chemin**:
+  - Les mots, phrases et jokers sans `/` correspondent au nom propre du fichier ou dossier.
+  - Les jetons séparés par `/` correspondent à une chaîne contiguë de composants de chemin et renvoient l’élément qui correspond au dernier segment.
+  - Les opérateurs booléens combinent des ensembles de résultats pour le même élément indexé; `foo bar` signifie qu’un même élément doit correspondre aux deux jetons, et non que ses ancêtres peuvent satisfaire l’un et son nom de base l’autre.
 - La sensibilité à la casse est contrôlée par le basculeur de l’UI:
   - En mode **insensible à la casse**, le moteur met en minuscules la requête et les candidats pour le matching nom/contenu.
   - En mode **sensible à la casse**, le moteur compare les octets tels quels.
@@ -32,7 +35,7 @@ ext:png;jpg travel|vacation   # PNG ou JPG dont le nom contient “travel” ou 
 
 ### 2.1 Jetons simples et phrases
 
-- Un jeton sans guillemets est une **correspondance par sous-chaîne** sur un composant de chemin:
+- Un jeton sans guillemets et sans `/` est une **correspondance par sous-chaîne** sur un composant de chemin:
   - `demo` correspond au dossier `/Users/demo` et à `/Users/alice/demo-notes.md`.
   - Il ne correspond pas à `/Users/demo/Projects/cardinal.md` uniquement parce qu’un ancêtre s’appelle `demo`; utilisez `demo/**` pour rechercher les descendants.
 - Les phrases entre guillemets doubles correspondent à la séquence exacte, espaces compris:
@@ -49,6 +52,7 @@ ext:png;jpg travel|vacation   # PNG ou JPG dont le nom contient “travel” ou 
   - `report-??.txt` — `report-01.txt`, `report-AB.txt`, etc.
   - `a*b` — noms commençant par `a` et finissant par `b`.
   - `src/**/Cargo.toml` — `Cargo.toml` n’importe où sous `src/`.
+- Comme les jetons simples, les jokers sans `/` correspondent à des composants de chemin. Une chaîne de jokers séparée par des barres comme `src/**/Cargo.toml` renvoie les éléments `Cargo.toml` correspondants, tandis que `src/**` renvoie les descendants sous les dossiers `src` correspondants.
 - Si vous avez besoin d’un `*` ou `?` littéral, mettez le jeton entre guillemets: `"*.rs"`. Les globstars doivent être des segments de barre autonomes (`foo/**/bar`, `/Users/**`, `**/notes`).
 
 ### 2.3 Segmentation de type chemin avec `/`

@@ -13,7 +13,7 @@ Cardinal’s query language is intentionally close to Everything’s syntax, whi
   - **Filters** (`ext:`, `type:`, `dm:`, `content:`, …),
   - **Boolean operators** (`AND`, `OR`, `NOT` / `!`).
 - Matching is **path-component oriented**:
-  - Plain words, phrases, and wildcard tokens match a file or folder's own name.
+  - Plain words, phrases, and wildcard tokens without `/` match a file or folder's own name.
   - Slash-separated tokens match a contiguous chain of path components and return the item that matches the final segment.
   - Boolean operators combine result sets for the same indexed item; `foo bar` means one item must match both tokens, not that its ancestors may satisfy one token and its basename another.
 - Case sensitivity is controlled by the UI toggle:
@@ -35,7 +35,7 @@ ext:png;jpg travel|vacation   # PNG or JPG whose names contain “travel” or �
 
 ### 2.1 Plain tokens and phrases
 
-- An unquoted token is a **substring match** on one path component:
+- An unquoted token without `/` is a **substring match** on one path component:
   - `demo` matches the `/Users/demo` folder and `/Users/alice/demo-notes.md`.
   - It does not match `/Users/demo/Projects/cardinal.md` merely because an ancestor is named `demo`; use `demo/**` when you want descendants.
 - Double‑quoted phrases match the exact sequence including spaces within one path component:
@@ -52,7 +52,7 @@ ext:png;jpg travel|vacation   # PNG or JPG whose names contain “travel” or �
   - `report-??.txt` — `report-01.txt`, `report-AB.txt`, etc.
   - `a*b` — names starting with `a` and ending with `b`.
   - `src/**/Cargo.toml` — `Cargo.toml` anywhere below `src/`.
-- Like plain tokens, wildcard tokens match path components. A slash-separated wildcard chain such as `src/**/Cargo.toml` returns matching `Cargo.toml` items, while `src/**` returns descendants below matching `src` folders.
+- Like plain tokens, wildcard tokens without `/` match path components. A slash-separated wildcard chain such as `src/**/Cargo.toml` returns matching `Cargo.toml` items, while `src/**` returns descendants below matching `src` folders.
 - If you need literal `*` or `?`, quote the token: `"*.rs"`. Globstars must be standalone slash segments (`foo/**/bar`, `/Users/**`, `**/notes`).
 
 ### 2.3 Path‑style segmentation with `/`
