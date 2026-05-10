@@ -1310,7 +1310,11 @@ mod tests {
 
         assert!(paths.iter().any(|path| path.ends_with("/Projects")));
         assert!(paths.iter().any(|path| path.ends_with("/Projects/Alpha")));
-        assert!(!paths.iter().any(|path| path.ends_with("/Projects/Alpha/notes.md")));
+        assert!(
+            !paths
+                .iter()
+                .any(|path| path.ends_with("/Projects/Alpha/notes.md"))
+        );
         assert!(!paths.iter().any(|path| path.ends_with("/root.txt")));
     }
 
@@ -1328,7 +1332,11 @@ mod tests {
 
         assert!(paths.iter().any(|path| path.ends_with("/Projects")));
         assert!(paths.iter().any(|path| path.ends_with("/Projects/Alpha")));
-        assert!(!paths.iter().any(|path| path.ends_with("/Projects/Alpha/notes.md")));
+        assert!(
+            !paths
+                .iter()
+                .any(|path| path.ends_with("/Projects/Alpha/notes.md"))
+        );
         assert!(!paths.iter().any(|path| path.ends_with("/root.txt")));
     }
 
