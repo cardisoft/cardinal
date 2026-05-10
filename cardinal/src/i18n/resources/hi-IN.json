@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "फ़ाइलों और फ़ोल्डरों में खोजें...",
-      "events": "पथ या नाम से ईवेंट फ़िल्टर करें..."
+      "events": "पथ या नाम से ईवेंट फ़िल्टर करें...",
+      "directory": "फ़ोल्डर स्कोप..."
     },
     "options": {
-      "caseSensitive": "केस-सेंसिटिव मिलान टॉगल करें"
+      "caseSensitive": "केस-सेंसिटिव मिलान टॉगल करें",
+      "directoryScope": "फ़ोल्डर स्कोप टॉगल करें"
     }
   },
   "stateDisplay": {
     "loading": "खोज जारी है...",
     "error": "खोज त्रुटि",
     "emptyTitle": "\"{{query}}\" के लिए कोई परिणाम नहीं",
-    "emptyMessage": "अपनी कुंजियाँ या फ़िल्टर बदलकर देखिए।"
+    "emptyMessage": "अपनी कुंजियाँ या फ़िल्टर बदलकर देखिए।",
+    "emptyTitleWithDirectory": "फ़ोल्डर स्कोप \"{{directoryQuery}}\" में \"{{query}}\" के लिए कोई परिणाम नहीं"
   },
   "columns": {
     "filename": "फ़ाइल नाम",

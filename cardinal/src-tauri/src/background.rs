@@ -362,7 +362,7 @@ pub fn run_background_event_loop(
                     result_tx
                 } = job.expect("Search channel closed");
                 let opts = SearchOptions::from(options);
-                let payload = cache.search_with_options(&query, opts, cancellation_token);
+                let payload = cache.search_query_with_options(query, opts, cancellation_token);
                 result_tx.send(payload).expect("Failed to send result");
             }
             recv(node_info_rx) -> request => {

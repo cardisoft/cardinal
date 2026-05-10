@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "Dosya ve klasör arayın...",
-      "events": "Olayları yol veya ada göre filtreleyin..."
+      "events": "Olayları yol veya ada göre filtreleyin...",
+      "directory": "Klasör kapsamı..."
     },
     "options": {
-      "caseSensitive": "Büyük/küçük harfe duyarlı eşleşmeyi değiştir"
+      "caseSensitive": "Büyük/küçük harfe duyarlı eşleşmeyi değiştir",
+      "directoryScope": "Klasör kapsamını değiştir"
     }
   },
   "stateDisplay": {
     "loading": "Aranıyor...",
     "error": "Arama hatası",
     "emptyTitle": "\"{{query}}\" için sonuç yok",
-    "emptyMessage": "Anahtar kelimeleri veya filtreleri değiştirmeyi deneyin."
+    "emptyMessage": "Anahtar kelimeleri veya filtreleri değiştirmeyi deneyin.",
+    "emptyTitleWithDirectory": "\"{{directoryQuery}}\" klasör kapsamında \"{{query}}\" için sonuç yok"
   },
   "columns": {
     "filename": "Dosya adı",

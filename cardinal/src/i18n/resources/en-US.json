@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "Search for files and folders...",
-      "events": "Filter events by path or name..."
+      "events": "Filter events by path or name...",
+      "directory": "Folder scope..."
     },
     "options": {
-      "caseSensitive": "Toggle case-sensitive matching"
+      "caseSensitive": "Toggle case-sensitive matching",
+      "directoryScope": "Toggle folder scope"
     }
   },
   "stateDisplay": {
     "loading": "Searching...",
     "error": "Search Error",
     "emptyTitle": "No results for \"{{query}}\"",
-    "emptyMessage": "Try adjusting your keywords or filters."
+    "emptyMessage": "Try adjusting your keywords or filters.",
+    "emptyTitleWithDirectory": "No results for \"{{query}}\" in folder scope \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "Filename",

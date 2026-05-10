@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "Rechercher des fichiers et des dossiers...",
-      "events": "Filtrer les événements par chemin ou nom..."
+      "events": "Filtrer les événements par chemin ou nom...",
+      "directory": "Portée du dossier..."
     },
     "options": {
-      "caseSensitive": "Activer la correspondance sensible à la casse"
+      "caseSensitive": "Activer la correspondance sensible à la casse",
+      "directoryScope": "Afficher la portée du dossier"
     }
   },
   "stateDisplay": {
     "loading": "Recherche en cours...",
     "error": "Erreur de recherche",
     "emptyTitle": "Aucun résultat pour \"{{query}}\"",
-    "emptyMessage": "Essayez d'ajuster vos mots-clés ou filtres."
+    "emptyMessage": "Essayez d'ajuster vos mots-clés ou filtres.",
+    "emptyTitleWithDirectory": "Aucun résultat pour \"{{query}}\" dans la portée de dossier \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "Nom de fichier",

@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "Buscar por arquivos e pastas...",
-      "events": "Filtrar eventos por caminho ou nome..."
+      "events": "Filtrar eventos por caminho ou nome...",
+      "directory": "Escopo de pasta..."
     },
     "options": {
-      "caseSensitive": "Alternar correspondência sensível a maiúsculas"
+      "caseSensitive": "Alternar correspondência sensível a maiúsculas",
+      "directoryScope": "Alternar escopo de pasta"
     }
   },
   "stateDisplay": {
     "loading": "Pesquisando...",
     "error": "Erro na busca",
     "emptyTitle": "Nenhum resultado para \"{{query}}\"",
-    "emptyMessage": "Tente ajustar suas palavras-chave ou filtros."
+    "emptyMessage": "Tente ajustar suas palavras-chave ou filtros.",
+    "emptyTitleWithDirectory": "Nenhum resultado para \"{{query}}\" no escopo de pasta \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "Nome do arquivo",

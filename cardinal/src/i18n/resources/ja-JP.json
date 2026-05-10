@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "ファイルやフォルダを検索...",
-      "events": "パスまたは名前でイベントを絞り込む..."
+      "events": "パスまたは名前でイベントを絞り込む...",
+      "directory": "フォルダ範囲..."
     },
     "options": {
-      "caseSensitive": "大文字と小文字を区別する"
+      "caseSensitive": "大文字と小文字を区別する",
+      "directoryScope": "フォルダ範囲を切り替え"
     }
   },
   "stateDisplay": {
     "loading": "検索中...",
     "error": "検索エラー",
     "emptyTitle": "\"{{query}}\" に一致する結果がありません",
-    "emptyMessage": "キーワードやフィルターを調整してください。"
+    "emptyMessage": "キーワードやフィルターを調整してください。",
+    "emptyTitleWithDirectory": "フォルダースコープ \"{{directoryQuery}}\" 内で \"{{query}}\" に一致する結果がありません"
   },
   "columns": {
     "filename": "ファイル名",

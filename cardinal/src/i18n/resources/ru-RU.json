@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "Поиск файлов и папок...",
-      "events": "Фильтруйте события по пути или имени..."
+      "events": "Фильтруйте события по пути или имени...",
+      "directory": "Область папок..."
     },
     "options": {
-      "caseSensitive": "Включить учет регистра"
+      "caseSensitive": "Включить учет регистра",
+      "directoryScope": "Переключить область папок"
     }
   },
   "stateDisplay": {
     "loading": "Поиск...",
     "error": "Ошибка поиска",
     "emptyTitle": "Нет результатов для \"{{query}}\"",
-    "emptyMessage": "Попробуйте изменить ключевые слова или фильтры."
+    "emptyMessage": "Попробуйте изменить ключевые слова или фильтры.",
+    "emptyTitleWithDirectory": "Нет результатов для \"{{query}}\" в области папки \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "Имя файла",

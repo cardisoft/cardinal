@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "搜索文件和文件夹…",
-      "events": "按路径或名称筛选事件…"
+      "events": "按路径或名称筛选事件…",
+      "directory": "限定文件夹范围…"
     },
     "options": {
-      "caseSensitive": "切换区分大小写匹配"
+      "caseSensitive": "切换区分大小写匹配",
+      "directoryScope": "切换文件夹范围"
     }
   },
   "stateDisplay": {
     "loading": "正在搜索…",
     "error": "搜索出现错误",
     "emptyTitle": "\"{{query}}\" 没有匹配结果",
-    "emptyMessage": "尝试调整关键字或筛选条件。"
+    "emptyMessage": "尝试调整关键字或筛选条件。",
+    "emptyTitleWithDirectory": "在文件夹范围 \"{{directoryQuery}}\" 中没有找到 \"{{query}}\""
   },
   "columns": {
     "filename": "文件名",

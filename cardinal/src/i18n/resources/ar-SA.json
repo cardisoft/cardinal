@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "ابحث عن الملفات والمجلدات...",
-      "events": "رشّح الأحداث حسب المسار أو الاسم..."
+      "events": "رشّح الأحداث حسب المسار أو الاسم...",
+      "directory": "نطاق المجلد..."
     },
     "options": {
-      "caseSensitive": "تفعيل/إيقاف حساسية حالة الأحرف"
+      "caseSensitive": "تفعيل/إيقاف حساسية حالة الأحرف",
+      "directoryScope": "تبديل نطاق المجلد"
     }
   },
   "stateDisplay": {
     "loading": "جارٍ البحث...",
     "error": "خطأ في البحث",
     "emptyTitle": "لا نتائج لـ \"{{query}}\"",
-    "emptyMessage": "جرّب تعديل الكلمات المفتاحية أو عوامل التصفية."
+    "emptyMessage": "جرّب تعديل الكلمات المفتاحية أو عوامل التصفية.",
+    "emptyTitleWithDirectory": "لا نتائج لـ \"{{query}}\" ضمن نطاق المجلد \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "اسم الملف",

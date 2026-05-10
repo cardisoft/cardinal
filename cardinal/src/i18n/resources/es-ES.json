@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "Buscar archivos y carpetas...",
-      "events": "Filtrar eventos por ruta o nombre..."
+      "events": "Filtrar eventos por ruta o nombre...",
+      "directory": "Ámbito de carpeta..."
     },
     "options": {
-      "caseSensitive": "Activar coincidencia sensible a mayúsculas"
+      "caseSensitive": "Activar coincidencia sensible a mayúsculas",
+      "directoryScope": "Alternar ámbito de carpeta"
     }
   },
   "stateDisplay": {
     "loading": "Buscando...",
     "error": "Error de búsqueda",
     "emptyTitle": "Sin resultados para \"{{query}}\"",
-    "emptyMessage": "Prueba ajustando tus palabras clave o filtros."
+    "emptyMessage": "Prueba ajustando tus palabras clave o filtros.",
+    "emptyTitleWithDirectory": "Sin resultados para \"{{query}}\" en el ámbito de carpeta \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "Nombre de archivo",

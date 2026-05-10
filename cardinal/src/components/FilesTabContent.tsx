@@ -17,6 +17,7 @@ type FilesTabContentProps = {
   displayState: DisplayState;
   searchErrorMessage: string | null;
   currentQuery: string;
+  currentDirectoryQuery: string;
   virtualListRef: React.Ref<VirtualListHandle>;
   results: SlabIndex[];
   // Bumps when backend search results change; useDataLoader treats it as a data-cache reset.
@@ -44,6 +45,7 @@ export function FilesTabContent({
   displayState,
   searchErrorMessage,
   currentQuery,
+  currentDirectoryQuery,
   virtualListRef,
   results,
   dataResultsVersion,
@@ -70,7 +72,12 @@ export function FilesTabContent({
       />
       <div className="flex-fill">
         {displayState !== 'results' ? (
-          <StateDisplay state={displayState} message={searchErrorMessage} query={currentQuery} />
+          <StateDisplay
+            state={displayState}
+            message={searchErrorMessage}
+            query={currentQuery}
+            directoryQuery={currentDirectoryQuery}
+          />
         ) : (
           <VirtualList
             ref={virtualListRef}

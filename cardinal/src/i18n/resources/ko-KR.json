@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "파일과 폴더 검색...",
-      "events": "경로 또는 이름으로 이벤트 필터링..."
+      "events": "경로 또는 이름으로 이벤트 필터링...",
+      "directory": "폴더 범위..."
     },
     "options": {
-      "caseSensitive": "대소문자 구분 검색 전환"
+      "caseSensitive": "대소문자 구분 검색 전환",
+      "directoryScope": "폴더 범위 전환"
     }
   },
   "stateDisplay": {
     "loading": "검색 중...",
     "error": "검색 오류",
     "emptyTitle": "\"{{query}}\"에 대한 결과가 없습니다",
-    "emptyMessage": "키워드나 필터를 조정해 보세요."
+    "emptyMessage": "키워드나 필터를 조정해 보세요.",
+    "emptyTitleWithDirectory": "폴더 범위 \"{{directoryQuery}}\"에서 \"{{query}}\"에 대한 결과가 없습니다"
   },
   "columns": {
     "filename": "파일 이름",

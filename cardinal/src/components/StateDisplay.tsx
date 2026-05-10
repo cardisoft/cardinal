@@ -14,6 +14,7 @@ type StateDisplayProps = {
   state: EmptyState;
   message?: string | null;
   query?: string;
+  directoryQuery?: string;
 };
 
 const State = ({ icon, title, message }: StateProps): React.JSX.Element => (
@@ -27,7 +28,12 @@ const State = ({ icon, title, message }: StateProps): React.JSX.Element => (
 );
 
 // Consistent empty/error/loading presentation inside the results pane.
-export function StateDisplay({ state, message, query }: StateDisplayProps): React.JSX.Element {
+export function StateDisplay({
+  state,
+  message,
+  query,
+  directoryQuery,
+}: StateDisplayProps): React.JSX.Element {
   const { t } = useTranslation();
   if (state === 'loading') {
     return <State icon={<div className="spinner" />} title={t('stateDisplay.loading')} />;
@@ -61,6 +67,9 @@ export function StateDisplay({ state, message, query }: StateDisplayProps): Reac
       <line x1="9" y1="9" x2="13" y2="13" />
     </svg>
   );
-  const emptyTitle = t('stateDisplay.emptyTitle', { query: query ?? '' });
+  const emptyTitle =
+    query && directoryQuery
+      ? t('stateDisplay.emptyTitleWithDirectory', { query, directoryQuery })
+      : t('stateDisplay.emptyTitle', { query: query || directoryQuery || '' });
   return <State icon={icon} title={emptyTitle} message={t('stateDisplay.emptyMessage')} />;
 }

@@ -90,4 +90,39 @@ describe('useFileSearch', () => {
       expect(result.current.state.initialFetchCompleted).toBe(true);
     });
   });
+
+  it('sends directory scope with search requests', async () => {
+    mockedInvoke.mockImplementation((command: string) => {
+      if (command === 'get_app_status') {
+        return Promise.resolve('Ready');
+      }
+      if (command === 'search') {
+        return Promise.resolve({
+          results: [],
+          highlights: [],
+          statusCode: SearchStatusCode.OK,
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    const { result } = renderHook(() => useFileSearch());
+
+    await waitFor(() => expect(result.current.state.initialFetchCompleted).toBe(true));
+    mockedInvoke.mockClear();
+
+    act(() => {
+      result.current.queueDirectorySearch('Projects', { immediate: true });
+    });
+
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenCalledWith('search', {
+        query: null,
+        directoryQuery: 'Projects',
+        options: {
+          caseInsensitive: true,
+        },
+      });
+    });
+  });
 });

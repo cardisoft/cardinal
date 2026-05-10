@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useMemo } from 'react';
+import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import './App.css';
 import { FileRow } from './components/FileRow';
@@ -37,6 +37,7 @@ function App() {
     searchParams,
     updateSearchParams,
     queueSearch,
+    queueDirectorySearch,
     handleStatusUpdate,
     setLifecycleState,
     requestRescan,
@@ -48,6 +49,7 @@ function App() {
     processedEvents,
     rescanErrors,
     currentQuery,
+    currentDirectoryQuery,
     highlightTerms,
     showLoadingUI,
     initialFetchCompleted,
@@ -63,7 +65,8 @@ function App() {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const { colWidths, onResizeStart, autoFitColumns } = useColumnResize();
-  const { caseSensitive } = searchParams;
+  const { caseSensitive, directoryQuery } = searchParams;
+  const [isDirectoryScopeOpen, setIsDirectoryScopeOpen] = useState(false);
   const { eventColWidths, onEventResizeStart, autoFitEventColumns } = useEventColumnWidths();
   const { t, i18n } = useTranslation();
   // `resultsVersion` tracks raw backend search result-set changes.
@@ -112,12 +115,17 @@ function App() {
     setEventFilterQuery,
     onTabChange,
     searchInputValue,
+    directoryInputValue,
     onQueryChange,
+    onDirectoryQueryChange,
+    onDirectoryInputKeyDown,
     onSearchInputKeyDown,
     submitFilesQuery,
   } = useFilesTabState({
     searchQuery: searchParams.query,
+    directoryQuery,
     queueSearch,
+    queueDirectorySearch,
     onNavigateFromSearchToResults: navigateFromSearchToResults,
   });
   const { filteredEvents } = useRecentFSEvents({
@@ -171,6 +179,12 @@ function App() {
   useEffect(() => {
     focusAndSelectSearchInput();
   }, [focusAndSelectSearchInput]);
+
+  useEffect(() => {
+    if (directoryQuery) {
+      setIsDirectoryScopeOpen(true);
+    }
+  }, [directoryQuery]);
 
   const refreshSearchResults = useCallback(() => {
     queueSearch(currentQuery, { immediate: true });
@@ -241,6 +255,10 @@ function App() {
     },
     [updateSearchParams],
   );
+
+  const toggleDirectoryScope = useCallback(() => {
+    setIsDirectoryScopeOpen((value) => !value);
+  }, []);
 
   const handleHorizontalSync = useCallback((scrollLeft: number) => {
     // VirtualList drives the scroll position; mirror it onto the sticky header for alignment.
@@ -342,8 +360,10 @@ function App() {
     ? t('app.fullDiskAccess.status.checking')
     : t('app.fullDiskAccess.status.disabled');
   const caseSensitiveLabel = t('search.options.caseSensitive');
+  const directoryScopeLabel = t('search.options.directoryScope');
   const searchPlaceholder =
     activeTab === 'files' ? t('search.placeholder.files') : t('search.placeholder.events');
+  const directorySearchPlaceholder = t('search.placeholder.directory');
   const permissionSteps = [
     t('app.fullDiskAccess.steps.one'),
     t('app.fullDiskAccess.steps.two'),
@@ -363,6 +383,14 @@ function App() {
           value={searchInputValue}
           onChange={onQueryChange}
           onKeyDown={onSearchInputKeyDown}
+          directoryScopeEnabled={activeTab === 'files'}
+          directoryScopeOpen={isDirectoryScopeOpen}
+          directoryScopeLabel={directoryScopeLabel}
+          directoryPlaceholder={directorySearchPlaceholder}
+          directoryValue={directoryInputValue}
+          onToggleDirectoryScope={toggleDirectoryScope}
+          onDirectoryChange={onDirectoryQueryChange}
+          onDirectoryKeyDown={onDirectoryInputKeyDown}
           caseSensitive={caseSensitive}
           onToggleCaseSensitive={onToggleCaseSensitive}
           caseSensitiveLabel={caseSensitiveLabel}
@@ -391,6 +419,7 @@ function App() {
               displayState={displayState}
               searchErrorMessage={searchErrorMessage}
               currentQuery={currentQuery}
+              currentDirectoryQuery={currentDirectoryQuery}
               virtualListRef={virtualListRef}
               results={displayedResults}
               dataResultsVersion={resultsVersion}

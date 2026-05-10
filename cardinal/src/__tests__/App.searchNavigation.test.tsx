@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 
 const mocks = vi.hoisted(() => ({
+  filesTabContentProps: vi.fn(),
   navigateSearchHistory: vi.fn(),
   selectSingleRow: vi.fn(),
 }));
@@ -53,18 +54,25 @@ vi.mock('../components/FileRow', () => ({
 
 vi.mock('../components/FilesTabContent', () => ({
   FilesTabContent: ({
+    currentDirectoryQuery,
+    currentQuery,
     renderRow,
   }: {
+    currentDirectoryQuery: string;
+    currentQuery: string;
     renderRow: (
       rowIndex: number,
       item: { path: string } | undefined,
       rowStyle: CSSProperties,
     ) => React.ReactNode;
-  }) => (
-    <div data-testid="files-tab-content">
-      {renderRow(0, { path: '/first-result' }, {} as CSSProperties)}
-    </div>
-  ),
+  }) => {
+    mocks.filesTabContentProps({ currentDirectoryQuery, currentQuery });
+    return (
+      <div data-testid="files-tab-content">
+        {renderRow(0, { path: '/first-result' }, {} as CSSProperties)}
+      </div>
+    );
+  },
 }));
 
 vi.mock('../components/PermissionOverlay', () => ({
@@ -94,6 +102,7 @@ vi.mock('../hooks/useFileSearch', () => ({
       processedEvents: 0,
       rescanErrors: 0,
       currentQuery: 'needle',
+      currentDirectoryQuery: 'Work/Docs',
       highlightTerms: [],
       showLoadingUI: false,
       initialFetchCompleted: true,
@@ -104,10 +113,12 @@ vi.mock('../hooks/useFileSearch', () => ({
     },
     searchParams: {
       query: 'needle',
+      directoryQuery: 'Work/Docs',
       caseSensitive: false,
     },
     updateSearchParams: vi.fn(),
     queueSearch: vi.fn(),
+    queueDirectorySearch: vi.fn(),
     handleStatusUpdate: vi.fn(),
     setLifecycleState: vi.fn(),
     requestRescan: vi.fn(),
@@ -240,6 +251,15 @@ describe('App search result keyboard navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.navigateSearchHistory.mockReturnValue(null);
+  });
+
+  it('passes main query and folder scope separately to the files tab content', () => {
+    render(<App />);
+
+    expect(mocks.filesTabContentProps).toHaveBeenLastCalledWith({
+      currentDirectoryQuery: 'Work/Docs',
+      currentQuery: 'needle',
+    });
   });
 
   it('selects the first result and blurs the search input when ArrowDown reaches the history tail', () => {

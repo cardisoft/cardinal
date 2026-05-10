@@ -12,8 +12,16 @@ const mockedUseSearchHistory = vi.mocked(useSearchHistory);
 
 type HookProps = {
   searchQuery: string;
+  directoryQuery: string;
   queueSearch: (
     query: string,
+    options?: {
+      immediate?: boolean;
+      onSearchCommitted?: (query: string) => void;
+    },
+  ) => void;
+  queueDirectorySearch: (
+    directoryQuery: string,
     options?: {
       immediate?: boolean;
       onSearchCommitted?: (query: string) => void;
@@ -24,6 +32,7 @@ type HookProps = {
 
 describe('useFilesTabState', () => {
   const queueSearch = vi.fn();
+  const queueDirectorySearch = vi.fn();
   const handleInputChange = vi.fn();
   const navigate = vi.fn();
   const ensureTailValue = vi.fn();
@@ -33,7 +42,9 @@ describe('useFilesTabState', () => {
     renderHook((props: HookProps) => useFilesTabState(props), {
       initialProps: {
         searchQuery: 'needle',
+        directoryQuery: 'scope',
         queueSearch,
+        queueDirectorySearch,
         ...overrides,
       },
     });
@@ -55,12 +66,14 @@ describe('useFilesTabState', () => {
     expect(result.current.activeTab).toBe('files');
     expect(result.current.isSearchFocused).toBe(false);
     expect(result.current.searchInputValue).toBe('needle');
+    expect(result.current.directoryInputValue).toBe('scope');
 
     act(() => {
       result.current.setActiveTab('events');
     });
     expect(result.current.activeTab).toBe('events');
     expect(result.current.searchInputValue).toBe('');
+    expect(result.current.directoryInputValue).toBe('');
 
     act(() => {
       result.current.setEventFilterQuery('evt');
@@ -69,7 +82,9 @@ describe('useFilesTabState', () => {
 
     rerender({
       searchQuery: 'needle-updated',
+      directoryQuery: 'scope-updated',
       queueSearch,
+      queueDirectorySearch,
     });
     expect(result.current.searchInputValue).toBe('evt');
 
@@ -133,6 +148,39 @@ describe('useFilesTabState', () => {
     });
     expect(result.current.eventFilterQuery).toBe('event-path');
     expect(queueSearch).not.toHaveBeenCalled();
+  });
+
+  it('submits directory scope changes only on files tab', () => {
+    const { result } = renderFilesTabState();
+
+    act(() => {
+      result.current.onDirectoryQueryChange({
+        target: { value: 'docs' },
+      } as ChangeEvent<HTMLInputElement>);
+    });
+    expect(queueDirectorySearch).toHaveBeenCalledWith('docs');
+
+    queueDirectorySearch.mockClear();
+
+    act(() => {
+      result.current.onDirectoryInputKeyDown({
+        key: 'Enter',
+        currentTarget: { value: 'projects' },
+      } as unknown as ReactKeyboardEvent<HTMLInputElement>);
+    });
+    expect(queueDirectorySearch).toHaveBeenCalledWith('projects', { immediate: true });
+
+    queueDirectorySearch.mockClear();
+
+    act(() => {
+      result.current.onTabChange('events');
+    });
+    act(() => {
+      result.current.onDirectoryQueryChange({
+        target: { value: 'ignored' },
+      } as ChangeEvent<HTMLInputElement>);
+    });
+    expect(queueDirectorySearch).not.toHaveBeenCalled();
   });
 
   it('handles Enter and history navigation keys on files tab', () => {

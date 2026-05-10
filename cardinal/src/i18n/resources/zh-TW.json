@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "搜尋檔案和資料夾…",
-      "events": "依路徑或名稱篩選事件…"
+      "events": "依路徑或名稱篩選事件…",
+      "directory": "限定資料夾範圍…"
     },
     "options": {
-      "caseSensitive": "切換區分大小寫比對"
+      "caseSensitive": "切換區分大小寫比對",
+      "directoryScope": "切換資料夾範圍"
     }
   },
   "stateDisplay": {
     "loading": "正在搜尋…",
     "error": "搜尋發生錯誤",
     "emptyTitle": "「{{query}}」沒有符合結果",
-    "emptyMessage": "試著調整關鍵字或篩選條件。"
+    "emptyMessage": "試著調整關鍵字或篩選條件。",
+    "emptyTitleWithDirectory": "在資料夾範圍「{{directoryQuery}}」中沒有找到「{{query}}」"
   },
   "columns": {
     "filename": "檔名",

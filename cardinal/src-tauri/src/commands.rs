@@ -19,7 +19,9 @@ use objc2::{
 use objc2_app_kit::{NSPasteboard, NSPasteboardItem, NSPasteboardTypeString, NSPasteboardWriting};
 use objc2_foundation::{NSArray, NSString, NSURL};
 use parking_lot::Mutex;
-use search_cache::{SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, SlabNodeMetadata};
+use search_cache::{
+    SearchOptions, SearchOutcome, SearchQuery, SearchResultNode, SlabIndex, SlabNodeMetadata,
+};
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
 use std::{cell::LazyCell, process::Command};
@@ -49,7 +51,7 @@ impl From<SearchOptionsPayload> for SearchOptions {
 
 #[derive(Debug, Clone)]
 pub struct SearchJob {
-    pub query: String,
+    pub query: SearchQuery,
     pub options: SearchOptionsPayload,
     pub cancellation_token: CancellationToken,
     pub result_tx: Sender<Result<SearchOutcome>>,
@@ -281,7 +283,8 @@ pub async fn toggle_quicklook(app_handle: AppHandle, items: Vec<QuickLookItemInp
 
 #[tauri::command]
 pub async fn search(
-    query: String,
+    directory_query: Option<String>,
+    query: Option<String>,
     options: Option<SearchOptionsPayload>,
     state: State<'_, SearchState>,
 ) -> Result<SearchResponse, String> {
@@ -291,7 +294,10 @@ pub async fn search(
     let cancellation_token = CancellationToken::new_search();
     let (result_tx, result_rx) = bounded(1);
     if let Err(e) = state.search_tx.send(SearchJob {
-        query,
+        query: SearchQuery {
+            directory_query,
+            query,
+        },
         options,
         cancellation_token,
         result_tx,

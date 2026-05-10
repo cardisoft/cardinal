@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "Nach Dateien und Ordnern suchen...",
-      "events": "Ereignisse nach Pfad oder Name filtern..."
+      "events": "Ereignisse nach Pfad oder Name filtern...",
+      "directory": "Ordnerbereich..."
     },
     "options": {
-      "caseSensitive": "Groß-/Kleinschreibung beachten"
+      "caseSensitive": "Groß-/Kleinschreibung beachten",
+      "directoryScope": "Ordnerbereich umschalten"
     }
   },
   "stateDisplay": {
     "loading": "Suche läuft...",
     "error": "Suchfehler",
     "emptyTitle": "Keine Ergebnisse für \"{{query}}\"",
-    "emptyMessage": "Passe deine Suchbegriffe oder Filter an."
+    "emptyMessage": "Passe deine Suchbegriffe oder Filter an.",
+    "emptyTitleWithDirectory": "Keine Ergebnisse für \"{{query}}\" im Ordnerbereich \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "Dateiname",

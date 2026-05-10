@@ -2,17 +2,20 @@
   "search": {
     "placeholder": {
       "files": "Cerca file e cartelle...",
-      "events": "Filtra eventi per percorso o nome..."
+      "events": "Filtra eventi per percorso o nome...",
+      "directory": "Ambito cartella..."
     },
     "options": {
-      "caseSensitive": "Attiva/disattiva distinzione tra maiuscole e minuscole"
+      "caseSensitive": "Attiva/disattiva distinzione tra maiuscole e minuscole",
+      "directoryScope": "Mostra ambito cartella"
     }
   },
   "stateDisplay": {
     "loading": "Ricerca in corso...",
     "error": "Errore di ricerca",
     "emptyTitle": "Nessun risultato per \"{{query}}\"",
-    "emptyMessage": "Prova a modificare parole chiave o filtri."
+    "emptyMessage": "Prova a modificare parole chiave o filtri.",
+    "emptyTitleWithDirectory": "Nessun risultato per \"{{query}}\" nell'ambito cartella \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "Nome file",

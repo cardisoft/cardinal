@@ -18,6 +18,7 @@ type SearchState = {
   processedEvents: number;
   rescanErrors: number;
   currentQuery: string;
+  currentDirectoryQuery: string;
   highlightTerms: string[];
   showLoadingUI: boolean;
   initialFetchCompleted: boolean;
@@ -29,6 +30,7 @@ type SearchState = {
 
 type SearchParams = {
   query: string;
+  directoryQuery: string;
   caseSensitive: boolean;
 };
 
@@ -49,6 +51,7 @@ type SearchAction =
       payload: {
         results: SlabIndex[];
         query: string;
+        directoryQuery: string;
         duration: number;
         count: number;
         highlightTerms: string[];
@@ -71,6 +74,7 @@ const initialSearchState: SearchState = {
   processedEvents: 0,
   rescanErrors: 0,
   currentQuery: '',
+  currentDirectoryQuery: '',
   highlightTerms: [],
   showLoadingUI: false,
   initialFetchCompleted: false,
@@ -82,6 +86,7 @@ const initialSearchState: SearchState = {
 
 const initialSearchParams: SearchParams = {
   query: '',
+  directoryQuery: '',
   caseSensitive: false,
 };
 
@@ -119,6 +124,7 @@ function reducer(state: SearchState, action: SearchAction): SearchState {
         results: action.payload.results,
         resultsVersion: state.resultsVersion + 1,
         currentQuery: action.payload.query,
+        currentDirectoryQuery: action.payload.directoryQuery,
         highlightTerms: action.payload.highlightTerms,
         showLoadingUI: false,
         initialFetchCompleted: true,
@@ -157,11 +163,14 @@ const searchParamsReducer = (prev: SearchParams, patch: Partial<SearchParams>): 
   return next;
 };
 
+const searchParamOrNull = (value: string): string | null => (value.trim() ? value : null);
+
 type UseFileSearchResult = {
   state: SearchState;
   searchParams: SearchParams;
   updateSearchParams: (patch: Partial<SearchParams>) => void;
   queueSearch: (query: string, options?: QueueSearchOptions) => void;
+  queueDirectorySearch: (directoryQuery: string, options?: QueueSearchOptions) => void;
   handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
   setLifecycleState: (status: AppLifecycleStatus) => void;
   requestRescan: () => Promise<void>;
@@ -230,7 +239,7 @@ export function useFileSearch(): UseFileSearchResult {
     const requestVersion = searchVersionRef.current + 1;
     searchVersionRef.current = requestVersion;
 
-    const { query, caseSensitive } = nextSearch;
+    const { query, directoryQuery, caseSensitive } = nextSearch;
     const startTs = performance.now();
     const isInitial = !hasInitialSearchRunRef.current;
 
@@ -246,7 +255,8 @@ export function useFileSearch(): UseFileSearchResult {
 
     try {
       const rawResults = await invoke<SearchResponsePayload>('search', {
-        query,
+        query: searchParamOrNull(query),
+        directoryQuery: searchParamOrNull(directoryQuery),
         options: {
           caseInsensitive: !caseSensitive,
         },
@@ -277,6 +287,7 @@ export function useFileSearch(): UseFileSearchResult {
         payload: {
           results: searchResults,
           query,
+          directoryQuery,
           duration,
           count: searchResults.length,
           highlightTerms,
@@ -309,22 +320,36 @@ export function useFileSearch(): UseFileSearchResult {
     }
   }, []);
 
-  const queueSearch = useCallback(
-    (query: string, options?: QueueSearchOptions) => {
-      updateSearchParams({ query });
+  const queueSearchPatch = useCallback(
+    (patch: Partial<SearchParams>, committedValue: string, options?: QueueSearchOptions) => {
+      updateSearchParams(patch);
       cancelPendingSearches();
       if (options?.immediate) {
-        options.onSearchCommitted?.(query);
-        void handleSearch({ query });
+        options.onSearchCommitted?.(committedValue);
+        void handleSearch(patch);
         return;
       }
 
       debounceTimerRef.current = setTimeout(() => {
-        options?.onSearchCommitted?.(query);
-        handleSearch({ query });
+        options?.onSearchCommitted?.(committedValue);
+        handleSearch(patch);
       }, SEARCH_DEBOUNCE_MS);
     },
     [cancelPendingSearches, handleSearch, updateSearchParams],
+  );
+
+  const queueSearch = useCallback(
+    (query: string, options?: QueueSearchOptions) => {
+      queueSearchPatch({ query }, query, options);
+    },
+    [queueSearchPatch],
+  );
+
+  const queueDirectorySearch = useCallback(
+    (directoryQuery: string, options?: QueueSearchOptions) => {
+      queueSearchPatch({ directoryQuery }, directoryQuery, options);
+    },
+    [queueSearchPatch],
   );
 
   useEffect(() => cancelPendingSearches, [cancelPendingSearches]);
@@ -335,7 +360,7 @@ export function useFileSearch(): UseFileSearchResult {
       return;
     }
 
-    if (!latestSearchRef.current.query) {
+    if (!latestSearchRef.current.query && !latestSearchRef.current.directoryQuery) {
       return;
     }
 
@@ -351,6 +376,7 @@ export function useFileSearch(): UseFileSearchResult {
     searchParams,
     updateSearchParams,
     queueSearch,
+    queueDirectorySearch,
     handleStatusUpdate,
     setLifecycleState,
     requestRescan,
