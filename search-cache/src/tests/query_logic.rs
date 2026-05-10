@@ -24,6 +24,68 @@ fn test_query_and_or_not_dedup_and_filtering() {
 }
 
 #[test]
+fn test_or_with_many_overlapping_branches_returns_unique_results() {
+    let tmp = TempDir::new("query_or_many_overlap").unwrap();
+    fs::write(tmp.path().join("alpha.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("alpha.md"), b"x").unwrap();
+    fs::write(tmp.path().join("beta.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("beta.md"), b"x").unwrap();
+    fs::write(tmp.path().join("gamma.txt"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let hits = cache
+        .search("alpha OR ext:txt OR alpha OR beta OR ext:txt")
+        .unwrap();
+    let paths = hits
+        .iter()
+        .map(|index| {
+            cache
+                .node_path(*index)
+                .unwrap()
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_path_buf()
+        })
+        .collect::<Vec<_>>();
+    let mut unique = paths.clone();
+    unique.sort();
+    unique.dedup();
+
+    assert_eq!(paths.len(), unique.len(), "OR results should be deduped");
+    assert_eq!(unique.len(), 5);
+    for expected in ["alpha.txt", "alpha.md", "beta.txt", "beta.md", "gamma.txt"] {
+        assert!(
+            unique.contains(&PathBuf::from(expected)),
+            "missing {expected:?} from {unique:?}"
+        );
+    }
+}
+
+#[test]
+fn test_and_with_empty_parent_filter_intersection_returns_empty() {
+    let tmp = TempDir::new("query_empty_parent_intersection").unwrap();
+    fs::create_dir(tmp.path().join("empty")).unwrap();
+    fs::write(tmp.path().join("report.txt"), b"x").unwrap();
+    fs::write(tmp.path().join("report.md"), b"x").unwrap();
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    let empty_parent = tmp.path().join("empty");
+    let parent_after_matches = format!(r#"report parent:"{}""#, empty_parent.display());
+    let hits = cache.search(&parent_after_matches).unwrap();
+    assert!(
+        hits.is_empty(),
+        "non-empty lhs intersected with empty parent rhs should clear results"
+    );
+
+    let parent_before_matches = format!(r#"parent:"{}" report"#, empty_parent.display());
+    let hits = cache.search(&parent_before_matches).unwrap();
+    assert!(
+        hits.is_empty(),
+        "empty parent lhs should stay empty when later filters run"
+    );
+}
+
+#[test]
 fn test_globstar_dedup_overlapping_parents() {
     let tmp = TempDir::new("query_globstar_dedup").unwrap();
     fs::create_dir_all(tmp.path().join("a/a")).unwrap();

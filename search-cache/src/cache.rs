@@ -1213,6 +1213,100 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
+    fn assert_path_suffixes(paths: &[String], expected: &[&str]) {
+        assert_eq!(
+            paths.len(),
+            expected.len(),
+            "expected suffixes {expected:?}, got paths {paths:?}"
+        );
+        for suffix in expected {
+            assert!(
+                paths.iter().any(|path| path.ends_with(suffix)),
+                "missing suffix {suffix:?} in {paths:?}"
+            );
+        }
+    }
+
+    fn assert_node_suffixes(nodes: &[SearchResultNode], expected: &[&str]) {
+        let paths = paths_from_nodes(nodes);
+        assert_path_suffixes(&paths, expected);
+    }
+
+    fn bytes_with_prefix(prefix: &str, len: usize) -> Vec<u8> {
+        let mut bytes = prefix.as_bytes().to_vec();
+        bytes.resize(len, b'x');
+        bytes
+    }
+
+    fn write_sized_file(path: &Path, prefix: &str, len: usize) {
+        fs::write(path, bytes_with_prefix(prefix, len)).unwrap();
+    }
+
+    fn build_base_filter_fixture(name: &str) -> (TempDir, PathBuf, SearchCache) {
+        let temp_dir = TempDir::new(name).unwrap();
+        let root = temp_dir.path().to_path_buf();
+        for dir in [
+            "Work/Docs/Nested",
+            "Work/Docs/FolderMatch",
+            "Work/Images",
+            "Personal/Docs/Nested",
+            "Personal/Docs/FolderMatch",
+            "Personal/Images",
+        ] {
+            fs::create_dir_all(root.join(dir)).unwrap();
+        }
+
+        write_sized_file(
+            &root.join("Work/Docs/report.md"),
+            "needle report document",
+            4096,
+        );
+        write_sized_file(
+            &root.join("Personal/Docs/report.md"),
+            "needle report document",
+            4096,
+        );
+        write_sized_file(&root.join("Work/Docs/notes.txt"), "needle notes", 2048);
+        write_sized_file(&root.join("Personal/Docs/notes.txt"), "needle notes", 2048);
+        write_sized_file(&root.join("Work/Docs/archive.md"), "needle archive", 4096);
+        write_sized_file(
+            &root.join("Personal/Docs/archive.md"),
+            "needle archive",
+            4096,
+        );
+        write_sized_file(&root.join("Work/Docs/draft.pdf"), "needle draft", 512);
+        write_sized_file(&root.join("Personal/Docs/draft.pdf"), "needle draft", 512);
+        write_sized_file(
+            &root.join("Work/Docs/Nested/nested.md"),
+            "needle nested document",
+            2048,
+        );
+        write_sized_file(
+            &root.join("Personal/Docs/Nested/nested.md"),
+            "needle nested document",
+            2048,
+        );
+        write_sized_file(
+            &root.join("Work/Images/report.md"),
+            "needle image scope",
+            4096,
+        );
+        write_sized_file(
+            &root.join("Personal/Images/report.md"),
+            "needle image scope",
+            4096,
+        );
+        write_sized_file(&root.join("Work/Docs/song.mp3"), "needle song", 1024);
+        write_sized_file(&root.join("Personal/Docs/song.mp3"), "needle song", 1024);
+        write_sized_file(&root.join("Work/Docs/clip.mp4"), "needle clip", 1024);
+        write_sized_file(&root.join("Personal/Docs/clip.mp4"), "needle clip", 1024);
+        write_sized_file(&root.join("Work/Docs/tool.exe"), "needle tool", 1024);
+        write_sized_file(&root.join("Personal/Docs/tool.exe"), "needle tool", 1024);
+
+        let cache = SearchCache::walk_fs(&root);
+        (temp_dir, root, cache)
+    }
+
     fn make_node(name: &str, children: Vec<Node>) -> Node {
         Node {
             children,
@@ -1739,6 +1833,192 @@ mod tests {
         assert!(
             paths[0].ends_with("/Work/Docs/café.md")
                 || paths[0].ends_with("/Work/Docs/cafe\u{301}.md")
+        );
+    }
+
+    #[test]
+    fn directory_query_with_base_filter_permutations_stay_inside_scope() {
+        let (_temp_dir, _root, mut cache) =
+            build_base_filter_fixture("base_filter_permutations_scope");
+
+        for query in [
+            "file: report ext:md size:>3k content:needle dm:today",
+            "content:needle size:>3k ext:md file: report dm:today",
+            "dm:today report content:needle ext:md size:>3k file:",
+        ] {
+            let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(query));
+            assert_node_suffixes(&nodes, &["/Work/Docs/report.md"]);
+        }
+    }
+
+    #[test]
+    fn directory_query_with_base_filter_or_and_not_combinations_do_not_escape_scope() {
+        let (_temp_dir, _root, mut cache) = build_base_filter_fixture("base_filter_boolean_scope");
+
+        for query in [
+            "(ext:md | ext:txt) content:needle !archive",
+            "content:needle !archive (ext:md | ext:txt)",
+            "!(archive) (ext:md | ext:txt) content:needle",
+        ] {
+            let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(query));
+            assert_node_suffixes(
+                &nodes,
+                &[
+                    "/Work/Docs/report.md",
+                    "/Work/Docs/notes.txt",
+                    "/Work/Docs/Nested/nested.md",
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn directory_query_with_base_path_filters_compose_with_other_filters() {
+        let (_temp_dir, root, mut cache) = build_base_filter_fixture("base_path_filters_scope");
+        let work_docs = root.join("Work/Docs");
+        let work_nested = root.join("Work/Docs/Nested");
+        let personal_docs = root.join("Personal/Docs");
+        let personal_nested = root.join("Personal/Docs/Nested");
+
+        for query in [
+            format!(
+                r#"parent:"{}" ext:md content:needle !archive"#,
+                work_docs.display()
+            ),
+            format!(
+                r#"ext:md !archive content:needle parent:"{}""#,
+                work_docs.display()
+            ),
+            format!(
+                r#"nosubfolders:"{}" ext:md content:needle !archive"#,
+                work_docs.display()
+            ),
+        ] {
+            let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(&query));
+            assert_node_suffixes(&nodes, &["/Work/Docs/report.md"]);
+        }
+
+        let nested_query = format!(
+            r#"infolder:"{}" ext:md content:needle"#,
+            work_nested.display()
+        );
+        let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(&nested_query));
+        assert_node_suffixes(&nodes, &["/Work/Docs/Nested/nested.md"]);
+
+        let outside_query = format!(
+            r#"parent:"{}" | infolder:"{}""#,
+            personal_docs.display(),
+            personal_nested.display()
+        );
+        let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(&outside_query));
+        assert!(nodes.is_empty(), "outside path filters leaked {nodes:?}");
+    }
+
+    #[test]
+    fn directory_query_with_base_type_filters_with_arguments_stay_inside_scope() {
+        let (_temp_dir, _root, mut cache) =
+            build_base_filter_fixture("base_type_argument_filters_scope");
+
+        for (query, expected) in [
+            ("file:report", vec!["/Work/Docs/report.md"]),
+            ("folder:FolderMatch", vec!["/Work/Docs/FolderMatch"]),
+            ("doc:report", vec!["/Work/Docs/report.md"]),
+            ("type:doc report", vec!["/Work/Docs/report.md"]),
+            (
+                "folder: | file:",
+                vec![
+                    "/Work/Docs/FolderMatch",
+                    "/Work/Docs/Nested",
+                    "/Work/Docs/archive.md",
+                    "/Work/Docs/clip.mp4",
+                    "/Work/Docs/draft.pdf",
+                    "/Work/Docs/notes.txt",
+                    "/Work/Docs/report.md",
+                    "/Work/Docs/song.mp3",
+                    "/Work/Docs/tool.exe",
+                    "/Work/Docs/Nested/nested.md",
+                ],
+            ),
+        ] {
+            let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(query));
+            assert_node_suffixes(&nodes, &expected);
+        }
+    }
+
+    #[test]
+    fn directory_query_with_base_media_executable_and_created_filters_stay_inside_scope() {
+        let (_temp_dir, _root, mut cache) =
+            build_base_filter_fixture("base_media_executable_filters_scope");
+
+        for (query, expected) in [
+            ("audio:song dc:today", vec!["/Work/Docs/song.mp3"]),
+            ("video:clip dc:today", vec!["/Work/Docs/clip.mp4"]),
+            ("exe:tool dc:today", vec!["/Work/Docs/tool.exe"]),
+            (
+                "(type:audio | type:video | type:exe) content:needle dc:today",
+                vec![
+                    "/Work/Docs/clip.mp4",
+                    "/Work/Docs/song.mp3",
+                    "/Work/Docs/tool.exe",
+                ],
+            ),
+        ] {
+            let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(query));
+            assert_node_suffixes(&nodes, &expected);
+        }
+    }
+
+    #[test]
+    fn search_with_options_base_filter_branches_all_share_base() {
+        let (_temp_dir, root, mut cache) =
+            build_base_filter_fixture("explicit_base_filter_branches");
+        let work_docs = root.join("Work/Docs");
+        let personal_docs = root.join("Personal/Docs");
+        let personal_nested = root.join("Personal/Docs/Nested");
+        let scope = guard_indices(cache.search_directory_scope(
+            "Work/Docs",
+            SearchOptions::default(),
+            CancellationToken::noop(),
+        ));
+
+        let or_query = format!(
+            r#"(parent:"{}" | ext:txt) content:needle"#,
+            personal_docs.display()
+        );
+        let indices = guard_indices(cache.search_with_options_base(
+            &or_query,
+            Some(&scope),
+            SearchOptions::default(),
+            CancellationToken::noop(),
+        ));
+        let nodes = cache.expand_file_nodes(&indices);
+        assert_node_suffixes(&nodes, &["/Work/Docs/notes.txt"]);
+
+        let mixed_query = format!(
+            r#"(infolder:"{}" | parent:"{}") ext:md !archive"#,
+            personal_nested.display(),
+            work_docs.display()
+        );
+        let indices = guard_indices(cache.search_with_options_base(
+            &mixed_query,
+            Some(&scope),
+            SearchOptions::default(),
+            CancellationToken::noop(),
+        ));
+        let nodes = cache.expand_file_nodes(&indices);
+        assert_node_suffixes(&nodes, &["/Work/Docs/report.md"]);
+
+        let not_query = format!(r#"!(parent:"{}") ext:md !archive"#, personal_docs.display());
+        let indices = guard_indices(cache.search_with_options_base(
+            &not_query,
+            Some(&scope),
+            SearchOptions::default(),
+            CancellationToken::noop(),
+        ));
+        let nodes = cache.expand_file_nodes(&indices);
+        assert_node_suffixes(
+            &nodes,
+            &["/Work/Docs/report.md", "/Work/Docs/Nested/nested.md"],
         );
     }
 

@@ -85,13 +85,19 @@ impl SearchCache {
         token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
         let mut result: Vec<SlabIndex> = Vec::new();
+        let mut seen: HashSet<SlabIndex> = HashSet::new();
         for part in parts {
             let candidate = self.evaluate_expr(part, base, options, token)?;
             let Some(nodes) = candidate else {
                 return Ok(None);
             };
-            if union_in_place(&mut result, &nodes, token).is_none() {
+            if token.is_cancelled().is_none() {
                 return Ok(None);
+            }
+            for index in nodes {
+                if seen.insert(index) {
+                    result.push(index);
+                }
             }
         }
         Ok(Some(result))
@@ -1658,6 +1664,10 @@ fn intersect_in_place(
     if values.is_empty() {
         return Some(());
     }
+    if rhs.is_empty() {
+        values.clear();
+        return Some(());
+    }
     let rhs_set: HashSet<SlabIndex> = rhs.iter().copied().collect();
     values.retain(|index| rhs_set.contains(index));
     Some(())
@@ -1674,23 +1684,5 @@ fn difference_in_place(
     }
     let rhs_set: HashSet<SlabIndex> = rhs.iter().copied().collect();
     values.retain(|index| !rhs_set.contains(index));
-    Some(())
-}
-
-fn union_in_place(
-    values: &mut Vec<SlabIndex>,
-    rhs: &[SlabIndex],
-    token: CancellationToken,
-) -> Option<()> {
-    token.is_cancelled()?;
-    if rhs.is_empty() {
-        return Some(());
-    }
-    let mut seen: HashSet<SlabIndex> = values.iter().copied().collect();
-    for index in rhs.iter().copied() {
-        if seen.insert(index) {
-            values.push(index);
-        }
-    }
     Some(())
 }
