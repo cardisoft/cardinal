@@ -43,6 +43,10 @@ pub fn search_tags_using_mdfind(
 /// This relies entirely on Spotlight's `kMDItemTextContent` index. It does not
 /// read file bodies directly, so coverage depends on Spotlight's importers and
 /// indexing state.
+///
+/// `needle` must be non-empty. Because it is embedded in a Spotlight string
+/// wildcard expression, single quotes, backslashes, and `*` are rejected instead
+/// of being escaped.
 pub fn search_content_using_mdfind(
     needle: &str,
     case_insensitive: bool,
