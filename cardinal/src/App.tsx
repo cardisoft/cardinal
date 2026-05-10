@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRef, useCallback, useEffect, useMemo } from 'react';
 import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import './App.css';
 import { FileRow } from './components/FileRow';
@@ -38,6 +38,7 @@ function App() {
     updateSearchParams,
     queueSearch,
     queueDirectorySearch,
+    queueDirectoryScopeActive,
     handleStatusUpdate,
     setLifecycleState,
     requestRescan,
@@ -65,8 +66,7 @@ function App() {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const { colWidths, onResizeStart, autoFitColumns } = useColumnResize();
-  const { caseSensitive, directoryQuery } = searchParams;
-  const [isDirectoryScopeOpen, setIsDirectoryScopeOpen] = useState(false);
+  const { caseSensitive, directoryQuery, directoryScopeActive } = searchParams;
   const { eventColWidths, onEventResizeStart, autoFitEventColumns } = useEventColumnWidths();
   const { t, i18n } = useTranslation();
   // `resultsVersion` tracks raw backend search result-set changes.
@@ -180,12 +180,6 @@ function App() {
     focusAndSelectSearchInput();
   }, [focusAndSelectSearchInput]);
 
-  useEffect(() => {
-    if (directoryQuery) {
-      setIsDirectoryScopeOpen(true);
-    }
-  }, [directoryQuery]);
-
   const refreshSearchResults = useCallback(() => {
     queueSearch(currentQuery, { immediate: true });
   }, [currentQuery, queueSearch]);
@@ -257,8 +251,8 @@ function App() {
   );
 
   const toggleDirectoryScope = useCallback(() => {
-    setIsDirectoryScopeOpen((value) => !value);
-  }, []);
+    queueDirectoryScopeActive(!directoryScopeActive);
+  }, [directoryScopeActive, queueDirectoryScopeActive]);
 
   const handleHorizontalSync = useCallback((scrollLeft: number) => {
     // VirtualList drives the scroll position; mirror it onto the sticky header for alignment.
@@ -384,7 +378,7 @@ function App() {
           onChange={onQueryChange}
           onKeyDown={onSearchInputKeyDown}
           directoryScopeEnabled={activeTab === 'files'}
-          directoryScopeOpen={isDirectoryScopeOpen}
+          directoryScopeOpen={directoryScopeActive}
           directoryScopeLabel={directoryScopeLabel}
           directoryPlaceholder={directorySearchPlaceholder}
           directoryValue={directoryInputValue}

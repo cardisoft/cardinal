@@ -114,11 +114,13 @@ vi.mock('../hooks/useFileSearch', () => ({
     searchParams: {
       query: 'needle',
       directoryQuery: 'Work/Docs',
+      directoryScopeActive: true,
       caseSensitive: false,
     },
     updateSearchParams: vi.fn(),
     queueSearch: vi.fn(),
     queueDirectorySearch: vi.fn(),
+    queueDirectoryScopeActive: vi.fn(),
     handleStatusUpdate: vi.fn(),
     setLifecycleState: vi.fn(),
     requestRescan: vi.fn(),

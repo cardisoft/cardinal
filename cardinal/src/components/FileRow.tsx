@@ -5,6 +5,7 @@ import { formatKB, formatTimestamp } from '../utils/format';
 import type { SearchResultItem } from '../types/search';
 import { startNativeFileDrag } from '../utils/drag';
 import { splitPath } from '../utils/path';
+import { hasModifierKey } from '../utils/keyboard';
 
 type FileRowProps = {
   item: SearchResultItem;
@@ -71,8 +72,7 @@ export const FileRow = memo(function FileRow({
       isCtrl: e.ctrlKey,
     };
 
-    const hasModifier = options.isShift || options.isMeta || options.isCtrl;
-    if (!isSelected || hasModifier) {
+    if (!isSelected || hasModifierKey(e)) {
       onSelect(rowIndex, options);
       pendingSelectRef.current = null;
       return;

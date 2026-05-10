@@ -6,6 +6,7 @@ import {
   subscribeQuickLookKeydown,
   type QuickLookKeydownPayload,
 } from '../runtime/tauriEventRuntime';
+import { hasModifierKey } from '../utils/keyboard';
 import { openResultPath } from '../utils/openResultPath';
 import { useStableEvent } from './useStableEvent';
 
@@ -116,7 +117,7 @@ export function useAppHotkeys({
     }
 
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      if (event.altKey || event.ctrlKey || event.metaKey) {
+      if (hasModifierKey(event, { includeShift: false })) {
         return true;
       }
 

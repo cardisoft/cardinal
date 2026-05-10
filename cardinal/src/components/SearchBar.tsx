@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import type { ChangeEvent, FocusEventHandler } from 'react';
+import { hasModifierKey } from '../utils/keyboard';
+import { assignRef } from '../utils/reactRefs';
 
 type SearchBarProps = {
   inputRef: React.Ref<HTMLInputElement>;
@@ -22,6 +24,14 @@ type SearchBarProps = {
   onBlur: FocusEventHandler<HTMLInputElement>;
 };
 
+const isCollapsedAtStart = (input: HTMLInputElement): boolean =>
+  input.selectionStart === 0 && input.selectionEnd === 0;
+
+const isCollapsedAtEnd = (input: HTMLInputElement): boolean => {
+  const end = input.value.length;
+  return input.selectionStart === end && input.selectionEnd === end;
+};
+
 export function SearchBar({
   inputRef,
   placeholder,
@@ -42,13 +52,62 @@ export function SearchBar({
   onFocus,
   onBlur,
 }: SearchBarProps): React.JSX.Element {
+  const queryInputRef = useRef<HTMLInputElement | null>(null);
   const directoryInputRef = useRef<HTMLInputElement | null>(null);
+
+  const setQueryInputRef = useCallback(
+    (node: HTMLInputElement | null) => {
+      queryInputRef.current = node;
+      assignRef(inputRef, node);
+    },
+    [inputRef],
+  );
 
   useEffect(() => {
     if (directoryScopeOpen) {
       directoryInputRef.current?.focus();
     }
   }, [directoryScopeOpen]);
+
+  const handleQueryKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (
+        directoryScopeEnabled &&
+        directoryScopeOpen &&
+        event.key === 'ArrowLeft' &&
+        !hasModifierKey(event) &&
+        isCollapsedAtStart(event.currentTarget)
+      ) {
+        event.preventDefault();
+        const input = directoryInputRef.current;
+        input?.focus();
+        const end = input?.value.length ?? 0;
+        input?.setSelectionRange(end, end);
+        return;
+      }
+
+      onKeyDown(event);
+    },
+    [directoryScopeEnabled, directoryScopeOpen, onKeyDown],
+  );
+
+  const handleDirectoryKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (
+        event.key === 'ArrowRight' &&
+        !hasModifierKey(event) &&
+        isCollapsedAtEnd(event.currentTarget)
+      ) {
+        event.preventDefault();
+        queryInputRef.current?.focus();
+        queryInputRef.current?.setSelectionRange(0, 0);
+        return;
+      }
+
+      onDirectoryKeyDown(event);
+    },
+    [onDirectoryKeyDown],
+  );
 
   return (
     <div className="search-container">
@@ -59,7 +118,7 @@ export function SearchBar({
               type="button"
               className="directory-scope-toggle"
               aria-label={directoryScopeLabel}
-              aria-pressed={directoryScopeOpen || directoryValue.trim().length > 0}
+              aria-pressed={directoryScopeOpen}
               title={directoryScopeLabel}
               onClick={onToggleDirectoryScope}
             >
@@ -74,7 +133,7 @@ export function SearchBar({
                 id="directory-scope-input"
                 value={directoryValue}
                 onChange={onDirectoryChange}
-                onKeyDown={onDirectoryKeyDown}
+                onKeyDown={handleDirectoryKeyDown}
                 placeholder={directoryPlaceholder}
                 spellCheck={false}
                 autoCorrect="off"
@@ -90,10 +149,10 @@ export function SearchBar({
         ) : null}
         <input
           id="search-input"
-          ref={inputRef}
+          ref={setQueryInputRef}
           value={value}
           onChange={onChange}
-          onKeyDown={onKeyDown}
+          onKeyDown={handleQueryKeyDown}
           placeholder={placeholder}
           spellCheck={false}
           autoCorrect="off"

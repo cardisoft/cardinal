@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { StatusTabKey } from '../components/StatusBar';
+import { hasModifierKey } from '../utils/keyboard';
 import { useSearchHistory } from './useSearchHistory';
 
 type QueueSearchOptions = {
@@ -108,7 +109,7 @@ export function useFilesTabState({
         return;
       }
 
-      if (event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) {
+      if (hasModifierKey(event)) {
         return;
       }
 

@@ -31,6 +31,7 @@ type SearchState = {
 type SearchParams = {
   query: string;
   directoryQuery: string;
+  directoryScopeActive: boolean;
   caseSensitive: boolean;
 };
 
@@ -87,6 +88,7 @@ const initialSearchState: SearchState = {
 const initialSearchParams: SearchParams = {
   query: '',
   directoryQuery: '',
+  directoryScopeActive: false,
   caseSensitive: false,
 };
 
@@ -162,7 +164,10 @@ const searchParamsReducer = (prev: SearchParams, patch: Partial<SearchParams>): 
   return { ...prev, ...patch };
 };
 
-const searchParamOrNull = (value: string): string | null => (value.trim() ? value : null);
+const searchParamOrNull = (value: string): string | null => (value.length > 0 ? value : null);
+
+const activeDirectoryQuery = ({ directoryQuery, directoryScopeActive }: SearchParams): string =>
+  directoryScopeActive ? directoryQuery : '';
 
 type UseFileSearchResult = {
   state: SearchState;
@@ -170,6 +175,7 @@ type UseFileSearchResult = {
   updateSearchParams: (patch: Partial<SearchParams>) => void;
   queueSearch: (query: string, options?: QueueSearchOptions) => void;
   queueDirectorySearch: (directoryQuery: string, options?: QueueSearchOptions) => void;
+  queueDirectoryScopeActive: (directoryScopeActive: boolean) => void;
   handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
   setLifecycleState: (status: AppLifecycleStatus) => void;
   requestRescan: () => Promise<void>;
@@ -238,7 +244,8 @@ export function useFileSearch(): UseFileSearchResult {
     const requestVersion = searchVersionRef.current + 1;
     searchVersionRef.current = requestVersion;
 
-    const { query, directoryQuery, caseSensitive } = nextSearch;
+    const { query, caseSensitive } = nextSearch;
+    const directoryQuery = activeDirectoryQuery(nextSearch);
     const startTs = performance.now();
     const isInitial = !hasInitialSearchRunRef.current;
 
@@ -351,6 +358,13 @@ export function useFileSearch(): UseFileSearchResult {
     [queueSearchParams],
   );
 
+  const queueDirectoryScopeActive = useCallback(
+    (directoryScopeActive: boolean) => {
+      queueSearchParams({ directoryScopeActive }, '', { immediate: true });
+    },
+    [queueSearchParams],
+  );
+
   useEffect(() => cancelPendingSearches, [cancelPendingSearches]);
 
   useEffect(() => {
@@ -359,7 +373,8 @@ export function useFileSearch(): UseFileSearchResult {
       return;
     }
 
-    if (!latestSearchRef.current.query && !latestSearchRef.current.directoryQuery) {
+    const nextSearch = latestSearchRef.current;
+    if (!nextSearch.query && !activeDirectoryQuery(nextSearch)) {
       return;
     }
 
@@ -376,6 +391,7 @@ export function useFileSearch(): UseFileSearchResult {
     updateSearchParams,
     queueSearch,
     queueDirectorySearch,
+    queueDirectoryScopeActive,
     handleStatusUpdate,
     setLifecycleState,
     requestRescan,

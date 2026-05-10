@@ -123,11 +123,13 @@ vi.mock('../hooks/useFileSearch', () => ({
     searchParams: {
       query: '',
       directoryQuery: '',
+      directoryScopeActive: false,
       caseSensitive: false,
     },
     updateSearchParams: vi.fn(),
     queueSearch: vi.fn(),
     queueDirectorySearch: vi.fn(),
+    queueDirectoryScopeActive: vi.fn(),
     handleStatusUpdate: vi.fn(),
     setLifecycleState: vi.fn(),
     requestRescan: vi.fn(),
