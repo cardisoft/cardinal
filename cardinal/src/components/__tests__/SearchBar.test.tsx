@@ -33,15 +33,30 @@ const renderSearchBar = (overrides: Partial<ComponentProps<typeof SearchBar>> = 
 
 describe('SearchBar', () => {
   it('does not mark the folder scope toggle as pressed while folded with a saved value', () => {
+    const onToggleDirectoryScope = vi.fn();
     renderSearchBar({
       directoryScopeOpen: false,
       directoryValue: 'Work/Docs',
+      onToggleDirectoryScope,
     });
 
-    expect(screen.getByRole('button', { name: 'Folder scope' })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    );
+    const toggle = screen.getByRole('button', { name: 'Folder scope' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(toggle);
+    expect(onToggleDirectoryScope).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('separator')).toBeNull();
+  });
+
+  it('uses the folder icon inside the opened directory scope to fold it', () => {
+    const onToggleDirectoryScope = vi.fn();
+    renderSearchBar({ onToggleDirectoryScope });
+
+    const toggle = screen.getByRole('button', { name: 'Folder scope' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(toggle).toHaveClass('directory-scope-field-toggle');
+
+    fireEvent.click(toggle);
+    expect(onToggleDirectoryScope).toHaveBeenCalledTimes(1);
   });
 
   it('routes directory input focus state through the shared search focus handlers', () => {
@@ -56,6 +71,12 @@ describe('SearchBar', () => {
 
     fireEvent.blur(directoryInput);
     expect(onBlur).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render a directory resize separator', () => {
+    renderSearchBar();
+
+    expect(screen.queryByRole('separator')).toBeNull();
   });
 
   it('moves focus from the query start to the directory input with ArrowLeft', () => {

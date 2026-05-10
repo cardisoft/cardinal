@@ -1,4 +1,4 @@
-import { useReducer, useRef, useCallback, useEffect } from 'react';
+import { useReducer, useRef, useCallback, useEffect, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { SEARCH_DEBOUNCE_MS } from '../constants';
@@ -34,6 +34,8 @@ type SearchParams = {
   directoryScopeOpen: boolean;
   caseSensitive: boolean;
 };
+
+export const DIRECTORY_SCOPE_OPEN_STORAGE_KEY = 'cardinal.search.directoryScopeOpen';
 
 type QueueSearchOptions = {
   immediate?: boolean;
@@ -90,6 +92,28 @@ const initialSearchParams: SearchParams = {
   directoryQuery: '',
   directoryScopeOpen: false,
   caseSensitive: false,
+};
+
+const readStoredDirectoryScopeOpen = (): boolean => {
+  if (typeof window === 'undefined') {
+    return initialSearchParams.directoryScopeOpen;
+  }
+  try {
+    return window.localStorage.getItem(DIRECTORY_SCOPE_OPEN_STORAGE_KEY) === 'true';
+  } catch {
+    return initialSearchParams.directoryScopeOpen;
+  }
+};
+
+const persistDirectoryScopeOpen = (open: boolean): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(DIRECTORY_SCOPE_OPEN_STORAGE_KEY, open ? 'true' : 'false');
+  } catch {
+    // Ignore storage failures.
+  }
 };
 
 const cancelTimer = (timerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>) => {
@@ -182,8 +206,12 @@ type UseFileSearchResult = {
 };
 
 export function useFileSearch(): UseFileSearchResult {
+  const [initialSearchParamsForHook] = useState<SearchParams>(() => ({
+    ...initialSearchParams,
+    directoryScopeOpen: readStoredDirectoryScopeOpen(),
+  }));
   const [state, dispatch] = useReducer(reducer, initialSearchState);
-  const latestSearchRef = useRef<SearchParams>(initialSearchParams);
+  const latestSearchRef = useRef<SearchParams>(initialSearchParamsForHook);
   // `search-cancellation` maintains an atomic counter
   // and will auto-increment for each search request
   // so this only serves as a defence-in-depth
@@ -192,10 +220,16 @@ export function useFileSearch(): UseFileSearchResult {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [searchParams, patchSearchParams] = useReducer(searchParamsReducer, initialSearchParams);
+  const [searchParams, patchSearchParams] = useReducer(
+    searchParamsReducer,
+    initialSearchParamsForHook,
+  );
 
   const updateSearchParams = useCallback((patch: Partial<SearchParams>) => {
     latestSearchRef.current = { ...latestSearchRef.current, ...patch };
+    if (patch.directoryScopeOpen !== undefined) {
+      persistDirectoryScopeOpen(patch.directoryScopeOpen);
+    }
     patchSearchParams(patch);
   }, []);
 

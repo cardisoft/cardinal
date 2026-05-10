@@ -1,8 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import type { SlabIndex } from '../../types/slab';
-import { useFileSearch } from '../useFileSearch';
+import { DIRECTORY_SCOPE_OPEN_STORAGE_KEY, useFileSearch } from '../useFileSearch';
 import { SearchStatusCode } from '../../types/ipc';
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -52,6 +52,10 @@ const renderReadySearchHook = async () => {
 };
 
 describe('useFileSearch', () => {
+  beforeEach(() => {
+    window.localStorage.setItem(DIRECTORY_SCOPE_OPEN_STORAGE_KEY, 'false');
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
   });
@@ -136,6 +140,7 @@ describe('useFileSearch', () => {
         },
       });
       expect(result.current.state.currentDirectoryQuery).toBe('Projects');
+      expect(window.localStorage.getItem(DIRECTORY_SCOPE_OPEN_STORAGE_KEY)).toBe('true');
     });
 
     mockedInvoke.mockClear();
@@ -151,6 +156,29 @@ describe('useFileSearch', () => {
         },
       });
       expect(result.current.state.currentDirectoryQuery).toBe('');
+      expect(window.localStorage.getItem(DIRECTORY_SCOPE_OPEN_STORAGE_KEY)).toBe('false');
+    });
+  });
+
+  it('hydrates persisted directory scope open state', async () => {
+    window.localStorage.setItem(DIRECTORY_SCOPE_OPEN_STORAGE_KEY, 'true');
+    mockSearchSuccess();
+    const { result } = await renderReadySearchHook();
+
+    expect(result.current.searchParams.directoryScopeOpen).toBe(true);
+
+    act(() => {
+      result.current.queueDirectorySearch('Projects', { immediate: true });
+    });
+
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenLastCalledWith('search', {
+        query: null,
+        directoryQuery: 'Projects',
+        options: {
+          caseInsensitive: true,
+        },
+      });
     });
   });
 
