@@ -17,14 +17,14 @@ type HookProps = {
     query: string,
     options?: {
       immediate?: boolean;
-      onSearchCommitted?: (query: string) => void;
+      onSearchCommitted?: () => void;
     },
   ) => void;
   queueDirectorySearch: (
     directoryQuery: string,
     options?: {
       immediate?: boolean;
-      onSearchCommitted?: (query: string) => void;
+      onSearchCommitted?: () => void;
     },
   ) => void;
   onNavigateFromSearchToResults?: () => void;
@@ -132,8 +132,10 @@ describe('useFilesTabState', () => {
     });
     expect(queueSearch).toHaveBeenCalledWith('abc', {
       immediate: undefined,
-      onSearchCommitted: handleInputChange,
+      onSearchCommitted: expect.any(Function),
     });
+    queueSearch.mock.calls[0][1]?.onSearchCommitted?.();
+    expect(handleInputChange).toHaveBeenCalledWith('abc');
 
     queueSearch.mockClear();
 
@@ -200,8 +202,10 @@ describe('useFilesTabState', () => {
     });
     expect(queueSearch).toHaveBeenCalledWith('enter-query', {
       immediate: true,
-      onSearchCommitted: handleInputChange,
+      onSearchCommitted: expect.any(Function),
     });
+    queueSearch.mock.calls[0][1]?.onSearchCommitted?.();
+    expect(handleInputChange).toHaveBeenCalledWith('enter-query');
     expect(enterPreventDefault).not.toHaveBeenCalled();
 
     queueSearch.mockClear();
@@ -335,7 +339,9 @@ describe('useFilesTabState', () => {
     });
     expect(queueSearch).toHaveBeenCalledWith('external-query', {
       immediate: true,
-      onSearchCommitted: handleInputChange,
+      onSearchCommitted: expect.any(Function),
     });
+    queueSearch.mock.calls[0][1]?.onSearchCommitted?.();
+    expect(handleInputChange).toHaveBeenCalledWith('external-query');
   });
 });

@@ -6,10 +6,15 @@ type ModifierKeyState = {
 };
 
 type ModifierKeyOptions = {
+  includeAlt?: boolean;
   includeShift?: boolean;
 };
 
 export const hasModifierKey = (
   event: ModifierKeyState,
-  { includeShift = true }: ModifierKeyOptions = {},
-): boolean => event.altKey || event.ctrlKey || event.metaKey || (includeShift && event.shiftKey);
+  { includeAlt = true, includeShift = true }: ModifierKeyOptions = {},
+): boolean =>
+  (includeAlt && event.altKey) ||
+  event.ctrlKey ||
+  event.metaKey ||
+  (includeShift && event.shiftKey);

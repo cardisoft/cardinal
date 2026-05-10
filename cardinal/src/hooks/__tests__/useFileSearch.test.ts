@@ -11,6 +11,46 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 const mockedInvoke = vi.mocked(invoke);
 
+const searchResponse = (results: SlabIndex[] = []) => ({
+  results,
+  highlights: [],
+  statusCode: SearchStatusCode.OK,
+});
+
+const mockSearchSuccess = (results: SlabIndex[] = []) => {
+  mockedInvoke.mockImplementation((command: string) => {
+    if (command === 'get_app_status') {
+      return Promise.resolve('Ready');
+    }
+    if (command === 'search') {
+      return Promise.resolve(searchResponse(results));
+    }
+    return Promise.resolve(null);
+  });
+};
+
+const mockSearchCancelled = () => {
+  mockedInvoke.mockImplementation((command: string) => {
+    if (command === 'get_app_status') {
+      return Promise.resolve('Ready');
+    }
+    if (command === 'search') {
+      return Promise.resolve({
+        results: [],
+        highlights: [],
+        statusCode: SearchStatusCode.CANCELLED,
+      });
+    }
+    return Promise.resolve(null);
+  });
+};
+
+const renderReadySearchHook = async () => {
+  const rendered = renderHook(() => useFileSearch());
+  await waitFor(() => expect(rendered.result.current.state.initialFetchCompleted).toBe(true));
+  return rendered;
+};
+
 describe('useFileSearch', () => {
   afterEach(() => {
     vi.clearAllMocks();
@@ -18,24 +58,8 @@ describe('useFileSearch', () => {
 
   it('reuses backend results array without copying', async () => {
     const backendResults = [1, 2, 3] as SlabIndex[];
-
-    mockedInvoke.mockImplementation((command: string) => {
-      if (command === 'get_app_status') {
-        return Promise.resolve('Ready');
-      }
-      if (command === 'search') {
-        return Promise.resolve({
-          results: backendResults,
-          highlights: [],
-          statusCode: SearchStatusCode.OK,
-        });
-      }
-      return Promise.resolve(null);
-    });
-
-    const { result } = renderHook(() => useFileSearch());
-
-    await waitFor(() => expect(result.current.state.initialFetchCompleted).toBe(true));
+    mockSearchSuccess(backendResults);
+    const { result } = await renderReadySearchHook();
 
     expect(result.current.state.results).toBe(backendResults);
     expect(result.current.state.resultCount).toBe(backendResults.length);
@@ -43,41 +67,12 @@ describe('useFileSearch', () => {
 
   it('ignores results when backend returns CANCELLED status', async () => {
     const initialResults = [1, 2, 3] as SlabIndex[];
-
-    mockedInvoke.mockImplementation((command: string) => {
-      if (command === 'get_app_status') {
-        return Promise.resolve('Ready');
-      }
-      if (command === 'search') {
-        // First call (initial search) returns results
-        return Promise.resolve({
-          results: initialResults,
-          highlights: [],
-          statusCode: SearchStatusCode.OK,
-        });
-      }
-      return Promise.resolve(null);
-    });
-
-    const { result } = renderHook(() => useFileSearch());
-
-    // Wait for initial search to complete
-    await waitFor(() => expect(result.current.state.initialFetchCompleted).toBe(true));
+    mockSearchSuccess(initialResults);
+    const { result } = await renderReadySearchHook();
     expect(result.current.state.results).toBe(initialResults);
 
-    // Mock search to return CANCELLED status for the next call
-    mockedInvoke.mockImplementation((command: string) => {
-      if (command === 'search') {
-        return Promise.resolve({
-          results: [],
-          highlights: [],
-          statusCode: SearchStatusCode.CANCELLED,
-        });
-      }
-      return Promise.resolve('Ready');
-    });
+    mockSearchCancelled();
 
-    // Trigger a new search
     act(() => {
       result.current.queueSearch('new query', { immediate: true });
     });
@@ -92,23 +87,8 @@ describe('useFileSearch', () => {
   });
 
   it('does not send directory scope while the scope input is inactive', async () => {
-    mockedInvoke.mockImplementation((command: string) => {
-      if (command === 'get_app_status') {
-        return Promise.resolve('Ready');
-      }
-      if (command === 'search') {
-        return Promise.resolve({
-          results: [],
-          highlights: [],
-          statusCode: SearchStatusCode.OK,
-        });
-      }
-      return Promise.resolve(null);
-    });
-
-    const { result } = renderHook(() => useFileSearch());
-
-    await waitFor(() => expect(result.current.state.initialFetchCompleted).toBe(true));
+    mockSearchSuccess();
+    const { result } = await renderReadySearchHook();
     mockedInvoke.mockClear();
 
     act(() => {
@@ -127,23 +107,8 @@ describe('useFileSearch', () => {
   });
 
   it('re-runs search when directory scope is toggled and controls the directory payload', async () => {
-    mockedInvoke.mockImplementation((command: string) => {
-      if (command === 'get_app_status') {
-        return Promise.resolve('Ready');
-      }
-      if (command === 'search') {
-        return Promise.resolve({
-          results: [],
-          highlights: [],
-          statusCode: SearchStatusCode.OK,
-        });
-      }
-      return Promise.resolve(null);
-    });
-
-    const { result } = renderHook(() => useFileSearch());
-
-    await waitFor(() => expect(result.current.state.initialFetchCompleted).toBe(true));
+    mockSearchSuccess();
+    const { result } = await renderReadySearchHook();
 
     act(() => {
       result.current.queueDirectorySearch('Projects', { immediate: true });
@@ -160,7 +125,7 @@ describe('useFileSearch', () => {
 
     mockedInvoke.mockClear();
     act(() => {
-      result.current.queueDirectoryScopeActive(true);
+      result.current.queueDirectoryScopeOpen(true);
     });
     await waitFor(() => {
       expect(mockedInvoke).toHaveBeenLastCalledWith('search', {
@@ -175,7 +140,7 @@ describe('useFileSearch', () => {
 
     mockedInvoke.mockClear();
     act(() => {
-      result.current.queueDirectoryScopeActive(false);
+      result.current.queueDirectoryScopeOpen(false);
     });
     await waitFor(() => {
       expect(mockedInvoke).toHaveBeenLastCalledWith('search', {
@@ -190,29 +155,14 @@ describe('useFileSearch', () => {
   });
 
   it('passes whitespace directory scope through when the scope is active', async () => {
-    mockedInvoke.mockImplementation((command: string) => {
-      if (command === 'get_app_status') {
-        return Promise.resolve('Ready');
-      }
-      if (command === 'search') {
-        return Promise.resolve({
-          results: [],
-          highlights: [],
-          statusCode: SearchStatusCode.OK,
-        });
-      }
-      return Promise.resolve(null);
-    });
-
-    const { result } = renderHook(() => useFileSearch());
-
-    await waitFor(() => expect(result.current.state.initialFetchCompleted).toBe(true));
+    mockSearchSuccess();
+    const { result } = await renderReadySearchHook();
 
     act(() => {
       result.current.queueDirectorySearch('   ', { immediate: true });
     });
     act(() => {
-      result.current.queueDirectoryScopeActive(true);
+      result.current.queueDirectoryScopeOpen(true);
     });
 
     await waitFor(() => {
@@ -228,23 +178,8 @@ describe('useFileSearch', () => {
   });
 
   it('passes whitespace query through to search', async () => {
-    mockedInvoke.mockImplementation((command: string) => {
-      if (command === 'get_app_status') {
-        return Promise.resolve('Ready');
-      }
-      if (command === 'search') {
-        return Promise.resolve({
-          results: [],
-          highlights: [],
-          statusCode: SearchStatusCode.OK,
-        });
-      }
-      return Promise.resolve(null);
-    });
-
-    const { result } = renderHook(() => useFileSearch());
-
-    await waitFor(() => expect(result.current.state.initialFetchCompleted).toBe(true));
+    mockSearchSuccess();
+    const { result } = await renderReadySearchHook();
     mockedInvoke.mockClear();
 
     act(() => {

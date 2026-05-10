@@ -31,13 +31,13 @@ type SearchState = {
 type SearchParams = {
   query: string;
   directoryQuery: string;
-  directoryScopeActive: boolean;
+  directoryScopeOpen: boolean;
   caseSensitive: boolean;
 };
 
 type QueueSearchOptions = {
   immediate?: boolean;
-  onSearchCommitted?: (value: string) => void;
+  onSearchCommitted?: () => void;
 };
 
 type SearchAction =
@@ -88,7 +88,7 @@ const initialSearchState: SearchState = {
 const initialSearchParams: SearchParams = {
   query: '',
   directoryQuery: '',
-  directoryScopeActive: false,
+  directoryScopeOpen: false,
   caseSensitive: false,
 };
 
@@ -166,8 +166,8 @@ const searchParamsReducer = (prev: SearchParams, patch: Partial<SearchParams>): 
 
 const searchParamOrNull = (value: string): string | null => (value.length > 0 ? value : null);
 
-const activeDirectoryQuery = ({ directoryQuery, directoryScopeActive }: SearchParams): string =>
-  directoryScopeActive ? directoryQuery : '';
+const activeDirectoryQuery = ({ directoryQuery, directoryScopeOpen }: SearchParams): string =>
+  directoryScopeOpen ? directoryQuery : '';
 
 type UseFileSearchResult = {
   state: SearchState;
@@ -175,7 +175,7 @@ type UseFileSearchResult = {
   updateSearchParams: (patch: Partial<SearchParams>) => void;
   queueSearch: (query: string, options?: QueueSearchOptions) => void;
   queueDirectorySearch: (directoryQuery: string, options?: QueueSearchOptions) => void;
-  queueDirectoryScopeActive: (directoryScopeActive: boolean) => void;
+  queueDirectoryScopeOpen: (directoryScopeOpen: boolean) => void;
   handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
   setLifecycleState: (status: AppLifecycleStatus) => void;
   requestRescan: () => Promise<void>;
@@ -327,17 +327,17 @@ export function useFileSearch(): UseFileSearchResult {
   }, []);
 
   const queueSearchParams = useCallback(
-    (patch: Partial<SearchParams>, committedValue: string, options?: QueueSearchOptions) => {
+    (patch: Partial<SearchParams>, options?: QueueSearchOptions) => {
       updateSearchParams(patch);
       cancelPendingSearches();
       if (options?.immediate) {
-        options.onSearchCommitted?.(committedValue);
+        options.onSearchCommitted?.();
         void handleSearch(patch);
         return;
       }
 
       debounceTimerRef.current = setTimeout(() => {
-        options?.onSearchCommitted?.(committedValue);
+        options?.onSearchCommitted?.();
         handleSearch(patch);
       }, SEARCH_DEBOUNCE_MS);
     },
@@ -346,21 +346,21 @@ export function useFileSearch(): UseFileSearchResult {
 
   const queueSearch = useCallback(
     (query: string, options?: QueueSearchOptions) => {
-      queueSearchParams({ query }, query, options);
+      queueSearchParams({ query }, options);
     },
     [queueSearchParams],
   );
 
   const queueDirectorySearch = useCallback(
     (directoryQuery: string, options?: QueueSearchOptions) => {
-      queueSearchParams({ directoryQuery }, directoryQuery, options);
+      queueSearchParams({ directoryQuery }, options);
     },
     [queueSearchParams],
   );
 
-  const queueDirectoryScopeActive = useCallback(
-    (directoryScopeActive: boolean) => {
-      queueSearchParams({ directoryScopeActive }, '', { immediate: true });
+  const queueDirectoryScopeOpen = useCallback(
+    (directoryScopeOpen: boolean) => {
+      queueSearchParams({ directoryScopeOpen }, { immediate: true });
     },
     [queueSearchParams],
   );
@@ -391,7 +391,7 @@ export function useFileSearch(): UseFileSearchResult {
     updateSearchParams,
     queueSearch,
     queueDirectorySearch,
-    queueDirectoryScopeActive,
+    queueDirectoryScopeOpen,
     handleStatusUpdate,
     setLifecycleState,
     requestRescan,

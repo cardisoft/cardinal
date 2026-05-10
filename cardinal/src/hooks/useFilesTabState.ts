@@ -6,7 +6,7 @@ import { useSearchHistory } from './useSearchHistory';
 
 type QueueSearchOptions = {
   immediate?: boolean;
-  onSearchCommitted?: (value: string) => void;
+  onSearchCommitted?: () => void;
 };
 
 type UseFilesTabStateOptions = {
@@ -69,7 +69,7 @@ export function useFilesTabState({
     (query: string, options?: { immediate?: boolean }) => {
       queueSearch(query, {
         immediate: options?.immediate,
-        onSearchCommitted: updateHistoryFromInput,
+        onSearchCommitted: () => updateHistoryFromInput(query),
       });
     },
     [queueSearch, updateHistoryFromInput],

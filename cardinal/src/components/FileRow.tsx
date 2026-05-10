@@ -72,7 +72,7 @@ export const FileRow = memo(function FileRow({
       isCtrl: e.ctrlKey,
     };
 
-    if (!isSelected || hasModifierKey(e)) {
+    if (!isSelected || hasModifierKey(e, { includeAlt: false })) {
       onSelect(rowIndex, options);
       pendingSelectRef.current = null;
       return;

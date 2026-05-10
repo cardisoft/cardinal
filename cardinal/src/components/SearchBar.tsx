@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import type { ChangeEvent, FocusEventHandler } from 'react';
 import { hasModifierKey } from '../utils/keyboard';
-import { assignRef } from '../utils/reactRefs';
 
 type SearchBarProps = {
-  inputRef: React.Ref<HTMLInputElement>;
+  inputRef: React.RefObject<HTMLInputElement>;
   placeholder: string;
   value: string;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -52,16 +51,7 @@ export function SearchBar({
   onFocus,
   onBlur,
 }: SearchBarProps): React.JSX.Element {
-  const queryInputRef = useRef<HTMLInputElement | null>(null);
   const directoryInputRef = useRef<HTMLInputElement | null>(null);
-
-  const setQueryInputRef = useCallback(
-    (node: HTMLInputElement | null) => {
-      queryInputRef.current = node;
-      assignRef(inputRef, node);
-    },
-    [inputRef],
-  );
 
   useEffect(() => {
     if (directoryScopeOpen) {
@@ -99,14 +89,14 @@ export function SearchBar({
         isCollapsedAtEnd(event.currentTarget)
       ) {
         event.preventDefault();
-        queryInputRef.current?.focus();
-        queryInputRef.current?.setSelectionRange(0, 0);
+        inputRef.current?.focus();
+        inputRef.current?.setSelectionRange(0, 0);
         return;
       }
 
       onDirectoryKeyDown(event);
     },
-    [onDirectoryKeyDown],
+    [inputRef, onDirectoryKeyDown],
   );
 
   return (
@@ -149,7 +139,7 @@ export function SearchBar({
         ) : null}
         <input
           id="search-input"
-          ref={setQueryInputRef}
+          ref={inputRef}
           value={value}
           onChange={onChange}
           onKeyDown={handleQueryKeyDown}

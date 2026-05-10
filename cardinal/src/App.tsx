@@ -38,7 +38,7 @@ function App() {
     updateSearchParams,
     queueSearch,
     queueDirectorySearch,
-    queueDirectoryScopeActive,
+    queueDirectoryScopeOpen,
     handleStatusUpdate,
     setLifecycleState,
     requestRescan,
@@ -63,10 +63,10 @@ function App() {
   const eventsPanelRef = useRef<FSEventsPanelHandle | null>(null);
   const headerRef = useRef<HTMLDivElement | null>(null);
   const virtualListRef = useRef<VirtualListHandle | null>(null);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { colWidths, onResizeStart, autoFitColumns } = useColumnResize();
-  const { caseSensitive, directoryQuery, directoryScopeActive } = searchParams;
+  const { caseSensitive, directoryQuery, directoryScopeOpen } = searchParams;
   const { eventColWidths, onEventResizeStart, autoFitEventColumns } = useEventColumnWidths();
   const { t, i18n } = useTranslation();
   // `resultsVersion` tracks raw backend search result-set changes.
@@ -251,8 +251,8 @@ function App() {
   );
 
   const toggleDirectoryScope = useCallback(() => {
-    queueDirectoryScopeActive(!directoryScopeActive);
-  }, [directoryScopeActive, queueDirectoryScopeActive]);
+    queueDirectoryScopeOpen(!directoryScopeOpen);
+  }, [directoryScopeOpen, queueDirectoryScopeOpen]);
 
   const handleHorizontalSync = useCallback((scrollLeft: number) => {
     // VirtualList drives the scroll position; mirror it onto the sticky header for alignment.
@@ -378,7 +378,7 @@ function App() {
           onChange={onQueryChange}
           onKeyDown={onSearchInputKeyDown}
           directoryScopeEnabled={activeTab === 'files'}
-          directoryScopeOpen={directoryScopeActive}
+          directoryScopeOpen={directoryScopeOpen}
           directoryScopeLabel={directoryScopeLabel}
           directoryPlaceholder={directorySearchPlaceholder}
           directoryValue={directoryInputValue}
