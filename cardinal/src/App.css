@@ -173,8 +173,8 @@ main,
   max-width: var(--directory-scope-toggle-width);
   overflow: hidden;
   transition:
-    flex-basis 300ms cubic-bezier(0.2, 1.45, 0.35, 1),
-    max-width 300ms cubic-bezier(0.2, 1.45, 0.35, 1);
+    flex-basis 300ms cubic-bezier(0.2, 1, 0.35, 1),
+    max-width 300ms cubic-bezier(0.2, 1, 0.35, 1);
 }
 
 .directory-scope-segment.is-open {
@@ -198,8 +198,8 @@ main,
   opacity: 0;
   pointer-events: none;
   transition:
-    flex-basis 300ms cubic-bezier(0.2, 1.45, 0.35, 1),
-    max-width 300ms cubic-bezier(0.2, 1.45, 0.35, 1),
+    flex-basis 300ms cubic-bezier(0.2, 1, 0.35, 1),
+    max-width 300ms cubic-bezier(0.2, 1, 0.35, 1),
     opacity 140ms ease,
     border-color 180ms ease,
     background-color 180ms ease;
