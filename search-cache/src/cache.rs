@@ -334,8 +334,8 @@ impl SearchCache {
         cancellation_token: CancellationToken,
     ) -> Result<SearchOutcome> {
         match (&query.directory_query, &query.query) {
-            // Both fields are active: resolve folder scope first, then intersect it
-            // with the normal file search results.
+            // Both fields are active: resolve folder scope first, then use that
+            // descendant set as the base for the normal file search.
             (Some(directory_query), Some(query)) => self.search_with_directory_scope(
                 directory_query,
                 query,
@@ -362,7 +362,7 @@ impl SearchCache {
         options: SearchOptions,
         cancellation_token: CancellationToken,
     ) -> Result<SearchOutcome> {
-        self.search_with_expr_transform(line, options, cancellation_token, |expr| expr)
+        self.search_with_options_base(line, None, options, cancellation_token)
     }
 
     fn search_folder_with_options(
@@ -371,18 +371,40 @@ impl SearchCache {
         options: SearchOptions,
         cancellation_token: CancellationToken,
     ) -> Result<SearchOutcome> {
-        self.search_with_expr_transform(line, options, cancellation_token, require_folder_expr)
+        self.search_with_expr_transform(
+            line,
+            None,
+            options,
+            cancellation_token,
+            require_folder_expr,
+        )
+    }
+
+    fn search_with_options_base(
+        &mut self,
+        line: &str,
+        base: Option<&Vec<SlabIndex>>,
+        options: SearchOptions,
+        cancellation_token: CancellationToken,
+    ) -> Result<SearchOutcome> {
+        self.search_with_expr_transform(line, base, options, cancellation_token, |expr| expr)
     }
 
     fn search_with_expr_transform(
         &mut self,
         line: &str,
+        base: Option<&Vec<SlabIndex>>,
         options: SearchOptions,
         cancellation_token: CancellationToken,
         transform: impl Fn(Expr) -> Expr + Copy,
     ) -> Result<SearchOutcome> {
-        let primary =
-            self.search_with_query_line_transform(line, options, cancellation_token, transform)?;
+        let primary = self.search_with_query_line_transform_base(
+            line,
+            base,
+            options,
+            cancellation_token,
+            transform,
+        )?;
         // Cancellation must short-circuit and propagate as `nodes: None`.
         // Running a secondary normalization pass after cancellation would be wasted work.
         if primary.is_cancelled() {
@@ -395,8 +417,9 @@ impl SearchCache {
             return Ok(primary);
         };
 
-        let secondary = self.search_with_query_line_transform(
+        let secondary = self.search_with_query_line_transform_base(
             &alt_line,
+            base,
             options,
             cancellation_token,
             transform,
@@ -452,24 +475,24 @@ impl SearchCache {
             return Ok(SearchOutcome::cancelled());
         };
 
-        let primary = self.search_with_options(query, options, cancellation_token)?;
+        let primary =
+            self.search_with_options_base(query, Some(&scope_nodes), options, cancellation_token)?;
         let SearchOutcome {
             nodes: primary_nodes,
             highlights: primary_highlights,
         } = primary;
-        let Some(mut primary_nodes) = primary_nodes else {
+        let Some(primary_nodes) = primary_nodes else {
             return Ok(SearchOutcome::cancelled());
         };
-
-        intersect_indices_in_place(&mut primary_nodes, &scope_nodes);
 
         let highlights = SearchOutcome::merge_preserve_order(scope_highlights, primary_highlights);
         Ok(SearchOutcome::new(Some(primary_nodes), highlights))
     }
 
-    fn search_with_query_line_transform(
+    fn search_with_query_line_transform_base(
         &mut self,
         line: &str,
+        base: Option<&Vec<SlabIndex>>,
         options: SearchOptions,
         cancellation_token: CancellationToken,
         transform: impl Fn(Expr) -> Expr,
@@ -481,7 +504,7 @@ impl SearchCache {
         unquoted.expr = transform(unquoted.expr);
         let optimized = optimize_query(unquoted);
         let search_time = Instant::now();
-        let result = self.evaluate_expr(&optimized.expr, options, cancellation_token);
+        let result = self.evaluate_expr(&optimized.expr, base, options, cancellation_token);
         info!("Search time: {:?}", search_time.elapsed());
         result.map(|nodes| SearchOutcome::new(nodes, highlights))
     }
@@ -1099,14 +1122,6 @@ fn require_folder_expr(expr: Expr) -> Expr {
     }
 }
 
-fn intersect_indices_in_place(values: &mut Vec<SlabIndex>, rhs: &[SlabIndex]) {
-    if values.is_empty() {
-        return;
-    }
-    let rhs_set = rhs.iter().copied().collect::<HashSet<_>>();
-    values.retain(|index| rhs_set.contains(index));
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1399,6 +1414,332 @@ mod tests {
 
         assert_eq!(paths.len(), 1);
         assert!(paths[0].ends_with("/Scope/Target/one/two/deep.md"));
+    }
+
+    #[test]
+    fn search_with_options_base_limits_main_query_to_scope_nodes() {
+        let temp_dir = TempDir::new("search_with_options_base_scope").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("Work/Docs")).unwrap();
+        fs::create_dir_all(root.join("Personal/Docs")).unwrap();
+        fs::write(root.join("Work/Docs/report.md"), b"work").unwrap();
+        fs::write(root.join("Personal/Docs/report.md"), b"personal").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let scope = guard_indices(cache.search_directory_scope(
+            "Work/Docs",
+            SearchOptions::default(),
+            CancellationToken::noop(),
+        ));
+        let indices = guard_indices(cache.search_with_options_base(
+            "report*.md",
+            Some(&scope),
+            SearchOptions::default(),
+            CancellationToken::noop(),
+        ));
+        let paths = paths_from_nodes(&cache.expand_file_nodes(&indices));
+
+        assert_eq!(paths.len(), 1);
+        assert!(paths[0].ends_with("/Work/Docs/report.md"));
+    }
+
+    #[test]
+    fn directory_query_with_empty_main_query_returns_scope_descendants() {
+        let temp_dir = TempDir::new("directory_query_empty_main_scope").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("Work/Docs/Nested")).unwrap();
+        fs::create_dir_all(root.join("Personal/Docs")).unwrap();
+        fs::write(root.join("Work/Docs/report.md"), b"work").unwrap();
+        fs::write(root.join("Work/Docs/Nested/notes.md"), b"notes").unwrap();
+        fs::write(root.join("Personal/Docs/report.md"), b"personal").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(""));
+        let paths = paths_from_nodes(&nodes);
+
+        assert_eq!(paths.len(), 3);
+        assert!(paths.iter().any(|path| path.ends_with("/Work/Docs/Nested")));
+        assert!(
+            paths
+                .iter()
+                .any(|path| path.ends_with("/Work/Docs/report.md"))
+        );
+        assert!(
+            paths
+                .iter()
+                .any(|path| path.ends_with("/Work/Docs/Nested/notes.md"))
+        );
+        assert!(
+            !paths
+                .iter()
+                .any(|path| path.ends_with("/Work/Docs") || path.ends_with("/Personal/Docs"))
+        );
+        assert!(
+            !paths
+                .iter()
+                .any(|path| path.ends_with("/Personal/Docs/report.md"))
+        );
+    }
+
+    #[test]
+    fn directory_query_with_or_main_query_respects_scope_base() {
+        let temp_dir = TempDir::new("directory_query_or_scope").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("Work/Docs")).unwrap();
+        fs::create_dir_all(root.join("Personal/Docs")).unwrap();
+        fs::write(root.join("Work/Docs/report.md"), b"work report").unwrap();
+        fs::write(root.join("Work/Docs/notes.md"), b"work notes").unwrap();
+        fs::write(root.join("Personal/Docs/report.md"), b"personal report").unwrap();
+        fs::write(root.join("Personal/Docs/notes.md"), b"personal notes").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some("report.md | notes.md"));
+        let paths = paths_from_nodes(&nodes);
+
+        assert_eq!(paths.len(), 2);
+        assert!(
+            paths
+                .iter()
+                .any(|path| path.ends_with("/Work/Docs/report.md"))
+        );
+        assert!(
+            paths
+                .iter()
+                .any(|path| path.ends_with("/Work/Docs/notes.md"))
+        );
+        assert!(!paths.iter().any(|path| path.contains("/Personal/Docs/")));
+    }
+
+    #[test]
+    fn directory_query_with_not_main_query_uses_scope_as_universe() {
+        let temp_dir = TempDir::new("directory_query_not_scope").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("Work/Docs")).unwrap();
+        fs::create_dir_all(root.join("Personal/Docs")).unwrap();
+        fs::write(root.join("Work/Docs/report.md"), b"report").unwrap();
+        fs::write(root.join("Work/Docs/draft.md"), b"draft").unwrap();
+        fs::write(root.join("Personal/Docs/report.md"), b"report").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some("!draft.md"));
+        let paths = paths_from_nodes(&nodes);
+
+        assert_eq!(paths.len(), 1);
+        assert!(paths[0].ends_with("/Work/Docs/report.md"));
+    }
+
+    #[test]
+    fn directory_query_with_regex_main_query_respects_scope_base() {
+        let temp_dir = TempDir::new("directory_query_regex_scope").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("Work/Docs")).unwrap();
+        fs::create_dir_all(root.join("Personal/Docs")).unwrap();
+        fs::write(root.join("Work/Docs/report-2026.md"), b"work").unwrap();
+        fs::write(root.join("Work/Docs/notes.md"), b"notes").unwrap();
+        fs::write(root.join("Personal/Docs/report-2026.md"), b"personal").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let nodes = scoped_search(
+            &mut cache,
+            Some("Work/Docs"),
+            Some(r"regex:^report-\d+\.md$"),
+        );
+        let paths = paths_from_nodes(&nodes);
+
+        assert_eq!(paths.len(), 1);
+        assert!(paths[0].ends_with("/Work/Docs/report-2026.md"));
+    }
+
+    #[test]
+    fn directory_query_with_filter_only_main_query_uses_scope_base() {
+        let temp_dir = TempDir::new("directory_query_filter_scope").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("Work/Docs")).unwrap();
+        fs::create_dir_all(root.join("Personal/Docs")).unwrap();
+        fs::write(root.join("Work/Docs/report.md"), b"work").unwrap();
+        fs::write(root.join("Work/Docs/report.txt"), b"work txt").unwrap();
+        fs::write(root.join("Personal/Docs/report.md"), b"personal").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some("ext:md"));
+        let paths = paths_from_nodes(&nodes);
+
+        assert_eq!(paths.len(), 1);
+        assert!(paths[0].ends_with("/Work/Docs/report.md"));
+    }
+
+    #[test]
+    fn directory_query_with_and_main_query_keeps_filter_order_base_aware() {
+        let temp_dir = TempDir::new("directory_query_and_order_scope").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("Work/Docs")).unwrap();
+        fs::create_dir_all(root.join("Personal/Docs")).unwrap();
+        fs::write(root.join("Work/Docs/report.md"), b"work").unwrap();
+        fs::write(root.join("Work/Docs/report.txt"), b"work txt").unwrap();
+        fs::write(root.join("Personal/Docs/report.md"), b"personal").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        for query in ["report ext:md", "ext:md report"] {
+            let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(query));
+            let paths = paths_from_nodes(&nodes);
+
+            assert_eq!(paths.len(), 1, "query {query:?}");
+            assert!(
+                paths[0].ends_with("/Work/Docs/report.md"),
+                "query {query:?} returned {paths:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn directory_query_with_content_filter_main_query_uses_scope_base() {
+        let temp_dir = TempDir::new("directory_query_content_scope").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("Work/Docs")).unwrap();
+        fs::create_dir_all(root.join("Personal/Docs")).unwrap();
+        fs::write(root.join("Work/Docs/report.md"), b"shared needle").unwrap();
+        fs::write(root.join("Personal/Docs/report.md"), b"shared needle").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some("content:needle"));
+        let paths = paths_from_nodes(&nodes);
+
+        assert_eq!(paths.len(), 1);
+        assert!(paths[0].ends_with("/Work/Docs/report.md"));
+    }
+
+    #[test]
+    fn directory_query_with_empty_scope_base_returns_no_main_results() {
+        let temp_dir = TempDir::new("directory_query_empty_scope_base").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("Empty/Scope")).unwrap();
+        fs::write(root.join("outside.md"), b"outside").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let nodes = scoped_search(&mut cache, Some("Empty/Scope"), Some("*"));
+
+        assert!(nodes.is_empty());
+    }
+
+    #[test]
+    fn directory_query_with_parent_filter_main_query_respects_scope_base() {
+        let temp_dir = TempDir::new("directory_query_parent_scope").unwrap();
+        let root = temp_dir.path();
+        let work_docs = root.join("Work/Docs");
+        let personal_docs = root.join("Personal/Docs");
+        fs::create_dir_all(&work_docs).unwrap();
+        fs::create_dir_all(&personal_docs).unwrap();
+        fs::write(work_docs.join("report.md"), b"work").unwrap();
+        fs::write(personal_docs.join("report.md"), b"personal").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let personal_parent_query = format!(r#"parent:"{}""#, personal_docs.display());
+        let work_parent_query = format!(r#"parent:"{}""#, work_docs.display());
+
+        let outside_nodes =
+            scoped_search(&mut cache, Some("Work/Docs"), Some(&personal_parent_query));
+        assert!(outside_nodes.is_empty());
+
+        let inside_nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(&work_parent_query));
+        let paths = paths_from_nodes(&inside_nodes);
+        assert_eq!(paths.len(), 1);
+        assert!(paths[0].ends_with("/Work/Docs/report.md"));
+    }
+
+    #[test]
+    fn directory_query_with_infolder_filter_main_query_respects_scope_base() {
+        let temp_dir = TempDir::new("directory_query_infolder_scope").unwrap();
+        let root = temp_dir.path();
+        let work_docs = root.join("Work/Docs");
+        let personal_docs = root.join("Personal/Docs");
+        fs::create_dir_all(work_docs.join("Nested")).unwrap();
+        fs::create_dir_all(personal_docs.join("Nested")).unwrap();
+        fs::write(work_docs.join("Nested/report.md"), b"work").unwrap();
+        fs::write(personal_docs.join("Nested/report.md"), b"personal").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let personal_query = format!(r#"infolder:"{}""#, personal_docs.display());
+        let work_query = format!(r#"infolder:"{}""#, work_docs.display());
+
+        let outside_nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(&personal_query));
+        assert!(outside_nodes.is_empty());
+
+        let inside_nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(&work_query));
+        let paths = paths_from_nodes(&inside_nodes);
+        assert_eq!(paths.len(), 2);
+        assert!(paths.iter().any(|path| path.ends_with("/Work/Docs/Nested")));
+        assert!(
+            paths
+                .iter()
+                .any(|path| path.ends_with("/Work/Docs/Nested/report.md"))
+        );
+    }
+
+    #[test]
+    fn directory_query_with_nosubfolders_filter_main_query_respects_scope_base() {
+        let temp_dir = TempDir::new("directory_query_nosubfolders_scope").unwrap();
+        let root = temp_dir.path();
+        let work_docs = root.join("Work/Docs");
+        let personal_docs = root.join("Personal/Docs");
+        fs::create_dir_all(work_docs.join("Nested")).unwrap();
+        fs::create_dir_all(&personal_docs).unwrap();
+        fs::write(work_docs.join("report.md"), b"work").unwrap();
+        fs::write(work_docs.join("Nested/deep.md"), b"deep").unwrap();
+        fs::write(personal_docs.join("report.md"), b"personal").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let personal_query = format!(r#"nosubfolders:"{}""#, personal_docs.display());
+        let work_query = format!(r#"nosubfolders:"{}""#, work_docs.display());
+
+        let outside_nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(&personal_query));
+        assert!(outside_nodes.is_empty());
+
+        let inside_nodes = scoped_search(&mut cache, Some("Work/Docs"), Some(&work_query));
+        let paths = paths_from_nodes(&inside_nodes);
+        assert_eq!(paths.len(), 1);
+        assert!(paths[0].ends_with("/Work/Docs/report.md"));
+    }
+
+    #[test]
+    fn search_with_options_base_propagates_primary_cancellation() {
+        let temp_dir = TempDir::new("search_with_options_base_cancel").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("Work/Docs")).unwrap();
+        fs::write(root.join("Work/Docs/report.md"), b"work").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let scope = guard_indices(cache.search_directory_scope(
+            "Work/Docs",
+            SearchOptions::default(),
+            CancellationToken::noop(),
+        ));
+        let token = CancellationToken::new_search();
+        let _ = CancellationToken::new_search();
+        let outcome = cache
+            .search_with_options_base("report.md", Some(&scope), SearchOptions::default(), token)
+            .expect("search should not fail");
+
+        assert!(outcome.is_cancelled());
+    }
+
+    #[test]
+    fn directory_query_with_normalization_fallback_respects_scope_base() {
+        let temp_dir = TempDir::new("directory_query_normalization_scope").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("Work/Docs")).unwrap();
+        fs::create_dir_all(root.join("Personal/Docs")).unwrap();
+        fs::write(root.join("Work/Docs/cafe\u{301}.md"), b"work").unwrap();
+        fs::write(root.join("Personal/Docs/cafe\u{301}.md"), b"personal").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let nodes = scoped_search(&mut cache, Some("Work/Docs"), Some("café.md"));
+        let paths = paths_from_nodes(&nodes);
+
+        assert_eq!(paths.len(), 1);
+        assert!(
+            paths[0].ends_with("/Work/Docs/café.md")
+                || paths[0].ends_with("/Work/Docs/cafe\u{301}.md")
+        );
     }
 
     #[test]
