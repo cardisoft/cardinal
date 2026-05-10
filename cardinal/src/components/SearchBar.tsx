@@ -82,6 +82,8 @@ export function SearchBar({
                 autoCapitalize="off"
                 aria-label={directoryScopeLabel}
                 disabled={!directoryScopeOpen}
+                onFocus={onFocus}
+                onBlur={onBlur}
               />
             </div>
           </>

@@ -5,7 +5,7 @@ import { useSearchHistory } from './useSearchHistory';
 
 type QueueSearchOptions = {
   immediate?: boolean;
-  onSearchCommitted?: (query: string) => void;
+  onSearchCommitted?: (value: string) => void;
 };
 
 type UseFilesTabStateOptions = {

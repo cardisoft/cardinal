@@ -36,7 +36,7 @@ type SearchParams = {
 
 type QueueSearchOptions = {
   immediate?: boolean;
-  onSearchCommitted?: (query: string) => void;
+  onSearchCommitted?: (value: string) => void;
 };
 
 type SearchAction =
@@ -159,8 +159,7 @@ function reducer(state: SearchState, action: SearchAction): SearchState {
 }
 
 const searchParamsReducer = (prev: SearchParams, patch: Partial<SearchParams>): SearchParams => {
-  const next = { ...prev, ...patch };
-  return next;
+  return { ...prev, ...patch };
 };
 
 const searchParamOrNull = (value: string): string | null => (value.trim() ? value : null);
@@ -320,7 +319,7 @@ export function useFileSearch(): UseFileSearchResult {
     }
   }, []);
 
-  const queueSearchPatch = useCallback(
+  const queueSearchParams = useCallback(
     (patch: Partial<SearchParams>, committedValue: string, options?: QueueSearchOptions) => {
       updateSearchParams(patch);
       cancelPendingSearches();
@@ -340,16 +339,16 @@ export function useFileSearch(): UseFileSearchResult {
 
   const queueSearch = useCallback(
     (query: string, options?: QueueSearchOptions) => {
-      queueSearchPatch({ query }, query, options);
+      queueSearchParams({ query }, query, options);
     },
-    [queueSearchPatch],
+    [queueSearchParams],
   );
 
   const queueDirectorySearch = useCallback(
     (directoryQuery: string, options?: QueueSearchOptions) => {
-      queueSearchPatch({ directoryQuery }, directoryQuery, options);
+      queueSearchParams({ directoryQuery }, directoryQuery, options);
     },
-    [queueSearchPatch],
+    [queueSearchParams],
   );
 
   useEffect(() => cancelPendingSearches, [cancelPendingSearches]);
