@@ -128,6 +128,11 @@
     "trayIcon": {
       "label": "トレイアイコンを表示"
     },
+    "server": {
+      "enabled": "HTTP 検索サーバー",
+      "endpoint": "HTTP サーバーエンドポイント",
+      "endpointError": "127.0.0.1:3388 または 0.0.0.0:3388 のようなエンドポイントを入力してください。"
+    },
     "sortingLimit": {
       "label": "並び替えの上限"
     },

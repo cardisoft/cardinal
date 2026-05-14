@@ -128,6 +128,11 @@
     "trayIcon": {
       "label": "Tepsi simgesini göster"
     },
+    "server": {
+      "enabled": "HTTP arama sunucusu",
+      "endpoint": "HTTP sunucu uç noktası",
+      "endpointError": "127.0.0.1:3388 veya 0.0.0.0:3388 gibi bir uç nokta girin."
+    },
     "sortingLimit": {
       "label": "Sıralama sınırı"
     },

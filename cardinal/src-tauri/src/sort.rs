@@ -1,16 +1,16 @@
 use fswalk::NodeFileType;
 use search_cache::{SearchResultNode, SlabIndex, SlabNodeMetadataCompact};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering as StdOrdering, path::Path};
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SortStatePayload {
     pub key: SortKeyPayload,
     pub direction: SortDirectionPayload,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SortKeyPayload {
     Filename,
@@ -20,7 +20,7 @@ pub enum SortKeyPayload {
     Ctime,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SortDirectionPayload {
     Asc,

@@ -127,6 +127,11 @@
     "trayIcon": {
       "label": "顯示托盤圖示"
     },
+    "server": {
+      "enabled": "HTTP 搜尋伺服器",
+      "endpoint": "HTTP 伺服器端點",
+      "endpointError": "請輸入類似 127.0.0.1:3388 或 0.0.0.0:3388 的端點。"
+    },
     "sortingLimit": {
       "label": "排序上限"
     },

@@ -128,6 +128,11 @@
     "trayIcon": {
       "label": "Mostra icona nel vassoio"
     },
+    "server": {
+      "enabled": "Server di ricerca HTTP",
+      "endpoint": "Endpoint del server HTTP",
+      "endpointError": "Inserisci un endpoint come 127.0.0.1:3388 o 0.0.0.0:3388."
+    },
     "sortingLimit": {
       "label": "Limite ordinamento"
     },

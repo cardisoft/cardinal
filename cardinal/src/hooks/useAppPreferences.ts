@@ -10,6 +10,8 @@ import { setWatchConfig } from '../utils/watchConfig';
 import type { FullDiskAccessStatus } from './useFullDiskAccessPermission';
 import { useIgnorePaths } from './useIgnorePaths';
 import { useIncludePaths } from './useIncludePaths';
+import { useServerConfig } from './useServerConfig';
+import type { ServerConfig } from './useServerConfig';
 import { useWatchRoot } from './useWatchRoot';
 
 type WatchConfigChangePayload = {
@@ -17,6 +19,12 @@ type WatchConfigChangePayload = {
   ignorePaths: string[];
   includePaths: string[];
 };
+
+type ServerConfigPayload = {
+  serverConfig: ServerConfig;
+};
+
+type PreferencesChangePayload = WatchConfigChangePayload & ServerConfigPayload;
 
 type UseAppPreferencesOptions = {
   fullDiskAccessStatus: FullDiskAccessStatus;
@@ -36,8 +44,10 @@ type UseAppPreferencesResult = {
   defaultIgnorePaths: string[];
   includePaths: string[];
   defaultIncludePaths: string[];
+  serverConfig: ServerConfig;
+  defaultServerConfig: ServerConfig;
   preferencesResetToken: number;
-  handleWatchConfigChange: (next: WatchConfigChangePayload) => void;
+  handlePreferencesChange: (next: PreferencesChangePayload) => void;
   handleResetPreferences: () => void;
 };
 
@@ -57,6 +67,7 @@ export function useAppPreferences({
   const { watchRoot, setWatchRoot, defaultWatchRoot } = useWatchRoot();
   const { ignorePaths, setIgnorePaths, defaultIgnorePaths } = useIgnorePaths();
   const { includePaths, setIncludePaths, defaultIncludePaths } = useIncludePaths();
+  const { serverConfig, setServerConfig, defaultServerConfig } = useServerConfig();
   const logicStartedRef = useRef(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [trayIconEnabled, setTrayIconEnabled] = useState<boolean>(() => getStoredTrayIconEnabled());
@@ -129,21 +140,35 @@ export function useAppPreferences({
     ],
   );
 
-  const handleWatchConfigChange = useCallback(
-    (next: WatchConfigChangePayload) => {
-      applyWatchConfig(next.watchRoot, next.ignorePaths, next.includePaths);
+  const applyServerConfig = useCallback(
+    (next: ServerConfig) => {
+      if (next.enabled === serverConfig.enabled && next.endpoint === serverConfig.endpoint) {
+        return;
+      }
+
+      setServerConfig(next);
+      void invoke('set_server_config', { config: next });
     },
-    [applyWatchConfig],
+    [serverConfig.enabled, serverConfig.endpoint, setServerConfig],
+  );
+
+  const handlePreferencesChange = useCallback(
+    (next: PreferencesChangePayload) => {
+      applyWatchConfig(next.watchRoot, next.ignorePaths, next.includePaths);
+      applyServerConfig(next.serverConfig);
+    },
+    [applyServerConfig, applyWatchConfig],
   );
 
   const handleResetPreferences = useCallback(() => {
     setTrayIconEnabled(false);
+    applyServerConfig(defaultServerConfig);
     persistThemePreference('system');
     applyThemePreference('system');
     const nextLanguage = getBrowserLanguage();
     void i18n.changeLanguage(nextLanguage);
     setPreferencesResetToken((token) => token + 1);
-  }, [i18n]);
+  }, [applyServerConfig, defaultServerConfig, i18n]);
 
   const closePreferences = useCallback(() => setIsPreferencesOpen(false), []);
 
@@ -158,8 +183,10 @@ export function useAppPreferences({
     defaultIgnorePaths,
     includePaths,
     defaultIncludePaths,
+    serverConfig,
+    defaultServerConfig,
     preferencesResetToken,
-    handleWatchConfigChange,
+    handlePreferencesChange,
     handleResetPreferences,
   };
 }

@@ -3,6 +3,7 @@ mod commands;
 mod lifecycle;
 mod quicklook;
 mod search_activity;
+mod server;
 mod sort;
 mod window_controls;
 
@@ -13,11 +14,12 @@ use background::{
 };
 use cardinal_sdk::EventWatcher;
 use commands::{
-    NodeInfoRequest, SearchJob, SearchState, WatchConfigUpdate, activate_main_window,
-    close_quicklook, copy_files_to_clipboard, get_app_status, get_nodes_info, get_sorted_view,
-    hide_main_window, normalize_watch_config, open_in_finder, open_path, search,
-    set_tray_activation_policy, set_watch_config, start_logic, toggle_main_window,
-    toggle_quicklook, trigger_rescan, update_icon_viewport, update_quicklook,
+    NodeInfoRequest, SearchJob, SearchState, ServerConfig, WatchConfigUpdate, activate_main_window,
+    close_quicklook, copy_files_to_clipboard, get_app_status, get_nodes_info, get_server_config,
+    get_sorted_view, hide_main_window, load_server_config_from_file, normalize_watch_config,
+    open_in_finder, open_path, search, set_server_config, set_tray_activation_policy,
+    set_watch_config, start_logic, toggle_main_window, toggle_quicklook, trigger_rescan,
+    update_icon_viewport, update_quicklook,
 };
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, bounded, unbounded};
 use lifecycle::{
@@ -63,6 +65,7 @@ pub fn run() -> Result<()> {
     let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>)>();
     let (rescan_tx, rescan_rx) = unbounded::<CancellationToken>();
     let (watch_config_tx, watch_config_rx) = unbounded::<WatchConfigUpdate>();
+    let (server_config_tx, server_config_rx) = unbounded::<ServerConfig>();
     let (icon_update_tx, icon_update_rx) = unbounded::<IconPayload>();
     let (update_window_state_tx, update_window_state_rx) = bounded::<()>(1);
     let (logic_start_tx, logic_start_rx) = bounded(1);
@@ -114,21 +117,25 @@ pub fn run() -> Result<()> {
 
     let app = builder
         .manage(SearchState::new(
-            search_tx,
-            node_info_tx,
+            search_tx.clone(),
+            node_info_tx.clone(),
             icon_viewport_tx.clone(),
             rescan_tx.clone(),
             watch_config_tx.clone(),
+            ServerConfig::default(),
+            server_config_tx.clone(),
             update_window_state_tx.clone(),
         ))
         .invoke_handler(tauri::generate_handler![
             search,
             get_nodes_info,
             get_sorted_view,
+            get_server_config,
             update_icon_viewport,
             get_app_status,
             trigger_rescan,
             set_watch_config,
+            set_server_config,
             open_in_finder,
             open_path,
             toggle_quicklook,
@@ -143,6 +150,16 @@ pub fn run() -> Result<()> {
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
+
+    let initial_server_config = app
+        .path()
+        .app_config_dir()
+        .map(|p| load_server_config_from_file(&p.join("server_config.json")))
+        .unwrap_or_default();
+    {
+        let state = app.state::<SearchState>();
+        *state.server_config.lock() = initial_server_config.clone();
+    }
 
     let db_path = DB_PATH
         .get_or_try_init(|| app.path().app_config_dir().map(|p| p.join("cardinal.db")))
@@ -161,6 +178,51 @@ pub fn run() -> Result<()> {
     };
     emit_app_state(app_handle);
     let icon_update_rx = &icon_update_rx;
+
+    // http server
+    let server_state = server::ServerState::new(search_tx, node_info_tx);
+    tauri::async_runtime::spawn(async move {
+        let mut current_server_handle: Option<tokio::sync::oneshot::Sender<()>> = None;
+        let server_config_rx = server_config_rx;
+        let mut current_config = initial_server_config;
+
+        loop {
+            // If enabled and not running, start it
+            if current_config.enabled && current_server_handle.is_none() {
+                let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+                let endpoint = current_config.endpoint.clone();
+                let state = server_state.clone();
+                tauri::async_runtime::spawn(async move {
+                    server::start_server(state, endpoint, async {
+                        let _ = shutdown_rx.await;
+                    })
+                    .await;
+                });
+                current_server_handle = Some(shutdown_tx);
+            } else if !current_config.enabled && current_server_handle.is_some() {
+                // If disabled and running, stop it
+                if let Some(handle) = current_server_handle.take() {
+                    let _ = handle.send(());
+                }
+            }
+
+            // Wait for next config update
+            match server_config_rx.recv() {
+                Ok(new_config) => {
+                    info!("Received server config update: {:?}", new_config);
+                    if new_config.endpoint != current_config.endpoint || !new_config.enabled {
+                        // Restart if endpoint changed or disabled
+                        if let Some(handle) = current_server_handle.take() {
+                            let _ = handle.send(());
+                        }
+                    }
+                    current_config = new_config;
+                }
+                Err(_) => break, // Channel closed
+            }
+        }
+    });
+
     std::thread::scope(move |s| {
         s.spawn(|| {
             while let Ok(icon) = icon_update_rx.recv() {

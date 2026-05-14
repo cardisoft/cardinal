@@ -128,6 +128,11 @@
     "trayIcon": {
       "label": "트레이 아이콘 표시"
     },
+    "server": {
+      "enabled": "HTTP 검색 서버",
+      "endpoint": "HTTP 서버 엔드포인트",
+      "endpointError": "127.0.0.1:3388 또는 0.0.0.0:3388 형식의 엔드포인트를 입력하세요."
+    },
     "sortingLimit": {
       "label": "정렬 한도"
     },
