@@ -22,7 +22,8 @@
     "path": "Path",
     "size": "Size",
     "modified": "Modified",
-    "created": "Created"
+    "created": "Created",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "Sorting is disabled. Too many results ({{limit}}+) may impact performance. You can adjust the threshold in Preferences."

@@ -22,7 +22,8 @@
     "path": "Yol",
     "size": "Boyut",
     "modified": "Değiştirildi",
-    "created": "Oluşturuldu"
+    "created": "Oluşturuldu",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "Sıralama devre dışı. Çok fazla sonuç ({{limit}}+) performansı etkileyebilir. Eşiği Tercihler'de ayarlayabilirsiniz."

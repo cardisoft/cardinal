@@ -22,7 +22,8 @@
     "path": "Percorso",
     "size": "Dimensione",
     "modified": "Modificato",
-    "created": "Creato"
+    "created": "Creato",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "L'ordinamento è disattivato. Troppi risultati ({{limit}}+) potrebbero influire sulle prestazioni. Puoi regolare la soglia in Preferenze."

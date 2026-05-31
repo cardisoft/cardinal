@@ -22,7 +22,8 @@
     "path": "Caminho",
     "size": "Tamanho",
     "modified": "Modificado",
-    "created": "Criado"
+    "created": "Criado",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "A ordenação está desativada. Muitos resultados ({{limit}}+) podem afetar o desempenho. Ajuste o limite em Preferências."

@@ -22,7 +22,8 @@
     "path": "路径",
     "size": "大小",
     "modified": "修改时间",
-    "created": "创建时间"
+    "created": "创建时间",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "排序已禁用。结果超过 {{limit}} 个可能影响性能。您可以在偏好设置中调整阈值。"

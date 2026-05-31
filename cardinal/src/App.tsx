@@ -30,6 +30,7 @@ import { useAppPreferences } from './hooks/useAppPreferences';
 import { useAppWindowListeners } from './hooks/useAppWindowListeners';
 import { useFilesTabEffects } from './hooks/useFilesTabEffects';
 import { useFilesTabState } from './hooks/useFilesTabState';
+import { extractContentTerms } from './utils/contentQuery';
 
 function App() {
   const {
@@ -262,6 +263,11 @@ function App() {
   }, []);
 
   const selectedIndexSet = useMemo(() => new Set(selectedIndices), [selectedIndices]);
+  const contentTerms = useMemo(() => extractContentTerms(currentQuery), [currentQuery]);
+  const showContentContext = contentTerms.length > 0;
+  const fileRowsWidth = showContentContext
+    ? 'var(--columns-total-with-context)'
+    : 'var(--columns-total)';
 
   const handleRowContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => {
@@ -289,7 +295,7 @@ function App() {
           <div
             key={`placeholder-${rowIndex}`}
             className="row columns row-loading"
-            style={{ ...rowStyle, width: 'var(--columns-total)' }}
+            style={{ ...rowStyle, width: fileRowsWidth }}
           />
         );
       }
@@ -299,11 +305,13 @@ function App() {
           key={item.path}
           rowIndex={rowIndex}
           item={item}
-          style={{ ...rowStyle, width: 'var(--columns-total)' }}
+          style={{ ...rowStyle, width: fileRowsWidth }}
           isSelected={selectedIndexSet.has(rowIndex)}
           selectedPathsForDrag={selectedPaths}
           caseInsensitive={!caseSensitive}
           highlightTerms={highlightTerms}
+          contentTerms={contentTerms}
+          showContentContext={showContentContext}
           onContextMenu={handleRowContextMenu}
           onSelect={handleRowSelect}
           onOpen={openResultPath}
@@ -314,6 +322,9 @@ function App() {
       handleRowContextMenu,
       handleRowSelect,
       highlightTerms,
+      contentTerms,
+      showContentContext,
+      fileRowsWidth,
       caseSensitive,
       selectedIndexSet,
       selectedPaths,
@@ -335,6 +346,7 @@ function App() {
       ({
         '--w-filename': `${colWidths.filename}px`,
         '--w-path': `${colWidths.path}px`,
+        '--w-context': `${Math.max(420, Math.floor(window.innerWidth * 0.4))}px`,
         '--w-size': `${colWidths.size}px`,
         '--w-modified': `${colWidths.modified}px`,
         '--w-created': `${colWidths.created}px`,
@@ -426,6 +438,9 @@ function App() {
               onSortToggle={handleSortToggle}
               sortDisabled={sortButtonsDisabled}
               sortDisabledTooltip={sortDisabledTooltip}
+              showContentContext={showContentContext}
+              contentTerms={contentTerms}
+              caseInsensitive={!caseSensitive}
             />
           )}
         </div>
