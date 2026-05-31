@@ -15,11 +15,17 @@ const fromNodeInfo = (node: NodeInfoResponse): SearchResultItem => ({
   mtime: node.mtime ?? node.metadata?.mtime,
   ctime: node.ctime ?? node.metadata?.ctime,
   icon: node.icon ?? undefined,
+  contentContext: node.contentContext ?? undefined,
 });
 
 // Data-only loader for visible rows. It owns row metadata caching and stale-request rejection;
 // VirtualList handles any temporary frozen-view rendering during result-set swaps.
-export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) {
+export function useDataLoader(
+  results: SlabIndex[],
+  dataResultsVersion: number,
+  contentTerms: readonly string[] = [],
+  caseInsensitive = false,
+) {
   const loadingRef = useRef<Set<SlabIndex>>(new Set());
   // Monotonic epoch for range-load requests. A new search result-set bumps this value so
   // late `get_nodes_info` responses from the previous result-set can be ignored safely.
@@ -32,7 +38,11 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
     return initial;
   });
   const resultsRef = useRef<SlabIndex[]>([]);
+  const contentTermsRef = useRef<readonly string[]>([]);
+  const caseInsensitiveRef = useRef(caseInsensitive);
   resultsRef.current = results;
+  contentTermsRef.current = contentTerms;
+  caseInsensitiveRef.current = caseInsensitive;
 
   // Reset cache state whenever the backing result-set changes so slab-index reuse in the
   // backend cannot surface stale row data for a newer search result-set.
@@ -102,7 +112,11 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
       }
       if (needLoading.length === 0) return;
       const versionAtRequest = versionRef.current;
-      const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', { results: needLoading });
+      const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', {
+        results: needLoading,
+        contentTerms: contentTermsRef.current,
+        caseInsensitive: caseInsensitiveRef.current,
+      });
       if (versionRef.current !== versionAtRequest) {
         // The result-set changed while this request was in flight. Drop the payload instead of
         // merging stale rows into the cache for the new query.

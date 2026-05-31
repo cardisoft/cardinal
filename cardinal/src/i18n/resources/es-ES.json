@@ -22,7 +22,8 @@
     "path": "Ruta",
     "size": "Tamaño",
     "modified": "Modificado",
-    "created": "Creado"
+    "created": "Creado",
+    "context": "Contexto"
   },
   "sorting": {
     "disabled": "La ordenación está deshabilitada. Demasiados resultados ({{limit}}+) pueden afectar el rendimiento. Puede ajustar el umbral en Preferencias."

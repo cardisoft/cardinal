@@ -27,18 +27,30 @@ type ColumnHeaderProps = {
   onSortToggle: (sortKey: SortKey) => void;
   sortDisabled: boolean;
   sortDisabledTooltip: string | null;
+  showContentContext: boolean;
 };
 
 // Column widths are applied via CSS vars on container; no need to pass colWidths prop.
 export const ColumnHeader = forwardRef<HTMLDivElement, ColumnHeaderProps>(
   (
-    { onResizeStart, onContextMenu, sortState, onSortToggle, sortDisabled, sortDisabledTooltip },
+    {
+      onResizeStart,
+      onContextMenu,
+      sortState,
+      onSortToggle,
+      sortDisabled,
+      sortDisabledTooltip,
+      showContentContext,
+    },
     ref,
   ) => {
     const { t } = useTranslation();
     return (
       <div ref={ref} className="header-row-container">
         <div className="header-row columns" onContextMenu={onContextMenu}>
+          {showContentContext ? (
+            <span className="context-text header header-cell">{t('columns.context')}</span>
+          ) : null}
           {columns.map(({ key, labelKey, className }) => {
             const label = t(labelKey);
             const sortKey = sortableColumns[key];

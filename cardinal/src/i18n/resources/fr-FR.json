@@ -22,7 +22,8 @@
     "path": "Chemin",
     "size": "Taille",
     "modified": "Modifié",
-    "created": "Créé"
+    "created": "Créé",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "Le tri est désactivé. Trop de résultats ({{limit}}+) peuvent affecter les performances. Vous pouvez ajuster le seuil dans les Préférences."

@@ -22,7 +22,8 @@
     "path": "路徑",
     "size": "大小",
     "modified": "修改時間",
-    "created": "建立時間"
+    "created": "建立時間",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "排序已停用。結果超過 {{limit}} 個可能影響效能。你可以在偏好設定中調整門檻。"

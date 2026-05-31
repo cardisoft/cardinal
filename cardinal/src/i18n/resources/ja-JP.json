@@ -22,7 +22,8 @@
     "path": "パス",
     "size": "サイズ",
     "modified": "更新日時",
-    "created": "作成日時"
+    "created": "作成日時",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "並べ替えは無効化されています。結果が多すぎる ({{limit}}+) とパフォーマンスに影響する可能性があります。環境設定でしきい値を調整できます。"
