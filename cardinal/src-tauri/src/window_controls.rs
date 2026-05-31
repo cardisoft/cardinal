@@ -1,5 +1,4 @@
 use crate::commands::SearchState;
-#[cfg(target_os = "macos")]
 use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow};
 use tracing::{error, info, warn};
@@ -12,10 +11,17 @@ pub enum WindowToggle {
 }
 
 pub fn activate_window<R: Runtime>(window: &WebviewWindow<R>) {
-    activate_window_on_platform(window);
+    let window_for_task = window.clone();
+    if let Err(err) = window.run_on_main_thread(move || {
+        apply_active_space_behavior(&window_for_task);
+        show_and_focus_window(&window_for_task);
+    }) {
+        error!(?err, "Failed to schedule macOS window activation");
+        show_and_focus_window(window);
+    }
 }
 
-fn activate_window_impl<R: Runtime>(window: &WebviewWindow<R>) {
+fn show_and_focus_window<R: Runtime>(window: &WebviewWindow<R>) {
     if let Ok(true) = window.is_minimized()
         && let Err(err) = window.unminimize()
     {
@@ -33,24 +39,6 @@ fn activate_window_impl<R: Runtime>(window: &WebviewWindow<R>) {
     }
 }
 
-#[cfg(target_os = "macos")]
-fn activate_window_on_platform<R: Runtime>(window: &WebviewWindow<R>) {
-    let window_for_task = window.clone();
-    if let Err(err) = window.run_on_main_thread(move || {
-        apply_active_space_behavior(&window_for_task);
-        activate_window_impl(&window_for_task);
-    }) {
-        error!(?err, "Failed to schedule macOS window activation");
-        activate_window_impl(window);
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-fn activate_window_on_platform<R: Runtime>(window: &WebviewWindow<R>) {
-    activate_window_impl(window);
-}
-
-#[cfg(target_os = "macos")]
 fn apply_active_space_behavior<R: Runtime>(window: &WebviewWindow<R>) {
     let ns_window = match window.ns_window() {
         Ok(ns_window) => ns_window,
@@ -71,7 +59,6 @@ fn apply_active_space_behavior<R: Runtime>(window: &WebviewWindow<R>) {
     ns_window.setCollectionBehavior(behavior);
 }
 
-#[cfg(target_os = "macos")]
 fn collection_behavior_for_active_space(
     mut behavior: NSWindowCollectionBehavior,
 ) -> NSWindowCollectionBehavior {
@@ -162,7 +149,7 @@ pub fn toggle_main_window_impl(app: &AppHandle) {
     }
 }
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use objc2_app_kit::NSWindowCollectionBehavior;
