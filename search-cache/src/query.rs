@@ -628,10 +628,10 @@ impl SearchCache {
     /// UI case-sensitivity toggle. Multiple `path:` filters are combined with
     /// AND by the query optimizer, each narrowing the result set further.
     ///
-    /// Instead of materializing a `PathBuf` per node (which walks the parent
-    /// chain and allocates), we walk the ancestor chain in place and check
-    /// whether any ancestor's interned `&'static str` name contains the
-    /// needle. This keeps the hot loop allocation-free.
+    /// Uses the name pool index to find names containing the needle, then
+    /// expands to all descendants of matching nodes — avoiding a full-tree
+    /// scan. This mirrors how `*.ext` queries leverage the index rather than
+    /// iterating every node.
     fn evaluate_path_filter(
         &self,
         argument: &FilterArgument,
@@ -643,44 +643,47 @@ impl SearchCache {
         if needle.is_empty() {
             bail!("path: requires a non-empty path fragment");
         }
-        let needle_lower = options
-            .case_insensitive
-            .then(|| needle.to_ascii_lowercase());
 
-        let Some(nodes) = self.nodes_from_base(base, token) else {
+        // Find every interned name that contains the needle.
+        let matching_names = if options.case_insensitive {
+            let pattern = regex::escape(needle);
+            let regex = RegexBuilder::new(&pattern)
+                .case_insensitive(true)
+                .build()
+                .map_err(|err| anyhow!("Invalid path: pattern: {err}"))?;
+            NAME_POOL.search_regex(&regex, token)
+        } else {
+            NAME_POOL.search_substr(needle, token)
+        };
+
+        let Some(matching_names) = matching_names else {
             return Ok(None);
         };
 
-        Ok(filter_nodes(nodes, token, |index| {
-            self.path_contains(index, needle, needle_lower.as_deref())
-        }))
-    }
+        // Collect every node whose own name matches, plus all descendants of
+        // those nodes (their path includes the matching ancestor).
+        let mut result: Vec<SlabIndex> = Vec::new();
+        for name in &matching_names {
+            token
+                .is_cancelled_sparse(result.len())
+                .ok_or_else(|| anyhow!("cancelled"))?;
+            if let Some(indices) = self.name_index.get(name) {
+                for &index in indices.iter() {
+                    result.push(index);
+                    if let Some(children) = self.all_subnodes(index, token) {
+                        result.extend(children);
+                    }
+                }
+            }
+        }
 
-    /// Returns true when the absolute path of `index` contains `needle` as a
-    /// substring of any of its path components. Walks the ancestor chain via
-    /// cached `&'static str` names — no `PathBuf` allocation.
-    fn path_contains(
-        &self,
-        mut index: SlabIndex,
-        needle: &str,
-        needle_lower: Option<&str>,
-    ) -> bool {
-        loop {
-            let Some(node) = self.file_nodes.get(index) else {
-                return false;
-            };
-            let name = node.name();
-            let matched = match needle_lower {
-                Some(lower_needle) => name.to_ascii_lowercase().contains(lower_needle),
-                None => name.contains(needle),
-            };
-            if matched {
-                return true;
+        if let Some(mut base_nodes) = base {
+            if intersect_in_place(&mut base_nodes, &result, token).is_none() {
+                return Ok(None);
             }
-            match node.parent() {
-                Some(parent) => index = parent,
-                None => return false,
-            }
+            Ok(Some(base_nodes))
+        } else {
+            Ok(Some(result))
         }
     }
 
