@@ -644,10 +644,48 @@ impl SearchCache {
             bail!("path: requires a non-empty path fragment");
         }
 
-        // Search the NAME_POOL (interned filenames) for names containing the
-        // needle, then fetch matching nodes from the NameIndex and expand
-        // their descendants. This is fast because the name pool is small
-        // (unique filenames only) and the name index provides O(1) lookup.
+        // When a base set is already provided (from a prior filter), filter it
+        // in-place by checking each node's path for the needle. This is
+        // O(base_size) and avoids eagerly expanding huge subtrees.
+        if let Some(base_nodes) = base {
+            let needle_lower = options
+                .case_insensitive
+                .then(|| needle.to_ascii_lowercase());
+            Ok(filter_nodes(base_nodes, token, |index| {
+                self.path_contains_component(index, needle, needle_lower.as_deref())
+            }))
+        } else {
+            // No base: use the name pool to find matching names, get their
+            // nodes, and expand descendants via flat index prefix range.
+            self.evaluate_path_filter_no_base(argument, options, token)
+        }
+    }
+
+    /// Check if any path component of `index` contains `needle`.
+    /// Uses the flat index entry's path directly — O(1) per node, no parent walk.
+    fn path_contains_component(
+        &self,
+        index: SlabIndex,
+        needle: &str,
+        needle_lower: Option<&str>,
+    ) -> bool {
+        let Some(entry) = self.flat_index.get(index) else {
+            return false;
+        };
+        // Check the full path for the needle as a substring of any component.
+        match needle_lower {
+            Some(lower) => entry.path.to_ascii_lowercase().contains(lower),
+            None => entry.path.contains(needle),
+        }
+    }
+
+    fn evaluate_path_filter_no_base(
+        &self,
+        argument: &FilterArgument,
+        options: SearchOptions,
+        token: CancellationToken,
+    ) -> Result<Option<Vec<SlabIndex>>> {
+        let needle = argument.raw.trim_start_matches('/');
         let matching_names = if options.case_insensitive {
             let pattern = regex::escape(needle);
             let regex = RegexBuilder::new(&pattern)
@@ -663,10 +701,6 @@ impl SearchCache {
             return Ok(None);
         };
 
-        // Collect every node whose own name matches, plus all descendants of
-        // those nodes (their path includes the matching ancestor). Use the
-        // flat index's prefix_range for descendant expansion — O(log n + k)
-        // instead of O(subtree) tree walk.
         let mut result: Vec<SlabIndex> = Vec::new();
         for name in &matching_names {
             token
@@ -675,8 +709,6 @@ impl SearchCache {
             if let Some(indices) = self.name_index.get(name) {
                 for &index in indices.iter() {
                     result.push(index);
-                    // Use flat index prefix range for descendants — get the
-                    // path from the flat entry directly (O(1), no parent walk).
                     if let Some(entry) = self.flat_index.get(index) {
                         let prefix = format!("{}/", entry.path);
                         let descendants = self.flat_index.prefix_indices(&prefix);
@@ -686,14 +718,7 @@ impl SearchCache {
             }
         }
 
-        if let Some(mut base_nodes) = base {
-            if intersect_in_place(&mut base_nodes, &result, token).is_none() {
-                return Ok(None);
-            }
-            Ok(Some(base_nodes))
-        } else {
-            Ok(Some(result))
-        }
+        Ok(Some(result))
     }
 
     fn evaluate_nosubfolders_filter(
