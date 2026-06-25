@@ -644,21 +644,22 @@ impl SearchCache {
             bail!("path: requires a non-empty path fragment");
         }
 
-        // When a base set is already provided (from a prior filter), filter it
-        // in-place by checking each node's path for the needle. This is
-        // O(base_size) and avoids eagerly expanding huge subtrees.
-        if let Some(base_nodes) = base {
-            let needle_lower = options
-                .case_insensitive
-                .then(|| needle.to_ascii_lowercase());
-            Ok(filter_nodes(base_nodes, token, |index| {
-                self.path_contains_component(index, needle, needle_lower.as_deref())
-            }))
-        } else {
-            // No base: use the name pool to find matching names, get their
-            // nodes, and expand descendants via flat index prefix range.
-            self.evaluate_path_filter_no_base(argument, options, token)
-        }
+        let needle_lower = options
+            .case_insensitive
+            .then(|| needle.to_ascii_lowercase());
+
+        // Always filter by checking each node's full path for the needle.
+        // When a base set exists, filter it in-place (O(base_size)).
+        // When no base exists, scan all nodes (O(N)) — but each check is a
+        // simple path-substring test, and filter_nodes properly propagates
+        // cancellation so the user can abort long-running queries.
+        let Some(nodes) = self.nodes_from_base(base, token) else {
+            return Ok(None);
+        };
+
+        Ok(filter_nodes(nodes, token, |index| {
+            self.path_contains_component(index, needle, needle_lower.as_deref())
+        }))
     }
 
     /// Check if the full path of `index` contains `needle`.
@@ -673,8 +674,6 @@ impl SearchCache {
         let path_str = if let Some(entry) = self.flat_index.get(index) {
             entry.path
         } else if let Some(path) = self.node_path(index) {
-            // Fallback: walk parent chain (slower but correct when flat
-            // index is not populated, e.g. cache loaded from disk).
             return match needle_lower {
                 Some(lower) => path.to_string_lossy().to_ascii_lowercase().contains(lower),
                 None => path.to_string_lossy().contains(needle),
@@ -686,52 +685,6 @@ impl SearchCache {
             Some(lower) => path_str.to_ascii_lowercase().contains(lower),
             None => path_str.contains(needle),
         }
-    }
-
-    fn evaluate_path_filter_no_base(
-        &self,
-        argument: &FilterArgument,
-        options: SearchOptions,
-        token: CancellationToken,
-    ) -> Result<Option<Vec<SlabIndex>>> {
-        let needle = argument.raw.trim_start_matches('/');
-        let matching_names = if options.case_insensitive {
-            let pattern = regex::escape(needle);
-            let regex = RegexBuilder::new(&pattern)
-                .case_insensitive(true)
-                .build()
-                .map_err(|err| anyhow!("Invalid path: pattern: {err}"))?;
-            NAME_POOL.search_regex(&regex, token)
-        } else {
-            NAME_POOL.search_substr(needle, token)
-        };
-
-        let Some(matching_names) = matching_names else {
-            return Ok(None);
-        };
-
-        let mut result: Vec<SlabIndex> = Vec::new();
-        for name in &matching_names {
-            token
-                .is_cancelled_sparse(result.len())
-                .ok_or_else(|| anyhow!("cancelled"))?;
-            if let Some(indices) = self.name_index.get(name) {
-                for &index in indices.iter() {
-                    result.push(index);
-                    // Expand descendants: use flat index prefix range when
-                    // available, fall back to tree walk otherwise.
-                    if let Some(entry) = self.flat_index.get(index) {
-                        let prefix = format!("{}/", entry.path);
-                        let descendants = self.flat_index.prefix_indices(&prefix);
-                        result.extend(descendants);
-                    } else if let Some(children) = self.all_subnodes(index, token) {
-                        result.extend(children);
-                    }
-                }
-            }
-        }
-
-        Ok(Some(result))
     }
 
     fn evaluate_nosubfolders_filter(
