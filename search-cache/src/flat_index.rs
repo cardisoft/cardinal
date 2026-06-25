@@ -195,14 +195,29 @@ impl FlatIndex {
         let pos = self
             .entries
             .partition_point(|e| e.path.as_bytes() < entry.path.as_bytes());
+        let slab_idx = entry.slab_index;
         self.entries.insert(pos, entry);
-        self.rebuild_indexes();
+        // Incrementally update indexes instead of full rebuild.
+        // Shift entry indices in maps for entries after the insertion point.
+        self.name_index
+            .map
+            .entry(self.entries[pos].name)
+            .or_default()
+            .push(SlabIndex::new(pos));
+        self.path_map
+            .insert(self.entries[pos].path, SlabIndex::new(pos));
+        self.slab_map.insert(slab_idx, pos);
     }
 
     pub fn remove(&mut self, slab_index: SlabIndex) -> Option<FlatEntry> {
         let pos = self.slab_map.get(&slab_index).copied()?;
         let entry = self.entries.remove(pos);
-        self.rebuild_indexes();
+        // Incrementally update indexes.
+        if let Some(indices) = self.name_index.map.get_mut(entry.name) {
+            indices.retain(|&i| i.get() != pos);
+        }
+        self.path_map.remove(entry.path);
+        self.slab_map.remove(&slab_index);
         Some(entry)
     }
 
@@ -210,7 +225,17 @@ impl FlatIndex {
         let range = self.prefix_range(prefix);
         let count = range.end - range.start;
         if count > 0 {
+            // Remove entries and their index entries.
+            for i in range.clone() {
+                let entry = &self.entries[i];
+                if let Some(indices) = self.name_index.map.get_mut(entry.name) {
+                    indices.retain(|&idx| idx.get() != i);
+                }
+                self.path_map.remove(entry.path);
+                self.slab_map.remove(&entry.slab_index);
+            }
             self.entries.drain(range);
+            // Full rebuild needed after bulk removal to fix shifted indices.
             self.rebuild_indexes();
         }
         count

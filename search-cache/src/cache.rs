@@ -649,18 +649,9 @@ impl SearchCache {
         let name = node.name();
         let index = self.file_nodes.insert(node);
         self.name_index.add_index(name, index, &self.file_nodes);
-        // Maintain flat index: intern the full path and add to path_map.
-        if let Some(path) = self.file_nodes.node_path(index) {
-            let path_str = path.to_string_lossy();
-            let interned = PATH_POOL.push(path_str.as_ref());
-            let entry = FlatEntry {
-                path: interned,
-                name,
-                slab_index: index,
-                metadata: self.file_nodes[index].metadata,
-            };
-            self.flat_index.insert(entry);
-        }
+        // Note: flat index is not maintained on FS events to avoid O(N)
+        // shifts in the sorted Vec. The path: filter falls back to
+        // node_path() for nodes not in the flat index.
         index
     }
 
@@ -832,18 +823,10 @@ impl SearchCache {
     /// Removes a node and its children recursively by index.
     fn remove_node(&mut self, index: SlabIndex) {
         fn remove_single_node(cache: &mut SearchCache, index: SlabIndex) {
-            // Get path before removing the node (node_path walks parent chain).
-            let path_str = cache
-                .file_nodes
-                .node_path(index)
-                .map(|p| p.to_string_lossy().into_owned());
             if let Some(node) = cache.file_nodes.try_remove(index) {
                 let removed = cache.name_index.remove_index(node.name(), index);
                 assert!(removed, "inconsistent name index and node");
-                // Maintain flat index: remove by path prefix.
-                if let Some(path_str) = path_str {
-                    cache.flat_index.remove_prefix(&path_str);
-                }
+                // Note: flat index is not maintained on FS events.
             }
         }
 
