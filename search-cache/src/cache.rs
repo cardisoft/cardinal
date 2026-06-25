@@ -195,9 +195,11 @@ impl SearchCache {
                     // name pool construction speed is fast enough that caching it doesn't worth it.
                     let name_index = NameIndex::construct_name_pool(name_index);
                     let slab = FileNodes::new(path, ignore_paths, include_paths, slab, slab_root);
-                    // Rebuild flat index from the slab (walks parent chains
-                    // once at load time; subsequent queries use the flat index).
-                    let flat_index = build_flat_index_from_slab(&slab);
+                    // Flat index is NOT built from the persisted cache — that
+                    // would require walking every node's parent chain (O(N×depth))
+                    // and hang on large caches. The path: filter falls back to
+                    // node_path() when the flat index is empty.
+                    let flat_index = FlatIndex::default();
                     Self::new(
                         slab,
                         last_event_id,
@@ -284,8 +286,10 @@ impl SearchCache {
             slab,
             slab_root,
         );
-        // Build the flat index from the slab so indices match the tree.
-        let flat_index = build_flat_index_from_slab(&slab);
+        // Flat index is left empty for now — path: filter uses node_path()
+        // fallback when flat index is not populated. Building it from the
+        // slab would require O(N×depth) parent-chain walks.
+        let flat_index = FlatIndex::default();
         // metadata cache inits later
         Some(Self::new(
             slab,
@@ -1099,34 +1103,6 @@ fn has_selected_ancestor(path: &Path, selected: &HashSet<PathBuf>) -> bool {
 pub enum HandleFSEError {
     /// Full rescan is required.
     Rescan,
-}
-
-/// Note: This function is expected to be called with WalkData which metadata is not fetched.
-/// Rebuild a `FlatIndex` from an existing `FileNodes` slab by walking
-/// every node and reconstructing its full path. Used when loading a cache
-/// from disk.
-fn build_flat_index_from_slab(slab: &FileNodes) -> FlatIndex {
-    let mut entries = Vec::new();
-    let root = slab.root();
-    let mut stack = vec![root];
-    while let Some(index) = stack.pop() {
-        if let Some(path) = slab.node_path(index) {
-            let node = &slab[index];
-            let path_str = path.to_string_lossy();
-            let interned_path = PATH_POOL.push(path_str.as_ref());
-            let name = node.name();
-            entries.push(FlatEntry {
-                path: interned_path,
-                name,
-                metadata: node.metadata,
-            });
-        }
-        if let Some(node) = slab.get(index) {
-            stack.extend_from_slice(&node.children);
-        }
-    }
-    entries.sort_unstable_by(|a, b| a.path.as_bytes().cmp(b.path.as_bytes()));
-    FlatIndex::build_from_entries(entries)
 }
 
 fn construct_node_slab_name_index(

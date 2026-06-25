@@ -661,21 +661,30 @@ impl SearchCache {
         }
     }
 
-    /// Check if any path component of `index` contains `needle`.
-    /// Uses the flat index entry's path directly — O(1) per node, no parent walk.
+    /// Check if the full path of `index` contains `needle`.
+    /// Uses the flat index entry's path directly (O(1)) when available,
+    /// falls back to node_path (parent-chain walk) otherwise.
     fn path_contains_component(
         &self,
         index: SlabIndex,
         needle: &str,
         needle_lower: Option<&str>,
     ) -> bool {
-        let Some(entry) = self.flat_index.get(index) else {
+        let path_str = if let Some(entry) = self.flat_index.get(index) {
+            entry.path
+        } else if let Some(path) = self.node_path(index) {
+            // Fallback: walk parent chain (slower but correct when flat
+            // index is not populated, e.g. cache loaded from disk).
+            return match needle_lower {
+                Some(lower) => path.to_string_lossy().to_ascii_lowercase().contains(lower),
+                None => path.to_string_lossy().contains(needle),
+            };
+        } else {
             return false;
         };
-        // Check the full path for the needle as a substring of any component.
         match needle_lower {
-            Some(lower) => entry.path.to_ascii_lowercase().contains(lower),
-            None => entry.path.contains(needle),
+            Some(lower) => path_str.to_ascii_lowercase().contains(lower),
+            None => path_str.contains(needle),
         }
     }
 
@@ -709,10 +718,14 @@ impl SearchCache {
             if let Some(indices) = self.name_index.get(name) {
                 for &index in indices.iter() {
                     result.push(index);
+                    // Expand descendants: use flat index prefix range when
+                    // available, fall back to tree walk otherwise.
                     if let Some(entry) = self.flat_index.get(index) {
                         let prefix = format!("{}/", entry.path);
                         let descendants = self.flat_index.prefix_indices(&prefix);
                         result.extend(descendants);
+                    } else if let Some(children) = self.all_subnodes(index, token) {
+                        result.extend(children);
                     }
                 }
             }
