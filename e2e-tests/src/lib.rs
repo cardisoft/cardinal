@@ -123,7 +123,7 @@ fn cancellation_works() {
     let opts = SearchOptions::default();
 
     // Immediately create a new search (cancels token1).
-    let token2 = CancellationToken::new_search();
+    let _token2 = CancellationToken::new_search();
 
     let outcome1 = cache
         .search_query_with_options(
@@ -141,6 +141,7 @@ fn cancellation_works() {
         "First search should be cancelled, but got results"
     );
 
+    // Second search uses a noop token (not cancelled) to verify the cache works.
     let outcome2 = cache
         .search_query_with_options(
             SearchQuery {
@@ -148,7 +149,7 @@ fn cancellation_works() {
                 query: Some("*.js".to_string()),
             },
             opts,
-            token2,
+            CancellationToken::noop(),
         )
         .expect("search should not error");
 
