@@ -8,6 +8,9 @@
     "options": {
       "caseSensitive": "Alternar correspondência sensível a maiúsculas",
       "directoryScope": "Alternar escopo de pasta"
+    },
+    "aria": {
+      "searchInput": "Entrada de pesquisa"
     }
   },
   "stateDisplay": {

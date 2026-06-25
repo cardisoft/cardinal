@@ -8,6 +8,7 @@ const MACOS_FOLDER_ICON =
 type SearchBarProps = {
   inputRef: React.RefObject<HTMLInputElement>;
   placeholder: string;
+  ariaLabel: string;
   value: string;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -37,6 +38,7 @@ const isCollapsedAtEnd = (input: HTMLInputElement): boolean => {
 export function SearchBar({
   inputRef,
   placeholder,
+  ariaLabel,
   value,
   onChange,
   onKeyDown,
@@ -164,6 +166,7 @@ export function SearchBar({
             onChange={onChange}
             onKeyDown={handleQueryKeyDown}
             placeholder={placeholder}
+            aria-label={ariaLabel}
             spellCheck={false}
             autoCorrect="off"
             autoComplete="off"

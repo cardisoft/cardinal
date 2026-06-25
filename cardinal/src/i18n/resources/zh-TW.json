@@ -8,6 +8,9 @@
     "options": {
       "caseSensitive": "切換區分大小寫比對",
       "directoryScope": "切換資料夾範圍"
+    },
+    "aria": {
+      "searchInput": "搜尋輸入"
     }
   },
   "stateDisplay": {

@@ -8,6 +8,9 @@
     "options": {
       "caseSensitive": "大文字と小文字を区別する",
       "directoryScope": "フォルダ範囲を切り替え"
+    },
+    "aria": {
+      "searchInput": "検索入力"
     }
   },
   "stateDisplay": {

@@ -12,8 +12,8 @@ use xa11y::{App, Error, Result, provider};
 const APP_NAME: &str = "Cardinal";
 const SEARCH_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Selector for the search input field (there is exactly one text_field).
-const SEARCH_INPUT: &str = "text_field";
+/// Selector for the search input field (has aria-label "Search input").
+const SEARCH_INPUT: &str = r#"text_field[name*="Search"]"#;
 
 /// Selector for the status bar text showing result count (e.g. "5 results • 3ms").
 const RESULTS_TEXT: &str = r#"static_text[value*="result"]"#;

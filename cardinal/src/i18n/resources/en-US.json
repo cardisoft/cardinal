@@ -8,6 +8,9 @@
     "options": {
       "caseSensitive": "Toggle case-sensitive matching",
       "directoryScope": "Toggle folder scope"
+    },
+    "aria": {
+      "searchInput": "Search input"
     }
   },
   "stateDisplay": {

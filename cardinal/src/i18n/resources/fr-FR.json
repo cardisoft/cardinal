@@ -8,6 +8,9 @@
     "options": {
       "caseSensitive": "Activer la correspondance sensible à la casse",
       "directoryScope": "Afficher la portée du dossier"
+    },
+    "aria": {
+      "searchInput": "Entrée de recherche"
     }
   },
   "stateDisplay": {

@@ -8,6 +8,9 @@
     "options": {
       "caseSensitive": "Перемкнути врахування регістру",
       "directoryScope": "Перемкнути область папок"
+    },
+    "aria": {
+      "searchInput": "Поле пошуку"
     }
   },
   "stateDisplay": {

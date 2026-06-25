@@ -8,6 +8,9 @@
     "options": {
       "caseSensitive": "Attiva/disattiva distinzione tra maiuscole e minuscole",
       "directoryScope": "Mostra ambito cartella"
+    },
+    "aria": {
+      "searchInput": "Input di ricerca"
     }
   },
   "stateDisplay": {

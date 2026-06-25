@@ -8,6 +8,9 @@
     "options": {
       "caseSensitive": "Activar coincidencia sensible a mayúsculas",
       "directoryScope": "Alternar ámbito de carpeta"
+    },
+    "aria": {
+      "searchInput": "Entrada de búsqueda"
     }
   },
   "stateDisplay": {
