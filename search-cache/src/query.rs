@@ -664,7 +664,9 @@ impl SearchCache {
         };
 
         // Collect every node whose own name matches, plus all descendants of
-        // those nodes (their path includes the matching ancestor).
+        // those nodes (their path includes the matching ancestor). Use the
+        // flat index's prefix_range for descendant expansion — O(log n + k)
+        // instead of O(subtree) tree walk.
         let mut result: Vec<SlabIndex> = Vec::new();
         for name in &matching_names {
             token
@@ -673,8 +675,12 @@ impl SearchCache {
             if let Some(indices) = self.name_index.get(name) {
                 for &index in indices.iter() {
                     result.push(index);
-                    if let Some(children) = self.all_subnodes(index, token) {
-                        result.extend(children);
+                    // Use flat index prefix range for descendants — get the
+                    // path from the flat entry directly (O(1), no parent walk).
+                    if let Some(entry) = self.flat_index.get(index) {
+                        let prefix = format!("{}/", entry.path);
+                        let descendants = self.flat_index.prefix_indices(&prefix);
+                        result.extend(descendants);
                     }
                 }
             }
