@@ -1110,6 +1110,9 @@ impl SearchCache {
 
 pub static NAME_POOL: LazyLock<NamePool> = LazyLock::new(NamePool::new);
 
+/// Global pool of interned full absolute paths, for the flat index.
+pub static PATH_POOL: LazyLock<NamePool> = LazyLock::new(NamePool::new);
+
 fn require_folder_expr(expr: Expr) -> Expr {
     let folder_filter = Expr::Term(Term::Filter(Filter {
         kind: FilterKind::Folder,
