@@ -1,7 +1,7 @@
 use search_cache::{FlatEntry, FlatIndex, SlabIndex, SlabNodeMetadataCompact};
 use std::path::Path;
 
-fn entry(path: &str) -> FlatEntry {
+fn entry(path: &str, slab_idx: usize) -> FlatEntry {
     let path = Path::new(path);
     let path_str = path.to_string_lossy();
     let interned_path = search_cache::PATH_POOL.push(path_str.as_ref());
@@ -12,6 +12,7 @@ fn entry(path: &str) -> FlatEntry {
     FlatEntry {
         path: interned_path,
         name,
+        slab_index: SlabIndex::new(slab_idx),
         metadata: SlabNodeMetadataCompact::none(),
     }
 }
@@ -19,16 +20,16 @@ fn entry(path: &str) -> FlatEntry {
 fn build_test_index() -> FlatIndex {
     // Sorted by path:
     let entries = vec![
-        entry("/Users/demo"),
-        entry("/Users/demo/file1.txt"),
-        entry("/Users/demo/src"),
-        entry("/Users/demo/src/main.rs"),
-        entry("/Users/demo/src/lib.rs"),
-        entry("/Users/demo/src/utils"),
-        entry("/Users/demo/src/utils/helper.rs"),
-        entry("/Users/demo/tests"),
-        entry("/Users/demo/tests/test1.rs"),
-        entry("/Users/other/readme.md"),
+        entry("/Users/demo", 0),
+        entry("/Users/demo/file1.txt", 1),
+        entry("/Users/demo/src", 2),
+        entry("/Users/demo/src/main.rs", 3),
+        entry("/Users/demo/src/lib.rs", 4),
+        entry("/Users/demo/src/utils", 5),
+        entry("/Users/demo/src/utils/helper.rs", 6),
+        entry("/Users/demo/tests", 7),
+        entry("/Users/demo/tests/test1.rs", 8),
+        entry("/Users/other/readme.md", 9),
     ];
     FlatIndex::build_from_entries(entries)
 }
@@ -119,12 +120,12 @@ fn remove_prefix_removes_subtree() {
 #[test]
 fn insert_maintains_sort_order() {
     let mut index = build_test_index();
-    index.insert(entry("/Users/demo/src/new.rs"));
+    index.insert(entry("/Users/demo/src/new.rs", 10));
 
     // Should be inserted between src/lib.rs and src/utils
     let range = index.prefix_range("/Users/demo/src/");
     let paths: Vec<_> = (range.start..range.end)
-        .map(|i| index.get(SlabIndex::new(i)).unwrap().path.to_string())
+        .map(|i| index.get_by_pos(i).unwrap().path.to_string())
         .collect();
     assert!(paths.contains(&"/Users/demo/src/new.rs".to_string()));
 }

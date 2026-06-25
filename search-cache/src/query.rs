@@ -648,18 +648,35 @@ impl SearchCache {
             .case_insensitive
             .then(|| needle.to_ascii_lowercase());
 
-        // Always filter by checking each node's full path for the needle.
         // When a base set exists, filter it in-place (O(base_size)).
-        // When no base exists, scan all nodes (O(N)) — but each check is a
-        // simple path-substring test, and filter_nodes properly propagates
-        // cancellation so the user can abort long-running queries.
-        let Some(nodes) = self.nodes_from_base(base, token) else {
-            return Ok(None);
-        };
+        if let Some(base_nodes) = base {
+            return Ok(filter_nodes(base_nodes, token, |index| {
+                self.path_contains_component(index, needle, needle_lower.as_deref())
+            }));
+        }
 
-        Ok(filter_nodes(nodes, token, |index| {
-            self.path_contains_component(index, needle, needle_lower.as_deref())
-        }))
+        // No base set: scan the flat index entries directly. Each entry
+        // stores the full path as an interned &'static str, so this is a
+        // simple linear scan with no allocation.
+        if token.is_cancelled().is_none() {
+            return Ok(None);
+        }
+        let mut results = Vec::new();
+        let mut counter = 0usize;
+        for (_, entry) in self.flat_index.iter() {
+            if counter % 0x10000 == 0 && token.is_cancelled().is_none() {
+                return Ok(None);
+            }
+            counter += 1;
+            let matches = match &needle_lower {
+                Some(lower) => entry.path_match_ci(lower),
+                None => entry.path.contains(needle),
+            };
+            if matches {
+                results.push(entry.slab_index);
+            }
+        }
+        Ok(Some(results))
     }
 
     /// Check if the full path of `index` contains `needle`.

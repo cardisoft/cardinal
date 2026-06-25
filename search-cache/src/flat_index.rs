@@ -26,6 +26,8 @@ pub struct FlatEntry {
     pub path: &'static str,
     /// Interned last path segment (e.g. `main.rs`). Derived at index time.
     pub name: &'static str,
+    /// The index into the slab (`FileNodes`) for this entry.
+    pub slab_index: SlabIndex,
     /// Compact metadata: file type, size, timestamps.
     pub metadata: SlabNodeMetadataCompact,
 }
@@ -37,6 +39,37 @@ impl FlatEntry {
 
     pub fn path(&self) -> &Path {
         Path::new(self.path)
+    }
+
+    /// Case-insensitive substring match on the path without allocation.
+    /// Uses `eq_ignore_ascii_case` on each character for matching.
+    pub fn path_match_ci(&self, needle_lower: &str) -> bool {
+        let path_bytes = self.path.as_bytes();
+        let needle_bytes = needle_lower.as_bytes();
+        if needle_bytes.is_empty() {
+            return true;
+        }
+        if needle_bytes.len() > path_bytes.len() {
+            return false;
+        }
+        // Sliding window: check if any substring of path matches needle
+        // case-insensitively (ASCII only).
+        for i in 0..=(path_bytes.len() - needle_bytes.len()) {
+            let mut found = true;
+            for (j, &nb) in needle_bytes.iter().enumerate() {
+                let pb = path_bytes[i + j];
+                // Convert both to lowercase ASCII for comparison
+                let pb_lower = pb.to_ascii_lowercase();
+                if pb_lower != nb {
+                    found = false;
+                    break;
+                }
+            }
+            if found {
+                return true;
+            }
+        }
+        false
     }
 }
 
@@ -68,6 +101,8 @@ pub struct FlatIndex {
     pub name_index: FlatNameIndex,
     /// Maps interned full paths → entry index (for path: filter lookups).
     path_map: BTreeMap<&'static str, SlabIndex>,
+    /// Maps slab index → entry index in `entries`.
+    slab_map: BTreeMap<SlabIndex, usize>,
 }
 
 impl FlatIndex {
@@ -83,12 +118,22 @@ impl FlatIndex {
         self.entries.is_empty()
     }
 
-    pub fn get(&self, index: SlabIndex) -> Option<&FlatEntry> {
-        self.entries.get(index.get())
+    pub fn get(&self, slab_index: SlabIndex) -> Option<&FlatEntry> {
+        self.slab_map
+            .get(&slab_index)
+            .and_then(|&i| self.entries.get(i))
     }
 
-    pub fn get_mut(&mut self, index: SlabIndex) -> Option<&mut FlatEntry> {
-        self.entries.get_mut(index.get())
+    /// Get an entry by its position in the sorted entries array.
+    pub fn get_by_pos(&self, pos: usize) -> Option<&FlatEntry> {
+        self.entries.get(pos)
+    }
+
+    pub fn get_mut(&mut self, slab_index: SlabIndex) -> Option<&mut FlatEntry> {
+        self.slab_map
+            .get(&slab_index)
+            .copied()
+            .and_then(move |i| self.entries.get_mut(i))
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (SlabIndex, &FlatEntry)> {
@@ -106,15 +151,18 @@ impl FlatIndex {
     pub fn build_from_entries(entries: Vec<FlatEntry>) -> Self {
         let mut name_map: BTreeMap<&'static str, Vec<SlabIndex>> = BTreeMap::new();
         let mut path_map: BTreeMap<&'static str, SlabIndex> = BTreeMap::new();
+        let mut slab_map: BTreeMap<SlabIndex, usize> = BTreeMap::new();
         for (i, entry) in entries.iter().enumerate() {
             let idx = SlabIndex::new(i);
             name_map.entry(entry.name).or_default().push(idx);
             path_map.insert(entry.path, idx);
+            slab_map.insert(entry.slab_index, i);
         }
         Self {
             entries,
             name_index: FlatNameIndex { map: name_map },
             path_map,
+            slab_map,
         }
     }
 
@@ -132,7 +180,7 @@ impl FlatIndex {
 
     pub fn prefix_indices(&self, prefix: &str) -> Vec<SlabIndex> {
         let range = self.prefix_range(prefix);
-        (range.start..range.end).map(SlabIndex::new).collect()
+        range.map(|i| self.entries[i].slab_index).collect()
     }
 
     pub fn node_path(&self, index: SlabIndex) -> Option<PathBuf> {
@@ -143,23 +191,19 @@ impl FlatIndex {
         self.get(index).map(|e| e.name)
     }
 
-    pub fn insert(&mut self, entry: FlatEntry) -> SlabIndex {
+    pub fn insert(&mut self, entry: FlatEntry) {
         let pos = self
             .entries
             .partition_point(|e| e.path.as_bytes() < entry.path.as_bytes());
         self.entries.insert(pos, entry);
-        self.rebuild_name_index();
-        SlabIndex::new(pos)
+        self.rebuild_indexes();
     }
 
-    pub fn remove(&mut self, index: SlabIndex) -> Option<FlatEntry> {
-        if index.get() < self.entries.len() {
-            let entry = self.entries.remove(index.get());
-            self.rebuild_name_index();
-            Some(entry)
-        } else {
-            None
-        }
+    pub fn remove(&mut self, slab_index: SlabIndex) -> Option<FlatEntry> {
+        let pos = self.slab_map.get(&slab_index).copied()?;
+        let entry = self.entries.remove(pos);
+        self.rebuild_indexes();
+        Some(entry)
     }
 
     pub fn remove_prefix(&mut self, prefix: &str) -> usize {
@@ -167,31 +211,40 @@ impl FlatIndex {
         let count = range.end - range.start;
         if count > 0 {
             self.entries.drain(range);
-            self.rebuild_name_index();
+            self.rebuild_indexes();
         }
         count
     }
 
-    fn rebuild_name_index(&mut self) {
+    fn rebuild_indexes(&mut self) {
         let mut name_map: BTreeMap<&'static str, Vec<SlabIndex>> = BTreeMap::new();
         let mut path_map: BTreeMap<&'static str, SlabIndex> = BTreeMap::new();
+        let mut slab_map: BTreeMap<SlabIndex, usize> = BTreeMap::new();
         for (i, entry) in self.entries.iter().enumerate() {
             let idx = SlabIndex::new(i);
             name_map.entry(entry.name).or_default().push(idx);
             path_map.insert(entry.path, idx);
+            slab_map.insert(entry.slab_index, i);
         }
         self.name_index = FlatNameIndex { map: name_map };
         self.path_map = path_map;
+        self.slab_map = slab_map;
     }
 
-    /// Look up an entry by its interned full path.
+    /// Look up the slab index for an interned full path.
     pub fn get_by_path(&self, path: &str) -> Option<SlabIndex> {
-        self.path_map.get(path).copied()
+        self.path_map
+            .get(path)
+            .map(|entry_idx| self.entries[entry_idx.get()].slab_index)
     }
 }
 
-/// Build a `FlatEntry` from a full path and optional metadata.
-pub fn make_flat_entry(path: &Path, metadata: Option<fswalk::NodeMetadata>) -> FlatEntry {
+/// Build a `FlatEntry` from a full path, slab index, and optional metadata.
+pub fn make_flat_entry(
+    path: &Path,
+    slab_index: SlabIndex,
+    metadata: Option<fswalk::NodeMetadata>,
+) -> FlatEntry {
     let path_str = path.to_string_lossy();
     let interned_path = PATH_POOL.push(path_str.as_ref());
     let name = path
@@ -205,6 +258,7 @@ pub fn make_flat_entry(path: &Path, metadata: Option<fswalk::NodeMetadata>) -> F
     FlatEntry {
         path: interned_path,
         name,
+        slab_index,
         metadata,
     }
 }

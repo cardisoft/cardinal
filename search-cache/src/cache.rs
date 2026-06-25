@@ -65,7 +65,7 @@ impl SearchOutcome {
         Self { nodes, highlights }
     }
 
-    fn cancelled() -> Self {
+    pub fn cancelled() -> Self {
         Self {
             nodes: None,
             highlights: vec![],
@@ -245,7 +245,7 @@ impl SearchCache {
         // Return None if cancelled
         fn walkfs_to_slab<F>(
             walk_data: &WalkData<'_, F>,
-        ) -> Option<(SlabIndex, ThinSlab<SlabNode>, NameIndex)>
+        ) -> Option<(SlabIndex, ThinSlab<SlabNode>, NameIndex, Vec<FlatEntry>)>
         where
             F: Fn() -> bool + Send + Sync,
         {
@@ -266,19 +266,28 @@ impl SearchCache {
             let slab_time = Instant::now();
             let mut slab = ThinSlab::new();
             let mut name_index = NameIndex::default();
-            let slab_root = construct_node_slab_name_index(None, &node, &mut slab, &mut name_index);
+            let mut flat_entries = Vec::with_capacity(1_000_000);
+            let slab_root = construct_node_slab_name_index(
+                None,
+                &node,
+                &mut slab,
+                &mut name_index,
+                &mut flat_entries,
+                walk_data.root_path.parent().unwrap_or(Path::new("")),
+            );
             info!(
-                "Slab & NameIndex construction time: {:?}, slab root: {:?}, slab len: {:?}",
+                "Slab & NameIndex & FlatIndex construction time: {:?}, slab root: {:?}, slab len: {:?}, flat entries: {:?}",
                 slab_time.elapsed(),
                 slab_root,
-                slab.len()
+                slab.len(),
+                flat_entries.len(),
             );
 
-            Some((slab_root, slab, name_index))
+            Some((slab_root, slab, name_index, flat_entries))
         }
 
         let last_event_id = current_event_id();
-        let (slab_root, slab, name_index) = walkfs_to_slab(walk_data)?;
+        let (slab_root, slab, name_index, flat_entries) = walkfs_to_slab(walk_data)?;
         let slab = FileNodes::new(
             walk_data.root_path.to_path_buf(),
             walk_data.ignore_directories.to_vec(),
@@ -286,10 +295,11 @@ impl SearchCache {
             slab,
             slab_root,
         );
-        // Flat index is left empty for now — path: filter uses node_path()
-        // fallback when flat index is not populated. Building it from the
-        // slab would require O(N×depth) parent-chain walks.
-        let flat_index = FlatIndex::default();
+        // Build the flat index from entries collected during the tree walk.
+        // Entries are already sorted by path because fswalk sorts children
+        // by name and construct_node_slab_name_index does a preorder traversal.
+        let flat_index = FlatIndex::build_from_entries(flat_entries);
+        info!("FlatIndex built: {} entries", flat_index.len());
         // metadata cache inits later
         Some(Self::new(
             slab,
@@ -345,6 +355,11 @@ impl SearchCache {
 
     pub fn is_noop(&self) -> bool {
         self.file_nodes.is_empty() && self.name_index.is_empty()
+    }
+
+    /// Number of entries in the flat index (full paths indexed).
+    pub fn flat_index_len(&self) -> usize {
+        self.flat_index.len()
     }
 
     pub fn search_empty(&self, cancellation_token: CancellationToken) -> Option<Vec<SlabIndex>> {
@@ -641,6 +656,7 @@ impl SearchCache {
             let entry = FlatEntry {
                 path: interned,
                 name,
+                slab_index: index,
                 metadata: self.file_nodes[index].metadata,
             };
             self.flat_index.insert(entry);
@@ -1110,6 +1126,8 @@ fn construct_node_slab_name_index(
     node: &Node,
     slab: &mut ThinSlab<SlabNode>,
     name_index: &mut NameIndex,
+    flat_entries: &mut Vec<FlatEntry>,
+    parent_path: &Path,
 ) -> SlabIndex {
     let metadata = match node.metadata {
         Some(metadata) => SlabNodeMetadataCompact::some(metadata),
@@ -1123,10 +1141,30 @@ fn construct_node_slab_name_index(
         // so this preorder traversal visits nodes in lexicographic path order.
         name_index.add_index_ordered(name, index);
     }
+
+    // Build the full path for this node by joining parent_path + name.
+    let full_path = parent_path.join(node.name.as_ref());
+    let path_str: &'static str = PATH_POOL.push(full_path.to_string_lossy().as_ref());
+    flat_entries.push(FlatEntry {
+        path: path_str,
+        name,
+        slab_index: index,
+        metadata,
+    });
+
     slab[index].children = node
         .children
         .iter()
-        .map(|node| construct_node_slab_name_index(Some(index), node, slab, name_index))
+        .map(|child| {
+            construct_node_slab_name_index(
+                Some(index),
+                child,
+                slab,
+                name_index,
+                flat_entries,
+                &full_path,
+            )
+        })
         .collect();
     index
 }
@@ -2201,7 +2239,15 @@ mod tests {
         );
         let mut slab = ThinSlab::new();
         let mut name_index = NameIndex::default();
-        let root = construct_node_slab_name_index(None, &tree, &mut slab, &mut name_index);
+        let mut flat_entries = Vec::new();
+        let root = construct_node_slab_name_index(
+            None,
+            &tree,
+            &mut slab,
+            &mut name_index,
+            &mut flat_entries,
+            Path::new(""),
+        );
         let file_nodes = FileNodes::new(
             PathBuf::from("/virtual/root"),
             Vec::new(),

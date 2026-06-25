@@ -12,7 +12,7 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rayon::spawn;
 use search_cache::{
-    HandleFSEError, SearchCache, SearchOptions, SearchResultNode, SlabIndex, WalkData,
+    HandleFSEError, SearchCache, SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, WalkData,
 };
 use search_cancel::CancellationToken;
 use serde::Serialize;
@@ -350,6 +350,28 @@ pub fn run_background_event_loop(
     let flush_ticker = crossbeam_channel::tick(Duration::from_secs(10));
 
     loop {
+        // Prioritize search requests over FS event processing so the UI
+        // stays responsive even when there's a large FS event backlog.
+        // Drain all pending search jobs, keeping only the latest (older
+        // ones are already cancelled by CancellationToken::new_search()).
+        if let Ok(mut latest_job) = search_rx.try_recv() {
+            while let Ok(newer) = search_rx.try_recv() {
+                // Send cancelled result for the superseded job.
+                let _ = latest_job.result_tx.send(Ok(SearchOutcome::cancelled()));
+                latest_job = newer;
+            }
+            let SearchJob {
+                query,
+                options,
+                cancellation_token,
+                result_tx,
+            } = latest_job;
+            let opts = SearchOptions::from(options);
+            let payload = cache.search_query_with_options(query, opts, cancellation_token);
+            result_tx.send(payload).expect("Failed to send result");
+            continue;
+        }
+
         crossbeam_channel::select! {
             recv(finish_rx) -> tx => {
                 let tx = tx.expect("Finish channel closed");
