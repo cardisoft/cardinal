@@ -17,6 +17,7 @@ type SearchState = {
   scannedFiles: number;
   processedEvents: number;
   rescanErrors: number;
+  statusMessage: string | null;
   currentQuery: string;
   currentDirectoryQuery: string;
   highlightTerms: string[];
@@ -45,7 +46,12 @@ type QueueSearchOptions = {
 type SearchAction =
   | {
       type: 'STATUS_UPDATE';
-      payload: { scannedFiles: number; processedEvents: number; rescanErrors: number };
+      payload: {
+        scannedFiles: number;
+        processedEvents: number;
+        rescanErrors: number;
+        statusMessage?: string;
+      };
     }
   | { type: 'SEARCH_REQUEST'; payload: { immediate: boolean } }
   | { type: 'SEARCH_LOADING_DELAY' }
@@ -76,6 +82,7 @@ const initialSearchState: SearchState = {
   scannedFiles: 0,
   processedEvents: 0,
   rescanErrors: 0,
+  statusMessage: null,
   currentQuery: '',
   currentDirectoryQuery: '',
   highlightTerms: [],
@@ -132,6 +139,7 @@ function reducer(state: SearchState, action: SearchAction): SearchState {
         scannedFiles: action.payload.scannedFiles,
         processedEvents: action.payload.processedEvents,
         rescanErrors: action.payload.rescanErrors,
+        statusMessage: action.payload.statusMessage ?? null,
       };
     case 'SEARCH_REQUEST':
       return {
@@ -200,7 +208,12 @@ type UseFileSearchResult = {
   queueSearch: (query: string, options?: QueueSearchOptions) => void;
   queueDirectorySearch: (directoryQuery: string, options?: QueueSearchOptions) => void;
   queueDirectoryScopeOpen: (directoryScopeOpen: boolean) => void;
-  handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
+  handleStatusUpdate: (
+    scannedFiles: number,
+    processedEvents: number,
+    rescanErrors: number,
+    statusMessage?: string,
+  ) => void;
   setLifecycleState: (status: AppLifecycleStatus) => void;
   requestRescan: () => Promise<void>;
 };
@@ -234,10 +247,15 @@ export function useFileSearch(): UseFileSearchResult {
   }, []);
 
   const handleStatusUpdate = useCallback(
-    (scannedFiles: number, processedEvents: number, rescanErrors: number) => {
+    (
+      scannedFiles: number,
+      processedEvents: number,
+      rescanErrors: number,
+      statusMessage?: string,
+    ) => {
       dispatch({
         type: 'STATUS_UPDATE',
-        payload: { scannedFiles, processedEvents, rescanErrors },
+        payload: { scannedFiles, processedEvents, rescanErrors, statusMessage },
       });
     },
     [],

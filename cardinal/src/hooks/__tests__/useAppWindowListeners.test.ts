@@ -25,7 +25,12 @@ type HookProps = {
   activeTab: 'files' | 'events';
   searchInputRef: RefObject<HTMLInputElement>;
   focusAndSelectSearchInput: () => void;
-  handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
+  handleStatusUpdate: (
+    scannedFiles: number,
+    processedEvents: number,
+    rescanErrors: number,
+    statusMessage?: string,
+  ) => void;
   setLifecycleState: (status: 'Initializing' | 'Updating' | 'Ready') => void;
   submitFilesQuery: (query: string, options?: { immediate?: boolean }) => void;
   setEventFilterQuery: (query: string) => void;
@@ -113,7 +118,7 @@ describe('useAppWindowListeners', () => {
     act(() => {
       statusCallback?.({ scannedFiles: 11, processedEvents: 22, rescanErrors: 3 });
     });
-    expect(handleStatusUpdate).toHaveBeenCalledWith(11, 22, 3);
+    expect(handleStatusUpdate).toHaveBeenCalledWith(11, 22, 3, undefined);
 
     act(() => {
       lifecycleCallback?.('Ready');

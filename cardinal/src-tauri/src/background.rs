@@ -30,6 +30,9 @@ pub struct StatusBarUpdate {
     pub scanned_files: usize,
     pub processed_events: usize,
     pub rescan_errors: usize,
+    /// Human-readable status message (e.g. "Walking filesystem…", "Indexing…").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_message: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -58,6 +61,7 @@ pub fn reset_status_bar(app_handle: &AppHandle) {
                 scanned_files: 0,
                 processed_events: 0,
                 rescan_errors: 0,
+                status_message: None,
             },
         )
         .unwrap();
@@ -68,6 +72,22 @@ pub fn emit_status_bar_update(
     scanned_files: usize,
     processed_events: usize,
     rescan_errors: usize,
+) {
+    emit_status_bar_update_with_message(
+        app_handle,
+        scanned_files,
+        processed_events,
+        rescan_errors,
+        None,
+    );
+}
+
+pub fn emit_status_bar_update_with_message(
+    app_handle: &AppHandle,
+    scanned_files: usize,
+    processed_events: usize,
+    rescan_errors: usize,
+    status_message: Option<&str>,
 ) {
     static LAST_EMIT: Lazy<Mutex<Instant>> =
         Lazy::new(|| Mutex::new(Instant::now() - Duration::from_secs(1)));
@@ -84,6 +104,7 @@ pub fn emit_status_bar_update(
                     scanned_files,
                     processed_events,
                     rescan_errors,
+                    status_message: status_message.map(|s| s.to_string()),
                 },
             )
             .unwrap();
@@ -434,12 +455,26 @@ pub(crate) fn build_search_cache(
 
     std::thread::scope(|s| {
         s.spawn(|| {
+            let mut phase = 0u8;
             while !walking_done.load(Ordering::Relaxed) {
                 let dirs = walk_data.num_dirs.load(Ordering::Relaxed);
                 let files = walk_data.num_files.load(Ordering::Relaxed);
                 let total = dirs + files;
-                emit_status_bar_update(app_handle, total, 0, 0);
-                std::thread::sleep(Duration::from_millis(100));
+                // Cycle through phase messages so the user sees activity.
+                let msg = match phase % 3 {
+                    0 => format!("Walking filesystem… {} items", total),
+                    1 => format!("Indexing… {} dirs, {} files", dirs, files),
+                    _ => format!("Scanning… {} items found", total),
+                };
+                emit_status_bar_update_with_message(
+                    app_handle,
+                    total,
+                    0,
+                    0,
+                    Some(&msg),
+                );
+                phase = phase.wrapping_add(1);
+                std::thread::sleep(Duration::from_millis(200));
             }
         });
         let cache = SearchCache::walk_fs_with_walk_data(&walk_data, &APP_QUIT);
