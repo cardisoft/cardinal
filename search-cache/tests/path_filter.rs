@@ -1,6 +1,6 @@
 //! Tests for the `path:` filter, which keeps items whose full absolute path
-//! contains the argument as a substring. Multiple `path:` filters combine with
-//! AND, each narrowing the result set further.
+//! contains the argument as a substring of any path component. Multiple
+//! `path:` filters combine with AND, each narrowing the result set further.
 
 use search_cache::{SearchCache, SearchOptions};
 use search_cancel::CancellationToken;

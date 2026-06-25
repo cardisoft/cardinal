@@ -624,9 +624,14 @@ impl SearchCache {
     }
 
     /// `path:` filters keep items whose full absolute path contains the
-    /// argument as a substring. Matching respects the UI case-sensitivity
-    /// toggle. Multiple `path:` filters are combined with AND by the query
-    /// optimizer, each narrowing the result set further.
+    /// argument as a substring of any path component. Matching respects the
+    /// UI case-sensitivity toggle. Multiple `path:` filters are combined with
+    /// AND by the query optimizer, each narrowing the result set further.
+    ///
+    /// Instead of materializing a `PathBuf` per node (which walks the parent
+    /// chain and allocates), we walk the ancestor chain in place and check
+    /// whether any ancestor's interned `&'static str` name contains the
+    /// needle. This keeps the hot loop allocation-free.
     fn evaluate_path_filter(
         &self,
         argument: &FilterArgument,
@@ -638,27 +643,45 @@ impl SearchCache {
         if needle.is_empty() {
             bail!("path: requires a non-empty path fragment");
         }
-        let needle = if options.case_insensitive {
-            needle.to_ascii_lowercase()
-        } else {
-            needle.to_string()
-        };
+        let needle_lower = options
+            .case_insensitive
+            .then(|| needle.to_ascii_lowercase());
 
         let Some(nodes) = self.nodes_from_base(base, token) else {
             return Ok(None);
         };
 
         Ok(filter_nodes(nodes, token, |index| {
-            let Some(path) = self.node_path(index) else {
+            self.path_contains(index, needle, needle_lower.as_deref())
+        }))
+    }
+
+    /// Returns true when the absolute path of `index` contains `needle` as a
+    /// substring of any of its path components. Walks the ancestor chain via
+    /// cached `&'static str` names — no `PathBuf` allocation.
+    fn path_contains(
+        &self,
+        mut index: SlabIndex,
+        needle: &str,
+        needle_lower: Option<&str>,
+    ) -> bool {
+        loop {
+            let Some(node) = self.file_nodes.get(index) else {
                 return false;
             };
-            let path = path.to_string_lossy();
-            if options.case_insensitive {
-                path.to_ascii_lowercase().contains(&needle)
-            } else {
-                path.contains(needle.as_str())
+            let name = node.name();
+            let matched = match needle_lower {
+                Some(lower_needle) => name.to_ascii_lowercase().contains(lower_needle),
+                None => name.contains(needle),
+            };
+            if matched {
+                return true;
             }
-        }))
+            match node.parent() {
+                Some(parent) => index = parent,
+                None => return false,
+            }
+        }
     }
 
     fn evaluate_nosubfolders_filter(
