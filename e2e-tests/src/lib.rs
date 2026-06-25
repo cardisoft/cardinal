@@ -11,6 +11,7 @@ use std::time::Instant;
 
 /// Walk the root filesystem (same as the Cardinal app does).
 /// Runs on a thread with a large stack to avoid overflow on deep directory trees.
+#[allow(dead_code)]
 fn build_cache() -> SearchCache {
     let ignore_paths = vec![
         std::path::PathBuf::from("/Volumes"),
@@ -31,6 +32,7 @@ fn build_cache() -> SearchCache {
     cache
 }
 
+#[allow(dead_code)]
 fn search(cache: &mut SearchCache, query: &str) -> (usize, std::time::Duration) {
     let token = CancellationToken::new_search();
     let opts = SearchOptions::default();

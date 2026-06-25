@@ -12,7 +12,8 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rayon::spawn;
 use search_cache::{
-    HandleFSEError, SearchCache, SearchOptions, SearchOutcome, SearchResultNode, SlabIndex, WalkData,
+    HandleFSEError, SearchCache, SearchOptions, SearchOutcome, SearchResultNode, SlabIndex,
+    WalkData,
 };
 use search_cancel::CancellationToken;
 use serde::Serialize;
@@ -478,13 +479,7 @@ pub(crate) fn build_search_cache(
     std::thread::scope(|s| {
         s.spawn(|| {
             while !walking_done.load(Ordering::Relaxed) {
-                emit_status_bar_update_with_message(
-                    app_handle,
-                    0,
-                    0,
-                    0,
-                    Some("Indexing…"),
-                );
+                emit_status_bar_update_with_message(app_handle, 0, 0, 0, Some("Indexing…"));
                 std::thread::sleep(Duration::from_millis(500));
             }
         });
@@ -529,13 +524,7 @@ fn perform_rescan(
     let stopped = std::thread::scope(|s| {
         s.spawn(|| {
             while !walking_done.load(Ordering::Relaxed) {
-                emit_status_bar_update_with_message(
-                    app_handle,
-                    0,
-                    0,
-                    0,
-                    Some("Indexing…"),
-                );
+                emit_status_bar_update_with_message(app_handle, 0, 0, 0, Some("Indexing…"));
                 std::thread::sleep(Duration::from_millis(500));
             }
         });
