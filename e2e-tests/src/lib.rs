@@ -101,10 +101,10 @@ fn path_repos_vs_star_js_parody() {
 }
 
 #[test]
-fn main_js_path_ayla_path_repos_combined_query() {
+fn main_js_path_downloads_path_repos_combined_query() {
     let mut cache = build_cache();
-    let (count, elapsed) = search(&mut cache, "main.js path:Ayla path:repos");
-    println!("main.js path:Ayla path:repos: {count} results in {elapsed:?}");
+    let (count, elapsed) = search(&mut cache, "main.js path:Downloads path:repos");
+    println!("main.js path:Downloads path:repos: {count} results in {elapsed:?}");
     // Should complete without hanging.
     assert!(
         elapsed.as_secs() < 10,

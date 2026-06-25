@@ -20,7 +20,7 @@ fn build_wide_cache() -> SearchCache {
     //     sub_0/  file_0.js .. file_49.js
     //     ...
     //     sub_49/ file_0.js .. file_49.js
-    //   Ayla/
+    //   Downloads/
     //     repos/
     //       main.js
     //     other/
@@ -36,11 +36,11 @@ fn build_wide_cache() -> SearchCache {
             std::fs::File::create(dir.join(format!("file_{f}.js"))).unwrap();
         }
     }
-    let ayla = root_path.join("Ayla");
-    std::fs::create_dir_all(ayla.join("repos")).unwrap();
-    std::fs::File::create(ayla.join("repos/main.js")).unwrap();
-    std::fs::create_dir_all(ayla.join("other")).unwrap();
-    std::fs::File::create(ayla.join("other/main.js")).unwrap();
+    let downloads = root_path.join("Downloads");
+    std::fs::create_dir_all(downloads.join("repos")).unwrap();
+    std::fs::File::create(downloads.join("repos/main.js")).unwrap();
+    std::fs::create_dir_all(downloads.join("other")).unwrap();
+    std::fs::File::create(downloads.join("other/main.js")).unwrap();
     std::fs::create_dir_all(root_path.join("docs")).unwrap();
     std::fs::File::create(root_path.join("docs/readme.md")).unwrap();
 
@@ -73,7 +73,7 @@ fn e2e_search_then_cancel_returns_promptly() {
 }
 
 #[test]
-fn e2e_main_js_path_ayla_path_repos_returns_correct_results() {
+fn e2e_main_js_path_downloads_path_repos_returns_correct_results() {
     let temp_dir = TempDir::new("e2e_path_query").unwrap();
     let root_path = temp_dir.path().to_path_buf();
     std::mem::forget(temp_dir);
@@ -82,7 +82,7 @@ fn e2e_main_js_path_ayla_path_repos_returns_correct_results() {
     // root/
     //   source/
     //     repos/
-    //       Ayla/
+    //       Downloads/
     //         main.js
     //         other.js
     //       cardinal/
@@ -90,9 +90,9 @@ fn e2e_main_js_path_ayla_path_repos_returns_correct_results() {
     //   other/
     //     main.js
     let source = root_path.join("source/repos");
-    std::fs::create_dir_all(source.join("Ayla")).unwrap();
-    std::fs::File::create(source.join("Ayla/main.js")).unwrap();
-    std::fs::File::create(source.join("Ayla/other.js")).unwrap();
+    std::fs::create_dir_all(source.join("Downloads")).unwrap();
+    std::fs::File::create(source.join("Downloads/main.js")).unwrap();
+    std::fs::File::create(source.join("Downloads/other.js")).unwrap();
     std::fs::create_dir_all(source.join("cardinal")).unwrap();
     std::fs::File::create(source.join("cardinal/main.js")).unwrap();
     std::fs::create_dir_all(root_path.join("other")).unwrap();
@@ -100,20 +100,23 @@ fn e2e_main_js_path_ayla_path_repos_returns_correct_results() {
 
     let mut cache = SearchCache::walk_fs(&root_path);
 
-    // User's query: main.js path:Ayla path:repos
+    // User's query: main.js path:Downloads path:repos
     let result = cache
-        .query_files("main.js path:Ayla path:repos", CancellationToken::noop())
+        .query_files(
+            "main.js path:Downloads path:repos",
+            CancellationToken::noop(),
+        )
         .expect("Query should succeed");
 
     let nodes = result.expect("Should return results");
-    // Only source/repos/Ayla/main.js matches all three filters.
+    // Only source/repos/Downloads/main.js matches all three filters.
     assert_eq!(
         nodes.len(),
         1,
-        "main.js path:Ayla path:repos should find exactly 1 file"
+        "main.js path:Downloads path:repos should find exactly 1 file"
     );
     let path = nodes[0].path.to_string_lossy().to_string();
-    assert!(path.contains("Ayla"));
+    assert!(path.contains("Downloads"));
     assert!(path.contains("repos"));
     assert!(path.ends_with("main.js"));
 }
@@ -127,8 +130,8 @@ fn e2e_star_js_is_fast_and_path_repos_works() {
         .query_files("*.js", CancellationToken::noop())
         .expect("*.js should succeed");
     let js_nodes = result.expect("*.js should return results");
-    // 50 dirs × 50 files + Ayla/repos/main.js + Ayla/other/main.js... wait other.js
-    // Actually: repos/sub_*/file_*.js = 2500, Ayla/repos/main.js = 1, Ayla/other/main.js = 1
+    // 50 dirs × 50 files + Downloads/repos/main.js + Downloads/other/main.js... wait other.js
+    // Actually: repos/sub_*/file_*.js = 2500, Downloads/repos/main.js = 1, Downloads/other/main.js = 1
     assert!(js_nodes.len() >= 2500, "*.js should find many files");
 
     // path:repos should also work

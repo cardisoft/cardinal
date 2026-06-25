@@ -10,7 +10,7 @@ use tempdir::TempDir;
 /// Build a test cache with nested directory structure:
 /// root/
 ///   main.js
-///   Ayla/
+///   Downloads/
 ///     repos/
 ///       main.js
 ///       other.js
@@ -25,9 +25,9 @@ fn build_path_cache() -> (SearchCache, PathBuf) {
 
     let files = [
         "main.js",
-        "Ayla/repos/main.js",
-        "Ayla/repos/other.js",
-        "Ayla/other/main.js",
+        "Downloads/repos/main.js",
+        "Downloads/repos/other.js",
+        "Downloads/other/main.js",
         "repos/main.js",
     ];
 
@@ -47,23 +47,23 @@ fn build_path_cache() -> (SearchCache, PathBuf) {
 fn path_filter_single_fragment_matches_descendants() {
     let (mut cache, _root) = build_path_cache();
 
-    let query = "main.js path:Ayla";
+    let query = "main.js path:Downloads";
     let result = cache
         .query_files(query, CancellationToken::noop())
         .expect("Query should succeed");
     let nodes = result.expect("Should return results");
 
-    // Only main.js files whose path contains "Ayla":
-    // Ayla/repos/main.js, Ayla/other/main.js (2). root/main.js and repos/main.js excluded.
+    // Only main.js files whose path contains "Downloads":
+    // Downloads/repos/main.js, Downloads/other/main.js (2). root/main.js and repos/main.js excluded.
     assert_eq!(
         nodes.len(),
         2,
-        "path:Ayla should narrow to files under Ayla"
+        "path:Downloads should narrow to files under Downloads"
     );
     for node in &nodes {
         assert!(
-            node.path.to_string_lossy().contains("Ayla"),
-            "all results should live under an Ayla directory"
+            node.path.to_string_lossy().contains("Downloads"),
+            "all results should live under a Downloads directory"
         );
     }
 }
@@ -72,8 +72,8 @@ fn path_filter_single_fragment_matches_descendants() {
 fn path_filter_multiple_fragments_narrow_with_and() {
     let (mut cache, _root) = build_path_cache();
 
-    // main.js path:Ayla path:repos -> only Ayla/repos/main.js
-    let query = "main.js path:Ayla path:repos";
+    // main.js path:Downloads path:repos -> only Downloads/repos/main.js
+    let query = "main.js path:Downloads path:repos";
     let result = cache
         .query_files(query, CancellationToken::noop())
         .expect("Query should succeed");
@@ -85,7 +85,7 @@ fn path_filter_multiple_fragments_narrow_with_and() {
         "two path: fragments should AND together to a single match"
     );
     let path = nodes[0].path.to_string_lossy().to_string();
-    assert!(path.contains("Ayla"));
+    assert!(path.contains("Downloads"));
     assert!(path.contains("repos"));
     assert!(path.ends_with("main.js"));
 }
@@ -101,8 +101,8 @@ fn path_filter_without_word_matches_all_under_fragment() {
     let nodes = result.expect("Should return results");
 
     // Nodes whose path contains "repos": the repos dirs themselves plus their
-    // contents -> repos, repos/main.js, Ayla/repos, Ayla/repos/main.js,
-    // Ayla/repos/other.js (5).
+    // contents -> repos, repos/main.js, Downloads/repos, Downloads/repos/main.js,
+    // Downloads/repos/other.js (5).
     assert_eq!(
         nodes.len(),
         5,
@@ -117,8 +117,8 @@ fn path_filter_without_word_matches_all_under_fragment() {
 fn path_filter_is_case_insensitive_when_enabled() {
     let (mut cache, _root) = build_path_cache();
 
-    // With case-insensitive matching, lowercase "ayla" should match "Ayla".
-    let query = "main.js path:ayla";
+    // With case-insensitive matching, lowercase "downloads" should match "Downloads".
+    let query = "main.js path:downloads";
     let case_insensitive = SearchOptions {
         case_insensitive: true,
     };
@@ -131,7 +131,7 @@ fn path_filter_is_case_insensitive_when_enabled() {
     assert_eq!(
         expanded.len(),
         2,
-        "case-insensitive path:ayla should match Ayla"
+        "case-insensitive path:downloads should match Downloads"
     );
 }
 
@@ -140,8 +140,8 @@ fn path_filter_is_case_sensitive_by_default() {
     let (mut cache, _root) = build_path_cache();
 
     // query_files uses SearchOptions::default() which is case-sensitive, so
-    // lowercase "ayla" must not match the "Ayla" directory.
-    let query = "main.js path:ayla";
+    // lowercase "downloads" must not match the "Downloads" directory.
+    let query = "main.js path:downloads";
     let result = cache
         .query_files(query, CancellationToken::noop())
         .expect("Query should succeed");
@@ -150,7 +150,7 @@ fn path_filter_is_case_sensitive_by_default() {
         None => {}
         Some(nodes) => assert!(
             nodes.is_empty(),
-            "case-sensitive path:ayla should not match Ayla"
+            "case-sensitive path:downloads should not match Downloads"
         ),
     }
 }
@@ -160,8 +160,8 @@ fn path_filter_strips_leading_slash() {
     let (mut cache, _root) = build_path_cache();
 
     // A leading slash is meaningless for a substring path filter; trim it so
-    // "path:/Ayla" behaves the same as "path:Ayla".
-    let query = "main.js path:/Ayla";
+    // "path:/Downloads" behaves the same as "path:Downloads".
+    let query = "main.js path:/Downloads";
     let result = cache
         .query_files(query, CancellationToken::noop())
         .expect("Query should succeed");
@@ -182,17 +182,17 @@ fn path_filter_requires_argument() {
 fn path_filter_uses_expanded_node_paths() {
     let (mut cache, _root) = build_path_cache();
 
-    let query = "path:Ayla path:repos";
+    let query = "path:Downloads path:repos";
     let result = cache
         .query_files(query, CancellationToken::noop())
         .expect("Query should succeed");
     let nodes = result.expect("Should return results");
 
-    // Ayla/repos, Ayla/repos/main.js, Ayla/repos/other.js (3)
+    // Downloads/repos, Downloads/repos/main.js, Downloads/repos/other.js (3)
     assert_eq!(nodes.len(), 3);
     for node in &nodes {
         let path = node.path.to_string_lossy();
-        assert!(path.contains("Ayla"));
+        assert!(path.contains("Downloads"));
         assert!(path.contains("repos"));
     }
 }

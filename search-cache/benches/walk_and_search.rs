@@ -48,7 +48,7 @@ const QUERIES: &[&str] = &[
     // path: substring filter — single fragment
     "path:repos",
     // path: substring filter — multiple fragments (AND)
-    "path:Ayla path:repos",
+    "path:Downloads path:repos",
     // path: + word
     "main.js path:repos",
 ];

@@ -163,12 +163,12 @@ These filters take an absolute path as their argument; a leading `~` is expanded
 
 | Filter  | Meaning                                                        | Example                              |
 | ------- | ------------------------------------------------------------- | ------------------------------------ |
-| `path:` | Items whose full path contains the argument (case-aware)      | `main.js path:Ayla path:repos`       |
+| `path:` | Items whose full path contains the argument (case-aware)      | `main.js path:Downloads path:repos`       |
 
 Examples:
 ```text
 main.js path:repos               # main.js anywhere under a path containing "repos"
-main.js path:Ayla path:repos     # main.js under a path containing both "Ayla" and "repos"
+main.js path:Downloads path:repos     # main.js under a path containing both "Downloads" and "repos"
 path:Documents report            # "report" items whose path contains "Documents"
 ```
 
@@ -330,7 +330,7 @@ ext:png;jpg travel|vacation
 in:/Users/demo/Projects ext:log dm:pastweek
 
 #  Narrow by path fragments when you only remember part of the hierarchy
-main.js path:Ayla path:repos
+main.js path:Downloads path:repos
 
 #  Shell scripts directly under Scripts folder
 parent:/Users/demo/Scripts *.sh

@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- Add `path:` filter for substring matching against an item's full absolute path. Multiple `path:` filters combine with AND (e.g. `main.js path:Ayla path:repos`).
+- Add `path:` filter for substring matching against an item's full absolute path. Multiple `path:` filters combine with AND (e.g. `main.js path:Downloads path:repos`).
 
 ## 0.1.23 — 2026-03-25
 - Reduce power consumption by expanding the default ignored paths to cover more macOS cache, log, metadata, and runtime directories.
