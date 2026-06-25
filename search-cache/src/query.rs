@@ -644,7 +644,10 @@ impl SearchCache {
             bail!("path: requires a non-empty path fragment");
         }
 
-        // Find every interned name that contains the needle.
+        // Search the NAME_POOL (interned filenames) for names containing the
+        // needle, then fetch matching nodes from the NameIndex and expand
+        // their descendants. This is fast because the name pool is small
+        // (unique filenames only) and the name index provides O(1) lookup.
         let matching_names = if options.case_insensitive {
             let pattern = regex::escape(needle);
             let regex = RegexBuilder::new(&pattern)

@@ -289,7 +289,9 @@ fn walk_flat_recursive<F: Fn() -> bool + Send + Sync>(
     }
     out.push(FlatWalkEntry {
         path: path.to_path_buf(),
-        metadata: need_metadata.then(|| metadata.map(NodeMetadata::from)).flatten(),
+        metadata: need_metadata
+            .then(|| metadata.map(NodeMetadata::from))
+            .flatten(),
     });
 
     if is_dir {
@@ -315,7 +317,11 @@ fn walk_flat_recursive<F: Fn() -> bool + Send + Sync>(
                             if let Ok(ft) = entry.file_type() {
                                 if ft.is_dir() {
                                     let mut child_entries = Vec::new();
-                                    walk_flat_recursive(&child_path, walk_data, &mut child_entries)?;
+                                    walk_flat_recursive(
+                                        &child_path,
+                                        walk_data,
+                                        &mut child_entries,
+                                    )?;
                                     Some(child_entries)
                                 } else {
                                     walk_data.num_files.fetch_add(1, Ordering::Relaxed);

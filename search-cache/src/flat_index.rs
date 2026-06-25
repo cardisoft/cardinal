@@ -11,11 +11,13 @@
 //! - A name index mapping the last path segment (filename) → entry indices,
 //!   for `*.ext` and word search — identical to the existing approach.
 
-use crate::{SlabIndex, SlabNodeMetadataCompact, NAME_POOL, PATH_POOL};
+use crate::{NAME_POOL, PATH_POOL, SlabIndex, SlabNodeMetadataCompact};
 use fswalk::NodeFileType;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 /// A single filesystem entry in the flat index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,11 +60,14 @@ impl FlatNameIndex {
     }
 }
 
-/// The flat index: a sorted array of entries plus a name index.
+/// The flat index: a sorted array of entries plus derived indexes.
 #[derive(Debug, Clone, Default)]
 pub struct FlatIndex {
     entries: Vec<FlatEntry>,
+    /// Maps interned filenames → entry indices (for *.ext / word search).
     pub name_index: FlatNameIndex,
+    /// Maps interned full paths → entry index (for path: filter lookups).
+    path_map: BTreeMap<&'static str, SlabIndex>,
 }
 
 impl FlatIndex {
@@ -100,15 +105,16 @@ impl FlatIndex {
     /// Build from entries already sorted by path.
     pub fn build_from_entries(entries: Vec<FlatEntry>) -> Self {
         let mut name_map: BTreeMap<&'static str, Vec<SlabIndex>> = BTreeMap::new();
+        let mut path_map: BTreeMap<&'static str, SlabIndex> = BTreeMap::new();
         for (i, entry) in entries.iter().enumerate() {
-            name_map
-                .entry(entry.name)
-                .or_default()
-                .push(SlabIndex::new(i));
+            let idx = SlabIndex::new(i);
+            name_map.entry(entry.name).or_default().push(idx);
+            path_map.insert(entry.path, idx);
         }
         Self {
             entries,
             name_index: FlatNameIndex { map: name_map },
+            path_map,
         }
     }
 
@@ -120,9 +126,7 @@ impl FlatIndex {
         let start = self
             .entries
             .partition_point(|e| e.path.as_bytes() < prefix.as_bytes());
-        let end = self.entries[start..]
-            .partition_point(|e| e.path.starts_with(prefix))
-            + start;
+        let end = self.entries[start..].partition_point(|e| e.path.starts_with(prefix)) + start;
         start..end
     }
 
@@ -170,13 +174,19 @@ impl FlatIndex {
 
     fn rebuild_name_index(&mut self) {
         let mut name_map: BTreeMap<&'static str, Vec<SlabIndex>> = BTreeMap::new();
+        let mut path_map: BTreeMap<&'static str, SlabIndex> = BTreeMap::new();
         for (i, entry) in self.entries.iter().enumerate() {
-            name_map
-                .entry(entry.name)
-                .or_default()
-                .push(SlabIndex::new(i));
+            let idx = SlabIndex::new(i);
+            name_map.entry(entry.name).or_default().push(idx);
+            path_map.insert(entry.path, idx);
         }
         self.name_index = FlatNameIndex { map: name_map };
+        self.path_map = path_map;
+    }
+
+    /// Look up an entry by its interned full path.
+    pub fn get_by_path(&self, path: &str) -> Option<SlabIndex> {
+        self.path_map.get(path).copied()
     }
 }
 

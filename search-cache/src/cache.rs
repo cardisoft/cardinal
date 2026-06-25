@@ -1,6 +1,6 @@
 use crate::{
-    FileNodes, NameIndex, SearchOptions, SearchResultNode, SlabIndex, SlabNode,
-    SlabNodeMetadataCompact, State, ThinSlab,
+    FileNodes, FlatEntry, FlatIndex, NameIndex, SearchOptions, SearchResultNode, SlabIndex,
+    SlabNode, SlabNodeMetadataCompact, State, ThinSlab,
     highlight::derive_highlight_terms,
     persistent::{PersistentStorage, read_cache_from_file, write_cache_to_file},
     query_preprocessor::{expand_query_home_dirs, strip_query_quotes},
@@ -37,6 +37,10 @@ pub struct SearchCache {
     last_event_id: u64,
     rescan_count: u64,
     pub(crate) name_index: NameIndex,
+    /// Flat index storing full paths directly, enabling O(log n) prefix
+    /// queries and O(1) path lookups. Gradually replacing the tree-based
+    /// `file_nodes` + `name_index` for path-oriented queries.
+    pub(crate) flat_index: FlatIndex,
     stop: &'static AtomicBool,
 }
 
@@ -191,7 +195,17 @@ impl SearchCache {
                     // name pool construction speed is fast enough that caching it doesn't worth it.
                     let name_index = NameIndex::construct_name_pool(name_index);
                     let slab = FileNodes::new(path, ignore_paths, include_paths, slab, slab_root);
-                    Self::new(slab, last_event_id, rescan_count, name_index, cancel)
+                    // Rebuild flat index from the slab (walks parent chains
+                    // once at load time; subsequent queries use the flat index).
+                    let flat_index = build_flat_index_from_slab(&slab);
+                    Self::new(
+                        slab,
+                        last_event_id,
+                        rescan_count,
+                        name_index,
+                        flat_index,
+                        cancel,
+                    )
                 },
             )
     }
@@ -270,8 +284,17 @@ impl SearchCache {
             slab,
             slab_root,
         );
+        // Build the flat index from the slab so indices match the tree.
+        let flat_index = build_flat_index_from_slab(&slab);
         // metadata cache inits later
-        Some(Self::new(slab, last_event_id, 0, name_index, cancel))
+        Some(Self::new(
+            slab,
+            last_event_id,
+            0,
+            name_index,
+            flat_index,
+            cancel,
+        ))
     }
 
     fn new(
@@ -279,6 +302,7 @@ impl SearchCache {
         last_event_id: u64,
         rescan_count: u64,
         name_index: NameIndex,
+        flat_index: FlatIndex,
         cancel: &'static AtomicBool,
     ) -> Self {
         Self {
@@ -286,6 +310,7 @@ impl SearchCache {
             last_event_id,
             rescan_count,
             name_index,
+            flat_index,
             stop: cancel,
         }
     }
@@ -309,6 +334,7 @@ impl SearchCache {
             last_event_id: 0,
             rescan_count: 0,
             name_index: NameIndex::default(),
+            flat_index: FlatIndex::default(),
             stop: cancel,
         }
     }
@@ -823,6 +849,7 @@ impl SearchCache {
             last_event_id,
             rescan_count,
             name_index,
+            flat_index: _,
             stop: _,
         } = self;
         let (path, ignore_paths, include_paths, slab_root, slab) = file_nodes.into_parts();
@@ -1055,6 +1082,33 @@ pub enum HandleFSEError {
 }
 
 /// Note: This function is expected to be called with WalkData which metadata is not fetched.
+/// Rebuild a `FlatIndex` from an existing `FileNodes` slab by walking
+/// every node and reconstructing its full path. Used when loading a cache
+/// from disk.
+fn build_flat_index_from_slab(slab: &FileNodes) -> FlatIndex {
+    let mut entries = Vec::new();
+    let root = slab.root();
+    let mut stack = vec![root];
+    while let Some(index) = stack.pop() {
+        if let Some(path) = slab.node_path(index) {
+            let node = &slab[index];
+            let path_str = path.to_string_lossy();
+            let interned_path = PATH_POOL.push(path_str.as_ref());
+            let name = node.name();
+            entries.push(FlatEntry {
+                path: interned_path,
+                name,
+                metadata: node.metadata,
+            });
+        }
+        if let Some(node) = slab.get(index) {
+            stack.extend_from_slice(&node.children);
+        }
+    }
+    entries.sort_unstable_by(|a, b| a.path.as_bytes().cmp(b.path.as_bytes()));
+    FlatIndex::build_from_entries(entries)
+}
+
 fn construct_node_slab_name_index(
     parent: Option<SlabIndex>,
     node: &Node,
