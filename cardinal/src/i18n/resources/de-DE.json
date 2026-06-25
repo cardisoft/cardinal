@@ -8,9 +8,6 @@
     "options": {
       "caseSensitive": "Groß-/Kleinschreibung beachten",
       "directoryScope": "Ordnerbereich umschalten"
-    },
-    "aria": {
-      "searchInput": "Sucheingabe"
     }
   },
   "stateDisplay": {
