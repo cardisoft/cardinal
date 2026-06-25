@@ -12,5 +12,6 @@ members = [
   "cardinal-syntax",
   "search-cancel",
   "slab-mmap",
+  "e2e-tests",
 ]
 exclude = ["cardinal"]
