@@ -137,7 +137,7 @@ fn reorder_by_priority(parts: &mut Vec<Expr>) {
     let priority = |expr: &Expr| -> u8 {
         match expr {
             Expr::Term(Term::Filter(filter)) => match filter.kind {
-                FilterKind::InFolder | FilterKind::Parent => 0,
+                FilterKind::InFolder | FilterKind::Parent | FilterKind::Path => 0,
                 FilterKind::Tag => 3,
                 _ => 2,
             },
@@ -355,6 +355,15 @@ pub enum FilterKind {
     /// assert!(matches!(filter.kind, FilterKind::InFolder));
     /// ```
     InFolder,
+    /// Restrict to items whose full path contains the argument as a substring
+    /// (`path:`). Multiple `path:` filters combine with AND, each narrowing the
+    /// result set further. Matching respects the UI case-sensitivity toggle.
+    /// ```
+    /// use cardinal_syntax::{parse_query, Expr, Term, FilterKind};
+    /// let Expr::Term(Term::Filter(filter)) = parse_query("path:repos").unwrap().expr else { panic!() };
+    /// assert!(matches!(filter.kind, FilterKind::Path));
+    /// ```
+    Path,
     /// Limit to the folder itself (`nosubfolders:`).
     /// ```
     /// use cardinal_syntax::{parse_query, Expr, Term, FilterKind};
@@ -551,6 +560,7 @@ impl FilterKind {
             "dr" | "daterun" => FilterKind::DateRun,
             "parent" => FilterKind::Parent,
             "infolder" | "in" => FilterKind::InFolder,
+            "path" => FilterKind::Path,
             "nosubfolders" => FilterKind::NoSubfolders,
             "child" => FilterKind::Child,
             "attrib" => FilterKind::Attribute,

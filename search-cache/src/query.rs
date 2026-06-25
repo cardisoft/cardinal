@@ -439,6 +439,13 @@ impl SearchCache {
                     .ok_or_else(|| anyhow!("infolder: requires a folder path"))?;
                 self.evaluate_infolder_filter(argument, base, options, token)
             }
+            FilterKind::Path => {
+                let argument = filter
+                    .argument
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("path: requires a path fragment"))?;
+                self.evaluate_path_filter(argument, base, options, token)
+            }
             FilterKind::NoSubfolders => {
                 let argument = filter
                     .argument
@@ -614,6 +621,44 @@ impl SearchCache {
         } else {
             Ok(Some(children))
         }
+    }
+
+    /// `path:` filters keep items whose full absolute path contains the
+    /// argument as a substring. Matching respects the UI case-sensitivity
+    /// toggle. Multiple `path:` filters are combined with AND by the query
+    /// optimizer, each narrowing the result set further.
+    fn evaluate_path_filter(
+        &self,
+        argument: &FilterArgument,
+        base: Option<Vec<SlabIndex>>,
+        options: SearchOptions,
+        token: CancellationToken,
+    ) -> Result<Option<Vec<SlabIndex>>> {
+        let needle = argument.raw.trim_start_matches('/');
+        if needle.is_empty() {
+            bail!("path: requires a non-empty path fragment");
+        }
+        let needle = if options.case_insensitive {
+            needle.to_ascii_lowercase()
+        } else {
+            needle.to_string()
+        };
+
+        let Some(nodes) = self.nodes_from_base(base, token) else {
+            return Ok(None);
+        };
+
+        Ok(filter_nodes(nodes, token, |index| {
+            let Some(path) = self.node_path(index) else {
+                return false;
+            };
+            let path = path.to_string_lossy();
+            if options.case_insensitive {
+                path.to_ascii_lowercase().contains(&needle)
+            } else {
+                path.contains(needle.as_str())
+            }
+        }))
     }
 
     fn evaluate_nosubfolders_filter(
