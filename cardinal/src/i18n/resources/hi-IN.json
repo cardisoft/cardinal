@@ -8,6 +8,9 @@
     "options": {
       "caseSensitive": "केस-सेंसिटिव मिलान टॉगल करें",
       "directoryScope": "फ़ोल्डर स्कोप टॉगल करें"
+    },
+    "aria": {
+      "searchInput": "खोज इनपुट"
     }
   },
   "stateDisplay": {

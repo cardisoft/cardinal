@@ -8,6 +8,9 @@
     "options": {
       "caseSensitive": "تفعيل/إيقاف حساسية حالة الأحرف",
       "directoryScope": "تبديل نطاق المجلد"
+    },
+    "aria": {
+      "searchInput": "إدخال البحث"
     }
   },
   "stateDisplay": {

@@ -8,6 +8,9 @@
     "options": {
       "caseSensitive": "Büyük/küçük harfe duyarlı eşleşmeyi değiştir",
       "directoryScope": "Klasör kapsamını değiştir"
+    },
+    "aria": {
+      "searchInput": "Arama girişi"
     }
   },
   "stateDisplay": {

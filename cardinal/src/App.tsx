@@ -358,6 +358,7 @@ function App() {
   const searchPlaceholder =
     activeTab === 'files' ? t('search.placeholder.files') : t('search.placeholder.events');
   const directorySearchPlaceholder = t('search.placeholder.directory');
+  const searchAriaLabel = t('search.aria.searchInput');
   const permissionSteps = [
     t('app.fullDiskAccess.steps.one'),
     t('app.fullDiskAccess.steps.two'),
@@ -374,6 +375,7 @@ function App() {
         <SearchBar
           inputRef={searchInputRef}
           placeholder={searchPlaceholder}
+          ariaLabel={searchAriaLabel}
           value={searchInputValue}
           onChange={onQueryChange}
           onKeyDown={onSearchInputKeyDown}

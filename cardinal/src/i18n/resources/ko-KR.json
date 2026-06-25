@@ -8,6 +8,9 @@
     "options": {
       "caseSensitive": "대소문자 구분 검색 전환",
       "directoryScope": "폴더 범위 전환"
+    },
+    "aria": {
+      "searchInput": "검색 입력"
     }
   },
   "stateDisplay": {

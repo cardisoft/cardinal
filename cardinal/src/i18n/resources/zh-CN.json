@@ -8,6 +8,9 @@
     "options": {
       "caseSensitive": "切换区分大小写匹配",
       "directoryScope": "切换文件夹范围"
+    },
+    "aria": {
+      "searchInput": "搜索输入"
     }
   },
   "stateDisplay": {
