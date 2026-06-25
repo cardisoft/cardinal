@@ -662,12 +662,10 @@ impl SearchCache {
             return Ok(None);
         }
         let mut results = Vec::new();
-        let mut counter = 0usize;
-        for (_, entry) in self.flat_index.iter() {
-            if counter % 0x10000 == 0 && token.is_cancelled().is_none() {
+        for (counter, (_, entry)) in self.flat_index.iter().enumerate() {
+            if counter.is_multiple_of(0x10000) && token.is_cancelled().is_none() {
                 return Ok(None);
             }
-            counter += 1;
             let matches = match &needle_lower {
                 Some(lower) => entry.path_match_ci(lower),
                 None => entry.path.contains(needle),
