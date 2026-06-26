@@ -118,7 +118,8 @@
     "maximize": "Yakınlaştır",
     "closeWindow": "Pencereyi kapat",
     "help": "Yardım",
-    "getUpdates": "Güncellemeleri al"
+    "getUpdates": "Güncellemeleri al",
+    "searchSyntax": "Arama Sözdizimi"
   },
   "preferences": {
     "title": "Tercihler",

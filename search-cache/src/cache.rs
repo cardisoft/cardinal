@@ -1,6 +1,6 @@
 use crate::{
-    FileNodes, NameIndex, SearchOptions, SearchResultNode, SlabIndex, SlabNode,
-    SlabNodeMetadataCompact, State, ThinSlab,
+    FileNodes, FlatEntry, FlatIndex, NameIndex, SearchOptions, SearchResultNode, SlabIndex,
+    SlabNode, SlabNodeMetadataCompact, State, ThinSlab,
     highlight::derive_highlight_terms,
     persistent::{PersistentStorage, read_cache_from_file, write_cache_to_file},
     query_preprocessor::{expand_query_home_dirs, strip_query_quotes},
@@ -37,6 +37,10 @@ pub struct SearchCache {
     last_event_id: u64,
     rescan_count: u64,
     pub(crate) name_index: NameIndex,
+    /// Flat index storing full paths directly, enabling O(log n) prefix
+    /// queries and O(1) path lookups. Gradually replacing the tree-based
+    /// `file_nodes` + `name_index` for path-oriented queries.
+    pub(crate) flat_index: FlatIndex,
     stop: &'static AtomicBool,
 }
 
@@ -61,7 +65,7 @@ impl SearchOutcome {
         Self { nodes, highlights }
     }
 
-    fn cancelled() -> Self {
+    pub fn cancelled() -> Self {
         Self {
             nodes: None,
             highlights: vec![],
@@ -191,7 +195,19 @@ impl SearchCache {
                     // name pool construction speed is fast enough that caching it doesn't worth it.
                     let name_index = NameIndex::construct_name_pool(name_index);
                     let slab = FileNodes::new(path, ignore_paths, include_paths, slab, slab_root);
-                    Self::new(slab, last_event_id, rescan_count, name_index, cancel)
+                    // Flat index is NOT built from the persisted cache — that
+                    // would require walking every node's parent chain (O(N×depth))
+                    // and hang on large caches. The path: filter falls back to
+                    // node_path() when the flat index is empty.
+                    let flat_index = FlatIndex::default();
+                    Self::new(
+                        slab,
+                        last_event_id,
+                        rescan_count,
+                        name_index,
+                        flat_index,
+                        cancel,
+                    )
                 },
             )
     }
@@ -229,7 +245,7 @@ impl SearchCache {
         // Return None if cancelled
         fn walkfs_to_slab<F>(
             walk_data: &WalkData<'_, F>,
-        ) -> Option<(SlabIndex, ThinSlab<SlabNode>, NameIndex)>
+        ) -> Option<(SlabIndex, ThinSlab<SlabNode>, NameIndex, Vec<FlatEntry>)>
         where
             F: Fn() -> bool + Send + Sync,
         {
@@ -250,19 +266,28 @@ impl SearchCache {
             let slab_time = Instant::now();
             let mut slab = ThinSlab::new();
             let mut name_index = NameIndex::default();
-            let slab_root = construct_node_slab_name_index(None, &node, &mut slab, &mut name_index);
+            let mut flat_entries = Vec::with_capacity(1_000_000);
+            let slab_root = construct_node_slab_name_index(
+                None,
+                &node,
+                &mut slab,
+                &mut name_index,
+                &mut flat_entries,
+                walk_data.root_path.parent().unwrap_or(Path::new("")),
+            );
             info!(
-                "Slab & NameIndex construction time: {:?}, slab root: {:?}, slab len: {:?}",
+                "Slab & NameIndex & FlatIndex construction time: {:?}, slab root: {:?}, slab len: {:?}, flat entries: {:?}",
                 slab_time.elapsed(),
                 slab_root,
-                slab.len()
+                slab.len(),
+                flat_entries.len(),
             );
 
-            Some((slab_root, slab, name_index))
+            Some((slab_root, slab, name_index, flat_entries))
         }
 
         let last_event_id = current_event_id();
-        let (slab_root, slab, name_index) = walkfs_to_slab(walk_data)?;
+        let (slab_root, slab, name_index, flat_entries) = walkfs_to_slab(walk_data)?;
         let slab = FileNodes::new(
             walk_data.root_path.to_path_buf(),
             walk_data.ignore_directories.to_vec(),
@@ -270,8 +295,20 @@ impl SearchCache {
             slab,
             slab_root,
         );
+        // Build the flat index from entries collected during the tree walk.
+        // Entries are already sorted by path because fswalk sorts children
+        // by name and construct_node_slab_name_index does a preorder traversal.
+        let flat_index = FlatIndex::build_from_entries(flat_entries);
+        info!("FlatIndex built: {} entries", flat_index.len());
         // metadata cache inits later
-        Some(Self::new(slab, last_event_id, 0, name_index, cancel))
+        Some(Self::new(
+            slab,
+            last_event_id,
+            0,
+            name_index,
+            flat_index,
+            cancel,
+        ))
     }
 
     fn new(
@@ -279,6 +316,7 @@ impl SearchCache {
         last_event_id: u64,
         rescan_count: u64,
         name_index: NameIndex,
+        flat_index: FlatIndex,
         cancel: &'static AtomicBool,
     ) -> Self {
         Self {
@@ -286,6 +324,7 @@ impl SearchCache {
             last_event_id,
             rescan_count,
             name_index,
+            flat_index,
             stop: cancel,
         }
     }
@@ -309,12 +348,18 @@ impl SearchCache {
             last_event_id: 0,
             rescan_count: 0,
             name_index: NameIndex::default(),
+            flat_index: FlatIndex::default(),
             stop: cancel,
         }
     }
 
     pub fn is_noop(&self) -> bool {
         self.file_nodes.is_empty() && self.name_index.is_empty()
+    }
+
+    /// Number of entries in the flat index (full paths indexed).
+    pub fn flat_index_len(&self) -> usize {
+        self.flat_index.len()
     }
 
     pub fn search_empty(&self, cancellation_token: CancellationToken) -> Option<Vec<SlabIndex>> {
@@ -604,6 +649,9 @@ impl SearchCache {
         let name = node.name();
         let index = self.file_nodes.insert(node);
         self.name_index.add_index(name, index, &self.file_nodes);
+        // Note: flat index is not maintained on FS events to avoid O(N)
+        // shifts in the sorted Vec. The path: filter falls back to
+        // node_path() for nodes not in the flat index.
         index
     }
 
@@ -778,6 +826,7 @@ impl SearchCache {
             if let Some(node) = cache.file_nodes.try_remove(index) {
                 let removed = cache.name_index.remove_index(node.name(), index);
                 assert!(removed, "inconsistent name index and node");
+                // Note: flat index is not maintained on FS events.
             }
         }
 
@@ -823,6 +872,7 @@ impl SearchCache {
             last_event_id,
             rescan_count,
             name_index,
+            flat_index: _,
             stop: _,
         } = self;
         let (path, ignore_paths, include_paths, slab_root, slab) = file_nodes.into_parts();
@@ -1054,12 +1104,13 @@ pub enum HandleFSEError {
     Rescan,
 }
 
-/// Note: This function is expected to be called with WalkData which metadata is not fetched.
 fn construct_node_slab_name_index(
     parent: Option<SlabIndex>,
     node: &Node,
     slab: &mut ThinSlab<SlabNode>,
     name_index: &mut NameIndex,
+    flat_entries: &mut Vec<FlatEntry>,
+    parent_path: &Path,
 ) -> SlabIndex {
     let metadata = match node.metadata {
         Some(metadata) => SlabNodeMetadataCompact::some(metadata),
@@ -1073,10 +1124,30 @@ fn construct_node_slab_name_index(
         // so this preorder traversal visits nodes in lexicographic path order.
         name_index.add_index_ordered(name, index);
     }
+
+    // Build the full path for this node by joining parent_path + name.
+    let full_path = parent_path.join(node.name.as_ref());
+    let path_str: &'static str = PATH_POOL.push(full_path.to_string_lossy().as_ref());
+    flat_entries.push(FlatEntry {
+        path: path_str,
+        name,
+        slab_index: index,
+        metadata,
+    });
+
     slab[index].children = node
         .children
         .iter()
-        .map(|node| construct_node_slab_name_index(Some(index), node, slab, name_index))
+        .map(|child| {
+            construct_node_slab_name_index(
+                Some(index),
+                child,
+                slab,
+                name_index,
+                flat_entries,
+                &full_path,
+            )
+        })
         .collect();
     index
 }
@@ -1109,6 +1180,9 @@ impl SearchCache {
 }
 
 pub static NAME_POOL: LazyLock<NamePool> = LazyLock::new(NamePool::new);
+
+/// Global pool of interned full absolute paths, for the flat index.
+pub static PATH_POOL: LazyLock<NamePool> = LazyLock::new(NamePool::new);
 
 fn require_folder_expr(expr: Expr) -> Expr {
     let folder_filter = Expr::Term(Term::Filter(Filter {
@@ -2148,7 +2222,15 @@ mod tests {
         );
         let mut slab = ThinSlab::new();
         let mut name_index = NameIndex::default();
-        let root = construct_node_slab_name_index(None, &tree, &mut slab, &mut name_index);
+        let mut flat_entries = Vec::new();
+        let root = construct_node_slab_name_index(
+            None,
+            &tree,
+            &mut slab,
+            &mut name_index,
+            &mut flat_entries,
+            Path::new(""),
+        );
         let file_nodes = FileNodes::new(
             PathBuf::from("/virtual/root"),
             Vec::new(),

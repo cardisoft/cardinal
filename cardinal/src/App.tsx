@@ -49,6 +49,7 @@ function App() {
     scannedFiles,
     processedEvents,
     rescanErrors,
+    statusMessage,
     currentQuery,
     currentDirectoryQuery,
     highlightTerms,
@@ -441,6 +442,7 @@ function App() {
           onTabChange={onTabChange}
           onRequestRescan={requestRescan}
           rescanErrorCount={rescanErrors}
+          statusMessage={statusMessage}
         />
       </main>
       <PreferencesOverlay

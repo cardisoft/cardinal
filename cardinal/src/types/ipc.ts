@@ -4,6 +4,7 @@ export type StatusBarUpdatePayload = {
   scannedFiles: number;
   processedEvents: number;
   rescanErrors: number;
+  statusMessage?: string;
 };
 
 export type IconUpdateWirePayload = {

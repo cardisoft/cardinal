@@ -117,7 +117,8 @@
     "maximize": "縮放視窗",
     "closeWindow": "關閉視窗",
     "help": "說明",
-    "getUpdates": "取得更新"
+    "getUpdates": "取得更新",
+    "searchSyntax": "搜尋語法"
   },
   "preferences": {
     "title": "偏好設定",

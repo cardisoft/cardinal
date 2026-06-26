@@ -118,7 +118,8 @@
     "maximize": "Zoom",
     "closeWindow": "Chiudi finestra",
     "help": "Aiuto",
-    "getUpdates": "Ricevi aggiornamenti"
+    "getUpdates": "Ricevi aggiornamenti",
+    "searchSyntax": "Sintassi di ricerca"
   },
   "preferences": {
     "title": "Preferenze",

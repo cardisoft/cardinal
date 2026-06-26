@@ -19,7 +19,12 @@ type UseAppWindowListenersOptions = {
   activeTab: StatusTabKey;
   searchInputRef: RefObject<HTMLInputElement>;
   focusAndSelectSearchInput: () => void;
-  handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
+  handleStatusUpdate: (
+    scannedFiles: number,
+    processedEvents: number,
+    rescanErrors: number,
+    statusMessage?: string,
+  ) => void;
   setLifecycleState: (status: AppLifecycleStatus) => void;
   submitFilesQuery: (query: string, options?: QueueSearchOptions) => void;
   setEventFilterQuery: (value: string) => void;
@@ -50,8 +55,8 @@ export function useAppWindowListeners({
   });
   useEffect(() => {
     const unlistenStatus = subscribeStatusBarUpdate((payload: StatusBarUpdatePayload) => {
-      const { scannedFiles, processedEvents, rescanErrors } = payload;
-      handleStatusUpdate(scannedFiles, processedEvents, rescanErrors);
+      const { scannedFiles, processedEvents, rescanErrors, statusMessage } = payload;
+      handleStatusUpdate(scannedFiles, processedEvents, rescanErrors, statusMessage);
     });
     return unlistenStatus;
   }, [handleStatusUpdate]);

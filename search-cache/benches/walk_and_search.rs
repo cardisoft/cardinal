@@ -45,6 +45,12 @@ const QUERIES: &[&str] = &[
     "*.h",
     // Term that should match very few results
     "ffffffff_no_match_xyzzy",
+    // path: substring filter — single fragment
+    "path:repos",
+    // path: substring filter — multiple fragments (AND)
+    "path:Downloads path:repos",
+    // path: + word
+    "main.js path:repos",
 ];
 
 // Measures search latency on a fresh cache per iteration. Cache construction is

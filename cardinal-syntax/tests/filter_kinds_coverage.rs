@@ -34,6 +34,7 @@ fn maps_known_filter_names() {
         ("daterun", FilterKind::DateRun),
         ("parent", FilterKind::Parent),
         ("infolder", FilterKind::InFolder),
+        ("path", FilterKind::Path),
         ("nosubfolders", FilterKind::NoSubfolders),
         ("child", FilterKind::Child),
         ("attrib", FilterKind::Attribute),

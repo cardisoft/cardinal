@@ -439,6 +439,13 @@ impl SearchCache {
                     .ok_or_else(|| anyhow!("infolder: requires a folder path"))?;
                 self.evaluate_infolder_filter(argument, base, options, token)
             }
+            FilterKind::Path => {
+                let argument = filter
+                    .argument
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("path: requires a path fragment"))?;
+                self.evaluate_path_filter(argument, base, options, token)
+            }
             FilterKind::NoSubfolders => {
                 let argument = filter
                     .argument
@@ -613,6 +620,85 @@ impl SearchCache {
             Ok(Some(nodes))
         } else {
             Ok(Some(children))
+        }
+    }
+
+    /// `path:` filters keep items whose full absolute path contains the
+    /// argument as a substring of any path component. Matching respects the
+    /// UI case-sensitivity toggle. Multiple `path:` filters are combined with
+    /// AND by the query optimizer, each narrowing the result set further.
+    ///
+    /// Uses the name pool index to find names containing the needle, then
+    /// expands to all descendants of matching nodes — avoiding a full-tree
+    /// scan. This mirrors how `*.ext` queries leverage the index rather than
+    /// iterating every node.
+    fn evaluate_path_filter(
+        &self,
+        argument: &FilterArgument,
+        base: Option<Vec<SlabIndex>>,
+        options: SearchOptions,
+        token: CancellationToken,
+    ) -> Result<Option<Vec<SlabIndex>>> {
+        let needle = argument.raw.trim_start_matches('/');
+        if needle.is_empty() {
+            bail!("path: requires a non-empty path fragment");
+        }
+
+        let needle_lower = options
+            .case_insensitive
+            .then(|| needle.to_ascii_lowercase());
+
+        // When a base set exists, filter it in-place (O(base_size)).
+        if let Some(base_nodes) = base {
+            return Ok(filter_nodes(base_nodes, token, |index| {
+                self.path_contains_component(index, needle, needle_lower.as_deref())
+            }));
+        }
+
+        // No base set: scan the flat index entries directly. Each entry
+        // stores the full path as an interned &'static str, so this is a
+        // simple linear scan with no allocation.
+        if token.is_cancelled().is_none() {
+            return Ok(None);
+        }
+        let mut results = Vec::new();
+        for (counter, (_, entry)) in self.flat_index.iter().enumerate() {
+            if counter.is_multiple_of(0x10000) && token.is_cancelled().is_none() {
+                return Ok(None);
+            }
+            let matches = match &needle_lower {
+                Some(lower) => entry.path_match_ci(lower),
+                None => entry.path.contains(needle),
+            };
+            if matches {
+                results.push(entry.slab_index);
+            }
+        }
+        Ok(Some(results))
+    }
+
+    /// Check if the full path of `index` contains `needle`.
+    /// Uses the flat index entry's path directly (O(1)) when available,
+    /// falls back to node_path (parent-chain walk) otherwise.
+    fn path_contains_component(
+        &self,
+        index: SlabIndex,
+        needle: &str,
+        needle_lower: Option<&str>,
+    ) -> bool {
+        let path_str = if let Some(entry) = self.flat_index.get(index) {
+            entry.path
+        } else if let Some(path) = self.node_path(index) {
+            return match needle_lower {
+                Some(lower) => path.to_string_lossy().to_ascii_lowercase().contains(lower),
+                None => path.to_string_lossy().contains(needle),
+            };
+        } else {
+            return false;
+        };
+        match needle_lower {
+            Some(lower) => path_str.to_ascii_lowercase().contains(lower),
+            None => path_str.contains(needle),
         }
     }
 

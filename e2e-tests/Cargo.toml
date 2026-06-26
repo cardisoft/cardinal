@@ -1,0 +1,14 @@
+[package]
+name = "e2e-tests"
+version = "0.1.0"
+edition = "2024"
+description = "End-to-end tests that drive the Cardinal desktop app via accessibility APIs."
+license = "MIT"
+publish = false
+
+[dependencies]
+search-cache = { path = "../search-cache" }
+search-cancel = { path = "../search-cancel" }
+
+[lib]
+doctest = false

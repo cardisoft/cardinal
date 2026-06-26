@@ -117,7 +117,8 @@
     "maximize": "缩放窗口",
     "closeWindow": "关闭窗口",
     "help": "帮助",
-    "getUpdates": "获取更新"
+    "getUpdates": "获取更新",
+    "searchSyntax": "搜索语法"
   },
   "preferences": {
     "title": "偏好设置",

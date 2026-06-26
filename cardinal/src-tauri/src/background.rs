@@ -12,7 +12,8 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rayon::spawn;
 use search_cache::{
-    HandleFSEError, SearchCache, SearchOptions, SearchResultNode, SlabIndex, WalkData,
+    HandleFSEError, SearchCache, SearchOptions, SearchOutcome, SearchResultNode, SlabIndex,
+    WalkData,
 };
 use search_cancel::CancellationToken;
 use serde::Serialize;
@@ -30,6 +31,9 @@ pub struct StatusBarUpdate {
     pub scanned_files: usize,
     pub processed_events: usize,
     pub rescan_errors: usize,
+    /// Human-readable status message (e.g. "Walking filesystem…", "Indexing…").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_message: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -58,6 +62,7 @@ pub fn reset_status_bar(app_handle: &AppHandle) {
                 scanned_files: 0,
                 processed_events: 0,
                 rescan_errors: 0,
+                status_message: None,
             },
         )
         .unwrap();
@@ -68,6 +73,22 @@ pub fn emit_status_bar_update(
     scanned_files: usize,
     processed_events: usize,
     rescan_errors: usize,
+) {
+    emit_status_bar_update_with_message(
+        app_handle,
+        scanned_files,
+        processed_events,
+        rescan_errors,
+        None,
+    );
+}
+
+pub fn emit_status_bar_update_with_message(
+    app_handle: &AppHandle,
+    scanned_files: usize,
+    processed_events: usize,
+    rescan_errors: usize,
+    status_message: Option<&str>,
 ) {
     static LAST_EMIT: Lazy<Mutex<Instant>> =
         Lazy::new(|| Mutex::new(Instant::now() - Duration::from_secs(1)));
@@ -84,6 +105,7 @@ pub fn emit_status_bar_update(
                     scanned_files,
                     processed_events,
                     rescan_errors,
+                    status_message: status_message.map(|s| s.to_string()),
                 },
             )
             .unwrap();
@@ -329,6 +351,28 @@ pub fn run_background_event_loop(
     let flush_ticker = crossbeam_channel::tick(Duration::from_secs(10));
 
     loop {
+        // Prioritize search requests over FS event processing so the UI
+        // stays responsive even when there's a large FS event backlog.
+        // Drain all pending search jobs, keeping only the latest (older
+        // ones are already cancelled by CancellationToken::new_search()).
+        if let Ok(mut latest_job) = search_rx.try_recv() {
+            while let Ok(newer) = search_rx.try_recv() {
+                // Send cancelled result for the superseded job.
+                let _ = latest_job.result_tx.send(Ok(SearchOutcome::cancelled()));
+                latest_job = newer;
+            }
+            let SearchJob {
+                query,
+                options,
+                cancellation_token,
+                result_tx,
+            } = latest_job;
+            let opts = SearchOptions::from(options);
+            let payload = cache.search_query_with_options(query, opts, cancellation_token);
+            result_tx.send(payload).expect("Failed to send result");
+            continue;
+        }
+
         crossbeam_channel::select! {
             recv(finish_rx) -> tx => {
                 let tx = tx.expect("Finish channel closed");
@@ -435,11 +479,8 @@ pub(crate) fn build_search_cache(
     std::thread::scope(|s| {
         s.spawn(|| {
             while !walking_done.load(Ordering::Relaxed) {
-                let dirs = walk_data.num_dirs.load(Ordering::Relaxed);
-                let files = walk_data.num_files.load(Ordering::Relaxed);
-                let total = dirs + files;
-                emit_status_bar_update(app_handle, total, 0, 0);
-                std::thread::sleep(Duration::from_millis(100));
+                emit_status_bar_update_with_message(app_handle, 0, 0, 0, Some("Indexing…"));
+                std::thread::sleep(Duration::from_millis(500));
             }
         });
         let cache = SearchCache::walk_fs_with_walk_data(&walk_data, &APP_QUIT);
@@ -483,11 +524,8 @@ fn perform_rescan(
     let stopped = std::thread::scope(|s| {
         s.spawn(|| {
             while !walking_done.load(Ordering::Relaxed) {
-                let dirs = walk_data.num_dirs.load(Ordering::Relaxed);
-                let files = walk_data.num_files.load(Ordering::Relaxed);
-                let total = dirs + files;
-                emit_status_bar_update(app_handle, total, 0, 0);
-                std::thread::sleep(Duration::from_millis(100));
+                emit_status_bar_update_with_message(app_handle, 0, 0, 0, Some("Indexing…"));
+                std::thread::sleep(Duration::from_millis(500));
             }
         });
         // If rescan is cancelled, we have nothing to do

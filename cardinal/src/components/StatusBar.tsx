@@ -16,6 +16,7 @@ type StatusBarProps = {
   onTabChange: (tab: StatusTabKey) => void;
   onRequestRescan: () => void;
   rescanErrorCount: number;
+  statusMessage: string | null;
 };
 
 const TABS: StatusTabKey[] = ['files', 'events'];
@@ -36,6 +37,7 @@ const StatusBar = ({
   onTabChange,
   onRequestRescan,
   rescanErrorCount,
+  statusMessage,
 }: StatusBarProps): React.JSX.Element => {
   const { t } = useTranslation();
   const tabsRef = useRef<HTMLDivElement | null>(null);
@@ -116,7 +118,7 @@ const StatusBar = ({
           >
             {lifecycleMeta.icon}
           </span>
-          <span className="status-text">{lifecycleLabel}</span>
+          <span className="status-text">{statusMessage ?? lifecycleLabel}</span>
         </div>
         <div
           ref={tabsRef}

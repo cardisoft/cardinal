@@ -118,7 +118,8 @@
     "maximize": "Zoomen",
     "closeWindow": "Fenster schließen",
     "help": "Hilfe",
-    "getUpdates": "Updates abrufen"
+    "getUpdates": "Updates abrufen",
+    "searchSyntax": "Suchsyntax"
   },
   "preferences": {
     "title": "Einstellungen",

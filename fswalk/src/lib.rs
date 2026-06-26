@@ -242,6 +242,117 @@ pub fn walk_it<F: Fn() -> bool + Send + Sync>(walk_data: &WalkData<'_, F>) -> Op
     })
 }
 
+/// A flat filesystem entry: full path + optional metadata.
+#[derive(Debug, Clone)]
+pub struct FlatWalkEntry {
+    pub path: PathBuf,
+    pub metadata: Option<NodeMetadata>,
+}
+
+/// Walk the filesystem and return a flat list of entries (sorted by path),
+/// instead of a tree. Each entry has its full absolute path available
+/// directly — no parent-chain reconstruction needed.
+///
+/// Returns `None` if cancelled.
+pub fn walk_flat<F: Fn() -> bool + Send + Sync>(
+    walk_data: &WalkData<'_, F>,
+) -> Option<Vec<FlatWalkEntry>> {
+    let mut entries = Vec::new();
+    walk_flat_recursive(walk_data.root_path, walk_data, &mut entries)?;
+    // fswalk visits children in parallel, so entries are not sorted.
+    // Sort by path to enable binary-search prefix queries.
+    entries.sort_unstable_by(|a, b| a.path.as_os_str().cmp(b.path.as_os_str()));
+    Some(entries)
+}
+
+fn walk_flat_recursive<F: Fn() -> bool + Send + Sync>(
+    path: &Path,
+    walk_data: &WalkData<'_, F>,
+    out: &mut Vec<FlatWalkEntry>,
+) -> Option<()> {
+    if walk_data.is_cancelled() {
+        return None;
+    }
+    if walk_data.should_ignore(path) {
+        return Some(());
+    }
+
+    let metadata = metadata_of_path(path);
+    let need_metadata = walk_data.need_metadata;
+    let is_dir = metadata.as_ref().map(|x| x.is_dir()).unwrap_or(false);
+
+    // Emit this entry.
+    if is_dir {
+        walk_data.num_dirs.fetch_add(1, Ordering::Relaxed);
+    } else {
+        walk_data.num_files.fetch_add(1, Ordering::Relaxed);
+    }
+    out.push(FlatWalkEntry {
+        path: path.to_path_buf(),
+        metadata: need_metadata
+            .then(|| metadata.map(NodeMetadata::from))
+            .flatten(),
+    });
+
+    if is_dir {
+        let read_dir = fs::read_dir(path);
+        if let Ok(entries) = read_dir {
+            let cancelled = AtomicBool::new(false);
+            // Collect children's entries in parallel via a mutex-protected vec.
+            let child_results: Vec<Option<Vec<FlatWalkEntry>>> = entries
+                .into_iter()
+                .par_bridge()
+                .map(|entry| {
+                    match &entry {
+                        Ok(entry) => {
+                            if walk_data.is_cancelled() {
+                                cancelled.store(true, Ordering::Relaxed);
+                                return None;
+                            }
+                            let child_path = entry.path();
+                            if walk_data.should_ignore(&child_path) {
+                                return None;
+                            }
+                            // Don't traverse symlinks.
+                            if let Ok(ft) = entry.file_type() {
+                                if ft.is_dir() {
+                                    let mut child_entries = Vec::new();
+                                    walk_flat_recursive(
+                                        &child_path,
+                                        walk_data,
+                                        &mut child_entries,
+                                    )?;
+                                    Some(child_entries)
+                                } else {
+                                    walk_data.num_files.fetch_add(1, Ordering::Relaxed);
+                                    let meta = need_metadata
+                                        .then(|| entry.metadata().ok().map(NodeMetadata::from))
+                                        .flatten();
+                                    Some(vec![FlatWalkEntry {
+                                        path: child_path,
+                                        metadata: meta,
+                                    }])
+                                }
+                            } else {
+                                None
+                            }
+                        }
+                        Err(_) => None,
+                    }
+                })
+                .collect();
+
+            if cancelled.load(Ordering::Acquire) {
+                return None;
+            }
+            for child_entries in child_results.into_iter().flatten() {
+                out.extend(child_entries);
+            }
+        }
+    }
+    Some(())
+}
+
 /// Note: this function will create a Node for the given path even if it's
 /// missing or inaccessible, but the metadata will be None in that case.
 fn walk<F: Fn() -> bool + Send + Sync>(path: &Path, walk_data: &WalkData<'_, F>) -> Option<Node> {

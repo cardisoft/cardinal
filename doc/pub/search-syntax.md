@@ -157,7 +157,26 @@ ext:png;jpg travel|vacation
 
 These filters take an absolute path as their argument; a leading `~` is expanded to the user home directory. Path lookup follows the UI case-sensitivity toggle: when case-sensitive matching is off, each path segment can match regardless of case.
 
-### 4.4 Type filter: `type:`
+### 4.4 Path substring filter: `path:`
+
+`path:` keeps items whose **full absolute path** contains the argument as a substring. Unlike `parent:`/`infolder:` it does not resolve a single folder — it matches any path fragment, so it works even when you only remember part of the hierarchy. Multiple `path:` filters combine with AND, each narrowing the result set further. Matching respects the UI case-sensitivity toggle.
+
+Like all filters, `path:` can be negated with `!` to exclude paths containing the argument.
+
+| Filter  | Meaning                                                        | Example                              |
+| ------- | ------------------------------------------------------------- | ------------------------------------ |
+| `path:` | Items whose full path contains the argument (case-aware)      | `main.js path:Downloads path:repos`       |
+| `!path:` | Items whose full path does **not** contain the argument      | `*.js !path:node_modules`                  |
+
+Examples:
+```text
+main.js path:repos               # main.js anywhere under a path containing "repos"
+main.js path:Downloads path:repos     # main.js under a path containing both "Downloads" and "repos"
+path:Documents report            # "report" items whose path contains "Documents"
+*.js !path:node_modules          # .js files excluding anything under node_modules
+```
+
+### 4.5 Type filter: `type:`
 
 `type:` groups file extensions into semantic categories. Supported categories (case-insensitive, with synonyms) include:
 
@@ -179,7 +198,7 @@ type:code "Cardinal"
 type:archive dm:pastmonth
 ```
 
-### 4.5 Type macros: `audio:`, `video:`, `doc:`, `exe:`
+### 4.6 Type macros: `audio:`, `video:`, `doc:`, `exe:`
 
 Shortcuts for common `type:` cases:
 
@@ -196,7 +215,7 @@ audio:soundtrack
 video:"Keynote"
 ```
 
-### 4.6 Size filter: `size:`
+### 4.7 Size filter: `size:`
 
 `size:` supports:
 
@@ -213,7 +232,7 @@ size:tiny                 # 0–10 KB (approximate keyword range)
 size:empty                # exactly 0 bytes
 ```
 
-### 4.7 Date filters: `dm:`, `dc:`
+### 4.8 Date filters: `dm:`, `dc:`
 
 - `dm:` / `datemodified:` — date modified.
 - `dc:` / `datecreated:` — date created.
@@ -243,7 +262,7 @@ dm:2024-01-01..2024-03-31     # modified in Q1 2024
 dm:>=2024/01/01               # modified from 2024-01-01 onwards
 ```
 
-### 4.8 Regex filter: `regex:`
+### 4.9 Regex filter: `regex:`
 
 `regex:` treats the rest of the token as a regular expression applied to a path component (file or folder name).
 
@@ -255,7 +274,7 @@ regex:Report.*2025
 
 The UI case-sensitivity toggle affects regex matching.
 
-### 4.9 Content filter: `content:`
+### 4.10 Content filter: `content:`
 
 `content:` scans file contents for a **plain substring**:
 
@@ -275,7 +294,7 @@ type:doc content:"Q4 budget"
 
 Content matching is done in streaming fashion over the file; multi-byte sequences can span buffer boundaries.
 
-### 4.10 Tag filter: `tag:` / `t:`
+### 4.11 Tag filter: `tag:` / `t:`
 
 Filters by Finder tags (macOS). Cardinal fetches tags on demand from the file’s metadata (no caching), and for large result sets it uses `mdfind` to narrow candidates before applying tag matching.
 
@@ -313,6 +332,9 @@ ext:png;jpg travel|vacation
 
 #  Recent log files inside a project tree
 in:/Users/demo/Projects ext:log dm:pastweek
+
+#  Narrow by path fragments when you only remember part of the hierarchy
+main.js path:Downloads path:repos
 
 #  Shell scripts directly under Scripts folder
 parent:/Users/demo/Scripts *.sh
