@@ -115,7 +115,8 @@
     "maximize": "Масштабировать",
     "closeWindow": "Закрыть окно",
     "help": "Справка",
-    "getUpdates": "Получить обновления"
+    "getUpdates": "Получить обновления",
+    "searchSyntax": "Синтаксис поиска"
   },
   "preferences": {
     "title": "Настройки",

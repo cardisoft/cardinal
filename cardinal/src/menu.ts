@@ -6,6 +6,7 @@ import i18n from './i18n/config';
 import { openPreferences } from './utils/openPreferences';
 
 const HELP_UPDATES_URL = 'https://github.com/cardisoft/cardinal/releases';
+const SEARCH_SYNTAX_URL = 'https://github.com/cardisoft/cardinal/blob/master/doc/pub/search-syntax.md';
 
 let menuInitPromise: Promise<void> | null = null;
 
@@ -91,10 +92,15 @@ async function buildAppMenu(): Promise<void> {
     text: i18n.t('menu.getUpdates'),
     action: () => void openUpdatesPage(),
   });
+  const searchSyntaxItem = await MenuItem.new({
+    id: 'menu.help_search_syntax',
+    text: i18n.t('menu.searchSyntax'),
+    action: () => void openUrl(SEARCH_SYNTAX_URL).catch(() => {}),
+  });
   const helpSubmenu = await Submenu.new({
     id: 'menu.help-root',
     text: i18n.t('menu.help'),
-    items: [getUpdatesItem],
+    items: [searchSyntaxItem, getUpdatesItem],
   });
 
   await helpSubmenu.setAsHelpMenuForNSApp().catch(() => {});

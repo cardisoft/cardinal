@@ -115,7 +115,8 @@
     "maximize": "줌",
     "closeWindow": "윈도우 닫기",
     "help": "도움말",
-    "getUpdates": "업데이트 받기"
+    "getUpdates": "업데이트 받기",
+    "searchSyntax": "검색 구문"
   },
   "preferences": {
     "title": "환경설정",

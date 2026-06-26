@@ -115,7 +115,8 @@
     "maximize": "Zoom",
     "closeWindow": "Fermer la fenêtre",
     "help": "Aide",
-    "getUpdates": "Obtenir les mises à jour"
+    "getUpdates": "Obtenir les mises à jour",
+    "searchSyntax": "Syntaxe de recherche"
   },
   "preferences": {
     "title": "Préférences",

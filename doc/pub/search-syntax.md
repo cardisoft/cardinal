@@ -161,15 +161,19 @@ These filters take an absolute path as their argument; a leading `~` is expanded
 
 `path:` keeps items whose **full absolute path** contains the argument as a substring. Unlike `parent:`/`infolder:` it does not resolve a single folder — it matches any path fragment, so it works even when you only remember part of the hierarchy. Multiple `path:` filters combine with AND, each narrowing the result set further. Matching respects the UI case-sensitivity toggle.
 
+Like all filters, `path:` can be negated with `!` to exclude paths containing the argument.
+
 | Filter  | Meaning                                                        | Example                              |
 | ------- | ------------------------------------------------------------- | ------------------------------------ |
 | `path:` | Items whose full path contains the argument (case-aware)      | `main.js path:Downloads path:repos`       |
+| `!path:` | Items whose full path does **not** contain the argument      | `*.js !path:node_modules`                  |
 
 Examples:
 ```text
 main.js path:repos               # main.js anywhere under a path containing "repos"
 main.js path:Downloads path:repos     # main.js under a path containing both "Downloads" and "repos"
 path:Documents report            # "report" items whose path contains "Documents"
+*.js !path:node_modules          # .js files excluding anything under node_modules
 ```
 
 ### 4.5 Type filter: `type:`

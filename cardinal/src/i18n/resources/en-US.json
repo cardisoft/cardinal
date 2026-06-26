@@ -115,7 +115,8 @@
     "maximize": "Zoom",
     "closeWindow": "Close Window",
     "help": "Help",
-    "getUpdates": "Get Updates"
+    "getUpdates": "Get Updates",
+    "searchSyntax": "Search Syntax"
   },
   "preferences": {
     "title": "Preferences",

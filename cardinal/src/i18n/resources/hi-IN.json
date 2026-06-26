@@ -105,7 +105,8 @@
     "view": "दृश्य",
     "window": "विंडो",
     "help": "सहायता",
-    "getUpdates": "अपडेट प्राप्त करें"
+    "getUpdates": "अपडेट प्राप्त करें",
+    "searchSyntax": "खोज सिंटैक्स"
   },
   "preferences": {
     "title": "प्राथमिकताएँ",

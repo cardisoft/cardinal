@@ -115,7 +115,8 @@
     "maximize": "تكبير",
     "closeWindow": "إغلاق النافذة",
     "help": "مساعدة",
-    "getUpdates": "الحصول على التحديثات"
+    "getUpdates": "الحصول على التحديثات",
+    "searchSyntax": "بنية البحث"
   },
   "preferences": {
     "title": "التفضيلات",
