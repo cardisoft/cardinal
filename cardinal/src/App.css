@@ -461,6 +461,7 @@ button:active:not(:disabled) {
   --columns-total: calc(
     var(--w-filename) + var(--w-path) + var(--w-size) + var(--w-modified) + var(--w-created)
   );
+  --columns-total-with-context: calc(var(--columns-total) + var(--w-context));
 }
 
 .scroll-area {
@@ -597,6 +598,14 @@ button:active:not(:disabled) {
   min-width: var(--columns-total);
 }
 
+.scroll-area--with-context .columns {
+  grid-template-columns:
+    var(--w-context) var(--w-filename) var(--w-path) var(--w-size) var(--w-modified)
+    var(--w-created);
+  width: var(--columns-total-with-context);
+  min-width: var(--columns-total-with-context);
+}
+
 /* === Header Row === */
 .header-row-container {
   overflow: hidden;
@@ -626,6 +635,16 @@ button:active:not(:disabled) {
   grid-template-columns:
     var(--w-filename) var(--w-path) var(--w-size) var(--w-modified) var(--w-created)
     var(--virtual-scrollbar-width);
+}
+
+.scroll-area--with-context .header-row {
+  width: calc(var(--columns-total-with-context) + var(--virtual-scrollbar-width));
+}
+
+.scroll-area--with-context .header-row.columns {
+  grid-template-columns:
+    var(--w-context) var(--w-filename) var(--w-path) var(--w-size) var(--w-modified)
+    var(--w-created) var(--virtual-scrollbar-width);
 }
 
 .header {
@@ -930,6 +949,13 @@ button:active:not(:disabled) {
   overflow: hidden;
   text-overflow: ellipsis;
   /* Horizontal padding for data cells */
+  padding: 0 var(--cell-hpad);
+}
+
+.context-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 0 var(--cell-hpad);
 }
 

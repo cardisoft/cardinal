@@ -32,6 +32,17 @@ const renderDataLoader = (initialProps: HookProps) =>
     initialProps,
   });
 
+const renderDataLoaderWithContent = (
+  initialProps: HookProps & { contentTerms: string[]; caseInsensitive: boolean },
+) =>
+  renderHook(
+    ({ results, version, contentTerms, caseInsensitive }) =>
+      useDataLoader(results, version, contentTerms, caseInsensitive),
+    {
+      initialProps,
+    },
+  );
+
 const createDeferred = <T>() => {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((res) => {
@@ -158,5 +169,24 @@ describe('useDataLoader', () => {
     unmount();
 
     expect(iconUpdateUnlisten).toHaveBeenCalled();
+  });
+
+  it('passes content snippet options to node info requests', async () => {
+    const { result } = renderDataLoaderWithContent({
+      results: [11 as SlabIndex],
+      version: 1,
+      contentTerms: ['needle'],
+      caseInsensitive: true,
+    });
+
+    await act(async () => {
+      await result.current.ensureRangeLoaded(0, 0);
+    });
+
+    expect(mockedInvoke).toHaveBeenCalledWith('get_nodes_info', {
+      results: [11],
+      contentTerms: ['needle'],
+      caseInsensitive: true,
+    });
   });
 });

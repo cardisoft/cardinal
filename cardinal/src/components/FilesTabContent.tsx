@@ -36,6 +36,9 @@ type FilesTabContentProps = {
   onSortToggle: (sortKey: SortKey) => void;
   sortDisabled: boolean;
   sortDisabledTooltip: string | null;
+  showContentContext: boolean;
+  contentTerms: readonly string[];
+  caseInsensitive: boolean;
 };
 
 export function FilesTabContent({
@@ -58,9 +61,12 @@ export function FilesTabContent({
   onSortToggle,
   sortDisabled,
   sortDisabledTooltip,
+  showContentContext,
+  contentTerms,
+  caseInsensitive,
 }: FilesTabContentProps): React.JSX.Element {
   return (
-    <div className="scroll-area">
+    <div className={`scroll-area${showContentContext ? ' scroll-area--with-context' : ''}`}>
       <ColumnHeader
         ref={headerRef}
         onResizeStart={onResizeStart}
@@ -69,6 +75,7 @@ export function FilesTabContent({
         onSortToggle={onSortToggle}
         sortDisabled={sortDisabled}
         sortDisabledTooltip={sortDisabledTooltip}
+        showContentContext={showContentContext}
       />
       <div className="flex-fill">
         {displayState !== 'results' ? (
@@ -88,6 +95,8 @@ export function FilesTabContent({
             overscan={overscan}
             renderRow={renderRow}
             onScrollSync={onScrollSync}
+            contentTerms={contentTerms}
+            caseInsensitive={caseInsensitive}
           />
         )}
       </div>

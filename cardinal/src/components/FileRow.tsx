@@ -21,6 +21,8 @@ type FileRowProps = {
   selectedPathsForDrag?: string[];
   caseInsensitive?: boolean;
   highlightTerms?: readonly string[];
+  contentTerms?: readonly string[];
+  showContentContext?: boolean;
 };
 
 export const FileRow = memo(function FileRow({
@@ -34,6 +36,8 @@ export const FileRow = memo(function FileRow({
   selectedPathsForDrag = [],
   caseInsensitive,
   highlightTerms,
+  contentTerms,
+  showContentContext = false,
 }: FileRowProps): React.JSX.Element {
   const pendingSelectRef = useRef<{
     isShift: boolean;
@@ -148,6 +152,19 @@ export const FileRow = memo(function FileRow({
       aria-selected={isSelected}
       title={path}
     >
+      {showContentContext ? (
+        item.contentContext ? (
+          <MiddleEllipsisHighlight
+            className="context-text"
+            text={item.contentContext}
+            highlightTerms={contentTerms}
+            caseInsensitive={caseInsensitive}
+            ellipsisMode="end"
+          />
+        ) : (
+          <span className="context-text muted">—</span>
+        )
+      ) : null}
       <div className="filename-column">
         {item.icon ? (
           <img src={item.icon} alt="icon" className="file-icon" />
