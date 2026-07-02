@@ -1,4 +1,5 @@
 use crate::commands::SearchState;
+use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow};
 use tracing::{error, info, warn};
 
@@ -10,6 +11,17 @@ pub enum WindowToggle {
 }
 
 pub fn activate_window<R: Runtime>(window: &WebviewWindow<R>) {
+    let window_for_task = window.clone();
+    if let Err(err) = window.run_on_main_thread(move || {
+        apply_active_space_behavior(&window_for_task);
+        show_and_focus_window(&window_for_task);
+    }) {
+        error!(?err, "Failed to schedule macOS window activation");
+        show_and_focus_window(window);
+    }
+}
+
+fn show_and_focus_window<R: Runtime>(window: &WebviewWindow<R>) {
     if let Ok(true) = window.is_minimized()
         && let Err(err) = window.unminimize()
     {
@@ -25,6 +37,34 @@ pub fn activate_window<R: Runtime>(window: &WebviewWindow<R>) {
     if let Err(err) = window.set_focus() {
         error!(?err, "Failed to focus window");
     }
+}
+
+fn apply_active_space_behavior<R: Runtime>(window: &WebviewWindow<R>) {
+    let ns_window = match window.ns_window() {
+        Ok(ns_window) => ns_window,
+        Err(err) => {
+            error!(?err, "Failed to get macOS NSWindow");
+            return;
+        }
+    };
+
+    if ns_window.is_null() {
+        warn!("macOS NSWindow pointer is null");
+        return;
+    }
+
+    // Move the existing window to whichever Space is active before AppKit focuses it.
+    let ns_window = unsafe { &*ns_window.cast::<NSWindow>() };
+    let behavior = collection_behavior_for_active_space(ns_window.collectionBehavior());
+    ns_window.setCollectionBehavior(behavior);
+}
+
+fn collection_behavior_for_active_space(
+    mut behavior: NSWindowCollectionBehavior,
+) -> NSWindowCollectionBehavior {
+    behavior.remove(NSWindowCollectionBehavior::CanJoinAllSpaces);
+    behavior.insert(NSWindowCollectionBehavior::MoveToActiveSpace);
+    behavior
 }
 
 pub fn hide_window<R: Runtime>(window: &WebviewWindow<R>) -> bool {
@@ -106,5 +146,43 @@ pub fn toggle_main_window_impl(app: &AppHandle) {
         }
     } else {
         warn!("Toggle requested but main window is unavailable");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use objc2_app_kit::NSWindowCollectionBehavior;
+
+    #[test]
+    fn active_space_behavior_moves_window_without_joining_all_spaces() {
+        let behavior = collection_behavior_for_active_space(NSWindowCollectionBehavior::Default);
+
+        assert!(behavior.contains(NSWindowCollectionBehavior::MoveToActiveSpace));
+        assert!(!behavior.contains(NSWindowCollectionBehavior::CanJoinAllSpaces));
+    }
+
+    #[test]
+    fn active_space_behavior_preserves_unrelated_flags() {
+        let existing =
+            NSWindowCollectionBehavior::Managed | NSWindowCollectionBehavior::ParticipatesInCycle;
+
+        let behavior = collection_behavior_for_active_space(existing);
+
+        assert!(behavior.contains(NSWindowCollectionBehavior::Managed));
+        assert!(behavior.contains(NSWindowCollectionBehavior::ParticipatesInCycle));
+        assert!(behavior.contains(NSWindowCollectionBehavior::MoveToActiveSpace));
+    }
+
+    #[test]
+    fn active_space_behavior_clears_all_spaces_visibility() {
+        let existing =
+            NSWindowCollectionBehavior::CanJoinAllSpaces | NSWindowCollectionBehavior::Managed;
+
+        let behavior = collection_behavior_for_active_space(existing);
+
+        assert!(!behavior.contains(NSWindowCollectionBehavior::CanJoinAllSpaces));
+        assert!(behavior.contains(NSWindowCollectionBehavior::MoveToActiveSpace));
+        assert!(behavior.contains(NSWindowCollectionBehavior::Managed));
     }
 }
