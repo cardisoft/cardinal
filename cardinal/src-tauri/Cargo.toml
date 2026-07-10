@@ -46,6 +46,8 @@ fswalk.path = "../../fswalk"
 fs-icon.path = "../../fs-icon"
 search-cancel.path = "../../search-cancel"
 camino = "1.2.1"
+axum = "0.8.9"
+tokio = { version = "1.52.1", features = ["rt-multi-thread", "macros"] }
 
 [features]
 default = []

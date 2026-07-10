@@ -25,7 +25,7 @@ use search_cache::{
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
 use std::{cell::LazyCell, process::Command};
-use tauri::{ActivationPolicy, AppHandle, State};
+use tauri::{ActivationPolicy, AppHandle, Emitter, Manager, State};
 use tracing::{error, info, warn};
 
 #[derive(Debug, Clone)]
@@ -49,6 +49,31 @@ impl From<SearchOptionsPayload> for SearchOptions {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerConfig {
+    pub enabled: bool,
+    pub endpoint: String,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            endpoint: "127.0.0.1:3388".to_string(),
+        }
+    }
+}
+
+/// Load `ServerConfig` from a JSON file previously written by `set_server_config`.
+/// Returns `ServerConfig::default()` if the file is absent or malformed.
+pub(crate) fn load_server_config_from_file(path: &std::path::Path) -> ServerConfig {
+    let Ok(contents) = std::fs::read_to_string(path) else {
+        return ServerConfig::default();
+    };
+    serde_json::from_str::<ServerConfig>(&contents).unwrap_or_default()
+}
+
 #[derive(Debug, Clone)]
 pub struct SearchJob {
     pub query: SearchQuery,
@@ -70,22 +95,27 @@ struct SortedViewCache {
 }
 
 pub struct SearchState {
-    search_tx: Sender<SearchJob>,
-    node_info_tx: Sender<NodeInfoRequest>,
+    pub(crate) search_tx: Sender<SearchJob>,
+    pub(crate) node_info_tx: Sender<NodeInfoRequest>,
     icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
     rescan_tx: Sender<CancellationToken>,
     watch_config_tx: Sender<WatchConfigUpdate>,
+    pub(crate) server_config: Mutex<ServerConfig>,
+    pub(crate) server_config_tx: Sender<ServerConfig>,
     sorted_view_cache: Mutex<Option<SortedViewCache>>,
     pub(crate) update_window_state_tx: Sender<()>,
 }
 
 impl SearchState {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         search_tx: Sender<SearchJob>,
         node_info_tx: Sender<NodeInfoRequest>,
         icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
         rescan_tx: Sender<CancellationToken>,
         watch_config_tx: Sender<WatchConfigUpdate>,
+        server_config: ServerConfig,
+        server_config_tx: Sender<ServerConfig>,
         update_window_state_tx: Sender<()>,
     ) -> Self {
         Self {
@@ -94,6 +124,8 @@ impl SearchState {
             icon_viewport_tx,
             rescan_tx,
             watch_config_tx,
+            server_config: Mutex::new(server_config),
+            server_config_tx,
             sorted_view_cache: Mutex::new(None),
             update_window_state_tx,
         }
@@ -232,7 +264,7 @@ impl SearchResponse {
     pub const CANCELLED: u8 = 1;
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct NodeInfoMetadata {
     pub r#type: u8,
     pub size: i64,
@@ -433,6 +465,40 @@ pub fn set_watch_config(
         scan_cancellation_token: CancellationToken::new_scan(),
     }) {
         error!("Failed to request watch config change: {e:?}");
+    }
+}
+
+#[tauri::command]
+pub fn get_server_config(state: State<'_, SearchState>) -> ServerConfig {
+    state.server_config.lock().clone()
+}
+
+#[tauri::command(async)]
+pub fn set_server_config(app: AppHandle, config: ServerConfig, state: State<'_, SearchState>) {
+    {
+        let mut current = state.server_config.lock();
+        *current = config.clone();
+    }
+
+    // Persist so the server can start from the correct config on next launch.
+    if let Ok(config_dir) = app.path().app_config_dir() {
+        let path = config_dir.join("server_config.json");
+        match serde_json::to_string(&config) {
+            Ok(json) => {
+                if let Err(e) = std::fs::write(&path, json) {
+                    error!("Failed to persist server config: {e:?}");
+                }
+            }
+            Err(e) => error!("Failed to serialize server config: {e:?}"),
+        }
+    }
+
+    if let Err(e) = state.server_config_tx.send(config.clone()) {
+        error!("Failed to request server config change: {e:?}");
+    }
+
+    if let Err(e) = app.emit("server-config-changed", config) {
+        error!("Failed to emit server-config-changed event: {e:?}");
     }
 }
 

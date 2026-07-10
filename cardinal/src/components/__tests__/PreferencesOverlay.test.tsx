@@ -32,47 +32,57 @@ const baseProps = {
   defaultIgnorePaths: ['/default/ignore'],
   includePaths: ['/include/a'],
   defaultIncludePaths: [] as string[],
+  serverConfig: {
+    enabled: false,
+    endpoint: '127.0.0.1:3388',
+  },
+  defaultServerConfig: {
+    enabled: false,
+    endpoint: '127.0.0.1:3388',
+  },
   onReset: vi.fn(),
   themeResetToken: 0,
-  onWatchConfigChange: vi.fn(),
+  onPreferencesChange: vi.fn(),
 };
 
 describe('PreferencesOverlay', () => {
-  it('saves watch root updates via onWatchConfigChange', () => {
-    const onWatchConfigChange = vi.fn();
-    render(<PreferencesOverlay {...baseProps} onWatchConfigChange={onWatchConfigChange} />);
+  it('saves watch root updates via onPreferencesChange', () => {
+    const onPreferencesChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onPreferencesChange={onPreferencesChange} />);
 
     const watchRootInput = screen.getByLabelText('watchRoot.label');
     fireEvent.change(watchRootInput, { target: { value: '/new/root' } });
 
     fireEvent.click(screen.getByText('preferences.save'));
 
-    expect(onWatchConfigChange).toHaveBeenCalledWith({
+    expect(onPreferencesChange).toHaveBeenCalledWith({
       watchRoot: '/new/root',
       ignorePaths: baseProps.ignorePaths,
       includePaths: baseProps.includePaths,
+      serverConfig: baseProps.serverConfig,
     });
   });
 
-  it('saves ignore path updates via onWatchConfigChange', () => {
-    const onWatchConfigChange = vi.fn();
-    render(<PreferencesOverlay {...baseProps} onWatchConfigChange={onWatchConfigChange} />);
+  it('saves ignore path updates via onPreferencesChange', () => {
+    const onPreferencesChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onPreferencesChange={onPreferencesChange} />);
 
     const ignorePathsInput = screen.getByLabelText('ignorePaths.label');
     fireEvent.change(ignorePathsInput, { target: { value: '/tmp/one\n/tmp/two' } });
 
     fireEvent.click(screen.getByText('preferences.save'));
 
-    expect(onWatchConfigChange).toHaveBeenCalledWith({
+    expect(onPreferencesChange).toHaveBeenCalledWith({
       watchRoot: baseProps.watchRoot,
       ignorePaths: ['/tmp/one', '/tmp/two'],
       includePaths: baseProps.includePaths,
+      serverConfig: baseProps.serverConfig,
     });
   });
 
-  it('saves include path updates via onWatchConfigChange', () => {
-    const onWatchConfigChange = vi.fn();
-    render(<PreferencesOverlay {...baseProps} onWatchConfigChange={onWatchConfigChange} />);
+  it('saves include path updates via onPreferencesChange', () => {
+    const onPreferencesChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onPreferencesChange={onPreferencesChange} />);
 
     const includePathsInput = screen.getByLabelText('includePaths.label');
     fireEvent.change(includePathsInput, {
@@ -81,16 +91,17 @@ describe('PreferencesOverlay', () => {
 
     fireEvent.click(screen.getByText('preferences.save'));
 
-    expect(onWatchConfigChange).toHaveBeenCalledWith({
+    expect(onPreferencesChange).toHaveBeenCalledWith({
       watchRoot: baseProps.watchRoot,
       ignorePaths: baseProps.ignorePaths,
       includePaths: ['/Volumes/media', '/Volumes/work'],
+      serverConfig: baseProps.serverConfig,
     });
   });
 
   it('blocks save when an include path is not absolute', () => {
-    const onWatchConfigChange = vi.fn();
-    render(<PreferencesOverlay {...baseProps} onWatchConfigChange={onWatchConfigChange} />);
+    const onPreferencesChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onPreferencesChange={onPreferencesChange} />);
 
     const includePathsInput = screen.getByLabelText('includePaths.label');
     fireEvent.change(includePathsInput, { target: { value: 'relative/path' } });
@@ -98,18 +109,67 @@ describe('PreferencesOverlay', () => {
     const saveButton = screen.getByText('preferences.save') as HTMLButtonElement;
     expect(saveButton.disabled).toBe(true);
     fireEvent.click(saveButton);
-    expect(onWatchConfigChange).not.toHaveBeenCalled();
+    expect(onPreferencesChange).not.toHaveBeenCalled();
+  });
+
+  it('saves server config updates via onPreferencesChange', () => {
+    const onPreferencesChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onPreferencesChange={onPreferencesChange} />);
+
+    fireEvent.click(screen.getByLabelText('preferences.server.enabled'));
+    fireEvent.change(screen.getByLabelText('preferences.server.endpoint'), {
+      target: { value: '0.0.0.0:3390' },
+    });
+    fireEvent.click(screen.getByText('preferences.save'));
+
+    expect(onPreferencesChange).toHaveBeenCalledWith({
+      watchRoot: baseProps.watchRoot,
+      ignorePaths: baseProps.ignorePaths,
+      includePaths: baseProps.includePaths,
+      serverConfig: {
+        enabled: true,
+        endpoint: '0.0.0.0:3390',
+      },
+    });
+  });
+
+  it('blocks save when server endpoint has a port outside the valid range', () => {
+    const onPreferencesChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onPreferencesChange={onPreferencesChange} />);
+
+    fireEvent.change(screen.getByLabelText('preferences.server.endpoint'), {
+      target: { value: '127.0.0.1:70000' },
+    });
+
+    const saveButton = screen.getByText('preferences.save') as HTMLButtonElement;
+    expect(saveButton.disabled).toBe(true);
+    fireEvent.click(saveButton);
+    expect(onPreferencesChange).not.toHaveBeenCalled();
+  });
+
+  it('blocks save when server endpoint contains a non-digit port suffix', () => {
+    const onPreferencesChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onPreferencesChange={onPreferencesChange} />);
+
+    fireEvent.change(screen.getByLabelText('preferences.server.endpoint'), {
+      target: { value: '127.0.0.1:3388abc' },
+    });
+
+    const saveButton = screen.getByText('preferences.save') as HTMLButtonElement;
+    expect(saveButton.disabled).toBe(true);
+    fireEvent.click(saveButton);
+    expect(onPreferencesChange).not.toHaveBeenCalled();
   });
 
   it('resets inputs to defaults before invoking onReset', () => {
     const onReset = vi.fn();
-    const onWatchConfigChange = vi.fn();
+    const onPreferencesChange = vi.fn();
     const onSortThresholdChange = vi.fn();
     render(
       <PreferencesOverlay
         {...baseProps}
         onReset={onReset}
-        onWatchConfigChange={onWatchConfigChange}
+        onPreferencesChange={onPreferencesChange}
         onSortThresholdChange={onSortThresholdChange}
       />,
     );
@@ -126,18 +186,22 @@ describe('PreferencesOverlay', () => {
     expect(screen.getByLabelText('includePaths.label')).toHaveValue(
       baseProps.defaultIncludePaths.join('\n'),
     );
+    expect(screen.getByLabelText('preferences.server.enabled')).not.toBeChecked();
+    expect(screen.getByLabelText('preferences.server.endpoint')).toHaveValue(
+      baseProps.defaultServerConfig.endpoint,
+    );
     expect(onReset).toHaveBeenCalledTimes(1);
     expect(onSortThresholdChange).not.toHaveBeenCalled();
-    expect(onWatchConfigChange).not.toHaveBeenCalled();
+    expect(onPreferencesChange).not.toHaveBeenCalled();
   });
 
   it('applies staged reset values when saved', () => {
-    const onWatchConfigChange = vi.fn();
+    const onPreferencesChange = vi.fn();
     const onSortThresholdChange = vi.fn();
     render(
       <PreferencesOverlay
         {...baseProps}
-        onWatchConfigChange={onWatchConfigChange}
+        onPreferencesChange={onPreferencesChange}
         onSortThresholdChange={onSortThresholdChange}
       />,
     );
@@ -146,10 +210,11 @@ describe('PreferencesOverlay', () => {
     fireEvent.click(screen.getByText('preferences.save'));
 
     expect(onSortThresholdChange).toHaveBeenCalledWith(baseProps.defaultSortThreshold);
-    expect(onWatchConfigChange).toHaveBeenCalledWith({
+    expect(onPreferencesChange).toHaveBeenCalledWith({
       watchRoot: baseProps.defaultWatchRoot,
       ignorePaths: baseProps.defaultIgnorePaths,
       includePaths: baseProps.defaultIncludePaths,
+      serverConfig: baseProps.defaultServerConfig,
     });
   });
 
