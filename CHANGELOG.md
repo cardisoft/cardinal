@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.24 — 2026-04-26
+- Eliminate flicker while switching search results
+- Improve the window resizing experience to better match Finder
+- Correct copy behavior when the search input is focused
+- Fix incorrect file drag-and-drop handling
+- Add large-corpus `search-cache` benchmarks and CI benchmark coverage
+
 ## 0.1.23 — 2026-03-25
 - Reduce power consumption by expanding the default ignored paths to cover more macOS cache, log, metadata, and runtime directories.
 - Further reduce background work by making the filesystem event watcher honor ignored paths.
