@@ -2051,3 +2051,116 @@ button:active:not(:disabled) {
   overflow-x: auto;
   overflow-y: hidden;
 }
+
+.search-history {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.search-history-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.8rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.55rem;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.search-history-toggle:hover {
+  background-color: var(--search-toggle-hover-bg);
+}
+
+.search-history-toggle[aria-expanded='true'] {
+  color: var(--color-accent);
+  background-color: rgba(var(--color-accent-rgb), 0.08);
+}
+
+.search-history-toggle svg {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+}
+
+.search-history-panel {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(24rem, 72vw);
+  max-height: 19rem;
+  padding: 0.3rem;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--color-accent-rgb), 0.14);
+  background-color: var(--color-elevated-bg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  box-sizing: border-box;
+}
+
+.search-history-list {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.search-history-item {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-family: var(--font-sans);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.search-history-item:hover {
+  background-color: rgba(var(--color-accent-rgb), 0.08);
+}
+
+.search-history-empty {
+  padding: 0.55rem;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.search-history-clear {
+  display: block;
+  width: 100%;
+  margin-top: 0.2rem;
+  padding: 0.4rem 0.55rem;
+  border: none;
+  border-top: 1px solid rgba(var(--color-accent-rgb), 0.12);
+  border-radius: 0 0 8px 8px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  font-family: var(--font-sans);
+  text-align: center;
+  cursor: pointer;
+}
+
+.search-history-clear:hover {
+  color: var(--color-accent);
+  background-color: rgba(var(--color-accent-rgb), 0.06);
+}

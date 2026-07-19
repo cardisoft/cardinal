@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useMemo } from 'react';
+import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import './App.css';
 import { FileRow } from './components/FileRow';
@@ -23,13 +23,14 @@ import type { FSEventsPanelHandle } from './components/FSEventsPanel';
 import { useTranslation } from 'react-i18next';
 import { useFullDiskAccessPermission } from './hooks/useFullDiskAccessPermission';
 import type { DisplayState } from './components/StateDisplay';
-import { openResultPath } from './utils/openResultPath';
+import { openResultPath, subscribeResultOpened } from './utils/openResultPath';
 import { useStableEvent } from './hooks/useStableEvent';
 import { useAppHotkeys } from './hooks/useAppHotkeys';
 import { useAppPreferences } from './hooks/useAppPreferences';
 import { useAppWindowListeners } from './hooks/useAppWindowListeners';
 import { useFilesTabEffects } from './hooks/useFilesTabEffects';
 import { useFilesTabState } from './hooks/useFilesTabState';
+import { useRecentSearches } from './hooks/useRecentSearches';
 
 function App() {
   const {
@@ -106,6 +107,9 @@ function App() {
     searchInputRef.current?.blur();
   }, [displayedResults.length, selectSingleRow]);
 
+  const { recentSearches, recordSearch, clearRecentSearches } = useRecentSearches();
+  const [historyOpen, setHistoryOpen] = useState(false);
+
   const {
     activeTab,
     isSearchFocused,
@@ -127,7 +131,28 @@ function App() {
     queueSearch,
     queueDirectorySearch,
     onNavigateFromSearchToResults: navigateFromSearchToResults,
+    onQueryCommitted: recordSearch,
   });
+
+  // Record the active query whenever a result is opened — a search that led to an
+  // open is a successful search worth keeping in history.
+  const recordOpenedSearch = useStableEvent(() => {
+    recordSearch(searchParams.query);
+  });
+  useEffect(() => subscribeResultOpened(recordOpenedSearch), [recordOpenedSearch]);
+
+  const toggleHistory = useCallback(() => {
+    setHistoryOpen((open) => !open);
+  }, []);
+
+  const selectHistoryEntry = useCallback(
+    (query: string) => {
+      setHistoryOpen(false);
+      submitFilesQuery(query, { immediate: true });
+      searchInputRef.current?.focus();
+    },
+    [submitFilesQuery],
+  );
   const { filteredEvents } = useRecentFSEvents({
     caseSensitive,
     isActive: activeTab === 'events',
@@ -392,6 +417,15 @@ function App() {
           caseSensitiveLabel={caseSensitiveLabel}
           onFocus={handleSearchFocus}
           onBlur={handleSearchBlur}
+          historyEnabled={activeTab === 'files'}
+          historyEntries={recentSearches}
+          historyOpen={historyOpen}
+          onToggleHistory={toggleHistory}
+          onSelectHistoryEntry={selectHistoryEntry}
+          onClearHistory={clearRecentSearches}
+          historyLabel={t('search.history.toggle')}
+          historyEmptyLabel={t('search.history.empty')}
+          historyClearLabel={t('search.history.clear')}
         />
         <div className={resultsContainerClassName} style={containerStyle}>
           {activeTab === 'events' ? (

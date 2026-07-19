@@ -11,6 +11,11 @@
     },
     "aria": {
       "searchInput": "Input di ricerca"
+    },
+    "history": {
+      "toggle": "Cronologia di ricerca",
+      "empty": "Nessuna cronologia di ricerca",
+      "clear": "Cancella cronologia"
     }
   },
   "stateDisplay": {

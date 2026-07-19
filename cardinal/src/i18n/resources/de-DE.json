@@ -11,6 +11,11 @@
     },
     "aria": {
       "searchInput": "Sucheingabe"
+    },
+    "history": {
+      "toggle": "Suchverlauf",
+      "empty": "Noch kein Suchverlauf",
+      "clear": "Verlauf löschen"
     }
   },
   "stateDisplay": {

@@ -11,6 +11,11 @@
     },
     "aria": {
       "searchInput": "搜索输入"
+    },
+    "history": {
+      "toggle": "搜索历史",
+      "empty": "暂无搜索历史",
+      "clear": "清空历史"
     }
   },
   "stateDisplay": {

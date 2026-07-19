@@ -11,6 +11,11 @@
     },
     "aria": {
       "searchInput": "検索入力"
+    },
+    "history": {
+      "toggle": "検索履歴",
+      "empty": "検索履歴はまだありません",
+      "clear": "履歴を消去"
     }
   },
   "stateDisplay": {

@@ -11,6 +11,11 @@
     },
     "aria": {
       "searchInput": "검색 입력"
+    },
+    "history": {
+      "toggle": "검색 기록",
+      "empty": "검색 기록이 없습니다",
+      "clear": "기록 지우기"
     }
   },
   "stateDisplay": {

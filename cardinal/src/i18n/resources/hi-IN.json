@@ -11,6 +11,11 @@
     },
     "aria": {
       "searchInput": "खोज इनपुट"
+    },
+    "history": {
+      "toggle": "खोज इतिहास",
+      "empty": "अभी तक कोई खोज इतिहास नहीं",
+      "clear": "इतिहास साफ़ करें"
     }
   },
   "stateDisplay": {

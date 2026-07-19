@@ -11,6 +11,11 @@
     },
     "aria": {
       "searchInput": "Arama girişi"
+    },
+    "history": {
+      "toggle": "Arama geçmişi",
+      "empty": "Henüz arama geçmişi yok",
+      "clear": "Geçmişi temizle"
     }
   },
   "stateDisplay": {

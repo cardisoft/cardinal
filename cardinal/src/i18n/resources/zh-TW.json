@@ -11,6 +11,11 @@
     },
     "aria": {
       "searchInput": "搜尋輸入"
+    },
+    "history": {
+      "toggle": "搜尋歷史",
+      "empty": "尚無搜尋歷史",
+      "clear": "清除歷史"
     }
   },
   "stateDisplay": {

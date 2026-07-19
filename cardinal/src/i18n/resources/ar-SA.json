@@ -11,6 +11,11 @@
     },
     "aria": {
       "searchInput": "إدخال البحث"
+    },
+    "history": {
+      "toggle": "سجل البحث",
+      "empty": "لا يوجد سجل بحث بعد",
+      "clear": "مسح السجل"
     }
   },
   "stateDisplay": {

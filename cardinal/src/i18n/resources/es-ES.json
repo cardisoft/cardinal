@@ -11,6 +11,11 @@
     },
     "aria": {
       "searchInput": "Entrada de búsqueda"
+    },
+    "history": {
+      "toggle": "Historial de búsqueda",
+      "empty": "Sin historial de búsqueda",
+      "clear": "Borrar historial"
     }
   },
   "stateDisplay": {
