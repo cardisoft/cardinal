@@ -23,6 +23,7 @@ import type { FSEventsPanelHandle } from './components/FSEventsPanel';
 import { useTranslation } from 'react-i18next';
 import { useFullDiskAccessPermission } from './hooks/useFullDiskAccessPermission';
 import type { DisplayState } from './components/StateDisplay';
+import type { DeepLinkSearchAction } from './runtime/deepLink';
 import { openResultPath } from './utils/openResultPath';
 import { useStableEvent } from './hooks/useStableEvent';
 import { useAppHotkeys } from './hooks/useAppHotkeys';
@@ -108,6 +109,7 @@ function App() {
 
   const {
     activeTab,
+    setActiveTab,
     isSearchFocused,
     handleSearchFocus,
     handleSearchBlur,
@@ -128,6 +130,15 @@ function App() {
     queueDirectorySearch,
     onNavigateFromSearchToResults: navigateFromSearchToResults,
   });
+
+  const submitDeepLinkSearch = useCallback(
+    ({ query, directoryQuery, directoryScopeOpen }: DeepLinkSearchAction) => {
+      setActiveTab('files');
+      updateSearchParams({ query, directoryQuery, directoryScopeOpen });
+      queueSearch(query, { immediate: true });
+    },
+    [queueSearch, setActiveTab, updateSearchParams],
+  );
   const { filteredEvents } = useRecentFSEvents({
     caseSensitive,
     isActive: activeTab === 'events',
@@ -212,6 +223,7 @@ function App() {
     handleStatusUpdate,
     setLifecycleState,
     submitFilesQuery,
+    submitDeepLinkSearch,
     setEventFilterQuery,
   });
 

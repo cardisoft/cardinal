@@ -1,7 +1,9 @@
+import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { Event as TauriEvent, UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { DragDropEvent } from '@tauri-apps/api/window';
+import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import type {
   AppLifecycleStatus,
   IconUpdatePayload,
@@ -10,6 +12,8 @@ import type {
   StatusBarUpdatePayload,
 } from '../types/ipc';
 import type { SlabIndex } from '../types/slab';
+import { parseDeepLinkSearchUrls } from './deepLink';
+import type { DeepLinkSearchAction } from './deepLink';
 
 export type QuickLookKeydownPayload = {
   keyCode: number;
@@ -28,6 +32,7 @@ export type WindowDragDropEvent = TauriEvent<DragDropEvent>;
 const statusBarUpdateListeners = new Set<Listener<StatusBarUpdatePayload>>();
 const lifecycleStateListeners = new Set<Listener<AppLifecycleStatus>>();
 const quickLaunchListeners = new Set<Listener<void>>();
+const deepLinkSearchActionListeners = new Set<Listener<DeepLinkSearchAction>>();
 const fsEventsBatchListeners = new Set<Listener<RecentEventPayload[]>>();
 const iconUpdateListeners = new Set<Listener<readonly IconUpdatePayload[]>>();
 const quickLookKeydownListeners = new Set<Listener<QuickLookKeydownPayload>>();
@@ -90,6 +95,17 @@ const normalizeIconUpdates = (payload: unknown): IconUpdatePayload[] => {
     .map((item) => ({ slabIndex: item.slabIndex as SlabIndex, icon: item.icon }));
 };
 
+const emitDeepLinkSearchUrls = (urls: readonly string[] | null | undefined): void => {
+  const payloads = parseDeepLinkSearchUrls(urls);
+  if (payloads.length === 0) {
+    return;
+  }
+  void invoke('activate_main_window').catch((error) => {
+    console.error('Failed to activate window for deep link', error);
+  });
+  payloads.forEach((payload) => emit(deepLinkSearchActionListeners, payload));
+};
+
 export const initializeTauriEventRuntime = (): Promise<void> => {
   if (initPromise) {
     return initPromise;
@@ -115,6 +131,18 @@ export const initializeTauriEventRuntime = (): Promise<void> => {
         emit(quickLaunchListeners, undefined);
       }).catch((error) => {
         console.error('Failed to register quick_launch listener', error);
+      }),
+      getCurrent()
+        .then((urls) => {
+          emitDeepLinkSearchUrls(urls);
+        })
+        .catch((error) => {
+          console.error('Failed to fetch current deep links', error);
+        }),
+      onOpenUrl((urls) => {
+        emitDeepLinkSearchUrls(urls);
+      }).catch((error) => {
+        console.error('Failed to register deep link listener', error);
       }),
       listen<RecentEventPayload[]>('fs_events_batch', (event) => {
         const payload = normalizeRecentEvents(event.payload);
@@ -167,6 +195,13 @@ export const subscribeLifecycleState = (listener: Listener<AppLifecycleStatus>):
 export const subscribeQuickLaunch = (listener: () => void): UnlistenFn => {
   void initializeTauriEventRuntime();
   return subscribe(quickLaunchListeners, listener);
+};
+
+export const subscribeDeepLinkSearchAction = (
+  listener: Listener<DeepLinkSearchAction>,
+): UnlistenFn => {
+  void initializeTauriEventRuntime();
+  return subscribe(deepLinkSearchActionListeners, listener);
 };
 
 export const subscribeFSEventsBatch = (listener: Listener<RecentEventPayload[]>): UnlistenFn => {

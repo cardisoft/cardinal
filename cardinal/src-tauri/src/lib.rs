@@ -78,6 +78,7 @@ pub fn run() -> Result<()> {
     let update_window_state_tx_for_window = update_window_state_tx.clone();
     builder = builder
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_macos_permissions::init())

@@ -9,6 +9,7 @@
     "core:window:allow-set-focus",
     "opener:default",
     "macos-permissions:default",
+    "deep-link:default",
     "drag:default",
     "global-shortcut:allow-is-registered",
     "global-shortcut:allow-register",

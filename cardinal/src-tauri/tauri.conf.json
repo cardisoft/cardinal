@@ -21,10 +21,20 @@
       "csp": null
     }
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["cardinal"]
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
     "category": "Utilities",
+    "resources": {
+      "resources/share/": "share/"
+    },
     "macOS": {
       "signingIdentity": "-",
       "minimumSystemVersion": "12.0"

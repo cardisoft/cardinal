@@ -25,6 +25,26 @@ brew install --cask cardinal-search
 
 You can also grab the latest packaged builds from [GitHub Releases](https://github.com/cardisoft/cardinal/releases/).
 
+### macOS integration
+
+Cardinal registers the `cardinal://` URL scheme on macOS. The supported deep link is:
+
+```text
+cardinal://search?scope=/path/to/folder&q=keyword
+```
+
+- `scope` is optional and opens Cardinal's folder scope with that directory.
+- `q` is optional and fills the main search query.
+- At least one of `scope` or `q` must be present.
+
+Cardinal also ships a Finder Quick Action workflow at:
+
+```text
+Cardinal.app/Contents/Resources/share/batch/macOS service menus/Cardinal, search in folder.workflow
+```
+
+Double-click the workflow to install it into `~/Library/Services`. After installation, Finder can show `Search in Cardinal` in Quick Actions or Services for selected files and folders.
+
 ### i18n support
 
 Need a different language? Click the ⚙️ button in the status bar to switch instantly.
@@ -86,4 +106,12 @@ npm run tauri dev -- --release --features dev
 ```bash
 cd cardinal
 npm run tauri build
+```
+
+To create a macOS DMG that exposes the Finder Quick Action installer in the DMG
+root, run:
+
+```bash
+cd cardinal
+npm run package:macos-dmg
 ```

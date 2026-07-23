@@ -3,11 +3,13 @@ import type { RefObject } from 'react';
 import type { StatusTabKey } from '../components/StatusBar';
 import {
   subscribeLifecycleState,
+  subscribeDeepLinkSearchAction,
   subscribeQuickLaunch,
   subscribeStatusBarUpdate,
   subscribeWindowDragDrop,
   type WindowDragDropEvent,
 } from '../runtime/tauriEventRuntime';
+import type { DeepLinkSearchAction } from '../runtime/deepLink';
 import type { AppLifecycleStatus, StatusBarUpdatePayload } from '../types/ipc';
 import { useStableEvent } from './useStableEvent';
 
@@ -22,6 +24,7 @@ type UseAppWindowListenersOptions = {
   handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
   setLifecycleState: (status: AppLifecycleStatus) => void;
   submitFilesQuery: (query: string, options?: QueueSearchOptions) => void;
+  submitDeepLinkSearch: (payload: DeepLinkSearchAction) => void;
   setEventFilterQuery: (value: string) => void;
 };
 
@@ -40,6 +43,7 @@ export function useAppWindowListeners({
   handleStatusUpdate,
   setLifecycleState,
   submitFilesQuery,
+  submitDeepLinkSearch,
   setEventFilterQuery,
 }: UseAppWindowListenersOptions): UseAppWindowListenersResult {
   const [isWindowFocused, setIsWindowFocused] = useState<boolean>(() => {
@@ -69,6 +73,14 @@ export function useAppWindowListeners({
     });
     return unlistenQuickLaunch;
   }, [focusAndSelectSearchInput]);
+
+  useEffect(() => {
+    const unlistenDeepLinkSearch = subscribeDeepLinkSearchAction((payload) => {
+      submitDeepLinkSearch(payload);
+      focusAndSelectSearchInput();
+    });
+    return unlistenDeepLinkSearch;
+  }, [focusAndSelectSearchInput, submitDeepLinkSearch]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
