@@ -5,6 +5,7 @@ import type { FSEventsPanelHandle } from '../components/FSEventsPanel';
 import type { VirtualListHandle } from '../components/VirtualList';
 
 type UseFilesTabEffectsOptions = {
+  isWorkspaceActive?: boolean;
   activeTab: StatusTabKey;
   selectedIndices: number[];
   activeRowIndex: number | null;
@@ -20,6 +21,7 @@ type UseFilesTabEffectsOptions = {
  * Centralizes files/events tab effects so App focuses on composing state and rendering.
  */
 export function useFilesTabEffects({
+  isWorkspaceActive = true,
   activeTab,
   selectedIndices,
   activeRowIndex,
@@ -31,12 +33,23 @@ export function useFilesTabEffects({
   eventsPanelRef,
 }: UseFilesTabEffectsOptions): void {
   useEffect(() => {
-    if (activeTab !== 'files') {
-      clearSelection();
+    if (!isWorkspaceActive) {
+      return;
     }
-  }, [activeTab, clearSelection]);
+    return () => closeQuickLook();
+  }, [closeQuickLook, isWorkspaceActive]);
 
   useEffect(() => {
+    if (isWorkspaceActive && activeTab !== 'files') {
+      clearSelection();
+    }
+  }, [activeTab, clearSelection, isWorkspaceActive]);
+
+  useEffect(() => {
+    if (!isWorkspaceActive) {
+      return;
+    }
+
     if (activeTab !== 'files') {
       closeQuickLook();
       return;
@@ -45,7 +58,7 @@ export function useFilesTabEffects({
     if (selectedIndices.length > 0) {
       updateQuickLook();
     }
-  }, [activeTab, selectedIndices, closeQuickLook, updateQuickLook]);
+  }, [activeTab, selectedIndices, closeQuickLook, isWorkspaceActive, updateQuickLook]);
 
   useEffect(() => {
     if (activeRowIndex == null) {
@@ -61,10 +74,10 @@ export function useFilesTabEffects({
   }, [resultsVersion, clearSelection, virtualListRef]);
 
   useEffect(() => {
-    if (activeTab === 'events') {
+    if (isWorkspaceActive && activeTab === 'events') {
       queueMicrotask(() => {
         eventsPanelRef.current?.scrollToBottom?.();
       });
     }
-  }, [activeTab, eventsPanelRef]);
+  }, [activeTab, eventsPanelRef, isWorkspaceActive]);
 }

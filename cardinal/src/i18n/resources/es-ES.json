@@ -3,7 +3,7 @@
     "placeholder": {
       "files": "Buscar archivos y carpetas...",
       "events": "Filtrar eventos por ruta o nombre...",
-      "directory": "Ámbito de carpeta..."
+      "directory": "Buscar en carpeta"
     },
     "options": {
       "caseSensitive": "Activar coincidencia sensible a mayúsculas",
@@ -12,6 +12,11 @@
     "aria": {
       "searchInput": "Entrada de búsqueda"
     }
+  },
+  "tabs": {
+    "newSearch": "Nueva búsqueda",
+    "tabList": "Pestañas de búsqueda",
+    "closeTab": "Cerrar {{title}}"
   },
   "stateDisplay": {
     "loading": "Buscando...",

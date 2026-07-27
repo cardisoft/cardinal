@@ -1,3 +1,5 @@
 target
+cardinal/src-tauri/finder-sync/build/
+proc_macro_probe
 .DS_Store
 .vscode

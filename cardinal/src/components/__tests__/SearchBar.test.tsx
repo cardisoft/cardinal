@@ -6,6 +6,8 @@ import { SearchBar } from '../SearchBar';
 
 const renderSearchBar = (overrides: Partial<ComponentProps<typeof SearchBar>> = {}) => {
   const props: ComponentProps<typeof SearchBar> = {
+    inputId: 'search-input-test',
+    directoryInputId: 'directory-scope-input-test',
     inputRef: createRef<HTMLInputElement>(),
     placeholder: 'Search',
     ariaLabel: 'Search input',
@@ -80,7 +82,7 @@ describe('SearchBar', () => {
     expect(screen.queryByRole('separator')).toBeNull();
   });
 
-  it('moves focus from the query start to the directory input with ArrowLeft', () => {
+  it('moves focus from the query end to the directory input with ArrowRight', () => {
     const queryRef = createRef<HTMLInputElement>();
     const onKeyDown = vi.fn();
     renderSearchBar({
@@ -93,15 +95,15 @@ describe('SearchBar', () => {
     const queryInput = screen.getByPlaceholderText('Search') as HTMLInputElement;
 
     queryInput.focus();
-    queryInput.setSelectionRange(0, 0);
-    fireEvent.keyDown(queryInput, { key: 'ArrowLeft' });
+    queryInput.setSelectionRange('report'.length, 'report'.length);
+    fireEvent.keyDown(queryInput, { key: 'ArrowRight' });
 
     expect(document.activeElement).toBe(directoryInput);
-    expect(directoryInput.selectionStart).toBe('Work/Docs'.length);
+    expect(directoryInput.selectionStart).toBe(0);
     expect(onKeyDown).not.toHaveBeenCalled();
   });
 
-  it('moves focus from the directory end to the query input with ArrowRight', () => {
+  it('moves focus from the directory start to the query input with ArrowLeft', () => {
     const onDirectoryKeyDown = vi.fn();
     renderSearchBar({
       value: 'report',
@@ -112,15 +114,15 @@ describe('SearchBar', () => {
     const queryInput = screen.getByPlaceholderText('Search') as HTMLInputElement;
 
     directoryInput.focus();
-    directoryInput.setSelectionRange('Work/Docs'.length, 'Work/Docs'.length);
-    fireEvent.keyDown(directoryInput, { key: 'ArrowRight' });
+    directoryInput.setSelectionRange(0, 0);
+    fireEvent.keyDown(directoryInput, { key: 'ArrowLeft' });
 
     expect(document.activeElement).toBe(queryInput);
-    expect(queryInput.selectionStart).toBe(0);
+    expect(queryInput.selectionStart).toBe('report'.length);
     expect(onDirectoryKeyDown).not.toHaveBeenCalled();
   });
 
-  it('does not move from query to directory when ArrowLeft has modifiers or selection is not at the start', () => {
+  it('does not move from query to directory when ArrowRight has modifiers or selection is not at the end', () => {
     const onKeyDown = vi.fn();
     renderSearchBar({
       value: 'report',
@@ -131,20 +133,20 @@ describe('SearchBar', () => {
     const queryInput = screen.getByPlaceholderText('Search') as HTMLInputElement;
 
     queryInput.focus();
-    queryInput.setSelectionRange(0, 0);
-    fireEvent.keyDown(queryInput, { key: 'ArrowLeft', metaKey: true });
+    queryInput.setSelectionRange('report'.length, 'report'.length);
+    fireEvent.keyDown(queryInput, { key: 'ArrowRight', metaKey: true });
     expect(document.activeElement).toBe(queryInput);
     expect(onKeyDown).toHaveBeenCalledTimes(1);
 
     onKeyDown.mockClear();
     queryInput.setSelectionRange(1, 1);
-    fireEvent.keyDown(queryInput, { key: 'ArrowLeft' });
+    fireEvent.keyDown(queryInput, { key: 'ArrowRight' });
     expect(document.activeElement).toBe(queryInput);
     expect(onKeyDown).toHaveBeenCalledTimes(1);
 
     onKeyDown.mockClear();
     queryInput.setSelectionRange(0, 2);
-    fireEvent.keyDown(queryInput, { key: 'ArrowLeft' });
+    fireEvent.keyDown(queryInput, { key: 'ArrowRight' });
     expect(document.activeElement).toBe(queryInput);
     expect(onKeyDown).toHaveBeenCalledTimes(1);
     expect(document.activeElement).not.toBe(directoryInput);
@@ -161,14 +163,14 @@ describe('SearchBar', () => {
     const queryInput = screen.getByPlaceholderText('Search') as HTMLInputElement;
 
     queryInput.focus();
-    queryInput.setSelectionRange(0, 0);
-    fireEvent.keyDown(queryInput, { key: 'ArrowLeft' });
+    queryInput.setSelectionRange('report'.length, 'report'.length);
+    fireEvent.keyDown(queryInput, { key: 'ArrowRight' });
 
     expect(document.activeElement).toBe(queryInput);
     expect(onKeyDown).toHaveBeenCalledTimes(1);
   });
 
-  it('does not move from directory to query when ArrowRight has modifiers or selection is not at the end', () => {
+  it('does not move from directory to query when ArrowLeft has modifiers or selection is not at the start', () => {
     const onDirectoryKeyDown = vi.fn();
     renderSearchBar({
       value: 'report',
@@ -179,20 +181,20 @@ describe('SearchBar', () => {
     const queryInput = screen.getByPlaceholderText('Search') as HTMLInputElement;
 
     directoryInput.focus();
-    directoryInput.setSelectionRange('Work/Docs'.length, 'Work/Docs'.length);
-    fireEvent.keyDown(directoryInput, { key: 'ArrowRight', shiftKey: true });
+    directoryInput.setSelectionRange(0, 0);
+    fireEvent.keyDown(directoryInput, { key: 'ArrowLeft', shiftKey: true });
     expect(document.activeElement).toBe(directoryInput);
     expect(onDirectoryKeyDown).toHaveBeenCalledTimes(1);
 
     onDirectoryKeyDown.mockClear();
     directoryInput.setSelectionRange(1, 1);
-    fireEvent.keyDown(directoryInput, { key: 'ArrowRight' });
+    fireEvent.keyDown(directoryInput, { key: 'ArrowLeft' });
     expect(document.activeElement).toBe(directoryInput);
     expect(onDirectoryKeyDown).toHaveBeenCalledTimes(1);
 
     onDirectoryKeyDown.mockClear();
     directoryInput.setSelectionRange(0, 'Work/Docs'.length);
-    fireEvent.keyDown(directoryInput, { key: 'ArrowRight' });
+    fireEvent.keyDown(directoryInput, { key: 'ArrowLeft' });
     expect(document.activeElement).toBe(directoryInput);
     expect(onDirectoryKeyDown).toHaveBeenCalledTimes(1);
     expect(document.activeElement).not.toBe(queryInput);

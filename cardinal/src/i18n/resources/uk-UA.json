@@ -3,7 +3,7 @@
     "placeholder": {
       "files": "Пошук файлів і папок...",
       "events": "Фільтруйте події за шляхом чи назвою...",
-      "directory": "Область папок..."
+      "directory": "Шукати в папці"
     },
     "options": {
       "caseSensitive": "Перемкнути врахування регістру",
@@ -12,6 +12,11 @@
     "aria": {
       "searchInput": "Поле пошуку"
     }
+  },
+  "tabs": {
+    "newSearch": "Новий пошук",
+    "tabList": "Вкладки пошуку",
+    "closeTab": "Закрити «{{title}}»"
   },
   "stateDisplay": {
     "loading": "Пошук...",

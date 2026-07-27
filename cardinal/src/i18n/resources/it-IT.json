@@ -3,7 +3,7 @@
     "placeholder": {
       "files": "Cerca file e cartelle...",
       "events": "Filtra eventi per percorso o nome...",
-      "directory": "Ambito cartella..."
+      "directory": "Cerca nella cartella"
     },
     "options": {
       "caseSensitive": "Attiva/disattiva distinzione tra maiuscole e minuscole",
@@ -12,6 +12,11 @@
     "aria": {
       "searchInput": "Input di ricerca"
     }
+  },
+  "tabs": {
+    "newSearch": "Nuova ricerca",
+    "tabList": "Schede di ricerca",
+    "closeTab": "Chiudi {{title}}"
   },
   "stateDisplay": {
     "loading": "Ricerca in corso...",

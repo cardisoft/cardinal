@@ -21,13 +21,23 @@
       "csp": null
     }
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["cardinal"]
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
     "category": "Utilities",
     "macOS": {
       "signingIdentity": "-",
-      "minimumSystemVersion": "12.0"
+      "minimumSystemVersion": "12.0",
+      "files": {
+        "PlugIns/CardinalFinderSync.appex": "./finder-sync/build/CardinalFinderSync.appex"
+      }
     },
     "icon": [
       "icons/32x32.png",

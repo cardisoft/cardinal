@@ -15,6 +15,7 @@ type MoveSelectionOptions = {
 };
 
 type UseAppHotkeysOptions = {
+  enabled?: boolean;
   activeTab: StatusTabKey;
   activeRowIndex: number | null;
   selectedPaths: string[];
@@ -37,6 +38,7 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 };
 
 export function useAppHotkeys({
+  enabled = true,
   activeTab,
   activeRowIndex,
   selectedPaths,
@@ -147,6 +149,9 @@ export function useAppHotkeys({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!enabled) {
+        return;
+      }
       const { activeTab: currentTab } = keyboardStateRef.current;
 
       if (event.metaKey && handleMetaShortcut(event, currentTab)) {
@@ -164,10 +169,10 @@ export function useAppHotkeys({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleMetaShortcut, handleFilesNavigation]);
+  }, [enabled, handleMetaShortcut, handleFilesNavigation]);
 
   const handleQuickLookKeydown = useStableEvent((payload: QuickLookKeydownPayload) => {
-    if (keyboardStateRef.current.activeTab !== 'files') {
+    if (!enabled || keyboardStateRef.current.activeTab !== 'files') {
       return;
     }
 

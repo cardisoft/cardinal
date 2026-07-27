@@ -3,7 +3,7 @@
     "placeholder": {
       "files": "Buscar por arquivos e pastas...",
       "events": "Filtrar eventos por caminho ou nome...",
-      "directory": "Escopo de pasta..."
+      "directory": "Pesquisar na pasta"
     },
     "options": {
       "caseSensitive": "Alternar correspondência sensível a maiúsculas",
@@ -12,6 +12,11 @@
     "aria": {
       "searchInput": "Entrada de pesquisa"
     }
+  },
+  "tabs": {
+    "newSearch": "Nova pesquisa",
+    "tabList": "Abas de pesquisa",
+    "closeTab": "Fechar {{title}}"
   },
   "stateDisplay": {
     "loading": "Pesquisando...",

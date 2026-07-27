@@ -3,7 +3,7 @@
     "placeholder": {
       "files": "Nach Dateien und Ordnern suchen...",
       "events": "Ereignisse nach Pfad oder Name filtern...",
-      "directory": "Ordnerbereich..."
+      "directory": "In Ordner suchen"
     },
     "options": {
       "caseSensitive": "Groß-/Kleinschreibung beachten",
@@ -12,6 +12,11 @@
     "aria": {
       "searchInput": "Sucheingabe"
     }
+  },
+  "tabs": {
+    "newSearch": "Neue Suche",
+    "tabList": "Such-Tabs",
+    "closeTab": "„{{title}}“ schließen"
   },
   "stateDisplay": {
     "loading": "Suche läuft...",

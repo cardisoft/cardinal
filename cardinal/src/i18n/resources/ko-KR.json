@@ -3,7 +3,7 @@
     "placeholder": {
       "files": "파일과 폴더 검색...",
       "events": "경로 또는 이름으로 이벤트 필터링...",
-      "directory": "폴더 범위..."
+      "directory": "폴더에서 검색"
     },
     "options": {
       "caseSensitive": "대소문자 구분 검색 전환",
@@ -12,6 +12,11 @@
     "aria": {
       "searchInput": "검색 입력"
     }
+  },
+  "tabs": {
+    "newSearch": "새 검색",
+    "tabList": "검색 탭",
+    "closeTab": "{{title}} 닫기"
   },
   "stateDisplay": {
     "loading": "검색 중...",

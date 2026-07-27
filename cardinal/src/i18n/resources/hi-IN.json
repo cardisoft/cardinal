@@ -3,7 +3,7 @@
     "placeholder": {
       "files": "फ़ाइलों और फ़ोल्डरों में खोजें...",
       "events": "पथ या नाम से ईवेंट फ़िल्टर करें...",
-      "directory": "फ़ोल्डर स्कोप..."
+      "directory": "फ़ोल्डर में खोजें"
     },
     "options": {
       "caseSensitive": "केस-सेंसिटिव मिलान टॉगल करें",
@@ -12,6 +12,11 @@
     "aria": {
       "searchInput": "खोज इनपुट"
     }
+  },
+  "tabs": {
+    "newSearch": "नई खोज",
+    "tabList": "खोज टैब",
+    "closeTab": "{{title}} बंद करें"
   },
   "stateDisplay": {
     "loading": "खोज जारी है...",

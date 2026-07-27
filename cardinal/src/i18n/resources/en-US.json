@@ -3,7 +3,7 @@
     "placeholder": {
       "files": "Search for files and folders...",
       "events": "Filter events by path or name...",
-      "directory": "Folder scope..."
+      "directory": "Search in folder"
     },
     "options": {
       "caseSensitive": "Toggle case-sensitive matching",
@@ -12,6 +12,11 @@
     "aria": {
       "searchInput": "Search input"
     }
+  },
+  "tabs": {
+    "newSearch": "New Search",
+    "tabList": "Search tabs",
+    "closeTab": "Close {{title}}"
   },
   "stateDisplay": {
     "loading": "Searching...",

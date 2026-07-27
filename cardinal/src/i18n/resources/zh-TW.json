@@ -3,7 +3,7 @@
     "placeholder": {
       "files": "搜尋檔案和資料夾…",
       "events": "依路徑或名稱篩選事件…",
-      "directory": "限定資料夾範圍…"
+      "directory": "在資料夾中搜尋"
     },
     "options": {
       "caseSensitive": "切換區分大小寫比對",
@@ -12,6 +12,11 @@
     "aria": {
       "searchInput": "搜尋輸入"
     }
+  },
+  "tabs": {
+    "newSearch": "新搜尋",
+    "tabList": "搜尋標籤頁",
+    "closeTab": "關閉「{{title}}」"
   },
   "stateDisplay": {
     "loading": "正在搜尋…",
