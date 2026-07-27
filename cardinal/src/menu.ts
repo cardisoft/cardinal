@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import i18n from './i18n/config';
+import { CLOSE_ACTIVE_TAB_EVENT } from './constants/appEvents';
 import { openPreferences } from './utils/openPreferences';
 
 const HELP_UPDATES_URL = 'https://github.com/cardisoft/cardinal/releases';
@@ -75,6 +76,14 @@ async function buildAppMenu(): Promise<void> {
     items: [await PredefinedMenuItem.new({ item: 'Fullscreen', text: i18n.t('menu.fullscreen') })],
   });
 
+  const closeTabItem = await MenuItem.new({
+    id: 'menu.closeTab',
+    text: i18n.t('menu.closeTab', { defaultValue: 'Close Tab' }),
+    accelerator: 'CmdOrCtrl+W',
+    action: () => {
+      window.dispatchEvent(new CustomEvent(CLOSE_ACTIVE_TAB_EVENT));
+    },
+  });
   const windowSubmenu = await Submenu.new({
     id: 'menu.window',
     text: i18n.t('menu.window'),
@@ -82,7 +91,7 @@ async function buildAppMenu(): Promise<void> {
       await PredefinedMenuItem.new({ item: 'Minimize', text: i18n.t('menu.minimize') }),
       await PredefinedMenuItem.new({ item: 'Maximize', text: i18n.t('menu.maximize') }),
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      await PredefinedMenuItem.new({ item: 'CloseWindow', text: i18n.t('menu.closeWindow') }),
+      closeTabItem,
     ],
   });
 

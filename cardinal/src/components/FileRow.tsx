@@ -21,6 +21,10 @@ type FileRowProps = {
   selectedPathsForDrag?: string[];
   caseInsensitive?: boolean;
   highlightTerms?: readonly string[];
+  treeDepth?: number;
+  isExpandable?: boolean;
+  isExpanded?: boolean;
+  onToggleExpanded?: () => void;
 };
 
 export const FileRow = memo(function FileRow({
@@ -34,6 +38,10 @@ export const FileRow = memo(function FileRow({
   selectedPathsForDrag = [],
   caseInsensitive,
   highlightTerms,
+  treeDepth = 0,
+  isExpandable = false,
+  isExpanded = false,
+  onToggleExpanded,
 }: FileRowProps): React.JSX.Element {
   const pendingSelectRef = useRef<{
     isShift: boolean;
@@ -102,6 +110,12 @@ export const FileRow = memo(function FileRow({
     }
   };
 
+  const handleToggleExpanded = (e: ReactMouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onToggleExpanded?.();
+  };
+
   const handleDragStart = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
       if (!path) {
@@ -148,7 +162,26 @@ export const FileRow = memo(function FileRow({
       aria-selected={isSelected}
       title={path}
     >
-      <div className="filename-column">
+      <div
+        className="filename-column"
+        style={{ paddingLeft: `calc(var(--cell-hpad) + ${treeDepth * 16}px)` }}
+      >
+        {isExpandable ? (
+          <button
+            type="button"
+            className={`disclosure-button${isExpanded ? ' disclosure-button--expanded' : ''}`}
+            aria-label={isExpanded ? '折叠文件夹' : '展开文件夹'}
+            aria-expanded={isExpanded}
+            onMouseDown={(e) => e.stopPropagation()}
+            onMouseUp={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+            onClick={handleToggleExpanded}
+          >
+            <span aria-hidden="true">▶</span>
+          </button>
+        ) : (
+          <span className="disclosure-spacer" aria-hidden="true" />
+        )}
         {item.icon ? (
           <img src={item.icon} alt="icon" className="file-icon" />
         ) : (

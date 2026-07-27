@@ -2,6 +2,7 @@ import { listen } from '@tauri-apps/api/event';
 import type { Event as TauriEvent, UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { DragDropEvent } from '@tauri-apps/api/window';
+import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import type {
   AppLifecycleStatus,
   IconUpdatePayload,
@@ -22,6 +23,10 @@ export type QuickLookKeydownPayload = {
   };
 };
 
+export type FinderSearchRequestPayload = {
+  query: string;
+};
+
 type Listener<T> = (payload: T) => void;
 export type WindowDragDropEvent = TauriEvent<DragDropEvent>;
 
@@ -32,6 +37,8 @@ const fsEventsBatchListeners = new Set<Listener<RecentEventPayload[]>>();
 const iconUpdateListeners = new Set<Listener<readonly IconUpdatePayload[]>>();
 const quickLookKeydownListeners = new Set<Listener<QuickLookKeydownPayload>>();
 const windowDragDropListeners = new Set<Listener<WindowDragDropEvent>>();
+const finderSearchRequestListeners = new Set<Listener<FinderSearchRequestPayload>>();
+const pendingFinderSearchRequests: FinderSearchRequestPayload[] = [];
 
 let initPromise: Promise<void> | null = null;
 
@@ -90,13 +97,48 @@ const normalizeIconUpdates = (payload: unknown): IconUpdatePayload[] => {
     .map((item) => ({ slabIndex: item.slabIndex as SlabIndex, icon: item.icon }));
 };
 
+const emitFinderSearchRequests = (urls: string[]) => {
+  urls.forEach((rawUrl) => {
+    try {
+      const url = new URL(rawUrl);
+      if (url.protocol !== 'cardinal:' || url.hostname !== 'finder-search') {
+        return;
+      }
+      const query = url.searchParams.get('query')?.trim();
+      if (query) {
+        const payload = { query };
+        if (finderSearchRequestListeners.size === 0) {
+          pendingFinderSearchRequests.push(payload);
+        } else {
+          emit(finderSearchRequestListeners, payload);
+        }
+      }
+    } catch {
+      // Ignore malformed or unrelated deep links.
+    }
+  });
+};
+
 export const initializeTauriEventRuntime = (): Promise<void> => {
   if (initPromise) {
     return initPromise;
   }
 
   initPromise = (async () => {
+    const initialFinderSearchUrls = await getCurrent().catch((error) => {
+      console.error('Failed to read initial deep link URLs', error);
+      return null;
+    });
+    if (initialFinderSearchUrls) {
+      emitFinderSearchRequests(initialFinderSearchUrls);
+    }
+
     const setupTasks: Promise<unknown>[] = [
+      onOpenUrl((urls) => {
+        emitFinderSearchRequests(urls);
+      }).catch((error) => {
+        console.error('Failed to listen for Finder search deep links', error);
+      }),
       listen<StatusBarUpdatePayload>('status_bar_update', (event) => {
         const payload = event.payload;
         if (!payload) return;
@@ -191,4 +233,18 @@ export const subscribeQuickLookKeydown = (
 export const subscribeWindowDragDrop = (listener: Listener<WindowDragDropEvent>): UnlistenFn => {
   void initializeTauriEventRuntime();
   return subscribe(windowDragDropListeners, listener);
+};
+
+export const subscribeFinderSearchRequest = (
+  listener: Listener<FinderSearchRequestPayload>,
+): UnlistenFn => {
+  void initializeTauriEventRuntime();
+  const unlisten = subscribe(finderSearchRequestListeners, listener);
+  while (pendingFinderSearchRequests.length > 0) {
+    const payload = pendingFinderSearchRequests.shift();
+    if (payload) {
+      listener(payload);
+    }
+  }
+  return unlisten;
 };

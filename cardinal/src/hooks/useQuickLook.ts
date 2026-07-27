@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import type { RefObject } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { currentMonitor, getCurrentWindow, primaryMonitor } from '@tauri-apps/api/window';
 
@@ -21,6 +22,7 @@ const escapePathForSelector = (value: string): string => {
 
 type UseQuickLookConfig = {
   getPaths: () => string[];
+  rootRef?: RefObject<HTMLElement | null>;
 };
 
 /**
@@ -29,7 +31,7 @@ type UseQuickLookConfig = {
  * It resolves window geometry when needed and translates DOM rects
  * into screen coordinates suitable for macOS' Quick Look APIs.
  */
-export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
+export const useQuickLook = ({ getPaths, rootRef }: UseQuickLookConfig) => {
   const resolveWindowGeometry = useCallback(async () => {
     try {
       const currentWindow = getCurrentWindow();
@@ -81,7 +83,7 @@ export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
 
     const buildItem = (path: string): QuickLookItemPayload => {
       const selector = `[data-row-path="${escapePathForSelector(path)}"]`;
-      const row = document.querySelector<HTMLElement>(selector);
+      const row = (rootRef?.current ?? document).querySelector<HTMLElement>(selector);
       const anchor = row?.querySelector<HTMLElement>('.file-icon, .file-icon-placeholder');
       const iconImage = row?.querySelector<HTMLImageElement>('img.file-icon');
       if (!row || !anchor || !iconImage) {
@@ -110,7 +112,7 @@ export const useQuickLook = ({ getPaths }: UseQuickLookConfig) => {
     };
 
     return paths.map((path) => buildItem(path));
-  }, [getPaths, resolveWindowGeometry]);
+  }, [getPaths, resolveWindowGeometry, rootRef]);
 
   const toggleQuickLook = useCallback(async () => {
     const items = await getQuickLookItems();

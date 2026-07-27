@@ -7,6 +7,9 @@ rustflags = [
   # "-Cpanic=abort",
 ]
 
+[target.aarch64-apple-darwin]
+linker = "tools/clang-rust-lld.sh"
+
 [unstable]
 # -- currently disabled for test
 # https://doc.rust-lang.org/cargo/reference/unstable.html#build-std

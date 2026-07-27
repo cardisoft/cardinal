@@ -3,7 +3,7 @@
     "placeholder": {
       "files": "Dosya ve klasör arayın...",
       "events": "Olayları yol veya ada göre filtreleyin...",
-      "directory": "Klasör kapsamı..."
+      "directory": "Klasörde ara"
     },
     "options": {
       "caseSensitive": "Büyük/küçük harfe duyarlı eşleşmeyi değiştir",
@@ -12,6 +12,11 @@
     "aria": {
       "searchInput": "Arama girişi"
     }
+  },
+  "tabs": {
+    "newSearch": "Yeni arama",
+    "tabList": "Arama sekmeleri",
+    "closeTab": "{{title}} sekmesini kapat"
   },
   "stateDisplay": {
     "loading": "Aranıyor...",

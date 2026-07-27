@@ -3,7 +3,7 @@
     "placeholder": {
       "files": "Rechercher des fichiers et des dossiers...",
       "events": "Filtrer les événements par chemin ou nom...",
-      "directory": "Portée du dossier..."
+      "directory": "Rechercher dans le dossier"
     },
     "options": {
       "caseSensitive": "Activer la correspondance sensible à la casse",
@@ -12,6 +12,11 @@
     "aria": {
       "searchInput": "Entrée de recherche"
     }
+  },
+  "tabs": {
+    "newSearch": "Nouvelle recherche",
+    "tabList": "Onglets de recherche",
+    "closeTab": "Fermer {{title}}"
   },
   "stateDisplay": {
     "loading": "Recherche en cours...",

@@ -3,7 +3,7 @@
     "placeholder": {
       "files": "ابحث عن الملفات والمجلدات...",
       "events": "رشّح الأحداث حسب المسار أو الاسم...",
-      "directory": "نطاق المجلد..."
+      "directory": "البحث في مجلد"
     },
     "options": {
       "caseSensitive": "تفعيل/إيقاف حساسية حالة الأحرف",
@@ -12,6 +12,11 @@
     "aria": {
       "searchInput": "إدخال البحث"
     }
+  },
+  "tabs": {
+    "newSearch": "بحث جديد",
+    "tabList": "علامات تبويب البحث",
+    "closeTab": "إغلاق {{title}}"
   },
   "stateDisplay": {
     "loading": "جارٍ البحث...",

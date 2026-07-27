@@ -108,13 +108,140 @@ main,
   height: 100%;
 }
 
+.tab-manager {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.workspace-tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  min-height: 2.25rem;
+  padding: 0.35rem var(--container-padding) 0;
+  border-bottom: 1px solid rgba(var(--color-accent-rgb), 0.12);
+  background: var(--color-elevated-bg);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.workspace-tab-list {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.workspace-tab-list::-webkit-scrollbar {
+  display: none;
+}
+
+.workspace-tab {
+  display: flex;
+  align-items: center;
+  flex: 0 0 14rem;
+  width: 14rem;
+  min-width: 14rem;
+  max-width: 14rem;
+  height: 1.9rem;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 8px 8px 0 0;
+  color: var(--color-muted);
+  background: transparent;
+}
+
+.workspace-tab:hover {
+  background: rgba(var(--color-accent-rgb), 0.06);
+}
+
+.workspace-tab.is-active {
+  border-color: rgba(var(--color-accent-rgb), 0.14);
+  border-bottom-color: transparent;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.workspace-tab-select,
+.workspace-tab-close,
+.workspace-tab-add {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+}
+
+.workspace-tab-select {
+  flex: 1;
+  min-width: 0;
+  padding: 0 0.45rem 0 0.65rem;
+  text-align: left;
+}
+
+.workspace-tab-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-tab-close {
+  flex: 0 0 1.55rem;
+  width: 1.55rem;
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0.65;
+}
+
+.workspace-tab-close:hover,
+.workspace-tab-add:hover {
+  opacity: 1;
+  background: rgba(var(--color-accent-rgb), 0.1);
+}
+
+.workspace-tab-add {
+  flex: 0 0 1.9rem;
+  width: 1.9rem;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.workspace-tab-select:focus-visible,
+.workspace-tab-close:focus-visible,
+.workspace-tab-add:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.workspace-tab-panels,
+.workspace-tab-panel {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.workspace-tab-panel[hidden] {
+  display: none;
+}
+
 .container {
   margin: 0;
   display: grid;
   grid-template-rows: auto 1fr auto; /* search bar | scroll area | status bar */
   grid-template-columns: 100%;
   text-align: center;
-  height: 100vh;
+  height: 100%;
 }
 
 /* === Search Bar === */
@@ -152,7 +279,7 @@ main,
   min-width: 6rem;
 }
 
-#search-input {
+.search-input {
   height: 100%;
   width: 100%;
   min-width: 0;
@@ -214,7 +341,7 @@ main,
   pointer-events: auto;
 }
 
-#directory-scope-input {
+.directory-scope-input {
   height: 100%;
   width: 100%;
   min-width: 0;
@@ -227,17 +354,17 @@ main,
   overflow: hidden;
 }
 
-#directory-scope-input:disabled {
+.directory-scope-input:disabled {
   cursor: default;
 }
 
-#search-input:focus,
-#directory-scope-input:focus {
+.search-input:focus,
+.directory-scope-input:focus {
   outline: none;
 }
 
-#search-input::placeholder,
-#directory-scope-input::placeholder {
+.search-input::placeholder,
+.directory-scope-input::placeholder {
   color: var(--color-muted);
 }
 
@@ -395,7 +522,7 @@ main,
     max-width: 100%;
   }
 
-  #directory-scope-input {
+  .directory-scope-input {
     width: 100%;
   }
 }
@@ -947,6 +1074,40 @@ button:active:not(:disabled) {
   min-width: 0;
   overflow: hidden;
   padding: 0 var(--cell-hpad);
+}
+
+.disclosure-button,
+.disclosure-spacer {
+  width: 12px;
+  height: 16px;
+  flex: 0 0 12px;
+}
+
+.disclosure-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  color: var(--color-muted);
+  background: transparent;
+  font-size: 8px;
+  line-height: 1;
+}
+
+.disclosure-button:hover,
+.disclosure-button:active:not(:disabled) {
+  border: 0;
+  color: currentColor;
+  background: transparent;
+}
+
+.disclosure-button > span {
+  transition: transform 100ms ease;
+}
+
+.disclosure-button--expanded > span {
+  transform: rotate(90deg);
 }
 
 .file-icon {

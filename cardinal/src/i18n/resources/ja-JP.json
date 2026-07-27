@@ -3,7 +3,7 @@
     "placeholder": {
       "files": "ファイルやフォルダを検索...",
       "events": "パスまたは名前でイベントを絞り込む...",
-      "directory": "フォルダ範囲..."
+      "directory": "フォルダ内を検索"
     },
     "options": {
       "caseSensitive": "大文字と小文字を区別する",
@@ -12,6 +12,11 @@
     "aria": {
       "searchInput": "検索入力"
     }
+  },
+  "tabs": {
+    "newSearch": "新しい検索",
+    "tabList": "検索タブ",
+    "closeTab": "「{{title}}」を閉じる"
   },
   "stateDisplay": {
     "loading": "検索中...",

@@ -16,6 +16,7 @@ type QueueSearchOptions = {
 };
 
 type UseAppWindowListenersOptions = {
+  isActive?: boolean;
   activeTab: StatusTabKey;
   searchInputRef: RefObject<HTMLInputElement>;
   focusAndSelectSearchInput: () => void;
@@ -34,6 +35,7 @@ type UseAppWindowListenersResult = {
  * Keeps the DOM focus attribute in sync and routes drag-drop queries by active tab.
  */
 export function useAppWindowListeners({
+  isActive = true,
   activeTab,
   searchInputRef,
   focusAndSelectSearchInput,
@@ -65,10 +67,12 @@ export function useAppWindowListeners({
 
   useEffect(() => {
     const unlistenQuickLaunch = subscribeQuickLaunch(() => {
-      focusAndSelectSearchInput();
+      if (isActive) {
+        focusAndSelectSearchInput();
+      }
     });
     return unlistenQuickLaunch;
-  }, [focusAndSelectSearchInput]);
+  }, [focusAndSelectSearchInput, isActive]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -94,6 +98,9 @@ export function useAppWindowListeners({
   }, [isWindowFocused]);
 
   const handleWindowDragDrop = useStableEvent((event: WindowDragDropEvent) => {
+    if (!isActive) {
+      return;
+    }
     const payload = event.payload;
     if (payload.type !== 'drop') {
       return;
