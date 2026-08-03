@@ -3,14 +3,37 @@
     "placeholder": {
       "files": "ファイルやフォルダを検索...",
       "events": "パスまたは名前でイベントを絞り込む...",
-      "directory": "フォルダ範囲..."
+      "directory": "検索する場所…（ディスク全体）"
     },
     "options": {
       "caseSensitive": "大文字と小文字を区別する",
-      "directoryScope": "フォルダ範囲を切り替え"
+      "directoryScope": "フォルダ内検索を切り替え"
+    },
+    "fileType": {
+      "label": "ファイルの種類",
+      "custom": "カスタム",
+      "all": "すべての種類",
+      "image": "画像",
+      "video": "動画",
+      "audio": "オーディオ",
+      "email": "メール",
+      "archive": "アーカイブ",
+      "code": "コード",
+      "app": "アプリ",
+      "folder": "フォルダ",
+      "document": "書類"
     },
     "aria": {
       "searchInput": "検索入力"
+    },
+    "directory": {
+      "browse": "フォルダを選択",
+      "close": "閉じる"
+    },
+    "content": {
+      "label": "内容",
+      "hint": "中のテキスト",
+      "custom": "検索バーで指定済み"
     }
   },
   "stateDisplay": {
@@ -18,14 +41,15 @@
     "error": "検索エラー",
     "emptyTitle": "\"{{query}}\" に一致する結果がありません",
     "emptyMessage": "キーワードやフィルターを調整してください。",
-    "emptyTitleWithDirectory": "フォルダースコープ \"{{directoryQuery}}\" 内で \"{{query}}\" に一致する結果がありません"
+    "emptyTitleWithDirectory": "\"{{directoryQuery}}\" に \"{{query}}\" の結果はありません"
   },
   "columns": {
     "filename": "ファイル名",
     "path": "パス",
     "size": "サイズ",
     "modified": "更新日時",
-    "created": "作成日時"
+    "created": "作成日時",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "並べ替えは無効化されています。結果が多すぎる ({{limit}}+) とパフォーマンスに影響する可能性があります。環境設定でしきい値を調整できます。"

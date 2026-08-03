@@ -3,14 +3,37 @@
     "placeholder": {
       "files": "Rechercher des fichiers et des dossiers...",
       "events": "Filtrer les événements par chemin ou nom...",
-      "directory": "Portée du dossier..."
+      "directory": "Rechercher dans… (tout le disque)"
     },
     "options": {
       "caseSensitive": "Activer la correspondance sensible à la casse",
-      "directoryScope": "Afficher la portée du dossier"
+      "directoryScope": "Activer la recherche dans un dossier"
+    },
+    "fileType": {
+      "label": "Type de fichier",
+      "custom": "Personnalisé",
+      "all": "Tous les types",
+      "image": "Image",
+      "video": "Vidéo",
+      "audio": "Audio",
+      "email": "E-mail",
+      "archive": "Archive",
+      "code": "Code",
+      "app": "Application",
+      "folder": "Dossier",
+      "document": "Document"
     },
     "aria": {
       "searchInput": "Entrée de recherche"
+    },
+    "directory": {
+      "browse": "Choisir un dossier",
+      "close": "Fermer"
+    },
+    "content": {
+      "label": "Contient",
+      "hint": "texte dedans",
+      "custom": "défini dans la barre de recherche"
     }
   },
   "stateDisplay": {
@@ -18,14 +41,15 @@
     "error": "Erreur de recherche",
     "emptyTitle": "Aucun résultat pour \"{{query}}\"",
     "emptyMessage": "Essayez d'ajuster vos mots-clés ou filtres.",
-    "emptyTitleWithDirectory": "Aucun résultat pour \"{{query}}\" dans la portée de dossier \"{{directoryQuery}}\""
+    "emptyTitleWithDirectory": "Aucun résultat pour \"{{query}}\" dans \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "Nom de fichier",
     "path": "Chemin",
     "size": "Taille",
     "modified": "Modifié",
-    "created": "Créé"
+    "created": "Créé",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "Le tri est désactivé. Trop de résultats ({{limit}}+) peuvent affecter les performances. Vous pouvez ajuster le seuil dans les Préférences."

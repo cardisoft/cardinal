@@ -1,8 +1,18 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createRef } from 'react';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { open } from '@tauri-apps/plugin-dialog';
 import { SearchBar } from '../SearchBar';
+
+// The bar now labels the file-type dropdown through i18n; keys are enough for these assertions.
+vi.mock('@tauri-apps/plugin-dialog', () => ({
+  open: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
 
 const renderSearchBar = (overrides: Partial<ComponentProps<typeof SearchBar>> = {}) => {
   const props: ComponentProps<typeof SearchBar> = {
@@ -23,6 +33,9 @@ const renderSearchBar = (overrides: Partial<ComponentProps<typeof SearchBar>> = 
     caseSensitive: false,
     onToggleCaseSensitive: vi.fn(),
     caseSensitiveLabel: 'Case sensitive',
+    fileTypeEnabled: true,
+    onQueryValueChange: vi.fn(),
+    onDirectoryValueChange: vi.fn(),
     onFocus: vi.fn(),
     onBlur: vi.fn(),
     ...overrides,
@@ -48,16 +61,45 @@ describe('SearchBar', () => {
     expect(screen.queryByRole('separator')).toBeNull();
   });
 
-  it('uses the folder icon inside the opened directory scope to fold it', () => {
+  it('browses for a folder with the folder icon, and folds with the chevron beside it', async () => {
     const onToggleDirectoryScope = vi.fn();
-    renderSearchBar({ onToggleDirectoryScope });
+    const onDirectoryValueChange = vi.fn();
+    vi.mocked(open).mockResolvedValueOnce('/Users/someone/Documents');
+    renderSearchBar({ onToggleDirectoryScope, onDirectoryValueChange });
 
-    const toggle = screen.getByRole('button', { name: 'Folder scope' });
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    expect(toggle).toHaveClass('directory-scope-field-toggle');
+    // The folder icon used to fold the field, which read as a lie: it looks like "pick a folder".
+    const browse = screen.getByRole('button', { name: 'search.directory.browse' });
+    expect(browse).toHaveClass('directory-scope-field-toggle');
+    fireEvent.click(browse);
+    await waitFor(() =>
+      expect(open).toHaveBeenCalledWith(expect.objectContaining({ directory: true })),
+    );
+    await waitFor(() =>
+      expect(onDirectoryValueChange).toHaveBeenCalledWith('/Users/someone/Documents'),
+    );
+    expect(onToggleDirectoryScope).not.toHaveBeenCalled();
 
-    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole('button', { name: 'search.directory.close' }));
     expect(onToggleDirectoryScope).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the folder untouched when the picker is cancelled', async () => {
+    const onDirectoryValueChange = vi.fn();
+    vi.mocked(open).mockResolvedValueOnce(null);
+    renderSearchBar({ onDirectoryValueChange });
+
+    fireEvent.click(screen.getByRole('button', { name: 'search.directory.browse' }));
+    await waitFor(() => expect(open).toHaveBeenCalled());
+    expect(onDirectoryValueChange).not.toHaveBeenCalled();
+  });
+
+  it('writes what the contains field types into the query as a quoted content filter', () => {
+    const onQueryValueChange = vi.fn();
+    renderSearchBar({ value: 'informe', onQueryValueChange });
+
+    const contains = screen.getByPlaceholderText('search.content.hint');
+    fireEvent.change(contains, { target: { value: 'Bearer token' } });
+    expect(onQueryValueChange).toHaveBeenCalledWith('informe content:"Bearer token"');
   });
 
   it('routes directory input focus state through the shared search focus handlers', () => {
@@ -196,5 +238,27 @@ describe('SearchBar', () => {
     expect(document.activeElement).toBe(directoryInput);
     expect(onDirectoryKeyDown).toHaveBeenCalledTimes(1);
     expect(document.activeElement).not.toBe(queryInput);
+  });
+
+  it('writes the picked file type into the query and reflects what is already there', () => {
+    const onQueryValueChange = vi.fn();
+    renderSearchBar({ value: 'informe', onQueryValueChange });
+
+    const select = screen.getByLabelText('search.fileType.label') as HTMLSelectElement;
+    expect(select.value).toBe('');
+
+    fireEvent.change(select, { target: { value: 'image' } });
+    expect(onQueryValueChange).toHaveBeenCalledWith('informe type:image');
+  });
+
+  it('shows a custom entry, and changes nothing, for a query it cannot represent', () => {
+    const onQueryValueChange = vi.fn();
+    renderSearchBar({ value: 'informe !type:image', onQueryValueChange });
+
+    const select = screen.getByLabelText('search.fileType.label') as HTMLSelectElement;
+    expect(select.value).toBe('custom');
+
+    fireEvent.change(select, { target: { value: 'custom' } });
+    expect(onQueryValueChange).not.toHaveBeenCalled();
   });
 });

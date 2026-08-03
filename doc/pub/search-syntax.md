@@ -168,6 +168,7 @@ These filters take an absolute path as their argument; a leading `~` is expanded
 - Presentations: `type:presentation`, `type:presentations`, `type:ppt`, `type:slides`
 - Spreadsheets: `type:spreadsheet`, `type:spreadsheets`, `type:xls`, `type:excel`, `type:sheet`, `type:sheets`
 - PDF: `type:pdf`
+- Email: `type:email`, `type:emails`, `type:mail`, `type:mails`, `type:message`, `type:messages` — covers `.eml`, `.emlx`, `.emlxpart` (Apple Mail), `.msg` (Outlook) and `.mbox`
 - Archives: `type:archive`, `type:archives`, `type:compressed`, `type:zip`
 - Code: `type:code`, `type:source`, `type:dev`
 - Executables: `type:exe`, `type:exec`, `type:executable`, `type:executables`, `type:program`, `type:programs`, `type:app`, `type:apps`

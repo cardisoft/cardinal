@@ -3,14 +3,37 @@
     "placeholder": {
       "files": "Buscar por arquivos e pastas...",
       "events": "Filtrar eventos por caminho ou nome...",
-      "directory": "Escopo de pasta..."
+      "directory": "Buscar em… (todo o disco)"
     },
     "options": {
       "caseSensitive": "Alternar correspondência sensível a maiúsculas",
-      "directoryScope": "Alternar escopo de pasta"
+      "directoryScope": "Alternar buscar na pasta"
+    },
+    "fileType": {
+      "label": "Tipo de arquivo",
+      "custom": "Personalizado",
+      "all": "Todos os tipos",
+      "image": "Imagem",
+      "video": "Vídeo",
+      "audio": "Áudio",
+      "email": "E-mail",
+      "archive": "Compactado",
+      "code": "Código",
+      "app": "Aplicativo",
+      "folder": "Pasta",
+      "document": "Documento"
     },
     "aria": {
       "searchInput": "Entrada de pesquisa"
+    },
+    "directory": {
+      "browse": "Escolher uma pasta",
+      "close": "Fechar"
+    },
+    "content": {
+      "label": "Contém",
+      "hint": "texto dentro",
+      "custom": "definido na barra de busca"
     }
   },
   "stateDisplay": {
@@ -18,14 +41,15 @@
     "error": "Erro na busca",
     "emptyTitle": "Nenhum resultado para \"{{query}}\"",
     "emptyMessage": "Tente ajustar suas palavras-chave ou filtros.",
-    "emptyTitleWithDirectory": "Nenhum resultado para \"{{query}}\" no escopo de pasta \"{{directoryQuery}}\""
+    "emptyTitleWithDirectory": "Sem resultados para \"{{query}}\" em \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "Nome do arquivo",
     "path": "Caminho",
     "size": "Tamanho",
     "modified": "Modificado",
-    "created": "Criado"
+    "created": "Criado",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "A ordenação está desativada. Muitos resultados ({{limit}}+) podem afetar o desempenho. Ajuste o limite em Preferências."

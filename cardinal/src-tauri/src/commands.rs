@@ -19,8 +19,10 @@ use objc2::{
 use objc2_app_kit::{NSPasteboard, NSPasteboardItem, NSPasteboardTypeString, NSPasteboardWriting};
 use objc2_foundation::{NSArray, NSString, NSURL};
 use parking_lot::Mutex;
+use rayon::prelude::*;
 use search_cache::{
     SearchOptions, SearchOutcome, SearchQuery, SearchResultNode, SlabIndex, SlabNodeMetadata,
+    content_snippet, content_terms_of_query,
 };
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
@@ -217,6 +219,8 @@ pub struct NodeInfo {
     pub path: String,
     pub metadata: Option<NodeInfoMetadata>,
     pub icon: Option<String>,
+    #[serde(rename = "contentContext")]
+    pub content_context: Option<String>,
 }
 
 #[derive(Serialize, Default)]
@@ -224,6 +228,9 @@ pub struct NodeInfo {
 pub struct SearchResponse {
     pub results: Vec<SlabIndex>,
     pub highlights: Vec<String>,
+    /// `content:` terms of this query, so the UI highlights in a snippet exactly what the search
+    /// looked for inside files.
+    pub content_terms: Vec<String>,
     pub status_code: u8,
 }
 
@@ -291,6 +298,10 @@ pub async fn search(
     search_activity::note_search_activity();
 
     let options = options.unwrap_or_default();
+    let content_terms = query
+        .as_deref()
+        .map(content_terms_of_query)
+        .unwrap_or_default();
     let cancellation_token = CancellationToken::new_search();
     let (result_tx, result_rx) = bounded(1);
     if let Err(e) = state.search_tx.send(SearchJob {
@@ -325,6 +336,7 @@ pub async fn search(
         SearchResponse {
             results,
             highlights,
+            content_terms,
             status_code,
         }
     })
@@ -335,6 +347,8 @@ pub async fn search(
 pub fn get_nodes_info(
     results: Vec<SlabIndex>,
     include_icons: Option<bool>,
+    content_terms: Option<Vec<String>>,
+    case_insensitive: Option<bool>,
     state: State<'_, SearchState>,
 ) -> Vec<NodeInfo> {
     if results.is_empty() {
@@ -342,11 +356,17 @@ pub fn get_nodes_info(
     }
 
     let include_icons = include_icons.unwrap_or(true);
+    let content_terms = content_terms.unwrap_or_default();
+    let case_insensitive = case_insensitive.unwrap_or_default();
     let nodes = state.request_nodes(results);
 
+    // Rows are independent, and each one may read a file for its icon and its content snippet.
     nodes
-        .into_iter()
+        .into_par_iter()
         .map(|SearchResultNode { path, metadata }| {
+            let content_context = content_terms
+                .iter()
+                .find_map(|term| content_snippet(&path, term, case_insensitive));
             let path = path.to_string_lossy().into_owned();
             let icon = if include_icons {
                 fs_icon::icon_of_path_ns(&path).map(|data| {
@@ -362,6 +382,7 @@ pub fn get_nodes_info(
                 path,
                 icon,
                 metadata: metadata.as_ref().map(NodeInfoMetadata::from_metadata),
+                content_context,
             }
         })
         .collect()

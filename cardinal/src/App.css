@@ -117,6 +117,98 @@ main,
   height: 100vh;
 }
 
+/* === Reordenar columnas arrastrando el título === */
+.header-cell {
+  cursor: grab;
+}
+
+.header-cell--dragging {
+  opacity: 0.45;
+}
+
+/* La línea marca dónde va a caer la columna. */
+.header-cell--drop-target {
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+/* El asa de redimensionar vive dentro de la celda arrastrable: sin esto, tomarla arrastra
+   la columna entera en vez de cambiarle el ancho. */
+.col-resizer {
+  cursor: col-resize;
+}
+
+/* === Campo "Contiene": busca dentro de los archivos === */
+.content-search-segment {
+  flex: 0 1 min(15rem, 26vw);
+  min-width: 6rem;
+  gap: 0;
+  padding-left: 0.6rem;
+  overflow: hidden;
+}
+
+.content-search-label {
+  flex: 0 0 auto;
+  padding-right: 0.4rem;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  border-right: 1px solid var(--color-border);
+  cursor: text;
+}
+
+#content-search-input {
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  font-size: 0.92rem;
+  overflow: hidden;
+}
+
+#content-search-input:focus {
+  outline: none;
+}
+
+#content-search-input::placeholder {
+  color: var(--color-muted);
+}
+
+#content-search-input:disabled {
+  cursor: not-allowed;
+  font-style: italic;
+}
+
+/* Cierra el campo de carpeta; el icono de carpeta ahora abre el selector del sistema. */
+.directory-scope-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.1rem;
+  width: 1.1rem;
+  height: var(--search-segment-height);
+  padding: 0;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.directory-scope-close svg {
+  width: 0.62rem;
+  height: 0.62rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.directory-scope-close:hover {
+  color: var(--color-text);
+}
+
 /* === Search Bar === */
 .search-container {
   margin: var(--container-padding) var(--container-padding) 0;
@@ -356,6 +448,57 @@ main,
   font-size: 0.78rem;
 }
 
+/* Native <select>: the popup, keyboard handling and RTL layout come from the platform. Only the
+   default macOS chrome is stripped so it reads as part of the toolbar. */
+.file-type-select {
+  appearance: none;
+  max-width: 9rem;
+  height: 1.8rem;
+  padding: 0 1.1rem 0 0.5rem;
+  border: none;
+  border-radius: 0.55rem;
+  background-color: transparent;
+  /* Chevron drawn inline so no asset is needed; currentColor keeps it on-theme. */
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    right 0.5rem top 55%,
+    right 0.26rem top 55%;
+  background-size:
+    0.24rem 0.24rem,
+    0.24rem 0.24rem;
+  background-repeat: no-repeat;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.file-type-select:hover {
+  background-color: var(--search-toggle-hover-bg);
+}
+
+/* Active filter reads like the case toggle when it is on.
+   Matched on a class, not `:not([value=''])`. React sets a controlled select's
+   value as a DOM property and never writes the attribute, so the attribute selector matches on
+   first paint and never updates — the accent colour stays on after switching back to "All". */
+.file-type-select.is-active {
+  color: var(--color-accent);
+}
+
+.file-type-select:focus-visible {
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.5);
+  outline-offset: 2px;
+}
+
+.file-type-select option {
+  color: var(--color-text);
+  background-color: var(--color-bg);
+}
+
 .search-option input:focus-visible + .search-option__display {
   outline: 2px solid rgba(var(--color-accent-rgb), 0.5);
   outline-offset: 2px;
@@ -461,6 +604,7 @@ button:active:not(:disabled) {
   --columns-total: calc(
     var(--w-filename) + var(--w-path) + var(--w-size) + var(--w-modified) + var(--w-created)
   );
+  --columns-total-with-context: calc(var(--columns-total) + var(--w-context));
 }
 
 .scroll-area {
@@ -597,6 +741,14 @@ button:active:not(:disabled) {
   min-width: var(--columns-total);
 }
 
+.scroll-area--with-context .columns {
+  grid-template-columns:
+    var(--w-filename) var(--w-context) var(--w-path) var(--w-size) var(--w-modified)
+    var(--w-created);
+  width: var(--columns-total-with-context);
+  min-width: var(--columns-total-with-context);
+}
+
 /* === Header Row === */
 .header-row-container {
   overflow: hidden;
@@ -626,6 +778,16 @@ button:active:not(:disabled) {
   grid-template-columns:
     var(--w-filename) var(--w-path) var(--w-size) var(--w-modified) var(--w-created)
     var(--virtual-scrollbar-width);
+}
+
+.scroll-area--with-context .header-row {
+  width: calc(var(--columns-total-with-context) + var(--virtual-scrollbar-width));
+}
+
+.scroll-area--with-context .header-row.columns {
+  grid-template-columns:
+    var(--w-filename) var(--w-context) var(--w-path) var(--w-size) var(--w-modified)
+    var(--w-created) var(--virtual-scrollbar-width);
 }
 
 .header {
@@ -930,6 +1092,13 @@ button:active:not(:disabled) {
   overflow: hidden;
   text-overflow: ellipsis;
   /* Horizontal padding for data cells */
+  padding: 0 var(--cell-hpad);
+}
+
+.context-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 0 var(--cell-hpad);
 }
 

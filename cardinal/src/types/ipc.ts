@@ -33,5 +33,6 @@ export enum SearchStatusCode {
 export type SearchResponsePayload = {
   results: number[];
   highlights?: string[];
+  contentTerms?: string[];
   statusCode: SearchStatusCode;
 };

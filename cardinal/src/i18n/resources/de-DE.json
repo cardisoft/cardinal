@@ -3,14 +3,37 @@
     "placeholder": {
       "files": "Nach Dateien und Ordnern suchen...",
       "events": "Ereignisse nach Pfad oder Name filtern...",
-      "directory": "Ordnerbereich..."
+      "directory": "Suchen in… (ganze Festplatte)"
     },
     "options": {
       "caseSensitive": "Groß-/Kleinschreibung beachten",
-      "directoryScope": "Ordnerbereich umschalten"
+      "directoryScope": "Suche im Ordner umschalten"
+    },
+    "fileType": {
+      "label": "Dateityp",
+      "custom": "Benutzerdefiniert",
+      "all": "Alle Typen",
+      "image": "Bild",
+      "video": "Video",
+      "audio": "Audio",
+      "email": "E-Mail",
+      "archive": "Archiv",
+      "code": "Code",
+      "app": "App",
+      "folder": "Ordner",
+      "document": "Dokument"
     },
     "aria": {
       "searchInput": "Sucheingabe"
+    },
+    "directory": {
+      "browse": "Ordner auswählen",
+      "close": "Schließen"
+    },
+    "content": {
+      "label": "Enthält",
+      "hint": "Text darin",
+      "custom": "in der Suchleiste festgelegt"
     }
   },
   "stateDisplay": {
@@ -18,14 +41,15 @@
     "error": "Suchfehler",
     "emptyTitle": "Keine Ergebnisse für \"{{query}}\"",
     "emptyMessage": "Passe deine Suchbegriffe oder Filter an.",
-    "emptyTitleWithDirectory": "Keine Ergebnisse für \"{{query}}\" im Ordnerbereich \"{{directoryQuery}}\""
+    "emptyTitleWithDirectory": "Keine Ergebnisse für \"{{query}}\" in \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "Dateiname",
     "path": "Pfad",
     "size": "Größe",
     "modified": "Geändert",
-    "created": "Erstellt"
+    "created": "Erstellt",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "Sortieren ist deaktiviert. Zu viele Ergebnisse ({{limit}}+) können die Leistung beeinträchtigen. Sie können den Schwellenwert in den Einstellungen anpassen."

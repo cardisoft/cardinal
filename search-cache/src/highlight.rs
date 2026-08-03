@@ -1,5 +1,7 @@
-use crate::query_preprocessor::strip_query_quotes_text;
-use cardinal_syntax::{ArgumentKind, Expr, FilterArgument, Term};
+use crate::query_preprocessor::{
+    expand_query_home_dirs, strip_query_quotes, strip_query_quotes_text,
+};
+use cardinal_syntax::{ArgumentKind, Expr, FilterArgument, FilterKind, Term, parse_query};
 use query_segmentation::{Segment, query_segmentation};
 use std::collections::BTreeSet;
 
@@ -7,6 +9,46 @@ pub fn derive_highlight_terms(expr: &Expr) -> Vec<String> {
     let mut collector = HighlightCollector::default();
     collector.collect_expr(expr);
     collector.into_terms()
+}
+
+/// The `content:` arguments a query searches file bodies for, in query order, after the same
+/// preprocessing the search itself applies. Callers use these to show why a file matched.
+pub fn content_terms_of_query(line: &str) -> Vec<String> {
+    let Ok(parsed) = parse_query(line) else {
+        return Vec::new();
+    };
+    let query = strip_query_quotes(expand_query_home_dirs(parsed));
+    let mut terms = Vec::new();
+    collect_content_terms(&query.expr, &mut terms);
+    terms
+}
+
+fn collect_content_terms(expr: &Expr, terms: &mut Vec<String>) {
+    match expr {
+        // A negated branch matches files *lacking* the term, so it has no occurrence to point at.
+        Expr::Empty | Expr::Not(_) => {}
+        Expr::Term(Term::Filter(filter)) if matches!(filter.kind, FilterKind::Content) => {
+            // Verbatim, no `.trim()`. Trimming looks harmless and is wrong:
+            // `content:"Bearer "` searches for the trailing space, so a trimmed term stops
+            // matching what the engine matched and the snippet lookup finds nothing.
+            let Some(value) = filter
+                .argument
+                .as_ref()
+                .map(|argument| argument.raw.as_str())
+            else {
+                return;
+            };
+            if !value.is_empty() && !terms.iter().any(|term| term == value) {
+                terms.push(value.to_string());
+            }
+        }
+        Expr::Term(_) => {}
+        Expr::And(parts) | Expr::Or(parts) => {
+            for part in parts {
+                collect_content_terms(part, terms);
+            }
+        }
+    }
 }
 
 #[derive(Default)]
@@ -2771,5 +2813,21 @@ mod tests {
         assert_eq!(terms[1], "bbb");
         assert_eq!(terms[2], "mmm");
         assert_eq!(terms[3], "zzz");
+    }
+
+    #[test]
+    fn content_terms_keep_query_order_and_skip_negated() {
+        assert_eq!(
+            content_terms_of_query(r#"*.md content:"Bearer " report content:token"#),
+            vec!["Bearer ", "token"]
+        );
+        // The file matched by *lacking* this term, so there is nothing to point at inside it.
+        assert!(content_terms_of_query("report !content:draft").is_empty());
+        assert!(content_terms_of_query("report").is_empty());
+        assert_eq!(
+            content_terms_of_query("content:dup content:dup").len(),
+            1,
+            "the same term twice is one snippet lookup"
+        );
     }
 }

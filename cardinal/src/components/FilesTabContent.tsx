@@ -1,3 +1,4 @@
+import type { OrderedColumn } from '../hooks/useColumnOrder';
 import React from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
@@ -36,6 +37,12 @@ type FilesTabContentProps = {
   onSortToggle: (sortKey: SortKey) => void;
   sortDisabled: boolean;
   sortDisabledTooltip: string | null;
+  showContentContext: boolean;
+  contentTerms: readonly string[];
+  caseInsensitive: boolean;
+  columnOrder: readonly OrderedColumn[];
+  onColumnMove: (dragged: OrderedColumn, target: OrderedColumn) => void;
+  columnsTemplate: string;
 };
 
 export function FilesTabContent({
@@ -58,9 +65,15 @@ export function FilesTabContent({
   onSortToggle,
   sortDisabled,
   sortDisabledTooltip,
+  showContentContext,
+  contentTerms,
+  caseInsensitive,
+  columnOrder,
+  onColumnMove,
+  columnsTemplate,
 }: FilesTabContentProps): React.JSX.Element {
   return (
-    <div className="scroll-area">
+    <div className={`scroll-area${showContentContext ? ' scroll-area--with-context' : ''}`}>
       <ColumnHeader
         ref={headerRef}
         onResizeStart={onResizeStart}
@@ -69,6 +82,10 @@ export function FilesTabContent({
         onSortToggle={onSortToggle}
         sortDisabled={sortDisabled}
         sortDisabledTooltip={sortDisabledTooltip}
+        showContentContext={showContentContext}
+        columnOrder={columnOrder}
+        onColumnMove={onColumnMove}
+        columnsTemplate={columnsTemplate}
       />
       <div className="flex-fill">
         {displayState !== 'results' ? (
@@ -88,6 +105,8 @@ export function FilesTabContent({
             overscan={overscan}
             renderRow={renderRow}
             onScrollSync={onScrollSync}
+            contentTerms={contentTerms}
+            caseInsensitive={caseInsensitive}
           />
         )}
       </div>

@@ -3,14 +3,37 @@
     "placeholder": {
       "files": "फ़ाइलों और फ़ोल्डरों में खोजें...",
       "events": "पथ या नाम से ईवेंट फ़िल्टर करें...",
-      "directory": "फ़ोल्डर स्कोप..."
+      "directory": "इसमें खोजें… (पूरी डिस्क)"
     },
     "options": {
       "caseSensitive": "केस-सेंसिटिव मिलान टॉगल करें",
-      "directoryScope": "फ़ोल्डर स्कोप टॉगल करें"
+      "directoryScope": "फ़ोल्डर में खोज टॉगल करें"
+    },
+    "fileType": {
+      "label": "फ़ाइल प्रकार",
+      "custom": "कस्टम",
+      "all": "सभी प्रकार",
+      "image": "छवि",
+      "video": "वीडियो",
+      "audio": "ऑडियो",
+      "email": "ईमेल",
+      "archive": "संग्रह",
+      "code": "कोड",
+      "app": "ऐप",
+      "folder": "फ़ोल्डर",
+      "document": "दस्तावेज़"
     },
     "aria": {
       "searchInput": "खोज इनपुट"
+    },
+    "directory": {
+      "browse": "फ़ोल्डर चुनें",
+      "close": "बंद करें"
+    },
+    "content": {
+      "label": "इसमें है",
+      "hint": "अंदर का पाठ",
+      "custom": "खोज बार में सेट है"
     }
   },
   "stateDisplay": {
@@ -18,14 +41,15 @@
     "error": "खोज त्रुटि",
     "emptyTitle": "\"{{query}}\" के लिए कोई परिणाम नहीं",
     "emptyMessage": "अपनी कुंजियाँ या फ़िल्टर बदलकर देखिए।",
-    "emptyTitleWithDirectory": "फ़ोल्डर स्कोप \"{{directoryQuery}}\" में \"{{query}}\" के लिए कोई परिणाम नहीं"
+    "emptyTitleWithDirectory": "\"{{directoryQuery}}\" में \"{{query}}\" के लिए कोई परिणाम नहीं"
   },
   "columns": {
     "filename": "फ़ाइल नाम",
     "path": "पथ",
     "size": "आकार",
     "modified": "संशोधित",
-    "created": "निर्मित"
+    "created": "निर्मित",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "सॉर्टिंग बंद है। बहुत अधिक परिणाम ({{limit}}+) प्रदर्शन को प्रभावित कर सकते हैं। आप सीमा को प्राथमिकताओं में बदल सकते हैं।"

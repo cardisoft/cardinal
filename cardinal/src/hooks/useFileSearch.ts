@@ -20,6 +20,7 @@ type SearchState = {
   currentQuery: string;
   currentDirectoryQuery: string;
   highlightTerms: string[];
+  contentTerms: string[];
   showLoadingUI: boolean;
   initialFetchCompleted: boolean;
   durationMs: number | null;
@@ -58,6 +59,7 @@ type SearchAction =
         duration: number;
         count: number;
         highlightTerms: string[];
+        contentTerms: string[];
       };
     }
   | {
@@ -79,6 +81,7 @@ const initialSearchState: SearchState = {
   currentQuery: '',
   currentDirectoryQuery: '',
   highlightTerms: [],
+  contentTerms: [],
   showLoadingUI: false,
   initialFetchCompleted: false,
   durationMs: null,
@@ -152,6 +155,7 @@ function reducer(state: SearchState, action: SearchAction): SearchState {
         currentQuery: action.payload.query,
         currentDirectoryQuery: action.payload.directoryQuery,
         highlightTerms: action.payload.highlightTerms,
+        contentTerms: action.payload.contentTerms,
         showLoadingUI: false,
         initialFetchCompleted: true,
         durationMs: action.payload.duration,
@@ -167,6 +171,7 @@ function reducer(state: SearchState, action: SearchAction): SearchState {
         durationMs: action.payload.duration,
         resultCount: 0,
         highlightTerms: [],
+        contentTerms: [],
       };
     case 'SEARCH_CANCELLED':
       return {
@@ -313,9 +318,12 @@ export function useFileSearch(): UseFileSearchResult {
       }
 
       const searchResults = rawResults.results as SlabIndex[];
-      const highlightTerms = Array.isArray(rawResults.highlights)
-        ? rawResults.highlights.filter((term): term is string => typeof term === 'string')
-        : [];
+      const stringTerms = (value: unknown): string[] =>
+        Array.isArray(value)
+          ? value.filter((term): term is string => typeof term === 'string')
+          : [];
+      const highlightTerms = stringTerms(rawResults.highlights);
+      const contentTerms = stringTerms(rawResults.contentTerms);
 
       cancelTimer(loadingDelayTimerRef);
 
@@ -331,6 +339,7 @@ export function useFileSearch(): UseFileSearchResult {
           duration,
           count: searchResults.length,
           highlightTerms,
+          contentTerms,
         },
       });
     } catch (error) {

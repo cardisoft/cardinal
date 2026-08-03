@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
+import { DEFAULT_COLUMN_ORDER } from '../../hooks/useColumnOrder';
 import { FileRow } from '../FileRow';
 
 const baseItem = {
@@ -10,7 +11,14 @@ const baseItem = {
 
 const renderRow = (props?: Partial<React.ComponentProps<typeof FileRow>>) => {
   return render(
-    <FileRow rowIndex={0} item={baseItem} isSelected={true} onSelect={vi.fn()} {...props} />,
+    <FileRow
+      rowIndex={0}
+      item={baseItem}
+      isSelected={true}
+      onSelect={vi.fn()}
+      columnOrder={DEFAULT_COLUMN_ORDER}
+      {...props}
+    />,
   );
 };
 

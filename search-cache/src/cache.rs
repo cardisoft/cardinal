@@ -2983,6 +2983,44 @@ mod tests {
     }
 
     #[test]
+    fn content_snippet_reads_context_across_chunks() {
+        let temp_dir = TempDir::new("content_snippet_reads_context_across_chunks").unwrap();
+        let path = temp_dir.path().join("large.log");
+
+        // Straddle a read boundary: the match starts one byte before the end of the first chunk,
+        // and its trailing context lives in the next one.
+        let mut payload = vec![b'a'; CONTENT_BUFFER_BYTES - 1];
+        payload.extend_from_slice(b"NeedLe tail text\n");
+        payload.extend(std::iter::repeat_n(b'z', 4096));
+        fs::write(&path, &payload).unwrap();
+
+        let snippet = crate::content_snippet(&path, "needle", true).unwrap();
+        assert!(snippet.starts_with('…'), "elided prefix: {snippet}");
+        assert!(snippet.ends_with('…'), "elided suffix: {snippet}");
+        assert!(
+            snippet.contains("NeedLe tail text"),
+            "original case: {snippet}"
+        );
+        assert!(!snippet.contains('\n'), "single row: {snippet}");
+
+        assert!(crate::content_snippet(&path, "needle", false).is_none());
+        assert!(crate::content_snippet(&path, "absent", true).is_none());
+    }
+
+    #[test]
+    fn content_snippet_marks_only_the_edges_it_cuts() {
+        let temp_dir = TempDir::new("content_snippet_marks_only_the_edges_it_cuts").unwrap();
+        let path = temp_dir.path().join("small.txt");
+        fs::write(&path, b"token here").unwrap();
+
+        // Whole file fits in the context window, so neither edge is elided.
+        assert_eq!(
+            crate::content_snippet(&path, "token", false).unwrap(),
+            "token here"
+        );
+    }
+
+    #[test]
     fn content_filter_matches_across_chunks() {
         let temp_dir = TempDir::new("content_filter_matches_across_chunks").unwrap();
         let dir = temp_dir.path();

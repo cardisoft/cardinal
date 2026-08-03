@@ -39,6 +39,8 @@ type VirtualListProps = {
     rowStyle: CSSProperties,
   ) => React.ReactNode;
   onScrollSync: (scrollLeft: number) => void;
+  contentTerms?: readonly string[];
+  caseInsensitive?: boolean;
 };
 
 // Virtualized list with lazy row hydration plus a short-lived frozen viewport during
@@ -52,6 +54,8 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     overscan,
     renderRow,
     onScrollSync,
+    contentTerms = [],
+    caseInsensitive = false,
   },
   ref,
 ) {
@@ -67,7 +71,12 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   const rowCount = results.length;
 
   // ----- data loader -----
-  const { cache, ensureRangeLoaded } = useDataLoader(results, dataResultsVersion);
+  const { cache, ensureRangeLoaded } = useDataLoader(
+    results,
+    dataResultsVersion,
+    contentTerms,
+    caseInsensitive,
+  );
 
   // Virtualized height powers the scrollbar math
   const totalHeight = rowCount * rowHeight;

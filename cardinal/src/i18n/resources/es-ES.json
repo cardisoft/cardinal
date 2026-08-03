@@ -3,14 +3,37 @@
     "placeholder": {
       "files": "Buscar archivos y carpetas...",
       "events": "Filtrar eventos por ruta o nombre...",
-      "directory": "Ámbito de carpeta..."
+      "directory": "Buscar en… (todo el disco)"
     },
     "options": {
       "caseSensitive": "Activar coincidencia sensible a mayúsculas",
-      "directoryScope": "Alternar ámbito de carpeta"
+      "directoryScope": "Alternar buscar en carpeta"
+    },
+    "fileType": {
+      "label": "Tipo de archivo",
+      "custom": "Personalizado",
+      "all": "Todos los tipos",
+      "image": "Imagen",
+      "video": "Video",
+      "audio": "Audio",
+      "email": "Email",
+      "archive": "Comprimido",
+      "code": "Código",
+      "app": "Aplicación",
+      "folder": "Carpeta",
+      "document": "Documento"
     },
     "aria": {
       "searchInput": "Entrada de búsqueda"
+    },
+    "directory": {
+      "browse": "Elegir una carpeta",
+      "close": "Cerrar"
+    },
+    "content": {
+      "label": "Contiene",
+      "hint": "texto dentro",
+      "custom": "definido en la barra de búsqueda"
     }
   },
   "stateDisplay": {
@@ -18,14 +41,15 @@
     "error": "Error de búsqueda",
     "emptyTitle": "Sin resultados para \"{{query}}\"",
     "emptyMessage": "Prueba ajustando tus palabras clave o filtros.",
-    "emptyTitleWithDirectory": "Sin resultados para \"{{query}}\" en el ámbito de carpeta \"{{directoryQuery}}\""
+    "emptyTitleWithDirectory": "Sin resultados para \"{{query}}\" en \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "Nombre de archivo",
     "path": "Ruta",
     "size": "Tamaño",
     "modified": "Modificado",
-    "created": "Creado"
+    "created": "Creado",
+    "context": "Contexto"
   },
   "sorting": {
     "disabled": "La ordenación está deshabilitada. Demasiados resultados ({{limit}}+) pueden afectar el rendimiento. Puede ajustar el umbral en Preferencias."

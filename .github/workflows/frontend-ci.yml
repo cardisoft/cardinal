@@ -27,7 +27,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22+: the test script passes --no-experimental-webstorage, which Node 20 rejects as an
+          # unknown option. Node 20 reached end of life in April 2026.
+          node-version: 24
           cache: npm
           cache-dependency-path: cardinal/package-lock.json
 

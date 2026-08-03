@@ -131,11 +131,44 @@ function applyMiddleEllipsis(parts: HighlightSegment[], maxChars: number): Highl
   return [...leftParts, { text: '…', isHighlight: false }, ...rightParts];
 }
 
+function applyEndEllipsis(parts: HighlightSegment[], maxChars: number): HighlightSegment[] {
+  if (maxChars <= 1) {
+    return [{ text: '…', isHighlight: false }];
+  }
+
+  const totalLength = parts.reduce((sum, part) => sum + part.text.length, 0);
+  if (totalLength <= maxChars) {
+    return parts;
+  }
+
+  const visibleChars = maxChars - 1;
+  const visibleParts: HighlightSegment[] = [];
+  let visibleCount = 0;
+  for (const part of parts) {
+    const remainingSpace = visibleChars - visibleCount;
+    if (remainingSpace <= 0) break;
+
+    if (part.text.length <= remainingSpace) {
+      visibleParts.push(part);
+      visibleCount += part.text.length;
+    } else {
+      visibleParts.push({
+        text: part.text.slice(0, remainingSpace),
+        isHighlight: part.isHighlight,
+      });
+      break;
+    }
+  }
+
+  return [...visibleParts, { text: '…', isHighlight: false }];
+}
+
 type MiddleEllipsisHighlightProps = {
   text: string;
   className?: string;
   highlightTerms?: readonly string[];
   caseInsensitive?: boolean;
+  ellipsisMode?: 'middle' | 'end';
 };
 
 export function MiddleEllipsisHighlight({
@@ -143,6 +176,7 @@ export function MiddleEllipsisHighlight({
   className,
   highlightTerms,
   caseInsensitive,
+  ellipsisMode = 'middle',
 }: MiddleEllipsisHighlightProps): React.JSX.Element {
   const containerRef = useRef<HTMLSpanElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -157,8 +191,10 @@ export function MiddleEllipsisHighlight({
     if (!containerWidth || highlightedParts.length === 0) return highlightedParts;
 
     const maxChars = Math.floor(containerWidth / CHAR_WIDTH) - 1;
-    return applyMiddleEllipsis(highlightedParts, maxChars);
-  }, [highlightedParts, containerWidth]);
+    return ellipsisMode === 'end'
+      ? applyEndEllipsis(highlightedParts, maxChars)
+      : applyMiddleEllipsis(highlightedParts, maxChars);
+  }, [highlightedParts, containerWidth, ellipsisMode]);
 
   // Measure before paint so result refreshes do not flash the full text before truncation.
   // ResizeObserver keeps truncation in sync with later layout shifts.

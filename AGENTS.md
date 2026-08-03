@@ -4,7 +4,8 @@
 - Desktop app lives in `cardinal/` (React UI in `src/`, Tauri/native glue in `src-tauri/`, build output in `cardinal/dist/`).
 - Workspace crates (root `Cargo.toml`): `lsf/` (CLI), `cardinal-sdk/` (shared types), `fswalk/`, `fs-icon/`, `namepool/`, `query-segmentation/`, `search-cache/`, `search-cancel/`, `cardinal-syntax/`, `slab-mmap/` (mmap-backed slab for the cache), `was/` (CLI that streams FSEvents via the SDK).
 - Tests sit next to code; cross-crate cases belong in each crate’s `tests/` directory. Generated outputs (`target/`, `cardinal/dist/`, vendor bundles) stay out of commits.
-- Toolchain pinned via `rust-toolchain.toml` (`nightly-2025-05-09`); install with `rustup toolchain install nightly-2025-05-09`.
+- Toolchain pinned via `rust-toolchain.toml` (`nightly-2025-12-11`); install with `rustup toolchain install nightly-2025-12-11`. Let the rustup shim pick it up rather than putting a toolchain's `bin/` on `PATH`: an older rustc still builds here from cache, but the proc-macro dylibs it emits are rejected by recent macOS dyld with `mis-aligned LINKEDIT string pool` as soon as anything has to be rebuilt.
+- Keep `target/` out of iCloud-synced folders (`CARGO_TARGET_DIR`). If iCloud evicts a fingerprint file, cargo blocks forever in `read()` waiting for a download that never lands.
 
 ## Build, Test, and Development Commands
 - `cargo check --workspace` — fast compile validation for all crates.

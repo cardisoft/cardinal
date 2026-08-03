@@ -1052,6 +1052,114 @@ impl SearchCache {
     }
 }
 
+/// Bytes of surrounding file text kept around a `content:` match.
+const SNIPPET_BEFORE_BYTES: usize = 24;
+const SNIPPET_AFTER_BYTES: usize = 160;
+
+/// One line of file text around the first occurrence of `term`, for showing *why* a `content:`
+/// search matched. Reads in the same chunks with the same finder as
+/// [`SearchCache::node_content_matches`], so a snippet is found wherever the filter found a match.
+//
+// No cancellation token: the caller hydrates visible rows only, over files the content filter
+// just read, so the pages are cached. Wire one in if snippets ever run ahead of the search.
+pub fn content_snippet(path: &Path, term: &str, case_insensitive: bool) -> Option<String> {
+    let needle = if case_insensitive {
+        term.to_ascii_lowercase().into_bytes()
+    } else {
+        term.as_bytes().to_vec()
+    };
+    if needle.is_empty() {
+        return None;
+    }
+
+    let mut file = File::open(path).ok()?;
+    let finder = rabinkarp::Finder::new(&needle);
+    // Carry enough of each chunk to catch a match split across reads *and* to keep the leading
+    // context of a match that lands at the start of the next one.
+    let overlap = needle.len().saturating_sub(1).max(SNIPPET_BEFORE_BYTES);
+    let mut buffer = vec![0u8; CONTENT_BUFFER_BYTES + overlap];
+    // The second buffer is not waste. `node_content_matches` right above folds the
+    // chunk in place, which is cheaper and is wrong here: the snippet is cut from these same bytes,
+    // so folding in place returns the matched line entirely in lowercase.
+    let mut folded = Vec::new();
+    let mut carry_len = 0usize;
+    let mut chunk_offset = 0usize;
+
+    loop {
+        let read = file.read(&mut buffer[carry_len..]).ok()?;
+        if read == 0 {
+            return None;
+        }
+        let chunk_len = carry_len + read;
+
+        let haystack = if case_insensitive {
+            folded.resize(chunk_len, 0);
+            folded[carry_len..].copy_from_slice(&buffer[carry_len..chunk_len]);
+            folded[carry_len..].make_ascii_lowercase();
+            &folded[..chunk_len]
+        } else {
+            &buffer[..chunk_len]
+        };
+
+        if let Some(at) = finder.find(haystack, &needle) {
+            return Some(snippet_at(
+                &mut file,
+                &buffer[..chunk_len],
+                at,
+                needle.len(),
+                chunk_offset,
+            ));
+        }
+
+        let keep = overlap.min(chunk_len);
+        buffer.copy_within(chunk_len - keep..chunk_len, 0);
+        if case_insensitive {
+            folded.copy_within(chunk_len - keep..chunk_len, 0);
+        }
+        chunk_offset += chunk_len - keep;
+        carry_len = keep;
+    }
+}
+
+/// `chunk_offset` is the file offset `chunk` starts at, which decides whether the snippet needs a
+/// leading ellipsis.
+fn snippet_at(
+    file: &mut File,
+    chunk: &[u8],
+    at: usize,
+    needle_len: usize,
+    chunk_offset: usize,
+) -> String {
+    let start = at.saturating_sub(SNIPPET_BEFORE_BYTES);
+    let wanted_end = at + needle_len + SNIPPET_AFTER_BYTES;
+    let end = wanted_end.min(chunk.len());
+    let mut bytes = chunk[start..end].to_vec();
+
+    let mut truncated = end < chunk.len();
+    if wanted_end > chunk.len() {
+        // The trailing context runs past what we read; the rest is the next bytes of the file.
+        let mut tail = vec![0u8; wanted_end - chunk.len()];
+        if let Ok(read) = file.read(&mut tail) {
+            bytes.extend_from_slice(&tail[..read]);
+            truncated = read == tail.len();
+        }
+    }
+
+    // Collapse newlines and runs of spaces so the snippet stays on one row, and drop the partial
+    // UTF-8 sequences that cutting on byte boundaries leaves at either edge.
+    let text = String::from_utf8_lossy(&bytes);
+    let compact = text
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim_matches(char::REPLACEMENT_CHARACTER)
+        .to_string();
+
+    let prefix = if chunk_offset + start > 0 { "…" } else { "" };
+    let suffix = if truncated { "…" } else { "" };
+    format!("{prefix}{compact}{suffix}")
+}
+
 fn normalize_extensions(argument: &FilterArgument) -> HashSet<String> {
     let mut values = HashSet::new();
     match &argument.kind {
@@ -1124,6 +1232,9 @@ fn lookup_type_group(name: &str) -> Option<TypeFilterTarget> {
             Some(TypeFilterTarget::Extensions(SPREADSHEET_EXTENSIONS))
         }
         "pdf" => Some(TypeFilterTarget::Extensions(PDF_EXTENSIONS)),
+        "email" | "emails" | "mail" | "mails" | "message" | "messages" => {
+            Some(TypeFilterTarget::Extensions(EMAIL_EXTENSIONS))
+        }
         "archive" | "archives" | "compressed" | "zip" => {
             Some(TypeFilterTarget::Extensions(ARCHIVE_EXTENSIONS))
         }
@@ -1152,6 +1263,9 @@ const DOCUMENT_EXTENSIONS: &[&str] = &[
 const PRESENTATION_EXTENSIONS: &[&str] = &["ppt", "pptx", "key", "odp"];
 const SPREADSHEET_EXTENSIONS: &[&str] = &["xls", "xlsx", "csv", "numbers", "ods"];
 const PDF_EXTENSIONS: &[&str] = &["pdf"];
+// `emlx`/`emlxpart` are Apple Mail's on-disk format, the one nobody finds by name; `msg` is
+// Outlook, `mbox` a whole mailbox exported as one file.
+const EMAIL_EXTENSIONS: &[&str] = &["eml", "emlx", "emlxpart", "msg", "mbox"];
 const ARCHIVE_EXTENSIONS: &[&str] = &[
     "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst", "cab", "iso", "dmg",
 ];

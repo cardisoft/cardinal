@@ -303,6 +303,23 @@ fn test_type_pdf_filter() {
 }
 
 #[test]
+fn test_type_email_and_aliases() {
+    let tmp = TempDir::new("type_email").unwrap();
+    fs::write(tmp.path().join("plain.eml"), b"x").unwrap();
+    fs::write(tmp.path().join("apple_mail.emlx"), b"x").unwrap();
+    fs::write(tmp.path().join("attachment.emlxpart"), b"x").unwrap();
+    fs::write(tmp.path().join("outlook.msg"), b"x").unwrap();
+    fs::write(tmp.path().join("mailbox.mbox"), b"x").unwrap();
+    fs::write(tmp.path().join("notes.txt"), b"x").unwrap();
+
+    let mut cache = SearchCache::walk_fs(tmp.path());
+
+    assert_eq!(cache.search("type:email").unwrap().len(), 5);
+    assert_eq!(cache.search("type:mail").unwrap().len(), 5);
+    assert_eq!(cache.search("type:emails").unwrap().len(), 5);
+}
+
+#[test]
 fn test_type_archive_comprehensive() {
     let tmp = TempDir::new("type_archive").unwrap();
     fs::write(tmp.path().join("archive.zip"), b"x").unwrap();

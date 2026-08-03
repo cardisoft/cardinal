@@ -104,6 +104,7 @@ vi.mock('../hooks/useFileSearch', () => ({
       currentQuery: 'needle',
       currentDirectoryQuery: 'Work/Docs',
       highlightTerms: [],
+      contentTerms: [],
       showLoadingUI: false,
       initialFetchCompleted: true,
       durationMs: 0,

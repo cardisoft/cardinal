@@ -3,14 +3,37 @@
     "placeholder": {
       "files": "Search for files and folders...",
       "events": "Filter events by path or name...",
-      "directory": "Folder scope..."
+      "directory": "Search in… (whole disk)"
     },
     "options": {
       "caseSensitive": "Toggle case-sensitive matching",
-      "directoryScope": "Toggle folder scope"
+      "directoryScope": "Toggle search in folder"
+    },
+    "fileType": {
+      "label": "File type",
+      "custom": "Custom",
+      "all": "All types",
+      "image": "Image",
+      "video": "Video",
+      "audio": "Audio",
+      "email": "Email",
+      "archive": "Archive",
+      "code": "Code",
+      "app": "App",
+      "folder": "Folder",
+      "document": "Document"
     },
     "aria": {
       "searchInput": "Search input"
+    },
+    "directory": {
+      "browse": "Browse for a folder",
+      "close": "Close"
+    },
+    "content": {
+      "label": "Contains",
+      "hint": "text inside",
+      "custom": "set in the search bar"
     }
   },
   "stateDisplay": {
@@ -18,14 +41,15 @@
     "error": "Search Error",
     "emptyTitle": "No results for \"{{query}}\"",
     "emptyMessage": "Try adjusting your keywords or filters.",
-    "emptyTitleWithDirectory": "No results for \"{{query}}\" in folder scope \"{{directoryQuery}}\""
+    "emptyTitleWithDirectory": "No results for \"{{query}}\" in \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "Filename",
     "path": "Path",
     "size": "Size",
     "modified": "Modified",
-    "created": "Created"
+    "created": "Created",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "Sorting is disabled. Too many results ({{limit}}+) may impact performance. You can adjust the threshold in Preferences."

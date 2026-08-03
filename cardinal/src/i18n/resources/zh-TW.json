@@ -3,14 +3,37 @@
     "placeholder": {
       "files": "搜尋檔案和資料夾…",
       "events": "依路徑或名稱篩選事件…",
-      "directory": "限定資料夾範圍…"
+      "directory": "在此處搜尋…（整個磁碟）"
     },
     "options": {
       "caseSensitive": "切換區分大小寫比對",
-      "directoryScope": "切換資料夾範圍"
+      "directoryScope": "切換在資料夾中搜尋"
+    },
+    "fileType": {
+      "label": "檔案類型",
+      "custom": "自訂",
+      "all": "所有類型",
+      "image": "圖片",
+      "video": "影片",
+      "audio": "音訊",
+      "email": "郵件",
+      "archive": "壓縮檔",
+      "code": "程式碼",
+      "app": "應用程式",
+      "folder": "資料夾",
+      "document": "文件"
     },
     "aria": {
       "searchInput": "搜尋輸入"
+    },
+    "directory": {
+      "browse": "選擇資料夾",
+      "close": "關閉"
+    },
+    "content": {
+      "label": "包含",
+      "hint": "檔案內文字",
+      "custom": "已在搜尋列中設定"
     }
   },
   "stateDisplay": {
@@ -18,14 +41,15 @@
     "error": "搜尋發生錯誤",
     "emptyTitle": "「{{query}}」沒有符合結果",
     "emptyMessage": "試著調整關鍵字或篩選條件。",
-    "emptyTitleWithDirectory": "在資料夾範圍「{{directoryQuery}}」中沒有找到「{{query}}」"
+    "emptyTitleWithDirectory": "在 \"{{directoryQuery}}\" 中沒有 \"{{query}}\" 的結果"
   },
   "columns": {
     "filename": "檔名",
     "path": "路徑",
     "size": "大小",
     "modified": "修改時間",
-    "created": "建立時間"
+    "created": "建立時間",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "排序已停用。結果超過 {{limit}} 個可能影響效能。你可以在偏好設定中調整門檻。"

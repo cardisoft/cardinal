@@ -113,6 +113,7 @@ vi.mock('../hooks/useFileSearch', () => ({
       currentQuery: '',
       currentDirectoryQuery: '',
       highlightTerms: [],
+      contentTerms: [],
       showLoadingUI: false,
       initialFetchCompleted: true,
       durationMs: 0,

@@ -3,14 +3,37 @@
     "placeholder": {
       "files": "Dosya ve klasör arayın...",
       "events": "Olayları yol veya ada göre filtreleyin...",
-      "directory": "Klasör kapsamı..."
+      "directory": "Şurada ara… (tüm disk)"
     },
     "options": {
       "caseSensitive": "Büyük/küçük harfe duyarlı eşleşmeyi değiştir",
-      "directoryScope": "Klasör kapsamını değiştir"
+      "directoryScope": "Klasörde aramayı aç/kapat"
+    },
+    "fileType": {
+      "label": "Dosya türü",
+      "custom": "Özel",
+      "all": "Tüm türler",
+      "image": "Görsel",
+      "video": "Video",
+      "audio": "Ses",
+      "email": "E-posta",
+      "archive": "Arşiv",
+      "code": "Kod",
+      "app": "Uygulama",
+      "folder": "Klasör",
+      "document": "Belge"
     },
     "aria": {
       "searchInput": "Arama girişi"
+    },
+    "directory": {
+      "browse": "Klasör seç",
+      "close": "Kapat"
+    },
+    "content": {
+      "label": "İçerir",
+      "hint": "içindeki metin",
+      "custom": "arama çubuğunda ayarlandı"
     }
   },
   "stateDisplay": {
@@ -18,14 +41,15 @@
     "error": "Arama hatası",
     "emptyTitle": "\"{{query}}\" için sonuç yok",
     "emptyMessage": "Anahtar kelimeleri veya filtreleri değiştirmeyi deneyin.",
-    "emptyTitleWithDirectory": "\"{{directoryQuery}}\" klasör kapsamında \"{{query}}\" için sonuç yok"
+    "emptyTitleWithDirectory": "\"{{directoryQuery}}\" içinde \"{{query}}\" için sonuç yok"
   },
   "columns": {
     "filename": "Dosya adı",
     "path": "Yol",
     "size": "Boyut",
     "modified": "Değiştirildi",
-    "created": "Oluşturuldu"
+    "created": "Oluşturuldu",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "Sıralama devre dışı. Çok fazla sonuç ({{limit}}+) performansı etkileyebilir. Eşiği Tercihler'de ayarlayabilirsiniz."

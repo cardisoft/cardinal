@@ -3,14 +3,37 @@
     "placeholder": {
       "files": "Поиск файлов и папок...",
       "events": "Фильтруйте события по пути или имени...",
-      "directory": "Область папок..."
+      "directory": "Искать в… (весь диск)"
     },
     "options": {
       "caseSensitive": "Включить учет регистра",
-      "directoryScope": "Переключить область папок"
+      "directoryScope": "Переключить поиск в папке"
+    },
+    "fileType": {
+      "label": "Тип файла",
+      "custom": "Другое",
+      "all": "Все типы",
+      "image": "Изображение",
+      "video": "Видео",
+      "audio": "Аудио",
+      "email": "Письмо",
+      "archive": "Архив",
+      "code": "Код",
+      "app": "Программа",
+      "folder": "Папка",
+      "document": "Документ"
     },
     "aria": {
       "searchInput": "Поле поиска"
+    },
+    "directory": {
+      "browse": "Выбрать папку",
+      "close": "Закрыть"
+    },
+    "content": {
+      "label": "Содержит",
+      "hint": "текст внутри",
+      "custom": "задано в строке поиска"
     }
   },
   "stateDisplay": {
@@ -18,14 +41,15 @@
     "error": "Ошибка поиска",
     "emptyTitle": "Нет результатов для \"{{query}}\"",
     "emptyMessage": "Попробуйте изменить ключевые слова или фильтры.",
-    "emptyTitleWithDirectory": "Нет результатов для \"{{query}}\" в области папки \"{{directoryQuery}}\""
+    "emptyTitleWithDirectory": "Нет результатов для \"{{query}}\" в \"{{directoryQuery}}\""
   },
   "columns": {
     "filename": "Имя файла",
     "path": "Путь",
     "size": "Размер",
     "modified": "Изменено",
-    "created": "Создано"
+    "created": "Создано",
+    "context": "Context"
   },
   "sorting": {
     "disabled": "Сортировка отключена. Слишком много результатов ({{limit}}+) может повлиять на производительность. Вы можете изменить порог в Настройках."
