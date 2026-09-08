@@ -7,7 +7,30 @@
     },
     "options": {
       "caseSensitive": "Activer la correspondance sensible à la casse",
-      "directoryScope": "Afficher la portée du dossier"
+      "directoryScope": "Afficher la portée du dossier",
+      "newest": "Plus récent"
+    },
+    "filters": {
+      "label": "Filtres",
+      "type": "Type",
+      "anyType": "Tout type",
+      "folders": "Dossiers",
+      "pictures": "Photos",
+      "videos": "Vidéos",
+      "audio": "Audio",
+      "documents": "Documents",
+      "archives": "Archives",
+      "code": "Code",
+      "apps": "Demandes",
+      "modified": "Modifié",
+      "anyTime": "À tout moment",
+      "today": "Aujourd'hui",
+      "pastWeek": "Semaine passée",
+      "pastMonth": "Mois précédent",
+      "pastYear": "Année précédente",
+      "size": "Taille",
+      "anySize": "Toute taille",
+      "clear": "Effacer"
     },
     "aria": {
       "searchInput": "Entrée de recherche"
@@ -52,6 +75,11 @@
     "copyFilenames": "Copier les noms de fichier",
     "copyPath": "Copier le chemin",
     "copyPaths": "Copier les chemins",
+    "moveToTrash_one": "Aller à la corbeille...",
+    "moveToTrash_other": "Déplacer {{count}} éléments dans la corbeille...",
+    "confirmTrash_one": "Déplacer l'élément sélectionné dans la corbeille ?",
+    "confirmTrash_other": "Déplacer {{count}} éléments sélectionnés dans la corbeille?",
+    "trashFailed": "L'article n'a pas pu être déplacé à la corbeille.",
     "resetColumnWidths": "Réinitialiser la largeur des colonnes"
   },
   "statusBar": {
@@ -169,6 +197,12 @@
   "ignorePaths": {
     "label": "Chemins ignorés",
     "help": "Un chemin par ligne ; les chemins ignorés sont exclus de l'indexation.",
+    "listLabel": "Dossiers ignorés",
+    "addLabel": "Chemin du dossier à ignorer",
+    "placeholder": "/path/to/folder",
+    "add": "Ajouter",
+    "remove": "Supprimer {{path}}",
+    "empty": "Aucun dossier supplémentaire n'est ignoré.",
     "errors": {
       "absolute": "Chaque chemin doit commencer par '/' ou '~'."
     }
@@ -178,6 +212,71 @@
     "help": "Un chemin par ligne ; les chemins inclus restent indexés même si un parent est ignoré.",
     "errors": {
       "absolute": "Chaque chemin doit commencer par '/' ou '~'."
+    }
+  },
+  "workspace": {
+    "toolbarLabel": "Outils d'espace de travail",
+    "close": "Fermer le panneau",
+    "remove": "Supprimer",
+    "sections": {
+      "saved": "Recherches sauvegardées",
+      "favorites": "Favoris",
+      "coverage": "Pourquoi n'a-t-il pas été trouvé ?",
+      "operations": "Opérations"
+    },
+    "saved": {
+      "nameLabel": "Nom de la recherche",
+      "saveCurrent": "Enregistrer la recherche actuelle",
+      "empty": "Pas encore de recherche enregistrée.",
+      "allFiles": "Tous les fichiers"
+    },
+    "favorites": {
+      "addSelection": "Ajouter une sélection aux favoris",
+      "empty": "Pas encore de fichiers ou dossiers préférés.",
+      "open": "Ouvrir le favori",
+      "reveal": "Afficher dans le Finder"
+    },
+    "coverage": {
+      "permission": "Accès au disque complet",
+      "granted": "Activé",
+      "denied": "Handicapé",
+      "state": "État index",
+      "indexed": "Postes indexés",
+      "root": "Surveiller la racine",
+      "excluded": "Voies exclues",
+      "included": "Explicitement inclus des chemins",
+      "none": "Aucun chemin n'est exclu.",
+      "allUnderRoot": "Tous les chemins accessibles sous la racine sont inclus.",
+      "directoryScope": "Portée active du dossier",
+      "explanation": "Si un fichier manque, vérifiez les autorisations, la racine du moniteur, les chemins exclus et la portée du dossier actif.",
+      "openSettings": "Ouvrir les réglages de recherche et d’indexation"
+    },
+    "operations": {
+      "indexing": "Indexation des fichiers",
+      "search": "Rechercher",
+      "sorting": "Tri",
+      "activity": "Activité index",
+      "activityLevels": {
+        "idle": "Idée",
+        "low": "Faible",
+        "medium": "Moyenne",
+        "high": "Élevé"
+      },
+      "indexedCount": "{{count}} postes indexés",
+      "trash": "Corbeille",
+      "fileStates": {
+        "running": "Déplacement de {{count}} articles",
+        "completed": "Déplacé {{count}} articles",
+        "failed": "Impossible de déplacer {{count}} articles"
+      },
+      "running": "Courir",
+      "paused": "En pause",
+      "pauseIndexing": "Suspendre l’indexation",
+      "resumeIndexing": "Reprendre l'indexation",
+      "cancelSearch": "Annuler la recherche",
+      "cancelSort": "Annuler le tri",
+      "rescan": "Réscan",
+      "idle": "Pas d'opérations de longue durée."
     }
   }
 }

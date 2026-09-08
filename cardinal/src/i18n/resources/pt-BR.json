@@ -7,7 +7,30 @@
     },
     "options": {
       "caseSensitive": "Alternar correspondência sensível a maiúsculas",
-      "directoryScope": "Alternar escopo de pasta"
+      "directoryScope": "Alternar escopo de pasta",
+      "newest": "Mais recente"
+    },
+    "filters": {
+      "label": "Filtros",
+      "type": "Tipo",
+      "anyType": "Qualquer tipo",
+      "folders": "Pastas",
+      "pictures": "Imagens",
+      "videos": "Vídeos",
+      "audio": "Áudio",
+      "documents": "Documentos",
+      "archives": "Arquivos",
+      "code": "Código",
+      "apps": "Aplicações",
+      "modified": "Modificado",
+      "anyTime": "A qualquer hora.",
+      "today": "Hoje",
+      "pastWeek": "Semana passada",
+      "pastMonth": "Mês passado",
+      "pastYear": "Ano passado",
+      "size": "Tamanho",
+      "anySize": "Qualquer tamanho",
+      "clear": "Limpar"
     },
     "aria": {
       "searchInput": "Entrada de pesquisa"
@@ -52,6 +75,11 @@
     "copyFilenames": "Copiar nomes de arquivos",
     "copyPath": "Copiar caminho",
     "copyPaths": "Copiar caminhos",
+    "moveToTrash_one": "Mover para o Lixo...",
+    "moveToTrash_other": "Mover {{count}} itens para o Lixo...",
+    "confirmTrash_one": "Mover o item selecionado para o Lixo?",
+    "confirmTrash_other": "Mover {{count}} itens selecionados para o Lixo?",
+    "trashFailed": "O item não pôde ser movido para o Lixo.",
     "resetColumnWidths": "Redefinir larguras das colunas"
   },
   "statusBar": {
@@ -169,6 +197,12 @@
   "ignorePaths": {
     "label": "Caminhos ignorados",
     "help": "Um caminho por linha; caminhos ignorados são ignorados durante a indexação.",
+    "listLabel": "Pastas ignoradas",
+    "addLabel": "Localização da pasta a ignorar",
+    "placeholder": "/path/to/folder",
+    "add": "Adicionar",
+    "remove": "Remover {{path}}",
+    "empty": "Nenhuma pasta extra é ignorada.",
     "errors": {
       "absolute": "Cada caminho deve começar com '/' ou '~'."
     }
@@ -178,6 +212,71 @@
     "help": "Um caminho por linha; caminhos incluídos permanecem indexados mesmo quando um ancestral é ignorado.",
     "errors": {
       "absolute": "Cada caminho deve começar com '/' ou '~'."
+    }
+  },
+  "workspace": {
+    "toolbarLabel": "Ferramentas de espaço de trabalho",
+    "close": "Fechar painel",
+    "remove": "Remover",
+    "sections": {
+      "saved": "Procuras Gravadas",
+      "favorites": "Favoritos",
+      "coverage": "Por que não foi encontrado?",
+      "operations": "Operações"
+    },
+    "saved": {
+      "nameLabel": "Nome da pesquisa",
+      "saveCurrent": "Gravar a pesquisa actual",
+      "empty": "Nenhuma pesquisa salva ainda.",
+      "allFiles": "Todos os arquivos"
+    },
+    "favorites": {
+      "addSelection": "Adicionar seleção aos favoritos",
+      "empty": "Ainda não existem ficheiros ou pastas favoritos.",
+      "open": "Abrir favorito",
+      "reveal": "Mostrar no Finder"
+    },
+    "coverage": {
+      "permission": "Acesso completo ao disco",
+      "granted": "Activado",
+      "denied": "Desactivado",
+      "state": "Estado do índice",
+      "indexed": "Rubricas indexadas",
+      "root": "Monitorar a raiz",
+      "excluded": "Caminhos excluídos",
+      "included": "Caminhos explicitamente incluídos",
+      "none": "Nenhum caminho está excluído.",
+      "allUnderRoot": "Todos os caminhos acessíveis sob a raiz estão incluídos.",
+      "directoryScope": "Âmbito ativo da pasta",
+      "explanation": "Se um arquivo estiver faltando, verifique as permissões, a raiz do monitor, os caminhos excluídos e o escopo da pasta ativa.",
+      "openSettings": "Abrir ajustes de busca e indexação"
+    },
+    "operations": {
+      "indexing": "Indexação de arquivos",
+      "search": "Procurar",
+      "sorting": "Ordenação",
+      "activity": "Actividade do índice",
+      "activityLevels": {
+        "idle": "Inativa",
+        "low": "Baixo",
+        "medium": "Médio",
+        "high": "Alta"
+      },
+      "indexedCount": "{{count}} itens indexados",
+      "trash": "Lixo",
+      "fileStates": {
+        "running": "Mover {{count}} itens",
+        "completed": "Mover {{count}} itens",
+        "failed": "Falha ao mover {{count}} itens"
+      },
+      "running": "Em execução",
+      "paused": "Pausa",
+      "pauseIndexing": "Pausar a indexação",
+      "resumeIndexing": "Continuar a indexação",
+      "cancelSearch": "Cancelar a pesquisa",
+      "cancelSort": "Cancelar ordenação",
+      "rescan": "Pesquisar novamente",
+      "idle": "Nada de operações longas."
     }
   }
 }

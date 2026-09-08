@@ -7,7 +7,30 @@
     },
     "options": {
       "caseSensitive": "대소문자 구분 검색 전환",
-      "directoryScope": "폴더 범위 전환"
+      "directoryScope": "폴더 범위 전환",
+      "newest": "최신순"
+    },
+    "filters": {
+      "label": "필터",
+      "type": "제품정보",
+      "anyType": "모든 유형",
+      "folders": "회사 소개",
+      "pictures": "사진 갤러리",
+      "videos": "이름 *",
+      "audio": "오디오",
+      "documents": "회사연혁",
+      "archives": "관련 기사",
+      "code": "이름 *",
+      "apps": "이름 *",
+      "modified": "수정하기",
+      "anyTime": "모든 시간",
+      "today": "이름 *",
+      "pastWeek": "지난 주",
+      "pastMonth": "지난 달",
+      "pastYear": "지난해",
+      "size": "크기 (mm)",
+      "anySize": "모든 크기",
+      "clear": "지우기"
     },
     "aria": {
       "searchInput": "검색 입력"
@@ -52,6 +75,11 @@
     "copyFilenames": "파일 이름 복사",
     "copyPath": "경로 복사",
     "copyPaths": "경로 복사",
+    "moveToTrash_one": "Trash로 이동 ...",
+    "moveToTrash_other": "Trash에 {{count}} 항목 이동 ...",
+    "confirmTrash_one": "선택된 항목을 Trash로 이동?",
+    "confirmTrash_other": "{{count}} 항목을 Trash로 이동?",
+    "trashFailed": "아이템은 쓰레기로 이동할 수 없습니다.",
     "resetColumnWidths": "열 너비 재설정"
   },
   "statusBar": {
@@ -169,6 +197,12 @@
   "ignorePaths": {
     "label": "무시할 경로",
     "help": "한 줄에 하나의 경로; 무시할 경로는 색인 중 건너뜁니다.",
+    "listLabel": "제외된 폴더",
+    "addLabel": "제외할 폴더 경로",
+    "placeholder": "/path/to/folder",
+    "add": "추가",
+    "remove": "제거 {{path}}",
+    "empty": "추가 폴더가 무시되지 않습니다.",
     "errors": {
       "absolute": "각 경로는 '/' 또는 '~'로 시작해야 합니다."
     }
@@ -178,6 +212,71 @@
     "help": "한 줄에 하나의 경로; 포함할 경로는 상위 경로가 무시되더라도 색인됩니다.",
     "errors": {
       "absolute": "각 경로는 '/' 또는 '~'로 시작해야 합니다."
+    }
+  },
+  "workspace": {
+    "toolbarLabel": "Workspace 도구",
+    "close": "패널 닫기",
+    "remove": "기타 제품",
+    "sections": {
+      "saved": "비밀번호",
+      "favorites": "이름 *",
+      "coverage": "왜 발견되지 않았습니까?",
+      "operations": "영업 시간"
+    },
+    "saved": {
+      "nameLabel": "이름 *",
+      "saveCurrent": "현재 검색 저장",
+      "empty": "아직 저장된 검색이 없습니다.",
+      "allFiles": "모든 파일"
+    },
+    "favorites": {
+      "addSelection": "즐겨찾기에 추가하기",
+      "empty": "아직 좋아하는 파일이나 폴더가 없습니다.",
+      "open": "즐겨찾기 열기",
+      "reveal": "Finder에서 보기"
+    },
+    "coverage": {
+      "permission": "전체 디스크 액세스",
+      "granted": "이름 *",
+      "denied": "지원하다",
+      "state": "Index 상태",
+      "indexed": "관련 상품",
+      "root": "감시 루트",
+      "excluded": "제외된 경로",
+      "included": "Explicitly 포함 경로",
+      "none": "경로는 제외되지 않습니다.",
+      "allUnderRoot": "루트의 모든 접근 경로가 포함되어 있습니다.",
+      "directoryScope": "Active 폴더 범위",
+      "explanation": "파일이 누락되면, 권한 확인, 모니터 루트, 제외 경로 및 활성 폴더 범위.",
+      "openSettings": "검색 및 인덱싱 설정 열기"
+    },
+    "operations": {
+      "indexing": "파일 색인",
+      "search": "이름 *",
+      "sorting": "분류하기",
+      "activity": "연구활동",
+      "activityLevels": {
+        "idle": "아이들",
+        "low": "이름 *",
+        "medium": "한국어",
+        "high": "사이트맵"
+      },
+      "indexedCount": "{{count}} 항목 인덱스",
+      "trash": "정보 수집",
+      "fileStates": {
+        "running": "이동 {{count}} 항목",
+        "completed": "공격 {{count}} 항목",
+        "failed": "{{count}} 항목 이동 실패"
+      },
+      "running": "(주)",
+      "paused": "일시 정지",
+      "pauseIndexing": "인덱싱 일시 정지",
+      "resumeIndexing": "인덱싱 다시 시작",
+      "cancelSearch": "자주 묻는 질문",
+      "cancelSort": "정렬 취소",
+      "rescan": "사이트맵",
+      "idle": "긴 가동 없음."
     }
   }
 }

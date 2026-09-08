@@ -33,6 +33,19 @@ const renderSearchBar = (overrides: Partial<ComponentProps<typeof SearchBar>> = 
 };
 
 describe('SearchBar', () => {
+  it('exposes a labeled one-click newest files action', () => {
+    const onShowNewest = vi.fn();
+    renderSearchBar({
+      showNewestLabel: 'Newest',
+      onShowNewest,
+      newestActive: false,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Newest' }));
+
+    expect(onShowNewest).toHaveBeenCalledTimes(1);
+  });
+
   it('does not mark the folder scope toggle as pressed while folded with a saved value', () => {
     const onToggleDirectoryScope = vi.fn();
     renderSearchBar({

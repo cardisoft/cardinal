@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { I18nextProvider } from 'react-i18next';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../../i18n/config';
 import { useContextMenu } from '../useContextMenu';
 
@@ -46,6 +46,11 @@ describe('useContextMenu', () => {
     mocks.popupMock.mockClear();
     mocks.invokeMock.mockClear();
     await i18n.changeLanguage('en-US');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('uses plural Copy Paths label and shortcut when multiple paths are selected', async () => {
@@ -135,5 +140,60 @@ describe('useContextMenu', () => {
     copyPaths?.action?.();
 
     expect(writeText).toHaveBeenCalledWith('/a\n/b');
+  });
+
+  it('asks for confirmation before moving selected files to Trash', async () => {
+    const confirmMock = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const onFileOperation = vi.fn();
+    const { result } = renderHook(() => useContextMenu(null, undefined, onFileOperation), {
+      wrapper,
+    });
+
+    result.current.showContextMenu(createEvent(), ['/a', '/b']);
+
+    await waitFor(() => expect(mocks.menuNewMock).toHaveBeenCalled());
+    const items = mocks.menuNewMock.mock.calls[0][0].items as Array<{
+      id: string;
+      text?: string;
+      action?: () => void;
+    }>;
+    const trashItem = items.find((item) => item.id === 'context_menu.move_to_trash');
+
+    expect(trashItem?.text).toBe('Move 2 Items to Trash…');
+    trashItem?.action?.();
+    await waitFor(() =>
+      expect(confirmMock).toHaveBeenCalledWith('Move 2 selected items to Trash?'),
+    );
+    await waitFor(() =>
+      expect(mocks.invokeMock).toHaveBeenCalledWith('move_to_trash', { paths: ['/a', '/b'] }),
+    );
+    expect(onFileOperation).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'trash', state: 'running', itemCount: 2 }),
+    );
+    await waitFor(() =>
+      expect(onFileOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'trash', state: 'completed', itemCount: 2 }),
+      ),
+    );
+  });
+
+  it('defers Trash confirmation until the native context-menu action has returned', async () => {
+    vi.useFakeTimers();
+    const confirmMock = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+
+    result.current.showContextMenu(createEvent(), ['/a', '/b']);
+    await vi.waitFor(() => expect(mocks.menuNewMock).toHaveBeenCalled());
+    const items = mocks.menuNewMock.mock.calls[0][0].items as Array<{
+      id: string;
+      action?: () => void;
+    }>;
+
+    items.find((item) => item.id === 'context_menu.move_to_trash')?.action?.();
+
+    expect(confirmMock).not.toHaveBeenCalled();
+    await vi.runAllTimersAsync();
+    expect(confirmMock).toHaveBeenCalledWith('Move 2 selected items to Trash?');
+    expect(mocks.invokeMock).not.toHaveBeenCalled();
   });
 });

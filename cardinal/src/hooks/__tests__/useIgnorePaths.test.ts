@@ -102,6 +102,16 @@ describe('useIgnorePaths', () => {
     expect(setItemSpy).toHaveBeenCalledWith(STORAGE_KEY, JSON.stringify(['/tmp', '/var']));
   });
 
+  it('deduplicates stored and newly added ignored paths', () => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(['/tmp', ' /tmp ', '/var']));
+    const { result } = renderHook(() => useIgnorePaths());
+
+    expect(result.current.ignorePaths).toEqual(['/tmp', '/var']);
+
+    act(() => result.current.setIgnorePaths(['/tmp', '/var', '/tmp']));
+    expect(result.current.ignorePaths).toEqual(['/tmp', '/var']);
+  });
+
   it('falls back to defaults when stored JSON is invalid', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     window.localStorage.setItem(STORAGE_KEY, '{');

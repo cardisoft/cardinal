@@ -7,7 +7,30 @@
     },
     "options": {
       "caseSensitive": "大文字と小文字を区別する",
-      "directoryScope": "フォルダ範囲を切り替え"
+      "directoryScope": "フォルダ範囲を切り替え",
+      "newest": "新しい順"
+    },
+    "filters": {
+      "label": "フィルター",
+      "type": "タイプ:",
+      "anyType": "任意のタイプ",
+      "folders": "フォルダ",
+      "pictures": "写真",
+      "videos": "ビデオ",
+      "audio": "オーディオ",
+      "documents": "ドキュメント",
+      "archives": "アーカイブ",
+      "code": "コードコード",
+      "apps": "アプリケーション",
+      "modified": "更新履歴",
+      "anyTime": "任意の時間",
+      "today": "今日更新",
+      "pastWeek": "年末年始",
+      "pastMonth": "過去の月",
+      "pastYear": "年末年始",
+      "size": "サイズ:",
+      "anySize": "任意のサイズ",
+      "clear": "クリア"
     },
     "aria": {
       "searchInput": "検索入力"
@@ -52,6 +75,11 @@
     "copyFilenames": "ファイル名をコピー",
     "copyPath": "パスをコピー",
     "copyPaths": "パスをコピー",
+    "moveToTrash_one": "ゴミ箱に移動...",
+    "moveToTrash_other": "{{count}}アイテムをゴミ箱に移動...",
+    "confirmTrash_one": "選択した項目をゴミ箱に移動しますか?",
+    "confirmTrash_other": "選択した{{count}}項目をゴミ箱に移動しますか？",
+    "trashFailed": "アイテムはゴミ箱に移動できません。",
     "resetColumnWidths": "列幅をリセット"
   },
   "statusBar": {
@@ -169,6 +197,12 @@
   "ignorePaths": {
     "label": "無視するパス",
     "help": "1 行に 1 パス。無視するパスはインデックス作成時にスキップされます。",
+    "listLabel": "無視されたフォルダ",
+    "addLabel": "無視するフォルダパス",
+    "placeholder": "/path/to/folder",
+    "add": "追加する",
+    "remove": "削除 {{path}}",
+    "empty": "追加のフォルダは無視されません。",
     "errors": {
       "absolute": "各パスは「/」または「~」で始まる必要があります。"
     }
@@ -178,6 +212,71 @@
     "help": "1 行に 1 パス。含めるパスは、上位ディレクトリが無視対象でもインデックスされます。",
     "errors": {
       "absolute": "各パスは「/」または「~」で始まる必要があります。"
+    }
+  },
+  "workspace": {
+    "toolbarLabel": "ワークスペースツール",
+    "close": "パネルを閉じる",
+    "remove": "削除",
+    "sections": {
+      "saved": "保存された検索",
+      "favorites": "お気に入り",
+      "coverage": "なぜ見つけられませんでしたか?",
+      "operations": "オペレーション"
+    },
+    "saved": {
+      "nameLabel": "検索名",
+      "saveCurrent": "現在の検索を保存",
+      "empty": "保存された検索はまだありません。",
+      "allFiles": "すべてのファイル"
+    },
+    "favorites": {
+      "addSelection": "お気に入りに追加",
+      "empty": "お気に入りのファイルやフォルダはまだありません。",
+      "open": "お気に入りを開く",
+      "reveal": "Finderで表示"
+    },
+    "coverage": {
+      "permission": "フルディスクアクセス",
+      "granted": "有効化",
+      "denied": "バリアフリー",
+      "state": "インデックスの状態",
+      "indexed": "インデックス項目",
+      "root": "モニタールート",
+      "excluded": "除外されたパス",
+      "included": "明示的に含まれているパス",
+      "none": "パスは除外されません。",
+      "allUnderRoot": "ルート内のすべてのアクセス可能なパスが含まれています。",
+      "directoryScope": "アクティブフォルダスコープ",
+      "explanation": "ファイルが見つからない場合、許可、モニターのルート、除外されたパス、およびアクティブなフォルダのスコープを確認します。",
+      "openSettings": "検索とインデックスの設定を開く"
+    },
+    "operations": {
+      "indexing": "ファイルインデックス",
+      "search": "インフォメーション",
+      "sorting": "ソート",
+      "activity": "インデックスアクティビティ",
+      "activityLevels": {
+        "idle": "アイドル",
+        "low": "低い",
+        "medium": "メディア",
+        "high": "高い"
+      },
+      "indexedCount": "{{count}} アイテムのインデックス",
+      "trash": "トラッシュ",
+      "fileStates": {
+        "running": "移動 {{count}} 項目",
+        "completed": "{{count}}アイテムの移動",
+        "failed": "{{count}}のアイテムを移動する失敗"
+      },
+      "running": "ランニング",
+      "paused": "一時停止",
+      "pauseIndexing": "インデックス作成を一時停止",
+      "resumeIndexing": "インデックス作成を再開",
+      "cancelSearch": "キャンセル検索",
+      "cancelSort": "並べ替えをキャンセル",
+      "rescan": "リスカ",
+      "idle": "長時間の運転は行いません。"
     }
   }
 }

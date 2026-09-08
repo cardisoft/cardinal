@@ -225,4 +225,30 @@ describe('useFileSearch', () => {
       expect(result.current.state.currentQuery).toBe('   ');
     });
   });
+
+  it('keeps visual filter commands out of the visible search text', async () => {
+    mockSearchSuccess();
+    const { result } = await renderReadySearchHook();
+    mockedInvoke.mockClear();
+
+    act(() => {
+      result.current.queueSearch('holiday', { immediate: true });
+    });
+    await waitFor(() => expect(result.current.state.currentQuery).toBe('holiday'));
+
+    mockedInvoke.mockClear();
+    act(() => {
+      result.current.queueFilterSearch('type:picture dm:pastweek', { immediate: true });
+    });
+
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenLastCalledWith('search', {
+        query: 'holiday type:picture dm:pastweek',
+        directoryQuery: null,
+        options: { caseInsensitive: true },
+      });
+      expect(result.current.searchParams.query).toBe('holiday');
+      expect(result.current.state.currentQuery).toBe('holiday');
+    });
+  });
 });

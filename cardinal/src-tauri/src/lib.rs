@@ -6,29 +6,31 @@ mod search_activity;
 mod sort;
 mod window_controls;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use background::{
     BackgroundLoopChannels, IconPayload, build_search_cache, emit_status_bar_update,
     run_background_event_loop,
 };
 use cardinal_sdk::EventWatcher;
 use commands::{
-    NodeInfoRequest, SearchJob, SearchState, WatchConfigUpdate, activate_main_window,
-    close_quicklook, copy_files_to_clipboard, get_app_status, get_nodes_info, get_sorted_view,
-    hide_main_window, normalize_watch_config, open_in_finder, open_path, search,
+    LatestRequestSlot, MetadataSortRequest, NodeInfoRequest, SearchJob, SearchState,
+    WatchConfigUpdate, activate_main_window, cancel_search, cancel_sort, close_quicklook,
+    copy_files_to_clipboard, get_app_status, get_nodes_info, get_sorted_view, hide_main_window,
+    move_to_trash, normalize_watch_config, open_in_finder, open_path, search, set_indexing_paused,
     set_tray_activation_policy, set_watch_config, start_logic, toggle_main_window,
     toggle_quicklook, trigger_rescan, update_icon_viewport, update_quicklook,
 };
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, bounded, unbounded};
-use lifecycle::{
-    APP_QUIT, AppLifecycleState, EXIT_REQUESTED, emit_app_state, load_app_state, update_app_state,
-};
+use lifecycle::{APP_QUIT, AppLifecycleState, EXIT_REQUESTED, emit_app_state, update_app_state};
 use once_cell::sync::OnceCell;
 use search_cache::{SearchCache, SlabIndex};
 use search_cancel::CancellationToken;
 use std::{
     path::{Path, PathBuf},
-    sync::{Once, atomic::Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
     time::Duration,
 };
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
@@ -60,9 +62,17 @@ pub fn run() -> Result<()> {
     let (finish_tx, finish_rx) = bounded::<Sender<Option<SearchCache>>>(1);
     let (search_tx, search_rx) = unbounded::<SearchJob>();
     let (node_info_tx, node_info_rx) = unbounded::<NodeInfoRequest>();
+    // Bound full-index sort requests so repeated UI clicks cannot retain unlimited
+    // result vectors while the background cache thread is busy.
+    let (metadata_sort_tx, metadata_sort_rx) = bounded::<()>(1);
+    let metadata_sort_pending = Arc::new(LatestRequestSlot::<MetadataSortRequest>::default());
+    let metadata_sort_generation = Arc::new(AtomicU64::new(0));
     let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>)>();
     let (rescan_tx, rescan_rx) = unbounded::<CancellationToken>();
     let (watch_config_tx, watch_config_rx) = unbounded::<WatchConfigUpdate>();
+    let (indexing_control_tx, indexing_control_rx) = unbounded::<bool>();
+    let indexing_paused = Arc::new(AtomicBool::new(false));
+    let rebuild_required = Arc::new(AtomicBool::new(false));
     let (icon_update_tx, icon_update_rx) = unbounded::<IconPayload>();
     let (update_window_state_tx, update_window_state_rx) = bounded::<()>(1);
     let (logic_start_tx, logic_start_rx) = bounded(1);
@@ -116,9 +126,14 @@ pub fn run() -> Result<()> {
         .manage(SearchState::new(
             search_tx,
             node_info_tx,
+            metadata_sort_tx,
+            metadata_sort_pending.clone(),
             icon_viewport_tx.clone(),
             rescan_tx.clone(),
             watch_config_tx.clone(),
+            indexing_control_tx,
+            indexing_paused.clone(),
+            metadata_sort_generation,
             update_window_state_tx.clone(),
         ))
         .invoke_handler(tauri::generate_handler![
@@ -128,9 +143,13 @@ pub fn run() -> Result<()> {
             update_icon_viewport,
             get_app_status,
             trigger_rescan,
+            set_indexing_paused,
+            cancel_search,
+            cancel_sort,
             set_watch_config,
             open_in_finder,
             open_path,
+            move_to_trash,
             toggle_quicklook,
             close_quicklook,
             update_quicklook,
@@ -148,74 +167,74 @@ pub fn run() -> Result<()> {
         .get_or_try_init(|| app.path().app_config_dir().map(|p| p.join("cardinal.db")))
         .expect("Failed to initialize database path");
 
-    let app_handle = &app.handle().to_owned();
+    let app_handle = app.handle().to_owned();
     let channels = BackgroundLoopChannels {
         finish_rx,
         search_rx,
         node_info_rx,
+        metadata_sort_rx,
+        metadata_sort_pending,
         icon_viewport_rx,
         rescan_rx,
         watch_config_rx,
+        indexing_control_rx,
+        indexing_paused,
+        rebuild_required,
         icon_update_tx,
         update_window_state_rx,
     };
-    emit_app_state(app_handle);
-    let icon_update_rx = &icon_update_rx;
-    std::thread::scope(move |s| {
-        s.spawn(|| {
-            while let Ok(icon) = icon_update_rx.recv() {
-                let mut icons = vec![icon];
-                std::thread::sleep(Duration::from_millis(100));
-                icons.extend(icon_update_rx.try_iter());
-                info!("emitting {} icons", icons.len());
-                app_handle.emit("icon_update", icons).unwrap();
+    emit_app_state(&app_handle);
+    let icon_app_handle = app_handle.clone();
+    spawn_detached(move || {
+        while let Ok(icon) = icon_update_rx.recv() {
+            let mut icons = vec![icon];
+            std::thread::sleep(Duration::from_millis(100));
+            icons.extend(icon_update_rx.try_iter());
+            info!("emitting {} icons", icons.len());
+            icon_app_handle.emit("icon_update", icons).unwrap();
+        }
+        info!("icon update thread exited");
+    });
+
+    let logic_app_handle = app_handle.clone();
+    let logic_db_path = db_path.clone();
+    spawn_detached(move || {
+        let Some(config) = wait_for_logic_start(logic_start_rx) else {
+            info!("Background thread quitting without Full Disk Access");
+            return;
+        };
+
+        run_logic_thread(&logic_app_handle, &logic_db_path, channels, config);
+    });
+
+    app.run(move |app_handle, event| match event {
+        RunEvent::Exit => {
+            APP_QUIT.store(true, Ordering::Relaxed);
+            if !EXIT_REQUESTED.swap(true, Ordering::Relaxed) {
+                request_background_shutdown(&finish_tx);
             }
-            info!("icon update thread exited");
-        });
-
-        let logic_start_rx = logic_start_rx;
-        s.spawn(move || {
-            let Some(config) = wait_for_logic_start(logic_start_rx) else {
-                info!("Background thread quitting without Full Disk Access");
-                return;
-            };
-
-            run_logic_thread(app_handle, db_path, channels, config);
-        });
-
-        app.run(move |app_handle, event| match event {
-            RunEvent::Exit => {
-                APP_QUIT.store(true, Ordering::Relaxed);
-                flush_cache_to_file_once(&finish_tx, db_path);
+        }
+        RunEvent::ExitRequested { code, .. } => {
+            let already_requested = EXIT_REQUESTED.swap(true, Ordering::Relaxed);
+            APP_QUIT.store(true, Ordering::Relaxed);
+            if !already_requested {
+                info!(
+                    "Exit requested (code: {:?}); stopping background work",
+                    code
+                );
+                request_background_shutdown(&finish_tx);
             }
-            RunEvent::ExitRequested { api, code, .. } => {
-                let already_requested = EXIT_REQUESTED.swap(true, Ordering::Relaxed);
-                APP_QUIT.store(true, Ordering::Relaxed);
-                if !already_requested {
-                    info!(
-                        "Exit requested (code: {:?}); flushing cache before shutdown",
-                        code
-                    );
-                }
-
-                flush_cache_to_file_once(&finish_tx, db_path);
-
-                if code.is_none() {
-                    api.prevent_exit();
-                    app_handle.exit(0);
-                }
+        }
+        RunEvent::Reopen { .. } => {
+            // On macOS, clicking the Dock icon should bring the main window back even if the
+            // app still "has windows" but they are hidden.
+            if let Some(window) = app_handle.get_webview_window("main") {
+                activate_window(&window);
+            } else {
+                warn!("Reopen requested but main window is unavailable");
             }
-            RunEvent::Reopen { .. } => {
-                // On macOS, clicking the Dock icon should bring the main window back even if the
-                // app still "has windows" but they are hidden.
-                if let Some(window) = app_handle.get_webview_window("main") {
-                    activate_window(&window);
-                } else {
-                    warn!("Reopen requested but main window is unavailable");
-                }
-            }
-            _ => {}
-        });
+        }
+        _ => {}
     });
 
     Ok(())
@@ -274,6 +293,7 @@ fn run_logic_thread(
                 return;
             } else {
                 info!("Initial scan cancelled by newer request, use noop cache");
+                channels.rebuild_required.store(true, Ordering::SeqCst);
                 SearchCache::noop(
                     path.clone(),
                     ignore_paths.clone(),
@@ -284,7 +304,7 @@ fn run_logic_thread(
         }
     };
 
-    let event_watcher = if cache.is_noop() {
+    let event_watcher = if cache.is_noop() || channels.indexing_paused.load(Ordering::SeqCst) {
         info!("Using noop event watcher due to cancelled initial scan");
         EventWatcher::noop()
     } else {
@@ -314,29 +334,19 @@ fn run_logic_thread(
     info!("Background thread exited");
 }
 
-fn flush_cache_to_file_once(finish_tx: &Sender<Sender<Option<SearchCache>>>, db_path: &PathBuf) {
-    static FLUSH_ONCE: Once = Once::new();
-    if load_app_state() != AppLifecycleState::Ready {
-        info!("App not fully initialized, skipping cache flush");
-        return;
+fn request_background_shutdown(finish_tx: &Sender<Sender<Option<SearchCache>>>) {
+    let (cache_tx, cache_rx) = bounded::<Option<SearchCache>>(1);
+    drop(cache_rx);
+    if let Err(error) = finish_tx.try_send(cache_tx) {
+        info!("Background shutdown signal was already queued or unavailable: {error:?}");
     }
-    FLUSH_ONCE.call_once(move || {
-        let (cache_tx, cache_rx) = bounded::<Option<SearchCache>>(1);
-        finish_tx
-            .send(cache_tx)
-            .context("cache_tx is closed")
-            .unwrap();
-        if let Some(cache) = cache_rx.recv().context("cache_tx is closed").unwrap() {
-            cache
-                .flush_to_file(db_path)
-                .context("Failed to write cache to file")
-                .unwrap();
+}
 
-            info!("Cache flushed successfully to {:?}", db_path);
-        } else {
-            info!("Cancelled before data constructed, no cache to flush");
-        }
-    });
+fn spawn_detached<F>(task: F)
+where
+    F: FnOnce() + Send + 'static,
+{
+    std::thread::spawn(task);
 }
 
 fn wait_for_logic_start(rx: Receiver<LogicStartConfig>) -> Option<LogicStartConfig> {
@@ -360,5 +370,40 @@ fn wait_for_logic_start(rx: Receiver<LogicStartConfig>) -> Option<LogicStartConf
                 return None;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shutdown_request_does_not_wait_for_cache_flush() {
+        let (finish_tx, finish_rx) = bounded(1);
+
+        request_background_shutdown(&finish_tx);
+
+        let cache_tx = finish_rx
+            .try_recv()
+            .expect("shutdown signal should be queued");
+        assert!(
+            cache_tx.send(None).is_err(),
+            "quit path must not retain a receiver and wait for a cache snapshot"
+        );
+    }
+
+    #[test]
+    fn detached_background_worker_does_not_block_the_caller() {
+        let (started_tx, started_rx) = bounded(1);
+        let (_release_tx, release_rx) = bounded::<()>(1);
+
+        spawn_detached(move || {
+            started_tx.send(()).expect("worker should start");
+            let _ = release_rx.recv();
+        });
+
+        started_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("detached worker should run independently");
     }
 }

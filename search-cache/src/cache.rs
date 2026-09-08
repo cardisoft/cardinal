@@ -13,6 +13,7 @@ use fswalk::{
 };
 use hashbrown::HashSet;
 use namepool::NamePool;
+use rayon::prelude::*;
 use search_cancel::CancellationToken;
 use std::{
     ffi::OsStr,
@@ -879,6 +880,49 @@ impl SearchCache {
     /// If the given node is not found, an empty SearchResultNode is returned.
     pub fn expand_file_nodes(&mut self, nodes: &[SlabIndex]) -> Vec<SearchResultNode> {
         self.expand_file_nodes_inner::<true>(nodes)
+    }
+
+    /// Returns compact metadata without constructing paths for nodes whose metadata is cached.
+    /// This is the fast path used by full-index size and date sorting.
+    pub fn metadata_for_nodes(&mut self, nodes: &[SlabIndex]) -> Vec<SlabNodeMetadataCompact> {
+        let pending: Vec<_> = nodes
+            .iter()
+            .copied()
+            .map(|node_index| {
+                let state = self.file_nodes.get(node_index).map(|node| node.state());
+                if !matches!(state, Some(State::None)) {
+                    let metadata = self
+                        .file_nodes
+                        .get(node_index)
+                        .map(|node| node.metadata)
+                        .unwrap_or_else(SlabNodeMetadataCompact::unaccessible);
+                    return (node_index, Some(metadata), None);
+                }
+                (node_index, None, self.node_path(node_index))
+            })
+            .collect();
+
+        let metadata: Vec<_> = pending
+            .par_iter()
+            .map(|(_, cached, path)| {
+                cached.unwrap_or_else(|| {
+                    path.as_ref()
+                        .and_then(|path| std::fs::symlink_metadata(path).ok())
+                        .map(|metadata| SlabNodeMetadataCompact::some(metadata.into()))
+                        .unwrap_or_else(SlabNodeMetadataCompact::unaccessible)
+                })
+            })
+            .collect();
+
+        for ((node_index, cached, _), metadata) in pending.into_iter().zip(metadata.iter().copied())
+        {
+            if cached.is_none()
+                && let Some(node) = self.file_nodes.get_mut(node_index)
+            {
+                node.metadata = metadata;
+            }
+        }
+        metadata
     }
 
     fn expand_file_nodes_inner<const FETCH_META: bool>(

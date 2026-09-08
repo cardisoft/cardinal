@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   filesTabContentProps: vi.fn(),
   navigateSearchHistory: vi.fn(),
   selectSingleRow: vi.fn(),
+  applySearchPreset: vi.fn(),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -84,7 +85,22 @@ vi.mock('../components/PreferencesOverlay', () => ({
 }));
 
 vi.mock('../components/StatusBar', () => ({
-  default: () => null,
+  default: ({
+    activeTab,
+    onTabChange,
+  }: {
+    activeTab: string;
+    onTabChange: (tab: 'files' | 'events') => void;
+  }) => (
+    <div>
+      <button aria-pressed={activeTab === 'files'} onClick={() => onTabChange('files')}>
+        files-tab
+      </button>
+      <button aria-pressed={activeTab === 'events'} onClick={() => onTabChange('events')}>
+        events-tab
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('../components/FSEventsPanel', () => ({
@@ -124,6 +140,10 @@ vi.mock('../hooks/useFileSearch', () => ({
     handleStatusUpdate: vi.fn(),
     setLifecycleState: vi.fn(),
     requestRescan: vi.fn(),
+    applySearchPreset: mocks.applySearchPreset,
+    indexingPaused: false,
+    toggleIndexingPaused: vi.fn(),
+    cancelCurrentSearch: vi.fn(),
   }),
 }));
 
@@ -252,7 +272,39 @@ vi.mock('../hooks/useStableEvent', () => ({
 describe('App search result keyboard navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     mocks.navigateSearchHistory.mockReturnValue(null);
+  });
+
+  it('switches from events to files before applying a saved file search', () => {
+    window.localStorage.setItem(
+      'cardinal.workspace.savedSearches',
+      JSON.stringify([
+        {
+          id: 'saved-1',
+          name: 'PDF raporları',
+          query: 'rapor',
+          filterQuery: 'type:pdf',
+          directoryQuery: '',
+          directoryScopeOpen: false,
+          caseSensitive: false,
+          createdAt: 1,
+        },
+      ]),
+    );
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'events-tab' }));
+    fireEvent.click(screen.getByRole('button', { name: 'workspace.sections.saved' }));
+    fireEvent.click(screen.getByRole('button', { name: /PDF raporları/ }));
+
+    expect(screen.getByRole('button', { name: 'files-tab' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(mocks.applySearchPreset).toHaveBeenCalledWith(
+      expect.objectContaining({ query: 'rapor', filterQuery: 'type:pdf' }),
+    );
   });
 
   it('passes main query and folder scope separately to the files tab content', () => {
@@ -262,6 +314,15 @@ describe('App search result keyboard navigation', () => {
       currentDirectoryQuery: 'Work/Docs',
       currentQuery: 'needle',
     });
+  });
+
+  it('keeps search and visual filters in one grid toolbar row', () => {
+    render(<App />);
+
+    const toolbar = document.querySelector('.container > .search-toolbar');
+    expect(toolbar).not.toBeNull();
+    expect(toolbar).toContainElement(screen.getByTestId('search-input'));
+    expect(toolbar?.querySelector('.search-filters')).not.toBeNull();
   });
 
   it('selects the first result and blurs the search input when ArrowDown reaches the history tail', () => {

@@ -24,7 +24,7 @@ const DEFAULT_IGNORE_PATHS = [
 ];
 
 const cleanPaths = (next: string[]): string[] =>
-  next.map((item) => item.trim()).filter((item) => item.length > 0);
+  Array.from(new Set(next.map((item) => item.trim()).filter((item) => item.length > 0)));
 
 export function useIgnorePaths() {
   const [ignorePaths, setIgnorePathsState] = useStoredState<string[]>({

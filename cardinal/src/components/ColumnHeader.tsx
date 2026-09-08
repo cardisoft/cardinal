@@ -26,13 +26,22 @@ type ColumnHeaderProps = {
   sortState: SortState;
   onSortToggle: (sortKey: SortKey) => void;
   sortDisabled: boolean;
+  isSortKeyDisabled: (sortKey: SortKey) => boolean;
   sortDisabledTooltip: string | null;
 };
 
 // Column widths are applied via CSS vars on container; no need to pass colWidths prop.
 export const ColumnHeader = forwardRef<HTMLDivElement, ColumnHeaderProps>(
   (
-    { onResizeStart, onContextMenu, sortState, onSortToggle, sortDisabled, sortDisabledTooltip },
+    {
+      onResizeStart,
+      onContextMenu,
+      sortState,
+      onSortToggle,
+      sortDisabled,
+      isSortKeyDisabled,
+      sortDisabledTooltip,
+    },
     ref,
   ) => {
     const { t } = useTranslation();
@@ -42,6 +51,7 @@ export const ColumnHeader = forwardRef<HTMLDivElement, ColumnHeaderProps>(
           {columns.map(({ key, labelKey, className }) => {
             const label = t(labelKey);
             const sortKey = sortableColumns[key];
+            const columnSortDisabled = sortDisabled || isSortKeyDisabled(sortKey);
             const isActive = sortState?.key === sortKey;
             const indicatorClasses = ['sort-indicator'];
 
@@ -53,13 +63,13 @@ export const ColumnHeader = forwardRef<HTMLDivElement, ColumnHeaderProps>(
               indicatorClasses.push('sort-indicator--neutral');
             }
 
-            if (sortDisabled) {
+            if (columnSortDisabled) {
               indicatorClasses.push('sort-indicator--disabled');
             } else if (isActive) {
               indicatorClasses.push('sort-indicator--active');
             }
 
-            const title = sortDisabled ? sortDisabledTooltip || undefined : undefined;
+            const title = columnSortDisabled ? sortDisabledTooltip || undefined : undefined;
 
             return (
               <span key={key} className={`${className} header header-cell`}>
@@ -67,8 +77,8 @@ export const ColumnHeader = forwardRef<HTMLDivElement, ColumnHeaderProps>(
                   type="button"
                   className="sort-button"
                   onClick={() => onSortToggle(sortKey)}
-                  disabled={sortDisabled}
-                  aria-pressed={isActive && !sortDisabled}
+                  disabled={columnSortDisabled}
+                  aria-pressed={isActive && !columnSortDisabled}
                   title={title}
                 >
                   <span className="sort-button__label">{label}</span>

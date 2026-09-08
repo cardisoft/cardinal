@@ -30,10 +30,13 @@ type SearchState = {
 
 type SearchParams = {
   query: string;
+  filterQuery: string;
   directoryQuery: string;
   directoryScopeOpen: boolean;
   caseSensitive: boolean;
 };
+
+export type SearchPreset = SearchParams;
 
 export const DIRECTORY_SCOPE_OPEN_STORAGE_KEY = 'cardinal.search.directoryScopeOpen';
 
@@ -89,6 +92,7 @@ const initialSearchState: SearchState = {
 
 const initialSearchParams: SearchParams = {
   query: '',
+  filterQuery: '',
   directoryQuery: '',
   directoryScopeOpen: false,
   caseSensitive: false,
@@ -198,11 +202,16 @@ type UseFileSearchResult = {
   searchParams: SearchParams;
   updateSearchParams: (patch: Partial<SearchParams>) => void;
   queueSearch: (query: string, options?: QueueSearchOptions) => void;
+  queueFilterSearch: (filterQuery: string, options?: QueueSearchOptions) => void;
   queueDirectorySearch: (directoryQuery: string, options?: QueueSearchOptions) => void;
   queueDirectoryScopeOpen: (directoryScopeOpen: boolean) => void;
   handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
   setLifecycleState: (status: AppLifecycleStatus) => void;
   requestRescan: () => Promise<void>;
+  applySearchPreset: (preset: SearchPreset) => void;
+  indexingPaused: boolean;
+  toggleIndexingPaused: () => Promise<void>;
+  cancelCurrentSearch: () => Promise<void>;
 };
 
 export function useFileSearch(): UseFileSearchResult {
@@ -211,6 +220,7 @@ export function useFileSearch(): UseFileSearchResult {
     directoryScopeOpen: readStoredDirectoryScopeOpen(),
   }));
   const [state, dispatch] = useReducer(reducer, initialSearchState);
+  const [indexingPaused, setIndexingPaused] = useState(false);
   const latestSearchRef = useRef<SearchParams>(initialSearchParamsForHook);
   // `search-cancellation` maintains an atomic counter
   // and will auto-increment for each search request
@@ -278,7 +288,8 @@ export function useFileSearch(): UseFileSearchResult {
     const requestVersion = searchVersionRef.current + 1;
     searchVersionRef.current = requestVersion;
 
-    const { query, caseSensitive } = nextSearch;
+    const { query, filterQuery, caseSensitive } = nextSearch;
+    const backendQuery = filterQuery ? `${query}${query ? ' ' : ''}${filterQuery}` : query;
     const directoryQuery = activeDirectoryQuery(nextSearch);
     const startTs = performance.now();
     const isInitial = !hasInitialSearchRunRef.current;
@@ -295,7 +306,7 @@ export function useFileSearch(): UseFileSearchResult {
 
     try {
       const rawResults = await invoke<SearchResponsePayload>('search', {
-        query: searchParamOrNull(query),
+        query: searchParamOrNull(backendQuery),
         directoryQuery: searchParamOrNull(directoryQuery),
         options: {
           caseInsensitive: !caseSensitive,
@@ -385,6 +396,13 @@ export function useFileSearch(): UseFileSearchResult {
     [queueSearchParams],
   );
 
+  const queueFilterSearch = useCallback(
+    (filterQuery: string, options?: QueueSearchOptions) => {
+      queueSearchParams({ filterQuery }, options);
+    },
+    [queueSearchParams],
+  );
+
   const queueDirectorySearch = useCallback(
     (directoryQuery: string, options?: QueueSearchOptions) => {
       queueSearchParams({ directoryQuery }, options);
@@ -408,7 +426,7 @@ export function useFileSearch(): UseFileSearchResult {
     }
 
     const nextSearch = latestSearchRef.current;
-    if (!nextSearch.query && !activeDirectoryQuery(nextSearch)) {
+    if (!nextSearch.query && !nextSearch.filterQuery && !activeDirectoryQuery(nextSearch)) {
       return;
     }
 
@@ -419,15 +437,40 @@ export function useFileSearch(): UseFileSearchResult {
     await invoke('trigger_rescan');
   }, []);
 
+  const applySearchPreset = useCallback(
+    (preset: SearchPreset) => {
+      queueSearchParams(preset, { immediate: true });
+    },
+    [queueSearchParams],
+  );
+
+  const toggleIndexingPaused = useCallback(async () => {
+    const next = !indexingPaused;
+    await invoke('set_indexing_paused', { paused: next });
+    setIndexingPaused(next);
+  }, [indexingPaused]);
+
+  const cancelCurrentSearch = useCallback(async () => {
+    searchVersionRef.current += 1;
+    cancelPendingSearches();
+    await invoke('cancel_search');
+    dispatch({ type: 'SEARCH_CANCELLED' });
+  }, [cancelPendingSearches]);
+
   return {
     state,
     searchParams,
     updateSearchParams,
     queueSearch,
+    queueFilterSearch,
     queueDirectorySearch,
     queueDirectoryScopeOpen,
     handleStatusUpdate,
     setLifecycleState,
     requestRescan,
+    applySearchPreset,
+    indexingPaused,
+    toggleIndexingPaused,
+    cancelCurrentSearch,
   };
 }

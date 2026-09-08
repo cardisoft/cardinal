@@ -7,7 +7,30 @@
     },
     "options": {
       "caseSensitive": "切换区分大小写匹配",
-      "directoryScope": "切换文件夹范围"
+      "directoryScope": "切换文件夹范围",
+      "newest": "最新优先"
+    },
+    "filters": {
+      "label": "过滤器",
+      "type": "类型",
+      "anyType": "任何类型",
+      "folders": "文件夹",
+      "pictures": "图片",
+      "videos": "视频",
+      "audio": "音频",
+      "documents": "页:1",
+      "archives": "档案",
+      "code": "代码",
+      "apps": "应用程序",
+      "modified": "已修改",
+      "anyTime": "随时",
+      "today": "现在",
+      "pastWeek": "上个礼拜",
+      "pastMonth": "上个月",
+      "pastYear": "上一年",
+      "size": "大小",
+      "anySize": "任意大小",
+      "clear": "清除"
     },
     "aria": {
       "searchInput": "搜索输入"
@@ -52,6 +75,11 @@
     "copyFilenames": "复制文件名",
     "copyPath": "复制路径",
     "copyPaths": "复制路径",
+    "moveToTrash_one": "移动到回收站...",
+    "moveToTrash_other": "将 {{count}} 项移动到回收站...",
+    "confirmTrash_one": "将选中的项目移至回收站 ?",
+    "confirmTrash_other": "将选中的 {{count}} 项移至回收站 ?",
+    "trashFailed": "无法将项目移至回收站 。",
     "resetColumnWidths": "重置列宽"
   },
   "statusBar": {
@@ -168,6 +196,12 @@
   "ignorePaths": {
     "label": "忽略路径",
     "help": "每行一个路径；这些目录将不会被索引。",
+    "listLabel": "已忽略文件夹",
+    "addLabel": "要忽略的文件夹路径",
+    "placeholder": "/path/to/folder",
+    "add": "添加",
+    "remove": "移除 {{path}}",
+    "empty": "没有额外忽略的文件夹。",
     "errors": {
       "absolute": "每个路径需以“/”或“~”开头。"
     }
@@ -177,6 +211,71 @@
     "help": "每行一个路径；即使父级目录被忽略，这些路径仍会被索引。",
     "errors": {
       "absolute": "每个路径需以“/”或“~”开头。"
+    }
+  },
+  "workspace": {
+    "toolbarLabel": "工作空间工具",
+    "close": "关闭面板",
+    "remove": "删除",
+    "sections": {
+      "saved": "已保存的搜索",
+      "favorites": "收藏夹",
+      "coverage": "为什么它没有找到?",
+      "operations": "业务"
+    },
+    "saved": {
+      "nameLabel": "搜索名称",
+      "saveCurrent": "保存当前搜索",
+      "empty": "尚无已保存的搜索。",
+      "allFiles": "所有文件"
+    },
+    "favorites": {
+      "addSelection": "添加选中内容到最爱",
+      "empty": "尚无收藏的文件或文件夹。",
+      "open": "打开最爱",
+      "reveal": "在 Finder 中显示"
+    },
+    "coverage": {
+      "permission": "完整磁盘访问",
+      "granted": "已启用",
+      "denied": "已禁用",
+      "state": "索引状态",
+      "indexed": "索引项目",
+      "root": "监视根",
+      "excluded": "排除路径",
+      "included": "明确包含的路径",
+      "none": "不包括任何路径。",
+      "allUnderRoot": "根下包含所有可访问路径.",
+      "directoryScope": "活动文件夹范围",
+      "explanation": "如果缺少文件, 请检查权限、 显示器根、 排除路径以及活动文件夹范围 。",
+      "openSettings": "打开搜索和索引设置"
+    },
+    "operations": {
+      "indexing": "文件索引",
+      "search": "搜索",
+      "sorting": "排序",
+      "activity": "指数活动",
+      "activityLevels": {
+        "idle": "闲置",
+        "low": "低档",
+        "medium": "中型",
+        "high": "高级"
+      },
+      "indexedCount": "{{count}}项已编入索引",
+      "trash": "废物",
+      "fileStates": {
+        "running": "移动{{count}}件物品",
+        "completed": "移动了{{count}}件物品",
+        "failed": "移动 {{count}} 项失败"
+      },
+      "running": "运行",
+      "paused": "暂停",
+      "pauseIndexing": "暂停索引",
+      "resumeIndexing": "恢复索引",
+      "cancelSearch": "取消搜索",
+      "cancelSort": "取消排序",
+      "rescan": "重新扫描",
+      "idle": "没有长期运营."
     }
   }
 }

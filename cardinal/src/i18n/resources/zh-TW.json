@@ -7,7 +7,30 @@
     },
     "options": {
       "caseSensitive": "切換區分大小寫比對",
-      "directoryScope": "切換資料夾範圍"
+      "directoryScope": "切換資料夾範圍",
+      "newest": "最新優先"
+    },
+    "filters": {
+      "label": "過濾器",
+      "type": "類型",
+      "anyType": "任何類型",
+      "folders": "文件夾",
+      "pictures": "圖片",
+      "videos": "視頻",
+      "audio": "音頻",
+      "documents": "頁:1",
+      "archives": "檔案",
+      "code": "代碼",
+      "apps": "應用程序",
+      "modified": "已修改",
+      "anyTime": "隨時",
+      "today": "現在",
+      "pastWeek": "上個禮拜",
+      "pastMonth": "上個月",
+      "pastYear": "上一年",
+      "size": "大小",
+      "anySize": "任意大小",
+      "clear": "清除"
     },
     "aria": {
       "searchInput": "搜尋輸入"
@@ -52,6 +75,11 @@
     "copyFilenames": "複製檔名",
     "copyPath": "複製路徑",
     "copyPaths": "複製路徑",
+    "moveToTrash_one": "移動到回收站...",
+    "moveToTrash_other": "将 {{count}} 项移动到回收站...",
+    "confirmTrash_one": "將選中的項目移至回收站 ?",
+    "confirmTrash_other": "将选中的 {{count}} 项移至回收站 ?",
+    "trashFailed": "無法將項目移至回收站 。",
     "resetColumnWidths": "重設欄寬"
   },
   "statusBar": {
@@ -168,6 +196,12 @@
   "ignorePaths": {
     "label": "忽略路徑",
     "help": "每行一個路徑；這些路徑將在索引時被跳過。",
+    "listLabel": "已忽略的資料夾",
+    "addLabel": "要忽略的資料夾路徑",
+    "placeholder": "/path/to/folder",
+    "add": "加入",
+    "remove": "移除 {{path}}",
+    "empty": "沒有額外忽略的資料夾。",
     "errors": {
       "absolute": "每個路徑需以「/」或「~」開頭。"
     }
@@ -177,6 +211,71 @@
     "help": "每行一個路徑；即使上層目錄被忽略，這些路徑仍會被索引。",
     "errors": {
       "absolute": "每個路徑需以「/」或「~」開頭。"
+    }
+  },
+  "workspace": {
+    "toolbarLabel": "工作空間工具",
+    "close": "關閉面板",
+    "remove": "刪除",
+    "sections": {
+      "saved": "已保存的搜索",
+      "favorites": "我的最愛",
+      "coverage": "爲什麼它沒有找到?",
+      "operations": "業務"
+    },
+    "saved": {
+      "nameLabel": "搜索名稱",
+      "saveCurrent": "保存當前搜索",
+      "empty": "尚無已儲存的搜尋。",
+      "allFiles": "所有文件"
+    },
+    "favorites": {
+      "addSelection": "添加選中內容到最愛",
+      "empty": "尚無喜愛的檔案或資料夾。",
+      "open": "打開最愛",
+      "reveal": "在 Finder 中顯示"
+    },
+    "coverage": {
+      "permission": "完整磁盤訪問",
+      "granted": "已啓用",
+      "denied": "已禁用",
+      "state": "索引狀態",
+      "indexed": "索引項目",
+      "root": "監視根",
+      "excluded": "排除路徑",
+      "included": "明確包含的路徑",
+      "none": "不包括任何路徑。",
+      "allUnderRoot": "根下包含所有可訪問路徑.",
+      "directoryScope": "活動文件夾範圍",
+      "explanation": "如果缺少文件, 請檢查權限、 顯示器根、 排除路徑以及活動文件夾範圍 。",
+      "openSettings": "開啟搜尋與索引設定"
+    },
+    "operations": {
+      "indexing": "文件索引",
+      "search": "搜索",
+      "sorting": "排序",
+      "activity": "指數活動",
+      "activityLevels": {
+        "idle": "閒置",
+        "low": "低檔",
+        "medium": "中型",
+        "high": "高級"
+      },
+      "indexedCount": "{{count}}项已编入索引",
+      "trash": "廢物",
+      "fileStates": {
+        "running": "移动{{count}}件物品",
+        "completed": "移动了{{count}}件物品",
+        "failed": "移动 {{count}} 项失败"
+      },
+      "running": "運行",
+      "paused": "暫停",
+      "pauseIndexing": "暫停索引",
+      "resumeIndexing": "恢復索引",
+      "cancelSearch": "取消搜索",
+      "cancelSort": "取消排序",
+      "rescan": "重新掃描",
+      "idle": "沒有長期運營."
     }
   }
 }

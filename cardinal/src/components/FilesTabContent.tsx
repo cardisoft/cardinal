@@ -35,6 +35,7 @@ type FilesTabContentProps = {
   sortState: SortState;
   onSortToggle: (sortKey: SortKey) => void;
   sortDisabled: boolean;
+  isSortKeyDisabled: (sortKey: SortKey) => boolean;
   sortDisabledTooltip: string | null;
 };
 
@@ -57,6 +58,7 @@ export function FilesTabContent({
   sortState,
   onSortToggle,
   sortDisabled,
+  isSortKeyDisabled,
   sortDisabledTooltip,
 }: FilesTabContentProps): React.JSX.Element {
   return (
@@ -68,6 +70,7 @@ export function FilesTabContent({
         sortState={sortState}
         onSortToggle={onSortToggle}
         sortDisabled={sortDisabled}
+        isSortKeyDisabled={isSortKeyDisabled}
         sortDisabledTooltip={sortDisabledTooltip}
       />
       <div className="flex-fill">

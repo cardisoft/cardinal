@@ -16,6 +16,8 @@ type StatusBarProps = {
   onTabChange: (tab: StatusTabKey) => void;
   onRequestRescan: () => void;
   rescanErrorCount: number;
+  indexingPaused: boolean;
+  onToggleIndexing: () => void;
 };
 
 const TABS: StatusTabKey[] = ['files', 'events'];
@@ -36,6 +38,8 @@ const StatusBar = ({
   onTabChange,
   onRequestRescan,
   rescanErrorCount,
+  indexingPaused,
+  onToggleIndexing,
 }: StatusBarProps): React.JSX.Element => {
   const { t } = useTranslation();
   const tabsRef = useRef<HTMLDivElement | null>(null);
@@ -87,8 +91,10 @@ const StatusBar = ({
     ? t('statusBar.resultsWithDuration', { results: resultsText, duration: durationText })
     : resultsText;
   const lifecycleMeta = LIFECYCLE_META[lifecycleState];
-  const lifecycleLabel = t(`statusBar.lifecycle.${lifecycleState}`);
-  const rescanDisabled = lifecycleState === 'Initializing';
+  const lifecycleLabel = indexingPaused
+    ? t('workspace.operations.paused')
+    : t(`statusBar.lifecycle.${lifecycleState}`);
+  const rescanDisabled = lifecycleState === 'Initializing' || indexingPaused;
   const rescanTitle = rescanDisabled
     ? t('statusBar.rescan.disabledHint')
     : t('statusBar.rescan.enabledHint');
@@ -149,6 +155,24 @@ const StatusBar = ({
           })}
         </div>
         <div className="status-controls">
+          <button
+            type="button"
+            className={`status-icon-button status-pause-button${indexingPaused ? ' is-active' : ''}`}
+            onClick={onToggleIndexing}
+            aria-pressed={indexingPaused}
+            title={
+              indexingPaused
+                ? t('workspace.operations.resumeIndexing')
+                : t('workspace.operations.pauseIndexing')
+            }
+            aria-label={
+              indexingPaused
+                ? t('workspace.operations.resumeIndexing')
+                : t('workspace.operations.pauseIndexing')
+            }
+          >
+            <span aria-hidden="true">{indexingPaused ? '▶' : 'Ⅱ'}</span>
+          </button>
           <button
             type="button"
             className="status-icon-button status-rescan-button"

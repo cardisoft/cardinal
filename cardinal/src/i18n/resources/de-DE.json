@@ -7,7 +7,30 @@
     },
     "options": {
       "caseSensitive": "Groß-/Kleinschreibung beachten",
-      "directoryScope": "Ordnerbereich umschalten"
+      "directoryScope": "Ordnerbereich umschalten",
+      "newest": "Neueste zuerst"
+    },
+    "filters": {
+      "label": "Filter",
+      "type": "Typ",
+      "anyType": "Jeder Typ",
+      "folders": "Ordner",
+      "pictures": "Bilder",
+      "videos": "Videos",
+      "audio": "Audio",
+      "documents": "Dokumente",
+      "archives": "Archive",
+      "code": "Code",
+      "apps": "Apps",
+      "modified": "Geändert",
+      "anyTime": "Jederzeit",
+      "today": "Heute",
+      "pastWeek": "Letzte Woche",
+      "pastMonth": "Letzter Monat",
+      "pastYear": "Vergangenes Jahr",
+      "size": "Größe",
+      "anySize": "Jede Größe",
+      "clear": "Zurücksetzen"
     },
     "aria": {
       "searchInput": "Sucheingabe"
@@ -52,6 +75,11 @@
     "copyFilenames": "Dateinamen kopieren",
     "copyPath": "Pfad kopieren",
     "copyPaths": "Pfade kopieren",
+    "moveToTrash_one": "Umzug nach Trash...",
+    "moveToTrash_other": "Bewegen Sie {{count}} Artikel in den Papierkorb...",
+    "confirmTrash_one": "Verschieben Sie den ausgewählten Artikel in den Papierkorb?",
+    "confirmTrash_other": "Bewegen Sie {{count}} ausgewählte Artikel in den Papierkorb?",
+    "trashFailed": "Der Artikel konnte nicht in den Papierkorb verschoben werden.",
     "resetColumnWidths": "Spaltenbreiten zurücksetzen"
   },
   "statusBar": {
@@ -169,6 +197,12 @@
   "ignorePaths": {
     "label": "Pfade ignorieren",
     "help": "Ein Pfad pro Zeile; ignorierte Pfade werden bei der Indexierung übersprungen.",
+    "listLabel": "Ignorierte Ordner",
+    "addLabel": "Zu ignorierender Ordnerpfad",
+    "placeholder": "/path/to/folder",
+    "add": "Hinzufügen",
+    "remove": "Entfernen {{path}}",
+    "empty": "Es werden keine zusätzlichen Ordner ignoriert.",
     "errors": {
       "absolute": "Jeder Pfad muss mit '/' oder '~' beginnen."
     }
@@ -178,6 +212,71 @@
     "help": "Ein Pfad pro Zeile; eingeschlossene Pfade bleiben indexiert, auch wenn ein übergeordneter Pfad ignoriert wird.",
     "errors": {
       "absolute": "Jeder Pfad muss mit '/' oder '~' beginnen."
+    }
+  },
+  "workspace": {
+    "toolbarLabel": "Arbeitsbereich-Werkzeuge",
+    "close": "Bereich schließen",
+    "remove": "Entfernen",
+    "sections": {
+      "saved": "Gespeicherte Suchen",
+      "favorites": "Favoriten",
+      "coverage": "Warum wurde es nicht gefunden?",
+      "operations": "Vorgänge"
+    },
+    "saved": {
+      "nameLabel": "Suchname",
+      "saveCurrent": "Aktuelle Suche speichern",
+      "empty": "Noch keine gespeicherten Suchen.",
+      "allFiles": "Alle Dateien"
+    },
+    "favorites": {
+      "addSelection": "Auswahl zu Favoriten hinzufügen",
+      "empty": "Noch keine Lieblingsdateien oder -ordner.",
+      "open": "Favorit öffnen",
+      "reveal": "Im Finder anzeigen"
+    },
+    "coverage": {
+      "permission": "Vollständiger Festplattenzugriff",
+      "granted": "Aktiviert",
+      "denied": "Deaktiviert",
+      "state": "Indexstatus",
+      "indexed": "Indexierte Elemente",
+      "root": "Überwachungsordner",
+      "excluded": "Ausgeschlossene Pfade",
+      "included": "Ausdrücklich eingeschlossene Pfade",
+      "none": "Keine Pfade sind ausgeschlossen.",
+      "allUnderRoot": "Alle zugänglichen Pfade unter der Wurzel sind enthalten.",
+      "directoryScope": "Aktiver Ordnerumfang",
+      "explanation": "Wenn eine Datei fehlt, überprüfen Sie die Berechtigungen, die Monitorwurzel, ausgeschlossene Pfade und den aktiven Ordnerumfang.",
+      "openSettings": "Such- und Indexeinstellungen öffnen"
+    },
+    "operations": {
+      "indexing": "Dateiindexierung",
+      "search": "Suche",
+      "sorting": "Sortierung",
+      "activity": "Indexaktivität",
+      "activityLevels": {
+        "idle": "Leerlauf",
+        "low": "niedrig",
+        "medium": "Mittel",
+        "high": "hoch"
+      },
+      "indexedCount": "{{count}} indexierte Posten",
+      "trash": "In den Papierkorb verschieben",
+      "fileStates": {
+        "running": "{{count}} Elemente werden verschoben",
+        "completed": "{{count}} Elemente verschoben",
+        "failed": "{{count}} Elemente konnten nicht verschoben werden"
+      },
+      "running": "Wird ausgeführt",
+      "paused": "Angehalten",
+      "pauseIndexing": "Indexierung pausieren",
+      "resumeIndexing": "Indexierung fortsetzen",
+      "cancelSearch": "Suche abbrechen",
+      "cancelSort": "Sortierung abbrechen",
+      "rescan": "Erneut scannen",
+      "idle": "Keine langfristigen Operationen."
     }
   }
 }

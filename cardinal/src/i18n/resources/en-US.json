@@ -7,7 +7,30 @@
     },
     "options": {
       "caseSensitive": "Toggle case-sensitive matching",
-      "directoryScope": "Toggle folder scope"
+      "directoryScope": "Toggle folder scope",
+      "newest": "Newest"
+    },
+    "filters": {
+      "label": "Filters",
+      "type": "Type",
+      "anyType": "Any type",
+      "folders": "Folders",
+      "pictures": "Pictures",
+      "videos": "Videos",
+      "audio": "Audio",
+      "documents": "Documents",
+      "archives": "Archives",
+      "code": "Code",
+      "apps": "Applications",
+      "modified": "Modified",
+      "anyTime": "Any time",
+      "today": "Today",
+      "pastWeek": "Past week",
+      "pastMonth": "Past month",
+      "pastYear": "Past year",
+      "size": "Size",
+      "anySize": "Any size",
+      "clear": "Clear"
     },
     "aria": {
       "searchInput": "Search input"
@@ -52,6 +75,11 @@
     "copyFilenames": "Copy Filenames",
     "copyPath": "Copy Path",
     "copyPaths": "Copy Paths",
+    "moveToTrash_one": "Move to Trash…",
+    "moveToTrash_other": "Move {{count}} Items to Trash…",
+    "confirmTrash_one": "Move the selected item to Trash?",
+    "confirmTrash_other": "Move {{count}} selected items to Trash?",
+    "trashFailed": "The item could not be moved to Trash.",
     "resetColumnWidths": "Reset Column Widths"
   },
   "statusBar": {
@@ -168,7 +196,13 @@
   },
   "ignorePaths": {
     "label": "Ignore paths",
-    "help": "One path per line; ignored paths are skipped during indexing.",
+    "help": "Folders in this list are skipped during indexing.",
+    "listLabel": "Ignored folders",
+    "addLabel": "Folder path to ignore",
+    "placeholder": "/path/to/folder",
+    "add": "Add",
+    "remove": "Remove {{path}}",
+    "empty": "No extra folders are ignored.",
     "errors": {
       "absolute": "Each path must start with '/' or '~'."
     }
@@ -178,6 +212,71 @@
     "help": "One path per line; included paths stay indexed even under an ignored parent.",
     "errors": {
       "absolute": "Each path must start with '/' or '~'."
+    }
+  },
+  "workspace": {
+    "toolbarLabel": "Workspace tools",
+    "close": "Close panel",
+    "remove": "Remove",
+    "sections": {
+      "saved": "Saved Searches",
+      "favorites": "Favorites",
+      "coverage": "Why Wasn't It Found?",
+      "operations": "Operations"
+    },
+    "saved": {
+      "nameLabel": "Search name",
+      "saveCurrent": "Save current search",
+      "empty": "No saved searches yet.",
+      "allFiles": "All files"
+    },
+    "favorites": {
+      "addSelection": "Add selection to favorites",
+      "empty": "No favorite files or folders yet.",
+      "open": "Open favorite",
+      "reveal": "Reveal in Finder"
+    },
+    "coverage": {
+      "permission": "Full Disk Access",
+      "granted": "Enabled",
+      "denied": "Disabled",
+      "state": "Index state",
+      "indexed": "Indexed items",
+      "root": "Monitor root",
+      "excluded": "Excluded paths",
+      "included": "Explicitly included paths",
+      "none": "No paths are excluded.",
+      "allUnderRoot": "All accessible paths under the root are included.",
+      "directoryScope": "Active folder scope",
+      "explanation": "If a file is missing, check permissions, the monitor root, excluded paths, and the active folder scope.",
+      "openSettings": "Open indexing settings"
+    },
+    "operations": {
+      "indexing": "File indexing",
+      "search": "Search",
+      "sorting": "Sorting",
+      "activity": "Index activity",
+      "activityLevels": {
+        "idle": "Idle",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      },
+      "indexedCount": "{{count}} items indexed",
+      "trash": "Trash",
+      "fileStates": {
+        "running": "Moving {{count}} items",
+        "completed": "Moved {{count}} items",
+        "failed": "Failed to move {{count}} items"
+      },
+      "running": "Running",
+      "paused": "Paused",
+      "pauseIndexing": "Pause indexing",
+      "resumeIndexing": "Resume indexing",
+      "cancelSearch": "Cancel search",
+      "cancelSort": "Cancel sorting",
+      "rescan": "Rescan",
+      "idle": "No long-running operations."
     }
   }
 }

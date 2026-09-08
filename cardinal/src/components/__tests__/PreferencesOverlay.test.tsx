@@ -58,14 +58,47 @@ describe('PreferencesOverlay', () => {
     const onWatchConfigChange = vi.fn();
     render(<PreferencesOverlay {...baseProps} onWatchConfigChange={onWatchConfigChange} />);
 
-    const ignorePathsInput = screen.getByLabelText('ignorePaths.label');
-    fireEvent.change(ignorePathsInput, { target: { value: '/tmp/one\n/tmp/two' } });
+    const ignorePathsInput = screen.getByLabelText('ignorePaths.addLabel');
+    fireEvent.change(ignorePathsInput, { target: { value: '/tmp/one' } });
+    fireEvent.click(screen.getByText('ignorePaths.add'));
+    fireEvent.change(ignorePathsInput, { target: { value: '/tmp/two' } });
+    fireEvent.keyDown(ignorePathsInput, { key: 'Enter' });
 
     fireEvent.click(screen.getByText('preferences.save'));
 
     expect(onWatchConfigChange).toHaveBeenCalledWith({
       watchRoot: baseProps.watchRoot,
-      ignorePaths: ['/tmp/one', '/tmp/two'],
+      ignorePaths: [...baseProps.ignorePaths, '/tmp/one', '/tmp/two'],
+      includePaths: baseProps.includePaths,
+    });
+  });
+
+  it('removes an ignored path with a visible row action', () => {
+    const onWatchConfigChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onWatchConfigChange={onWatchConfigChange} />);
+
+    fireEvent.click(screen.getAllByLabelText('ignorePaths.remove', { exact: false })[0]);
+    fireEvent.click(screen.getByText('preferences.save'));
+
+    expect(onWatchConfigChange).toHaveBeenCalledWith({
+      watchRoot: baseProps.watchRoot,
+      ignorePaths: ['/ignore/b'],
+      includePaths: baseProps.includePaths,
+    });
+  });
+
+  it('includes a valid typed path when Save is clicked without pressing Add', () => {
+    const onWatchConfigChange = vi.fn();
+    render(<PreferencesOverlay {...baseProps} onWatchConfigChange={onWatchConfigChange} />);
+
+    fireEvent.change(screen.getByLabelText('ignorePaths.addLabel'), {
+      target: { value: '/tmp/not-added-yet' },
+    });
+    fireEvent.click(screen.getByText('preferences.save'));
+
+    expect(onWatchConfigChange).toHaveBeenCalledWith({
+      watchRoot: baseProps.watchRoot,
+      ignorePaths: [...baseProps.ignorePaths, '/tmp/not-added-yet'],
       includePaths: baseProps.includePaths,
     });
   });
@@ -120,9 +153,7 @@ describe('PreferencesOverlay', () => {
       String(baseProps.defaultSortThreshold),
     );
     expect(screen.getByLabelText('watchRoot.label')).toHaveValue(baseProps.defaultWatchRoot);
-    expect(screen.getByLabelText('ignorePaths.label')).toHaveValue(
-      baseProps.defaultIgnorePaths.join('\n'),
-    );
+    expect(screen.getByLabelText('ignorePaths.listLabel')).toHaveTextContent('/default/ignore');
     expect(screen.getByLabelText('includePaths.label')).toHaveValue(
       baseProps.defaultIncludePaths.join('\n'),
     );

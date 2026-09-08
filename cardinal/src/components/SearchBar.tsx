@@ -23,6 +23,9 @@ type SearchBarProps = {
   caseSensitive: boolean;
   onToggleCaseSensitive: (event: ChangeEvent<HTMLInputElement>) => void;
   caseSensitiveLabel: string;
+  showNewestLabel?: string;
+  onShowNewest?: () => void;
+  newestActive?: boolean;
   onFocus: FocusEventHandler<HTMLInputElement>;
   onBlur: FocusEventHandler<HTMLInputElement>;
 };
@@ -53,6 +56,9 @@ export function SearchBar({
   caseSensitive,
   onToggleCaseSensitive,
   caseSensitiveLabel,
+  showNewestLabel,
+  onShowNewest,
+  newestActive = false,
   onFocus,
   onBlur,
 }: SearchBarProps): React.JSX.Element {
@@ -176,6 +182,22 @@ export function SearchBar({
           />
         </div>
         <div className="search-segment search-options">
+          {showNewestLabel && onShowNewest ? (
+            <button
+              type="button"
+              className={`newest-files-button${newestActive ? ' is-active' : ''}`}
+              onClick={onShowNewest}
+              aria-pressed={newestActive}
+              aria-label={showNewestLabel}
+              title={showNewestLabel}
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="8" cy="8" r="5.75" />
+                <path d="M8 4.5v3.8l2.6 1.4" />
+              </svg>
+              <span>{showNewestLabel}</span>
+            </button>
+          ) : null}
           <label className="search-option" title={caseSensitiveLabel}>
             <input
               type="checkbox"

@@ -1,5 +1,7 @@
 use crate::{
-    commands::{NodeInfoRequest, SearchJob, WatchConfigUpdate},
+    commands::{
+        LatestRequestSlot, MetadataSortRequest, NodeInfoRequest, SearchJob, WatchConfigUpdate,
+    },
     lifecycle::{APP_QUIT, AppLifecycleState, load_app_state, update_app_state},
     search_activity,
     window_controls::is_main_window_foreground,
@@ -7,7 +9,7 @@ use crate::{
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
 use cardinal_sdk::{EventFlag, EventWatcher, FsEvent};
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, unbounded};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rayon::spawn;
@@ -18,7 +20,10 @@ use search_cancel::CancellationToken;
 use serde::Serialize;
 use std::{
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Emitter};
@@ -44,10 +49,108 @@ pub struct BackgroundLoopChannels {
     pub update_window_state_rx: Receiver<()>,
     pub search_rx: Receiver<SearchJob>,
     pub node_info_rx: Receiver<NodeInfoRequest>,
+    pub metadata_sort_rx: Receiver<()>,
+    pub metadata_sort_pending: Arc<LatestRequestSlot<MetadataSortRequest>>,
     pub icon_viewport_rx: Receiver<(u64, Vec<SlabIndex>)>,
     pub rescan_rx: Receiver<CancellationToken>,
     pub watch_config_rx: Receiver<WatchConfigUpdate>,
+    pub indexing_control_rx: Receiver<bool>,
+    pub indexing_paused: Arc<AtomicBool>,
+    pub rebuild_required: Arc<AtomicBool>,
     pub icon_update_tx: Sender<IconPayload>,
+}
+
+#[derive(Default)]
+struct IndexingPauseState {
+    paused: bool,
+}
+
+impl IndexingPauseState {
+    fn apply(&mut self, paused: bool) -> bool {
+        if self.paused == paused {
+            return false;
+        }
+        self.paused = paused;
+        true
+    }
+
+    #[cfg(test)]
+    fn is_paused(&self) -> bool {
+        self.paused
+    }
+}
+
+struct QueueSubmission<T> {
+    start_now: Option<T>,
+    superseded: Option<T>,
+}
+
+struct SingleFlightQueue<T> {
+    worker_active: bool,
+    pending: Option<T>,
+}
+
+impl<T> Default for SingleFlightQueue<T> {
+    fn default() -> Self {
+        Self {
+            worker_active: false,
+            pending: None,
+        }
+    }
+}
+
+impl<T> SingleFlightQueue<T> {
+    fn submit(&mut self, request: T) -> QueueSubmission<T> {
+        if !self.worker_active {
+            self.worker_active = true;
+            return QueueSubmission {
+                start_now: Some(request),
+                superseded: None,
+            };
+        }
+
+        QueueSubmission {
+            start_now: None,
+            superseded: self.pending.replace(request),
+        }
+    }
+
+    fn complete(&mut self) -> Option<T> {
+        let next = self.pending.take();
+        self.worker_active = next.is_some();
+        next
+    }
+}
+
+fn spawn_metadata_sort(
+    cache: &mut SearchCache,
+    request: MetadataSortRequest,
+    completed_tx: Sender<()>,
+) {
+    let MetadataSortRequest {
+        results,
+        sort,
+        generation,
+        active_generation,
+        response_tx,
+    } = request;
+    let metadata = cache.metadata_for_nodes(&results);
+    rayon::spawn(move || {
+        let mut entries: Vec<_> = results.into_iter().zip(metadata).collect();
+        let completed = crate::sort::sort_metadata_indices_cancellable(&mut entries, &sort, || {
+            active_generation.load(Ordering::Relaxed) != generation
+        });
+        let ordered = if completed {
+            entries
+                .into_iter()
+                .map(|(slab_index, _)| slab_index)
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let _ = response_tx.send(ordered);
+        let _ = completed_tx.send(());
+    });
 }
 
 pub fn reset_status_bar(app_handle: &AppHandle) {
@@ -101,6 +204,8 @@ fn handle_watch_config_update(
     fse_latency_secs: f64,
     history_ready: &mut bool,
     processed_events: &mut usize,
+    indexing_paused: &AtomicBool,
+    rebuild_required: &AtomicBool,
 ) {
     info!("Received watch config update: {:?}", update);
     let WatchConfigUpdate {
@@ -125,6 +230,20 @@ fn handle_watch_config_update(
     *history_ready = false;
     *processed_events = 0;
 
+    if indexing_paused.load(Ordering::SeqCst) {
+        *cache = SearchCache::noop(
+            PathBuf::from(&next_watch_root),
+            next_ignore_paths,
+            next_include_paths,
+            &APP_QUIT,
+        );
+        *watch_root = next_watch_root;
+        rebuild_required.store(true, Ordering::SeqCst);
+        update_app_state(app_handle, AppLifecycleState::Ready);
+        info!("Deferred watch config rebuild until indexing resumes");
+        return;
+    }
+
     let next_cache = match build_search_cache(
         app_handle,
         &next_watch_root,
@@ -133,6 +252,7 @@ fn handle_watch_config_update(
         scan_cancellation_token,
     ) {
         Some(cache) => {
+            rebuild_required.store(false, Ordering::SeqCst);
             info!(
                 "Search cache built. New root: {}, ignore paths: {:?}, include paths: {:?}",
                 next_watch_root, next_ignore_paths, next_include_paths
@@ -144,6 +264,7 @@ fn handle_watch_config_update(
             // if cache build is cancelled, we cannot reuse the old cache since
             // it's tied to the old watch config; create a noop cache instead
             info!("Watch config change cancelled, use noop state");
+            rebuild_required.store(true, Ordering::SeqCst);
             SearchCache::noop(
                 PathBuf::from(&next_watch_root),
                 next_ignore_paths,
@@ -155,7 +276,7 @@ fn handle_watch_config_update(
 
     *cache = next_cache;
     *watch_root = next_watch_root.to_string();
-    *event_watcher = if cache.is_noop() {
+    *event_watcher = if cache.is_noop() || indexing_paused.load(Ordering::SeqCst) {
         EventWatcher::noop()
     } else {
         update_app_state(app_handle, AppLifecycleState::Updating);
@@ -213,7 +334,7 @@ fn handle_event_watcher_events(
     events: Vec<FsEvent>,
     history_ready: &mut bool,
     processed_events: &mut usize,
-) {
+) -> bool {
     *processed_events += events.len();
 
     emit_status_bar_update(
@@ -239,7 +360,8 @@ fn handle_event_watcher_events(
     }
 
     let handle_result = cache.handle_fs_events(events);
-    if let Err(HandleFSEError::Rescan) = handle_result {
+    let needs_rescan = matches!(handle_result, Err(HandleFSEError::Rescan));
+    if needs_rescan {
         info!("!!!!!!!!!! Rescan triggered !!!!!!!!");
         emit_status_bar_update(
             app_handle,
@@ -252,6 +374,7 @@ fn handle_event_watcher_events(
     if *history_ready && !snapshots.is_empty() {
         forward_new_events(app_handle, &snapshots);
     }
+    needs_rescan
 }
 
 fn handle_icon_viewport_update(
@@ -315,9 +438,14 @@ pub fn run_background_event_loop(
         update_window_state_rx,
         search_rx,
         node_info_rx,
+        metadata_sort_rx,
+        metadata_sort_pending,
         icon_viewport_rx,
         rescan_rx,
         watch_config_rx,
+        indexing_control_rx,
+        indexing_paused,
+        rebuild_required,
         icon_update_tx,
     } = channels;
     let mut processed_events = 0usize;
@@ -327,13 +455,18 @@ pub fn run_background_event_loop(
     let mut hide_flush_remaining_ticks: u8 = 0;
     // Hide flush is polled on a 10s ticker; idle flush shares the same tick.
     let flush_ticker = crossbeam_channel::tick(Duration::from_secs(10));
+    let (metadata_sort_completed_tx, metadata_sort_completed_rx) = unbounded::<()>();
+    let mut metadata_sort_queue = SingleFlightQueue::default();
+    let mut indexing_pause_state = IndexingPauseState {
+        paused: indexing_paused.load(Ordering::SeqCst),
+    };
 
     loop {
         crossbeam_channel::select! {
             recv(finish_rx) -> tx => {
                 let tx = tx.expect("Finish channel closed");
                 // Only save cache if it's not a noop (i.e. the initial walk wasn't cancelled), otherwise send None to avoid writing an empty cache file
-                tx.send((!cache.is_noop()).then_some(cache)).expect("Failed to send cache");
+                let _ = tx.send((!cache.is_noop()).then_some(cache));
                 return;
             }
             recv(update_window_state_rx) -> _ => {
@@ -374,12 +507,34 @@ pub fn run_background_event_loop(
                 let node_info_results = cache.expand_file_nodes(&slab_indices);
                 let _ = response_tx.send(node_info_results);
             }
+            recv(metadata_sort_rx) -> notification => {
+                notification.expect("Metadata sort channel closed");
+                let Some(latest_request) = metadata_sort_pending.take() else {
+                    continue;
+                };
+                let submission = metadata_sort_queue.submit(latest_request);
+                if let Some(superseded) = submission.superseded {
+                    let _ = superseded.response_tx.send(Vec::new());
+                }
+                if let Some(request) = submission.start_now {
+                    spawn_metadata_sort(&mut cache, request, metadata_sort_completed_tx.clone());
+                }
+            }
+            recv(metadata_sort_completed_rx) -> _ => {
+                if let Some(request) = metadata_sort_queue.complete() {
+                    spawn_metadata_sort(&mut cache, request, metadata_sort_completed_tx.clone());
+                }
+            }
             recv(icon_viewport_rx) -> update => {
                 let update = update.expect("Icon viewport channel closed");
                 handle_icon_viewport_update(&mut cache, update, &icon_update_tx);
             }
             recv(rescan_rx) -> request => {
                 let scan_cancellation_token = request.expect("Rescan channel closed");
+                if indexing_paused.load(Ordering::SeqCst) {
+                    info!("Ignoring rescan request while indexing is paused");
+                    continue;
+                }
                 info!("Manual rescan requested");
                 perform_rescan(
                     app_handle,
@@ -390,6 +545,7 @@ pub fn run_background_event_loop(
                     &mut history_ready,
                     &mut processed_events,
                     scan_cancellation_token,
+                    &indexing_paused,
                 );
             }
             recv(watch_config_rx) -> update => {
@@ -403,17 +559,77 @@ pub fn run_background_event_loop(
                     fse_latency_secs,
                     &mut history_ready,
                     &mut processed_events,
+                    &indexing_paused,
+                    &rebuild_required,
                 );
+            }
+            recv(indexing_control_rx) -> paused => {
+                let paused = paused.expect("Indexing control channel closed");
+                if !indexing_pause_state.apply(paused) {
+                    continue;
+                }
+                if paused {
+                    event_watcher = EventWatcher::noop();
+                    update_app_state(app_handle, AppLifecycleState::Ready);
+                    info!("Filesystem indexing paused");
+                } else {
+                    if cache.is_noop() || rebuild_required.swap(false, Ordering::SeqCst) {
+                        event_watcher = EventWatcher::noop();
+                        update_app_state(app_handle, AppLifecycleState::Initializing);
+                        reset_status_bar(app_handle);
+                        let ignore_paths = cache.ignore_paths().to_vec();
+                        let include_paths = cache.include_paths().to_vec();
+                        let rebuilt = build_search_cache(
+                            app_handle,
+                            &watch_root,
+                            &ignore_paths,
+                            &include_paths,
+                            CancellationToken::new_scan(),
+                        );
+                        let Some(rebuilt) = rebuilt else {
+                            rebuild_required.store(true, Ordering::SeqCst);
+                            update_app_state(app_handle, AppLifecycleState::Ready);
+                            info!("Index rebuild was cancelled while resuming");
+                            continue;
+                        };
+                        cache = rebuilt;
+                        history_ready = false;
+                        processed_events = 0;
+                        emit_status_bar_update(app_handle, cache.get_total_files(), 0, 0);
+                    }
+                    update_app_state(app_handle, AppLifecycleState::Updating);
+                    event_watcher = EventWatcher::spawn(
+                        watch_root.to_string(),
+                        cache.last_event_id(),
+                        fse_latency_secs,
+                        cache.ignore_paths(),
+                        cache.include_paths(),
+                    ).1;
+                    info!("Filesystem indexing resumed");
+                }
             }
             recv(event_watcher) -> events => {
                 let events = events.expect("Event stream closed");
-                handle_event_watcher_events(
+                let needs_rescan = handle_event_watcher_events(
                     app_handle,
                     &mut cache,
                     events,
                     &mut history_ready,
                     &mut processed_events,
                 );
+                if needs_rescan && !indexing_paused.load(Ordering::SeqCst) {
+                    perform_rescan(
+                        app_handle,
+                        &mut cache,
+                        &mut event_watcher,
+                        &watch_root,
+                        fse_latency_secs,
+                        &mut history_ready,
+                        &mut processed_events,
+                        CancellationToken::new_scan(),
+                        &indexing_paused,
+                    );
+                }
             }
         }
     }
@@ -427,7 +643,9 @@ pub(crate) fn build_search_cache(
     scan_cancellation_token: CancellationToken,
 ) -> Option<SearchCache> {
     let path = Path::new(watch_root);
-    let walk_data = WalkData::new(path, ignore_paths, include_paths, false, move || {
+    // Capture size/date metadata during the single index traversal so full-index
+    // "Newest" and size sorting remain memory-only after startup.
+    let walk_data = WalkData::new(path, ignore_paths, include_paths, true, move || {
         APP_QUIT.load(Ordering::Relaxed) || scan_cancellation_token.is_cancelled().is_none()
     });
     let walking_done = AtomicBool::new(false);
@@ -458,6 +676,7 @@ fn perform_rescan(
     history_ready: &mut bool,
     processed_events: &mut usize,
     scan_cancellation_token: CancellationToken,
+    indexing_paused: &AtomicBool,
 ) {
     if scan_cancellation_token.is_cancelled().is_none() {
         info!("Skipping stale rescan request");
@@ -496,7 +715,7 @@ fn perform_rescan(
         stopped
     });
 
-    *event_watcher = if stopped {
+    *event_watcher = if stopped || indexing_paused.load(Ordering::SeqCst) {
         EventWatcher::noop()
     } else {
         update_app_state(app_handle, AppLifecycleState::Updating);
@@ -620,6 +839,32 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn indexing_pause_state_rebuilds_the_watcher_only_when_state_changes() {
+        let mut state = IndexingPauseState::default();
+
+        assert!(state.apply(true));
+        assert!(!state.apply(true));
+        assert!(state.is_paused());
+        assert!(state.apply(false));
+        assert!(!state.is_paused());
+    }
+
+    #[test]
+    fn metadata_sort_queue_keeps_only_one_worker_and_the_latest_pending_request() {
+        let mut queue = SingleFlightQueue::default();
+
+        let first = queue.submit(1);
+        let second = queue.submit(2);
+        let third = queue.submit(3);
+
+        assert_eq!(first.start_now, Some(1));
+        assert_eq!(second.start_now, None);
+        assert_eq!(third.superseded, Some(2));
+        assert_eq!(queue.complete(), Some(3));
+        assert_eq!(queue.complete(), None);
+    }
 
     #[derive(Default)]
     struct FakeCache {

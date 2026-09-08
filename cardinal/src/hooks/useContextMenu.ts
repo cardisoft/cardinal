@@ -12,9 +12,17 @@ type UseContextMenuResult = {
   showHeaderContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
 };
 
+export type FileOperationUpdate = {
+  id: string;
+  kind: 'trash';
+  state: 'running' | 'completed' | 'failed';
+  itemCount: number;
+};
+
 export function useContextMenu(
   autoFitColumns: (() => void) | null = null,
   onQuickLookRequest?: () => void | Promise<void>,
+  onFileOperation?: (operation: FileOperationUpdate) => void,
 ): UseContextMenuResult {
   const { t } = useTranslation();
   const writeClipboard = useCallback((text: string) => {
@@ -96,9 +104,35 @@ export function useContextMenu(
         });
       }
 
+      const trashCount = targetPaths.length;
+      items.push({
+        id: 'context_menu.move_to_trash',
+        text: t('contextMenu.moveToTrash', { count: trashCount }),
+        accelerator: 'Cmd+Backspace',
+        action: () => {
+          window.setTimeout(() => {
+            const message = t('contextMenu.confirmTrash', { count: trashCount });
+            if (!window.confirm(message)) {
+              return;
+            }
+            const id = `trash-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            onFileOperation?.({ id, kind: 'trash', state: 'running', itemCount: trashCount });
+            void invoke('move_to_trash', { paths: targetPaths })
+              .then(() => {
+                onFileOperation?.({ id, kind: 'trash', state: 'completed', itemCount: trashCount });
+              })
+              .catch((error) => {
+                onFileOperation?.({ id, kind: 'trash', state: 'failed', itemCount: trashCount });
+                console.error('Failed to move files to Trash', error);
+                window.alert(t('contextMenu.trashFailed'));
+              });
+          }, 0);
+        },
+      });
+
       return items;
     },
-    [onQuickLookRequest, t, writeClipboard],
+    [onFileOperation, onQuickLookRequest, t, writeClipboard],
   );
 
   const buildHeaderMenuItems = useCallback((): MenuItemOptions[] => {

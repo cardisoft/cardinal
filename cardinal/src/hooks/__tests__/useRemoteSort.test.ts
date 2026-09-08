@@ -109,6 +109,78 @@ describe('useRemoteSort', () => {
     expect(result.current.displayedResults).toEqual(results);
   });
 
+  it('allows fast metadata sorting when the result count exceeds the text sort threshold', async () => {
+    window.localStorage.setItem('cardinal.sortThreshold', '2');
+    const results = toSlabIndices([0, 1, 2]);
+    const { result } = renderHook(() => useRemoteSort(results, 1, 'en-US', () => null));
+
+    act(() => {
+      result.current.handleSortToggle('mtime');
+    });
+
+    await waitFor(() => {
+      expect(result.current.sortState).toEqual({ key: 'mtime', direction: 'asc' });
+    });
+    expect(mockedInvoke).toHaveBeenCalledWith('get_sorted_view', {
+      results,
+      sort: { key: 'mtime', direction: 'asc' },
+    });
+  });
+
+  it('shows newest files in one action even above the text sort threshold', async () => {
+    window.localStorage.setItem('cardinal.sortThreshold', '2');
+    const results = toSlabIndices([0, 1, 2]);
+    const { result } = renderHook(() => useRemoteSort(results, 1, 'en-US', () => null));
+
+    act(() => {
+      result.current.showNewest();
+    });
+
+    await waitFor(() => {
+      expect(result.current.sortState).toEqual({ key: 'mtime', direction: 'desc' });
+    });
+    expect(mockedInvoke).toHaveBeenCalledWith('get_sorted_view', {
+      results,
+      sort: { key: 'mtime', direction: 'desc' },
+    });
+  });
+
+  it('turns newest sorting off when the active button is clicked again', async () => {
+    const results = toSlabIndices([0, 1, 2]);
+    const { result } = renderHook(() => useRemoteSort(results, 1, 'en-US', () => null));
+
+    act(() => {
+      result.current.showNewest();
+    });
+    await waitFor(() => {
+      expect(result.current.sortState).toEqual({ key: 'mtime', direction: 'desc' });
+    });
+
+    act(() => {
+      result.current.showNewest();
+    });
+
+    expect(result.current.sortState).toBeNull();
+    expect(result.current.displayedResults).toEqual(results);
+  });
+
+  it('cancels the active backend sort when the operation is cancelled', async () => {
+    const results = toSlabIndices([0, 1, 2]);
+    const pending = createDeferred();
+    mockedInvoke.mockImplementation((command: string) => {
+      if (command === 'get_sorted_view') return pending.promise;
+      return Promise.resolve(null);
+    });
+    const { result } = renderHook(() => useRemoteSort(results, 1, 'en-US', () => null));
+
+    act(() => result.current.showNewest());
+    await waitFor(() => expect(result.current.isSorting).toBe(true));
+    act(() => result.current.cancelSort());
+
+    expect(mockedInvoke).toHaveBeenCalledWith('cancel_sort');
+    expect(result.current.isSorting).toBe(false);
+  });
+
   it('preserves current sort state when result count stays within threshold (including empty results)', async () => {
     const initial = toSlabIndices([0, 1, 2]);
 

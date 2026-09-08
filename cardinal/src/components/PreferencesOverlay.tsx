@@ -49,6 +49,7 @@ export function PreferencesOverlay({
   const [thresholdInput, setThresholdInput] = useState<string>(() => sortThreshold.toString());
   const [watchRootInput, setWatchRootInput] = useState<string>(() => watchRoot);
   const [ignorePathsInput, setIgnorePathsInput] = useState<string>(() => ignorePaths.join('\n'));
+  const [ignorePathDraft, setIgnorePathDraft] = useState('');
   const [includePathsInput, setIncludePathsInput] = useState<string>(() => includePaths.join('\n'));
 
   useEffect(() => {
@@ -80,6 +81,7 @@ export function PreferencesOverlay({
     }
     setWatchRootInput(watchRoot);
     setIgnorePathsInput(ignorePaths.join('\n'));
+    setIgnorePathDraft('');
     setIncludePathsInput(includePaths.join('\n'));
   }, [open, watchRoot, ignorePaths, includePaths]);
 
@@ -114,9 +116,25 @@ export function PreferencesOverlay({
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
   const ignorePathsErrorMessage = (() => {
-    const invalid = parsedIgnorePaths.find((line) => !isPathInputValid(line));
-    return invalid ? t('ignorePaths.errors.absolute') : null;
+    const invalidSavedPath = parsedIgnorePaths.find((line) => !isPathInputValid(line));
+    const invalidDraft = ignorePathDraft.trim() && !isPathInputValid(ignorePathDraft.trim());
+    return invalidSavedPath || invalidDraft ? t('ignorePaths.errors.absolute') : null;
   })();
+
+  const addIgnorePath = (): void => {
+    const nextPath = ignorePathDraft.trim();
+    if (!nextPath || !isPathInputValid(nextPath)) {
+      return;
+    }
+    if (!parsedIgnorePaths.includes(nextPath)) {
+      setIgnorePathsInput([...parsedIgnorePaths, nextPath].join('\n'));
+    }
+    setIgnorePathDraft('');
+  };
+
+  const removeIgnorePath = (pathToRemove: string): void => {
+    setIgnorePathsInput(parsedIgnorePaths.filter((path) => path !== pathToRemove).join('\n'));
+  };
 
   const parsedIncludePaths = includePathsInput
     .split(/\r?\n/)
@@ -133,13 +151,19 @@ export function PreferencesOverlay({
     }
     commitThreshold();
     const trimmedWatchRoot = watchRootInput.trim();
+    const trimmedIgnoreDraft = ignorePathDraft.trim();
+    const nextIgnorePaths =
+      trimmedIgnoreDraft && !parsedIgnorePaths.includes(trimmedIgnoreDraft)
+        ? [...parsedIgnorePaths, trimmedIgnoreDraft]
+        : parsedIgnorePaths;
     onWatchConfigChange({
       watchRoot: trimmedWatchRoot,
-      ignorePaths: parsedIgnorePaths,
+      ignorePaths: nextIgnorePaths,
       includePaths: parsedIncludePaths,
     });
     setWatchRootInput(trimmedWatchRoot);
-    setIgnorePathsInput(parsedIgnorePaths.join('\n'));
+    setIgnorePathsInput(nextIgnorePaths.join('\n'));
+    setIgnorePathDraft('');
     setIncludePathsInput(parsedIncludePaths.join('\n'));
     onClose();
   };
@@ -148,6 +172,7 @@ export function PreferencesOverlay({
     setThresholdInput(defaultSortThreshold.toString());
     setWatchRootInput(defaultWatchRoot);
     setIgnorePathsInput(defaultIgnorePaths.join('\n'));
+    setIgnorePathDraft('');
     setIncludePathsInput(defaultIncludePaths.join('\n'));
     onReset();
   };
@@ -248,14 +273,53 @@ export function PreferencesOverlay({
               </p>
             </div>
             <div className="preferences-control">
-              <textarea
-                className="preferences-field preferences-textarea"
-                value={ignorePathsInput}
-                onChange={(event) => setIgnorePathsInput(event.target.value)}
-                aria-label={t('ignorePaths.label')}
-                autoComplete="off"
-                spellCheck={false}
-              />
+              <div className="path-list-editor">
+                <div className="path-list-editor__items" aria-label={t('ignorePaths.listLabel')}>
+                  {parsedIgnorePaths.length ? (
+                    parsedIgnorePaths.map((path) => (
+                      <div className="path-list-editor__item" key={path}>
+                        <span title={path}>{path}</span>
+                        <button
+                          type="button"
+                          className="path-list-editor__remove"
+                          aria-label={t('ignorePaths.remove', { path })}
+                          onClick={() => removeIgnorePath(path)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="path-list-editor__empty">{t('ignorePaths.empty')}</p>
+                  )}
+                </div>
+                <div className="path-list-editor__add-row">
+                  <input
+                    className="preferences-field path-list-editor__input"
+                    type="text"
+                    value={ignorePathDraft}
+                    onChange={(event) => setIgnorePathDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        addIgnorePath();
+                      }
+                    }}
+                    aria-label={t('ignorePaths.addLabel')}
+                    placeholder={t('ignorePaths.placeholder')}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <button
+                    type="button"
+                    className="path-list-editor__add"
+                    onClick={addIgnorePath}
+                    disabled={!ignorePathDraft.trim() || Boolean(ignorePathsErrorMessage)}
+                  >
+                    {t('ignorePaths.add')}
+                  </button>
+                </div>
+              </div>
               {ignorePathsErrorMessage ? (
                 <p
                   className="permission-status permission-status--error preferences-field-error"

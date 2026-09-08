@@ -11,7 +11,7 @@ use crate::{
 use anyhow::{Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
-use crossbeam_channel::{Sender, bounded};
+use crossbeam_channel::{Sender, TrySendError, bounded};
 use objc2::{
     rc::{Retained, autoreleasepool},
     runtime::ProtocolObject,
@@ -24,7 +24,14 @@ use search_cache::{
 };
 use search_cancel::CancellationToken;
 use serde::{Deserialize, Serialize};
-use std::{cell::LazyCell, process::Command};
+use std::{
+    cell::LazyCell,
+    process::Command,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
+};
 use tauri::{ActivationPolicy, AppHandle, State};
 use tracing::{error, info, warn};
 
@@ -63,6 +70,37 @@ pub struct NodeInfoRequest {
     pub response_tx: Sender<Vec<SearchResultNode>>,
 }
 
+#[derive(Debug)]
+pub struct MetadataSortRequest {
+    pub results: Vec<SlabIndex>,
+    pub sort: SortStatePayload,
+    pub generation: u64,
+    pub active_generation: Arc<AtomicU64>,
+    pub response_tx: Sender<Vec<SlabIndex>>,
+}
+
+pub(crate) struct LatestRequestSlot<T> {
+    pending: Mutex<Option<T>>,
+}
+
+impl<T> Default for LatestRequestSlot<T> {
+    fn default() -> Self {
+        Self {
+            pending: Mutex::new(None),
+        }
+    }
+}
+
+impl<T> LatestRequestSlot<T> {
+    pub(crate) fn replace(&self, request: T) -> Option<T> {
+        self.pending.lock().replace(request)
+    }
+
+    pub(crate) fn take(&self) -> Option<T> {
+        self.pending.lock().take()
+    }
+}
+
 #[derive(Default)]
 struct SortedViewCache {
     slab_indices: Vec<SlabIndex>,
@@ -72,28 +110,44 @@ struct SortedViewCache {
 pub struct SearchState {
     search_tx: Sender<SearchJob>,
     node_info_tx: Sender<NodeInfoRequest>,
+    metadata_sort_tx: Sender<()>,
+    metadata_sort_pending: Arc<LatestRequestSlot<MetadataSortRequest>>,
     icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
     rescan_tx: Sender<CancellationToken>,
     watch_config_tx: Sender<WatchConfigUpdate>,
+    indexing_control_tx: Sender<bool>,
+    indexing_paused: Arc<AtomicBool>,
+    metadata_sort_generation: Arc<AtomicU64>,
     sorted_view_cache: Mutex<Option<SortedViewCache>>,
     pub(crate) update_window_state_tx: Sender<()>,
 }
 
 impl SearchState {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         search_tx: Sender<SearchJob>,
         node_info_tx: Sender<NodeInfoRequest>,
+        metadata_sort_tx: Sender<()>,
+        metadata_sort_pending: Arc<LatestRequestSlot<MetadataSortRequest>>,
         icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
         rescan_tx: Sender<CancellationToken>,
         watch_config_tx: Sender<WatchConfigUpdate>,
+        indexing_control_tx: Sender<bool>,
+        indexing_paused: Arc<AtomicBool>,
+        metadata_sort_generation: Arc<AtomicU64>,
         update_window_state_tx: Sender<()>,
     ) -> Self {
         Self {
             search_tx,
             node_info_tx,
+            metadata_sort_tx,
+            metadata_sort_pending,
             icon_viewport_tx,
             rescan_tx,
             watch_config_tx,
+            indexing_control_tx,
+            indexing_paused,
+            metadata_sort_generation,
             sorted_view_cache: Mutex::new(None),
             update_window_state_tx,
         }
@@ -139,6 +193,45 @@ impl SearchState {
             nodes: nodes.clone(),
         });
         nodes
+    }
+
+    fn request_metadata_sort(
+        &self,
+        results: Vec<SlabIndex>,
+        sort: SortStatePayload,
+    ) -> Vec<SlabIndex> {
+        let fallback = results.clone();
+        let (response_tx, response_rx) = bounded::<Vec<SlabIndex>>(1);
+        let generation = self.metadata_sort_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let request = MetadataSortRequest {
+            results,
+            sort,
+            generation,
+            active_generation: self.metadata_sort_generation.clone(),
+            response_tx,
+        };
+        if let Some(superseded) = self.metadata_sort_pending.replace(request) {
+            let _ = superseded.response_tx.send(Vec::new());
+        }
+        match self.metadata_sort_tx.try_send(()) {
+            Ok(()) | Err(TrySendError::Full(())) => {}
+            Err(TrySendError::Disconnected(())) => {
+                error!("Failed to notify background metadata sorter");
+                return fallback;
+            }
+        }
+
+        response_rx.recv().unwrap_or_else(|error| {
+            error!("Failed to receive metadata sort result: {error:?}");
+            fallback
+        })
+    }
+
+    fn cancel_metadata_sort(&self) {
+        self.metadata_sort_generation.fetch_add(1, Ordering::SeqCst);
+        if let Some(pending) = self.metadata_sort_pending.take() {
+            let _ = pending.response_tx.send(Vec::new());
+        }
     }
 }
 
@@ -378,6 +471,9 @@ pub fn get_sorted_view(
     }
 
     let sort_state = sort.expect("checked above");
+    if sort_state.key.uses_metadata() {
+        return state.request_metadata_sort(results, sort_state);
+    }
     let nodes = state.fetch_sorted_nodes(&results);
     let mut entries: Vec<SortEntry> = results
         .into_iter()
@@ -407,6 +503,28 @@ pub fn trigger_rescan(state: State<'_, SearchState>) {
     if let Err(e) = state.rescan_tx.send(CancellationToken::new_scan()) {
         error!("Failed to request rescan: {e:?}");
     }
+}
+
+#[tauri::command]
+pub fn set_indexing_paused(paused: bool, state: State<'_, SearchState>) -> Result<(), String> {
+    state.indexing_paused.store(paused, Ordering::SeqCst);
+    if paused {
+        let _ = CancellationToken::new_scan();
+    }
+    state
+        .indexing_control_tx
+        .send(paused)
+        .map_err(|error| format!("Failed to update indexing state: {error}"))
+}
+
+#[tauri::command]
+pub fn cancel_sort(state: State<'_, SearchState>) {
+    state.cancel_metadata_sort();
+}
+
+#[tauri::command]
+pub fn cancel_search() {
+    let _ = CancellationToken::new_search();
 }
 
 #[tauri::command(async)]
@@ -448,6 +566,72 @@ pub async fn open_path(path: String) {
     if let Err(e) = Command::new("open").arg(&path).spawn() {
         error!("Failed to open path: {e}");
     }
+}
+
+fn validate_trash_paths(paths: &[String]) -> Result<Vec<PathBuf>, String> {
+    if paths.is_empty() || paths.len() > 1_000 {
+        return Err("Trash request must contain between 1 and 1000 paths".to_string());
+    }
+
+    let mut validated = Vec::with_capacity(paths.len());
+    for input in paths {
+        if input.is_empty() || input != input.trim() {
+            return Err(
+                "Trash paths cannot be empty or contain surrounding whitespace".to_string(),
+            );
+        }
+        let path = PathBuf::from(input);
+        let has_alias_component = input
+            .split(['/', '\\'])
+            .any(|component| component == "." || component == "..");
+        if !path.is_absolute() || path.parent().is_none() || has_alias_component {
+            return Err("Only absolute, non-root paths can be moved to Trash".to_string());
+        }
+        let home = std::env::var("HOME").map_err(|_| "Home directory is unavailable")?;
+        let metadata = std::fs::symlink_metadata(path.as_std_path()).ok();
+        if !metadata.as_ref().is_some_and(std::fs::Metadata::is_symlink) {
+            let canonical_home =
+                std::fs::canonicalize(&home).map_err(|_| "Home directory could not be verified")?;
+            if same_file::is_same_file(path.as_std_path(), &home).unwrap_or(false) {
+                return Err("The home directory cannot be moved to Trash".to_string());
+            }
+            if let Ok(canonical_target) = std::fs::canonicalize(path.as_std_path())
+                && (canonical_target == canonical_home || canonical_target.parent().is_none())
+            {
+                return Err("Home and filesystem roots cannot be moved to Trash".to_string());
+            }
+        }
+        if !validated.contains(&path) {
+            validated.push(path);
+        }
+    }
+
+    validated.sort_unstable_by(|left, right| {
+        left.components()
+            .count()
+            .cmp(&right.components().count())
+            .then_with(|| left.cmp(right))
+    });
+    let mut top_level = Vec::with_capacity(validated.len());
+    for path in validated {
+        if top_level
+            .iter()
+            .any(|parent: &PathBuf| path.starts_with(parent))
+        {
+            continue;
+        }
+        top_level.push(path);
+    }
+    Ok(top_level)
+}
+
+#[tauri::command]
+pub async fn move_to_trash(paths: Vec<String>) -> Result<(), String> {
+    let validated = validate_trash_paths(&paths)?;
+    tauri::async_runtime::spawn_blocking(move || trash::delete_all(validated))
+        .await
+        .map_err(|error| format!("Trash operation failed: {error}"))?
+        .map_err(|error| format!("Could not move item to Trash: {error}"))
 }
 
 #[tauri::command]
@@ -544,6 +728,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn metadata_sort_pending_slot_retains_only_the_latest_request() {
+        let slot = LatestRequestSlot::default();
+
+        assert_eq!(slot.replace(1), None);
+        assert_eq!(slot.replace(2), Some(1));
+        assert_eq!(slot.take(), Some(2));
+        assert_eq!(slot.take(), None);
+    }
+
+    #[test]
     fn normalize_rejects_empty_input() {
         assert_eq!(normalize_path_input(""), None);
         assert_eq!(normalize_path_input("   "), None);
@@ -576,5 +770,43 @@ mod tests {
         assert_eq!(normalize_path_input("./relative"), None);
         assert_eq!(normalize_path_input("~someone"), None);
         assert_eq!(normalize_path_input("~someone/Documents"), None);
+    }
+
+    #[test]
+    fn trash_paths_require_safe_absolute_non_root_targets() {
+        assert!(validate_trash_paths(&[]).is_err());
+        assert!(validate_trash_paths(&["relative".to_string()]).is_err());
+        assert!(validate_trash_paths(&["/".to_string()]).is_err());
+        assert!(validate_trash_paths(&["/Users/example/..".to_string()]).is_err());
+        assert!(validate_trash_paths(&["/tmp/./report.pdf".to_string()]).is_err());
+        assert!(validate_trash_paths(&[" /tmp/report.pdf ".to_string()]).is_err());
+        if let Ok(home) = std::env::var("HOME") {
+            let case_alias = home.replacen("/Users/", "/users/", 1);
+            if case_alias != home && std::path::Path::new(&case_alias).exists() {
+                assert!(validate_trash_paths(&[case_alias]).is_err());
+            }
+            let firmlink_alias = format!("/System/Volumes/Data{home}");
+            if std::path::Path::new(&firmlink_alias).exists()
+                && same_file::is_same_file(&firmlink_alias, &home).unwrap_or(false)
+            {
+                assert!(validate_trash_paths(&[firmlink_alias]).is_err());
+            }
+        }
+        assert_eq!(
+            validate_trash_paths(&["/tmp/report.pdf".to_string()]).unwrap(),
+            vec![PathBuf::from("/tmp/report.pdf")]
+        );
+        assert_eq!(
+            validate_trash_paths(&[
+                "/tmp/project".to_string(),
+                "/tmp/project/report.pdf".to_string(),
+                "/tmp/other.txt".to_string(),
+            ])
+            .unwrap(),
+            vec![
+                PathBuf::from("/tmp/other.txt"),
+                PathBuf::from("/tmp/project")
+            ]
+        );
     }
 }

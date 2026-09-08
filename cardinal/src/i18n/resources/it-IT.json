@@ -7,7 +7,30 @@
     },
     "options": {
       "caseSensitive": "Attiva/disattiva distinzione tra maiuscole e minuscole",
-      "directoryScope": "Mostra ambito cartella"
+      "directoryScope": "Mostra ambito cartella",
+      "newest": "Più recenti"
+    },
+    "filters": {
+      "label": "Filtri",
+      "type": "Tipo",
+      "anyType": "Qualsiasi tipo",
+      "folders": "Cartelle",
+      "pictures": "Fotografie",
+      "videos": "Video",
+      "audio": "Audio",
+      "documents": "Documenti",
+      "archives": "Archivio",
+      "code": "Codice",
+      "apps": "Applicazioni",
+      "modified": "Modificato",
+      "anyTime": "Ogni volta",
+      "today": "Oggi",
+      "pastWeek": "Settimana passata",
+      "pastMonth": "Passato mese",
+      "pastYear": "Anno passato",
+      "size": "Dimensione",
+      "anySize": "Qualsiasi dimensione",
+      "clear": "Reimposta"
     },
     "aria": {
       "searchInput": "Input di ricerca"
@@ -52,6 +75,11 @@
     "copyFilenames": "Copia nomi file",
     "copyPath": "Copia percorso",
     "copyPaths": "Copia percorsi",
+    "moveToTrash_one": "Muovetevi nel cestino...",
+    "moveToTrash_other": "Spostare {{count}} Articoli per...",
+    "confirmTrash_one": "Spostare l'elemento selezionato per Cestino?",
+    "confirmTrash_other": "Spostare {{count}} elementi selezionati per Cestino?",
+    "trashFailed": "L'articolo non potrebbe essere spostato in cestino.",
     "resetColumnWidths": "Reimposta larghezze colonne"
   },
   "statusBar": {
@@ -169,6 +197,12 @@
   "ignorePaths": {
     "label": "Percorsi ignorati",
     "help": "Un percorso per riga; i percorsi ignorati vengono saltati durante l'indicizzazione.",
+    "listLabel": "Cartelle ignorate",
+    "addLabel": "Percorso della cartella da ignorare",
+    "placeholder": "/path/to/folder",
+    "add": "Aggiungi",
+    "remove": "Rimuovi {{path}}",
+    "empty": "Nessuna cartella in più viene ignorata.",
     "errors": {
       "absolute": "Ogni percorso deve iniziare con '/' o '~'."
     }
@@ -178,6 +212,71 @@
     "help": "Un percorso per riga; i percorsi inclusi restano indicizzati anche se un livello superiore è ignorato.",
     "errors": {
       "absolute": "Ogni percorso deve iniziare con '/' o '~'."
+    }
+  },
+  "workspace": {
+    "toolbarLabel": "Strumenti per lo spazio di lavoro",
+    "close": "Chiudi pannello",
+    "remove": "Rimuovi",
+    "sections": {
+      "saved": "Ricerche salvate",
+      "favorites": "Preferiti",
+      "coverage": "Perche' non e' stato trovato?",
+      "operations": "Operazioni"
+    },
+    "saved": {
+      "nameLabel": "Nome della ricerca",
+      "saveCurrent": "Salva la ricerca corrente",
+      "empty": "Ancora nessuna ricerca salvata.",
+      "allFiles": "Tutti i file"
+    },
+    "favorites": {
+      "addSelection": "Aggiungi selezione ai preferiti",
+      "empty": "Nessun file preferito o cartelle ancora.",
+      "open": "Apri preferiti",
+      "reveal": "Mostra nel Finder"
+    },
+    "coverage": {
+      "permission": "Accesso a disco completo",
+      "granted": "Abilitato",
+      "denied": "Disabili",
+      "state": "Stato indice",
+      "indexed": "Articoli indicizzati",
+      "root": "Monitorare la radice",
+      "excluded": "Percorsi esclusi",
+      "included": "Percorsi espliciti inclusi",
+      "none": "Non sono esclusi i percorsi.",
+      "allUnderRoot": "Tutti i percorsi accessibili sotto la radice sono inclusi.",
+      "directoryScope": "Campo di applicazione della cartella attiva",
+      "explanation": "Se manca un file, controlla le autorizzazioni, la radice del monitor, i percorsi esclusi e l'ambito della cartella attiva.",
+      "openSettings": "Apri impostazioni di ricerca e indicizzazione"
+    },
+    "operations": {
+      "indexing": "Indicizzazione dei file",
+      "search": "Ricerca",
+      "sorting": "Ordinazione",
+      "activity": "Attività indice",
+      "activityLevels": {
+        "idle": "Inattiva",
+        "low": "Basso",
+        "medium": "Media",
+        "high": "Alto"
+      },
+      "indexedCount": "{{count}} articoli indicizzati",
+      "trash": "Trattamenti",
+      "fileStates": {
+        "running": "Spostare {{count}} articoli",
+        "completed": "Spostato {{count}} articoli",
+        "failed": "Non spostato {{count}} articoli"
+      },
+      "running": "Correre",
+      "paused": "In pausa",
+      "pauseIndexing": "Sospendi indicizzazione",
+      "resumeIndexing": "Riprendi l'indicizzazione",
+      "cancelSearch": "Annulla ricerca",
+      "cancelSort": "Annulla ordinamento",
+      "rescan": "Ripeti scansione",
+      "idle": "Nessuna operazione di lunga durata."
     }
   }
 }

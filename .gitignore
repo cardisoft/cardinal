@@ -1,3 +1,20 @@
 target
 .DS_Store
 .vscode
+
+# Local secrets and signing material
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
+
+# Local databases and generated packages
+*.db
+*.sqlite
+*.sqlite3
+*.dmg
+graphify-out/

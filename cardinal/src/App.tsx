@@ -1,8 +1,9 @@
-import { useRef, useCallback, useEffect, useMemo } from 'react';
+import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import './App.css';
 import { FileRow } from './components/FileRow';
 import { SearchBar } from './components/SearchBar';
+import { SearchFilters } from './components/SearchFilters';
 import { FilesTabContent } from './components/FilesTabContent';
 import { PermissionOverlay } from './components/PermissionOverlay';
 import PreferencesOverlay from './components/PreferencesOverlay';
@@ -10,6 +11,7 @@ import StatusBar from './components/StatusBar';
 import type { SearchResultItem } from './types/search';
 import { useColumnResize } from './hooks/useColumnResize';
 import { useContextMenu } from './hooks/useContextMenu';
+import { useFileOperationLog } from './hooks/useFileOperationLog';
 import { useFileSearch } from './hooks/useFileSearch';
 import { useEventColumnWidths } from './hooks/useEventColumnWidths';
 import { useRecentFSEvents } from './hooks/useRecentFSEvents';
@@ -30,6 +32,12 @@ import { useAppPreferences } from './hooks/useAppPreferences';
 import { useAppWindowListeners } from './hooks/useAppWindowListeners';
 import { useFilesTabEffects } from './hooks/useFilesTabEffects';
 import { useFilesTabState } from './hooks/useFilesTabState';
+import { useWorkspaceCollections } from './hooks/useWorkspaceCollections';
+import type { SavedSearch } from './hooks/useWorkspaceCollections';
+import { WorkspacePanel, WorkspaceToolbar } from './components/WorkspacePanel';
+import type { WorkspaceSection } from './components/WorkspacePanel';
+import { openPreferences } from './utils/openPreferences';
+import { invoke } from '@tauri-apps/api/core';
 
 function App() {
   const {
@@ -37,11 +45,16 @@ function App() {
     searchParams,
     updateSearchParams,
     queueSearch,
+    queueFilterSearch,
     queueDirectorySearch,
     queueDirectoryScopeOpen,
     handleStatusUpdate,
     setLifecycleState,
     requestRescan,
+    applySearchPreset,
+    indexingPaused,
+    toggleIndexingPaused,
+    cancelCurrentSearch,
   } = useFileSearch();
   const {
     results,
@@ -79,6 +92,10 @@ function App() {
     setSortThreshold,
     sortDisabledTooltip,
     sortButtonsDisabled,
+    isSortKeyDisabled,
+    showNewest,
+    cancelSort,
+    isSorting,
     handleSortToggle,
   } = useRemoteSort(results, resultsVersion, i18n.language, (limit) =>
     t('sorting.disabled', { limit }),
@@ -108,6 +125,7 @@ function App() {
 
   const {
     activeTab,
+    setActiveTab,
     isSearchFocused,
     handleSearchFocus,
     handleSearchBlur,
@@ -133,6 +151,10 @@ function App() {
     isActive: activeTab === 'events',
     eventFilterQuery,
   });
+  const [workspaceSection, setWorkspaceSection] = useState<WorkspaceSection | null>(null);
+  const { fileOperations, updateFileOperation } = useFileOperationLog();
+  const { savedSearches, favorites, saveSearch, removeSavedSearch, addFavorites, removeFavorite } =
+    useWorkspaceCollections();
 
   const getQuickLookPaths = useCallback(
     () => (activeTab === 'files' ? selectedPaths : []),
@@ -146,7 +168,7 @@ function App() {
   const {
     showContextMenu: showFilesContextMenu,
     showHeaderContextMenu: showFilesHeaderContextMenu,
-  } = useContextMenu(autoFitColumns, toggleQuickLook);
+  } = useContextMenu(autoFitColumns, toggleQuickLook, updateFileOperation);
 
   const {
     showContextMenu: showEventsContextMenu,
@@ -369,67 +391,155 @@ function App() {
     isSearchFocused ? ' results-container--search-focused' : ''
   }`;
 
+  const toggleWorkspaceSection = useCallback((section: WorkspaceSection) => {
+    setWorkspaceSection((current) => (current === section ? null : section));
+  }, []);
+
+  const handleSaveCurrentSearch = useCallback(
+    (name: string) => {
+      saveSearch({ name, ...searchParams });
+    },
+    [saveSearch, searchParams],
+  );
+
+  const handleApplySavedSearch = useCallback(
+    (savedSearch: SavedSearch) => {
+      setActiveTab('files');
+      applySearchPreset({
+        query: savedSearch.query,
+        filterQuery: savedSearch.filterQuery,
+        directoryQuery: savedSearch.directoryQuery,
+        directoryScopeOpen: savedSearch.directoryScopeOpen,
+        caseSensitive: savedSearch.caseSensitive,
+      });
+    },
+    [applySearchPreset, setActiveTab],
+  );
+
   return (
     <>
       <main className="container" aria-hidden={showFullDiskAccessOverlay || isPreferencesOpen}>
-        <SearchBar
-          inputRef={searchInputRef}
-          placeholder={searchPlaceholder}
-          ariaLabel={searchAriaLabel}
-          value={searchInputValue}
-          onChange={onQueryChange}
-          onKeyDown={onSearchInputKeyDown}
-          directoryScopeEnabled={activeTab === 'files'}
-          directoryScopeOpen={directoryScopeOpen}
-          directoryScopeLabel={directoryScopeLabel}
-          directoryPlaceholder={directorySearchPlaceholder}
-          directoryValue={directoryInputValue}
-          onToggleDirectoryScope={toggleDirectoryScope}
-          onDirectoryChange={onDirectoryQueryChange}
-          onDirectoryKeyDown={onDirectoryInputKeyDown}
-          caseSensitive={caseSensitive}
-          onToggleCaseSensitive={onToggleCaseSensitive}
-          caseSensitiveLabel={caseSensitiveLabel}
-          onFocus={handleSearchFocus}
-          onBlur={handleSearchBlur}
-        />
-        <div className={resultsContainerClassName} style={containerStyle}>
-          {activeTab === 'events' ? (
-            <FSEventsPanel
-              ref={eventsPanelRef}
-              events={filteredEvents}
-              onResizeStart={onEventResizeStart}
-              onContextMenu={handleEventsContextMenu}
-              onHeaderContextMenu={showEventsHeaderContextMenu}
-              searchQuery={eventFilterQuery}
-              caseInsensitive={!caseSensitive}
+        <div className="search-toolbar">
+          <SearchBar
+            inputRef={searchInputRef}
+            placeholder={searchPlaceholder}
+            ariaLabel={searchAriaLabel}
+            value={searchInputValue}
+            onChange={onQueryChange}
+            onKeyDown={onSearchInputKeyDown}
+            directoryScopeEnabled={activeTab === 'files'}
+            directoryScopeOpen={directoryScopeOpen}
+            directoryScopeLabel={directoryScopeLabel}
+            directoryPlaceholder={directorySearchPlaceholder}
+            directoryValue={directoryInputValue}
+            onToggleDirectoryScope={toggleDirectoryScope}
+            onDirectoryChange={onDirectoryQueryChange}
+            onDirectoryKeyDown={onDirectoryInputKeyDown}
+            caseSensitive={caseSensitive}
+            onToggleCaseSensitive={onToggleCaseSensitive}
+            caseSensitiveLabel={caseSensitiveLabel}
+            showNewestLabel={activeTab === 'files' ? t('search.options.newest') : undefined}
+            onShowNewest={activeTab === 'files' ? showNewest : undefined}
+            newestActive={sortState?.key === 'mtime' && sortState.direction === 'desc'}
+            onFocus={handleSearchFocus}
+            onBlur={handleSearchBlur}
+          />
+          <div hidden={activeTab !== 'files'}>
+            <SearchFilters
+              query={searchParams.filterQuery}
+              onChange={(filterQuery) => queueFilterSearch(filterQuery, { immediate: true })}
             />
-          ) : (
-            // `dataResultsVersion`: backend result-set changes. This resets row metadata cache.
-            // `displayedResultsVersion`: visible-order/projection changes. This refreshes viewport
-            // work such as icon hydration and frozen-view handoff in VirtualList.
-            <FilesTabContent
-              headerRef={headerRef}
-              onResizeStart={onResizeStart}
-              onHeaderContextMenu={showFilesHeaderContextMenu}
-              displayState={displayState}
-              searchErrorMessage={searchErrorMessage}
-              currentQuery={currentQuery}
-              currentDirectoryQuery={currentDirectoryQuery}
-              virtualListRef={virtualListRef}
-              results={displayedResults}
-              dataResultsVersion={resultsVersion}
-              displayedResultsVersion={displayedResultsVersion}
-              rowHeight={ROW_HEIGHT}
-              overscan={OVERSCAN_ROW_COUNT}
-              renderRow={renderRow}
-              onScrollSync={handleHorizontalSync}
-              sortState={sortState}
-              onSortToggle={handleSortToggle}
-              sortDisabled={sortButtonsDisabled}
-              sortDisabledTooltip={sortDisabledTooltip}
+          </div>
+          <WorkspaceToolbar activeSection={workspaceSection} onSelect={toggleWorkspaceSection} />
+        </div>
+        <div className={`content-workspace${workspaceSection ? ' has-panel' : ''}`}>
+          <div className={resultsContainerClassName} style={containerStyle}>
+            {activeTab === 'events' ? (
+              <FSEventsPanel
+                ref={eventsPanelRef}
+                events={filteredEvents}
+                onResizeStart={onEventResizeStart}
+                onContextMenu={handleEventsContextMenu}
+                onHeaderContextMenu={showEventsHeaderContextMenu}
+                searchQuery={eventFilterQuery}
+                caseInsensitive={!caseSensitive}
+              />
+            ) : (
+              // `dataResultsVersion`: backend result-set changes. This resets row metadata cache.
+              // `displayedResultsVersion`: visible-order/projection changes. This refreshes viewport
+              // work such as icon hydration and frozen-view handoff in VirtualList.
+              <FilesTabContent
+                headerRef={headerRef}
+                onResizeStart={onResizeStart}
+                onHeaderContextMenu={showFilesHeaderContextMenu}
+                displayState={displayState}
+                searchErrorMessage={searchErrorMessage}
+                currentQuery={currentQuery}
+                currentDirectoryQuery={currentDirectoryQuery}
+                virtualListRef={virtualListRef}
+                results={displayedResults}
+                dataResultsVersion={resultsVersion}
+                displayedResultsVersion={displayedResultsVersion}
+                rowHeight={ROW_HEIGHT}
+                overscan={OVERSCAN_ROW_COUNT}
+                renderRow={renderRow}
+                onScrollSync={handleHorizontalSync}
+                sortState={sortState}
+                onSortToggle={handleSortToggle}
+                sortDisabled={sortButtonsDisabled}
+                isSortKeyDisabled={isSortKeyDisabled}
+                sortDisabledTooltip={sortDisabledTooltip}
+              />
+            )}
+          </div>
+          {workspaceSection ? (
+            <WorkspacePanel
+              activeSection={workspaceSection}
+              onClose={() => setWorkspaceSection(null)}
+              savedSearches={savedSearches}
+              favorites={favorites}
+              selectedPaths={selectedPaths}
+              onSaveSearch={handleSaveCurrentSearch}
+              onApplySavedSearch={handleApplySavedSearch}
+              onRemoveSavedSearch={removeSavedSearch}
+              onAddSelectedFavorites={() => addFavorites(selectedPaths)}
+              onOpenFavorite={openResultPath}
+              onRevealFavorite={(path) => void invoke('open_in_finder', { path })}
+              onRemoveFavorite={removeFavorite}
+              coverage={{
+                watchRoot: watchRoot ?? defaultWatchRoot,
+                ignorePaths,
+                includePaths,
+                fullDiskAccessGranted: fullDiskAccessStatus === 'granted',
+                lifecycleState,
+                scannedFiles,
+                currentQuery,
+                currentDirectoryQuery,
+              }}
+              operations={{
+                indexingPaused,
+                lifecycleState,
+                activity: indexingPaused
+                  ? 'idle'
+                  : lifecycleState === 'Initializing' || isSorting
+                    ? 'high'
+                    : showLoadingUI
+                      ? 'medium'
+                      : lifecycleState === 'Updating'
+                        ? 'low'
+                        : 'idle',
+                scannedFiles,
+                fileOperations,
+                isSearching: showLoadingUI,
+                isSorting,
+                onToggleIndexing: () => void toggleIndexingPaused(),
+                onCancelSearch: () => void cancelCurrentSearch(),
+                onCancelSort: cancelSort,
+                onRequestRescan: () => void requestRescan(),
+              }}
+              onOpenPreferences={openPreferences}
             />
-          )}
+          ) : null}
         </div>
         <StatusBar
           scannedFiles={scannedFiles}
@@ -441,6 +551,8 @@ function App() {
           onTabChange={onTabChange}
           onRequestRescan={requestRescan}
           rescanErrorCount={rescanErrors}
+          indexingPaused={indexingPaused}
+          onToggleIndexing={() => void toggleIndexingPaused()}
         />
       </main>
       <PreferencesOverlay

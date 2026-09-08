@@ -5,6 +5,7 @@ import type { SlabIndex } from '../types/slab';
 
 const SORT_THRESHOLD_STORAGE_KEY = 'cardinal.sortThreshold';
 export const DEFAULT_SORTABLE_RESULT_THRESHOLD = 20000;
+const FAST_METADATA_SORT_KEYS = new Set<SortKey>(['size', 'mtime', 'ctime']);
 
 const clampSortThreshold = (value: number): number => {
   if (!Number.isFinite(value)) {
@@ -51,6 +52,9 @@ export type RemoteSortControls = {
   isSorting: boolean;
   sortDisabledTooltip: string | null;
   sortButtonsDisabled: boolean;
+  isSortKeyDisabled: (key: SortKey) => boolean;
+  showNewest: () => void;
+  cancelSort: () => void;
   handleSortToggle: (key: SortKey) => void;
 };
 
@@ -71,7 +75,11 @@ export const useRemoteSort = (
     0,
   );
 
-  const canSort = results.length <= sortThreshold;
+  const isSortKeyDisabled = useCallback(
+    (key: SortKey) => results.length > sortThreshold && !FAST_METADATA_SORT_KEYS.has(key),
+    [results.length, sortThreshold],
+  );
+  const canSort = !sortState || !isSortKeyDisabled(sortState.key);
   const shouldUseSortedResults = Boolean(sortState && canSort);
   const displayedResults = shouldUseSortedResults ? sortedResults : results;
 
@@ -83,7 +91,7 @@ export const useRemoteSort = (
 
   const handleSortToggle = useCallback(
     (nextKey: SortKey) => {
-      if (!canSort) {
+      if (isSortKeyDisabled(nextKey)) {
         return;
       }
       setSortState((prev) => {
@@ -96,8 +104,23 @@ export const useRemoteSort = (
         return null;
       });
     },
-    [canSort],
+    [isSortKeyDisabled],
   );
+
+  const showNewest = useCallback(() => {
+    setSortState((current) =>
+      current?.key === 'mtime' && current.direction === 'desc'
+        ? null
+        : { key: 'mtime', direction: 'desc' },
+    );
+  }, []);
+
+  const cancelSort = useCallback(() => {
+    sortRequestRef.current += 1;
+    setSortState(null);
+    setIsSorting(false);
+    void invoke('cancel_sort');
+  }, []);
 
   useEffect(() => {
     if (!canSort && sortState) {
@@ -144,7 +167,7 @@ export const useRemoteSort = (
     [locale, sortThreshold],
   );
   const sortDisabledTooltip = canSort ? null : formatDisabledTooltip(sortLimitLabel);
-  const sortButtonsDisabled = !canSort || isSorting;
+  const sortButtonsDisabled = isSorting;
 
   return {
     sortState,
@@ -156,6 +179,9 @@ export const useRemoteSort = (
     isSorting,
     sortDisabledTooltip,
     sortButtonsDisabled,
+    isSortKeyDisabled,
+    showNewest,
+    cancelSort,
     handleSortToggle,
   };
 };

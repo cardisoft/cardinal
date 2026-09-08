@@ -7,7 +7,30 @@
     },
     "options": {
       "caseSensitive": "Büyük/küçük harfe duyarlı eşleşmeyi değiştir",
-      "directoryScope": "Klasör kapsamını değiştir"
+      "directoryScope": "Klasör kapsamını değiştir",
+      "newest": "En Yeniler"
+    },
+    "filters": {
+      "label": "Filtreler",
+      "type": "Tür",
+      "anyType": "Tüm türler",
+      "folders": "Klasörler",
+      "pictures": "Görseller",
+      "videos": "Videolar",
+      "audio": "Ses",
+      "documents": "Belgeler",
+      "archives": "Arşivler",
+      "code": "Kod",
+      "apps": "Uygulamalar",
+      "modified": "Değiştirilme",
+      "anyTime": "Tüm zamanlar",
+      "today": "Bugün",
+      "pastWeek": "Son hafta",
+      "pastMonth": "Son ay",
+      "pastYear": "Son yıl",
+      "size": "Boyut",
+      "anySize": "Tüm boyutlar",
+      "clear": "Temizle"
     },
     "aria": {
       "searchInput": "Arama girişi"
@@ -52,6 +75,11 @@
     "copyFilenames": "Dosya adlarını kopyala",
     "copyPath": "Yolu kopyala",
     "copyPaths": "Yolları kopyala",
+    "moveToTrash_one": "Çöp'e Taşı…",
+    "moveToTrash_other": "{{count}} Öğeyi Çöp'e Taşı…",
+    "confirmTrash_one": "Seçili öğe Çöp'e taşınsın mı?",
+    "confirmTrash_other": "Seçili {{count}} öğe Çöp'e taşınsın mı?",
+    "trashFailed": "Öğe Çöp'e taşınamadı.",
     "resetColumnWidths": "Sütun genişliklerini sıfırla"
   },
   "statusBar": {
@@ -168,7 +196,13 @@
   },
   "ignorePaths": {
     "label": "Yok sayılan yollar",
-    "help": "Her satıra bir yol; yok sayılan yollar dizinleme sırasında atlanır.",
+    "help": "Bu listedeki klasörler dizinleme sırasında atlanır.",
+    "listLabel": "Taramaya dahil edilmeyen klasörler",
+    "addLabel": "Taramaya dahil edilmeyecek klasör yolu",
+    "placeholder": "/klasör/yolu",
+    "add": "Ekle",
+    "remove": "{{path}} yolunu kaldır",
+    "empty": "Ek olarak hariç tutulan klasör yok.",
     "errors": {
       "absolute": "Her yol '/' veya '~' ile başlamalıdır."
     }
@@ -178,6 +212,71 @@
     "help": "Her satıra bir yol; dahil edilen yollar, üst dizini yok sayılsa bile dizinde kalır.",
     "errors": {
       "absolute": "Her yol '/' veya '~' ile başlamalıdır."
+    }
+  },
+  "workspace": {
+    "toolbarLabel": "Çalışma araçları",
+    "close": "Paneli kapat",
+    "remove": "Kaldır",
+    "sections": {
+      "saved": "Kayıtlı Aramalar",
+      "favorites": "Favoriler",
+      "coverage": "Neden Bulunamadı?",
+      "operations": "İşlemler"
+    },
+    "saved": {
+      "nameLabel": "Arama adı",
+      "saveCurrent": "Geçerli aramayı kaydet",
+      "empty": "Henüz kayıtlı arama yok.",
+      "allFiles": "Tüm dosyalar"
+    },
+    "favorites": {
+      "addSelection": "Seçimi favorilere ekle",
+      "empty": "Henüz favori dosya veya klasör yok.",
+      "open": "Favoriyi aç",
+      "reveal": "Finder'da göster"
+    },
+    "coverage": {
+      "permission": "Tam Disk Erişimi",
+      "granted": "Etkin",
+      "denied": "Kapalı",
+      "state": "İndeks durumu",
+      "indexed": "İndekslenen öğe",
+      "root": "Tarama kökü",
+      "excluded": "Hariç tutulan yollar",
+      "included": "Özel olarak dahil edilen yollar",
+      "none": "Hariç tutulan yol yok.",
+      "allUnderRoot": "Kök altındaki tüm erişilebilir yollar dahil.",
+      "directoryScope": "Etkin klasör kapsamı",
+      "explanation": "Bir dosya görünmüyorsa izinleri, tarama kökünü, hariç tutulan yolları ve etkin klasör kapsamını kontrol edin.",
+      "openSettings": "Arama ve indeksleme ayarlarını aç"
+    },
+    "operations": {
+      "indexing": "Dosya indeksleme",
+      "search": "Arama",
+      "sorting": "Sıralama",
+      "activity": "İndeks etkinliği",
+      "activityLevels": {
+        "idle": "Boşta",
+        "low": "Düşük",
+        "medium": "Orta",
+        "high": "Yüksek"
+      },
+      "indexedCount": "{{count}} öğe indekslendi",
+      "trash": "Çöp Sepeti",
+      "fileStates": {
+        "running": "{{count}} öğe taşınıyor",
+        "completed": "{{count}} öğe taşındı",
+        "failed": "{{count}} öğe taşınamadı"
+      },
+      "running": "Çalışıyor",
+      "paused": "Duraklatıldı",
+      "pauseIndexing": "İndekslemeyi duraklat",
+      "resumeIndexing": "İndekslemeyi sürdür",
+      "cancelSearch": "Aramayı iptal et",
+      "cancelSort": "Sıralamayı iptal et",
+      "rescan": "Yeniden tara",
+      "idle": "Bekleyen uzun işlem yok."
     }
   }
 }

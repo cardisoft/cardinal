@@ -20,6 +20,12 @@ pub enum SortKeyPayload {
     Ctime,
 }
 
+impl SortKeyPayload {
+    pub(crate) fn uses_metadata(self) -> bool {
+        matches!(self, Self::Size | Self::Mtime | Self::Ctime)
+    }
+}
+
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SortDirectionPayload {
@@ -50,6 +56,68 @@ impl SortEntry {
 
 pub(crate) fn sort_entries(entries: &mut [SortEntry], sort: &SortStatePayload) {
     entries.sort_by(|a, b| compare_entries(a, b, sort));
+}
+
+pub(crate) fn sort_metadata_indices_cancellable(
+    entries: &mut [(SlabIndex, SlabNodeMetadataCompact)],
+    sort: &SortStatePayload,
+    is_cancelled: impl Fn() -> bool,
+) -> bool {
+    const CHUNK_SIZE: usize = 16_384;
+    if is_cancelled() {
+        return false;
+    }
+    let compare = |(index_a, metadata_a): &(SlabIndex, SlabNodeMetadataCompact),
+                   (index_b, metadata_b): &(SlabIndex, SlabNodeMetadataCompact)| {
+        let ordering = metadata_numeric(metadata_a, sort.key)
+            .cmp(&metadata_numeric(metadata_b, sort.key))
+            .then_with(|| index_a.get().cmp(&index_b.get()));
+        match sort.direction {
+            SortDirectionPayload::Asc => ordering,
+            SortDirectionPayload::Desc => ordering.reverse(),
+        }
+    };
+
+    for chunk in entries.chunks_mut(CHUNK_SIZE) {
+        if is_cancelled() {
+            return false;
+        }
+        chunk.sort_unstable_by(&compare);
+    }
+
+    let mut source = entries.to_vec();
+    let mut target = source.clone();
+    let mut width = CHUNK_SIZE;
+    while width < source.len() {
+        if is_cancelled() {
+            return false;
+        }
+        for start in (0..source.len()).step_by(width.saturating_mul(2)) {
+            let middle = (start + width).min(source.len());
+            let end = (start + width.saturating_mul(2)).min(source.len());
+            let (mut left, mut right, mut output) = (start, middle, start);
+            while left < middle && right < end {
+                if output.is_multiple_of(CHUNK_SIZE) && is_cancelled() {
+                    return false;
+                }
+                if compare(&source[left], &source[right]) != StdOrdering::Greater {
+                    target[output] = source[left];
+                    left += 1;
+                } else {
+                    target[output] = source[right];
+                    right += 1;
+                }
+                output += 1;
+            }
+            target[output..output + (middle - left)].clone_from_slice(&source[left..middle]);
+            output += middle - left;
+            target[output..output + (end - right)].clone_from_slice(&source[right..end]);
+        }
+        std::mem::swap(&mut source, &mut target);
+        width = width.saturating_mul(2);
+    }
+    entries.clone_from_slice(&source);
+    !is_cancelled()
 }
 
 fn normalize_path(path: &Path) -> String {
@@ -145,6 +213,20 @@ mod tests {
         })
     }
 
+    fn metadata_with_dates(
+        r#type: NodeFileType,
+        size: u64,
+        ctime: u64,
+        mtime: u64,
+    ) -> SlabNodeMetadataCompact {
+        SlabNodeMetadataCompact::some(NodeMetadata {
+            r#type,
+            size,
+            ctime: std::num::NonZeroU64::new(ctime),
+            mtime: std::num::NonZeroU64::new(mtime),
+        })
+    }
+
     #[test]
     fn filename_sort_keeps_directories_before_files() {
         let sort_state = SortStatePayload {
@@ -195,5 +277,101 @@ mod tests {
             vec![0, 2, 1],
             "directories stay ahead when size and names match, while files fall back to path order"
         );
+    }
+
+    #[test]
+    fn metadata_sort_orders_recent_files_without_expanding_paths() {
+        let sort_state = SortStatePayload {
+            key: SortKeyPayload::Mtime,
+            direction: SortDirectionPayload::Desc,
+        };
+        let mut entries = vec![
+            (
+                SlabIndex::new(7),
+                metadata_with_dates(NodeFileType::File, 10, 100, 200),
+            ),
+            (
+                SlabIndex::new(3),
+                metadata_with_dates(NodeFileType::File, 10, 100, 900),
+            ),
+            (
+                SlabIndex::new(5),
+                metadata_with_dates(NodeFileType::File, 10, 100, 400),
+            ),
+        ];
+
+        assert!(sort_metadata_indices_cancellable(
+            &mut entries,
+            &sort_state,
+            || false
+        ));
+
+        assert_eq!(
+            entries
+                .iter()
+                .map(|(slab_index, _)| slab_index.get())
+                .collect::<Vec<_>>(),
+            vec![3, 5, 7]
+        );
+    }
+
+    #[test]
+    fn metadata_sort_stops_when_generation_is_cancelled() {
+        let sort_state = SortStatePayload {
+            key: SortKeyPayload::Mtime,
+            direction: SortDirectionPayload::Desc,
+        };
+        let mut entries = vec![
+            (
+                SlabIndex::new(1),
+                metadata_with_dates(NodeFileType::File, 1, 1, 1),
+            ),
+            (
+                SlabIndex::new(2),
+                metadata_with_dates(NodeFileType::File, 1, 1, 2),
+            ),
+        ];
+
+        assert!(!sort_metadata_indices_cancellable(
+            &mut entries,
+            &sort_state,
+            || true
+        ));
+    }
+
+    #[test]
+    fn cancelled_metadata_sort_does_not_poison_the_next_sort() {
+        use std::cell::Cell;
+
+        let sort_state = SortStatePayload {
+            key: SortKeyPayload::Size,
+            direction: SortDirectionPayload::Asc,
+        };
+        let mut entries = (0..40_000)
+            .rev()
+            .map(|index| {
+                (
+                    SlabIndex::new(index),
+                    metadata_with_type(NodeFileType::File, index as u64),
+                )
+            })
+            .collect::<Vec<_>>();
+        let checks = Cell::new(0usize);
+        assert!(!sort_metadata_indices_cancellable(
+            &mut entries,
+            &sort_state,
+            || {
+                checks.set(checks.get() + 1);
+                checks.get() > 2
+            }
+        ));
+
+        assert!(sort_metadata_indices_cancellable(
+            &mut entries,
+            &sort_state,
+            || false
+        ));
+        assert_eq!(entries.first().map(|entry| entry.0.get()), Some(0));
+        assert_eq!(entries.last().map(|entry| entry.0.get()), Some(39_999));
     }
 }
