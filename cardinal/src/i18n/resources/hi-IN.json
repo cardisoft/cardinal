@@ -52,7 +52,10 @@
     "copyFilenames": "फ़ाइल नाम कॉपी करें",
     "copyPath": "पथ कॉपी करें",
     "copyPaths": "पथ कॉपी करें",
-    "resetColumnWidths": "कॉलम चौड़ाई रीसेट करें"
+    "resetColumnWidths": "कॉलम चौड़ाई रीसेट करें",
+    "moveToTrash": "ट्रैश में भेजें",
+    "deleteImmediately": "तुरंत स्थायी रूप से हटाएँ…",
+    "confirmPermanentDelete": "चुने गए आइटम को स्थायी रूप से हटाएँ? इसे पूर्ववत नहीं किया जा सकता।"
   },
   "statusBar": {
     "tabs": {

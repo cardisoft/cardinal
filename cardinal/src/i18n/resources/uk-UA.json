@@ -52,7 +52,10 @@
     "copyFilenames": "Копіювати назви файлів",
     "copyPath": "Копіювати шлях",
     "copyPaths": "Копіювати шляхи",
-    "resetColumnWidths": "Скинути ширину стовпців"
+    "resetColumnWidths": "Скинути ширину стовпців",
+    "moveToTrash": "Перемістити до Кошика",
+    "deleteImmediately": "Видалити назавжди…",
+    "confirmPermanentDelete": "Видалити вибрані елементи назавжди? Цю дію неможливо скасувати."
   },
   "statusBar": {
     "tabs": {

@@ -31,6 +31,7 @@ type HookProps = {
   clearSelection: () => void;
   navigateSelection: (delta: 1 | -1, options?: { extend?: boolean }) => void;
   triggerQuickLook: () => void;
+  onDeletePaths: (paths: string[], permanentlyDelete: boolean) => void;
 };
 
 describe('useAppHotkeys', () => {
@@ -40,6 +41,7 @@ describe('useAppHotkeys', () => {
   const clearSelection = vi.fn();
   const navigateSelection = vi.fn();
   const triggerQuickLook = vi.fn();
+  const onDeletePaths = vi.fn();
 
   let quickLookListener: ((payload: any) => void) | null;
 
@@ -55,6 +57,7 @@ describe('useAppHotkeys', () => {
         clearSelection,
         navigateSelection,
         triggerQuickLook,
+        onDeletePaths,
         ...overrides,
       },
     });
@@ -117,6 +120,28 @@ describe('useAppHotkeys', () => {
     expect(mockedInvoke).toHaveBeenCalledWith('copy_files_to_clipboard', {
       paths: ['/tmp/a', '/tmp/b'],
     });
+
+    const moveToTrashEvent = new KeyboardEvent('keydown', {
+      key: 'Backspace',
+      metaKey: true,
+      cancelable: true,
+    });
+    act(() => {
+      window.dispatchEvent(moveToTrashEvent);
+    });
+    expect(onDeletePaths).toHaveBeenCalledWith(['/tmp/a', '/tmp/b'], false);
+    expect(moveToTrashEvent.defaultPrevented).toBe(true);
+
+    const permanentlyDeleteEvent = new KeyboardEvent('keydown', {
+      key: 'Backspace',
+      metaKey: true,
+      shiftKey: true,
+      cancelable: true,
+    });
+    act(() => {
+      window.dispatchEvent(permanentlyDeleteEvent);
+    });
+    expect(onDeletePaths).toHaveBeenCalledWith(['/tmp/a', '/tmp/b'], true);
   });
 
   it('does not override native copy shortcuts inside editable fields', () => {
@@ -249,6 +274,7 @@ describe('useAppHotkeys', () => {
       clearSelection,
       navigateSelection,
       triggerQuickLook,
+      onDeletePaths,
     });
 
     navigateSelection.mockClear();

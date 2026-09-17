@@ -52,7 +52,10 @@
     "copyFilenames": "Копировать имена файлов",
     "copyPath": "Копировать путь",
     "copyPaths": "Копировать пути",
-    "resetColumnWidths": "Сбросить ширину столбцов"
+    "resetColumnWidths": "Сбросить ширину столбцов",
+    "moveToTrash": "Переместить в Корзину",
+    "deleteImmediately": "Удалить безвозвратно…",
+    "confirmPermanentDelete": "Удалить выбранные элементы безвозвратно? Это действие нельзя отменить."
   },
   "statusBar": {
     "tabs": {

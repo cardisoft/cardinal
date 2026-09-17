@@ -12,9 +12,12 @@ type UseContextMenuResult = {
   showHeaderContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
 };
 
+type DeletePathsHandler = (paths: string[], permanentlyDelete: boolean) => void | Promise<void>;
+
 export function useContextMenu(
   autoFitColumns: (() => void) | null = null,
   onQuickLookRequest?: () => void | Promise<void>,
+  onDeletePaths?: DeletePathsHandler,
 ): UseContextMenuResult {
   const { t } = useTranslation();
   const writeClipboard = useCallback((text: string) => {
@@ -25,7 +28,7 @@ export function useContextMenu(
   }, []);
 
   const buildFileMenuItems = useCallback(
-    (targetPathsInput: string[]): MenuItemOptions[] => {
+    (targetPathsInput: string[], permanentlyDelete = false): MenuItemOptions[] => {
       const targetPaths = targetPathsInput.filter(Boolean);
       if (targetPaths.length === 0) {
         return [];
@@ -96,9 +99,23 @@ export function useContextMenu(
         });
       }
 
+      if (onDeletePaths) {
+        const deleteLabel = permanentlyDelete
+          ? t('contextMenu.deleteImmediately', { count: targetPaths.length })
+          : t('contextMenu.moveToTrash', { count: targetPaths.length });
+        items.push({
+          id: 'context_menu.delete',
+          text: deleteLabel,
+          accelerator: permanentlyDelete ? 'Cmd+Shift+Backspace' : 'Cmd+Backspace',
+          action: () => {
+            void onDeletePaths(targetPaths, permanentlyDelete);
+          },
+        });
+      }
+
       return items;
     },
-    [onQuickLookRequest, t, writeClipboard],
+    [onDeletePaths, onQuickLookRequest, t, writeClipboard],
   );
 
   const buildHeaderMenuItems = useCallback((): MenuItemOptions[] => {
@@ -134,7 +151,7 @@ export function useContextMenu(
     (event: ReactMouseEvent<HTMLElement>, targetPaths: string[]) => {
       event.preventDefault();
       event.stopPropagation();
-      void showMenu(buildFileMenuItems(targetPaths));
+      void showMenu(buildFileMenuItems(targetPaths, event.shiftKey));
     },
     [buildFileMenuItems, showMenu],
   );

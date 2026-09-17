@@ -52,7 +52,10 @@
     "copyFilenames": "Dateinamen kopieren",
     "copyPath": "Pfad kopieren",
     "copyPaths": "Pfade kopieren",
-    "resetColumnWidths": "Spaltenbreiten zurücksetzen"
+    "resetColumnWidths": "Spaltenbreiten zurücksetzen",
+    "moveToTrash": "In den Papierkorb legen",
+    "deleteImmediately": "Sofort löschen…",
+    "confirmPermanentDelete": "Ausgewählte Elemente dauerhaft löschen? Diese Aktion kann nicht rückgängig gemacht werden."
   },
   "statusBar": {
     "tabs": {

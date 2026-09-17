@@ -52,7 +52,10 @@
     "copyFilenames": "复制文件名",
     "copyPath": "复制路径",
     "copyPaths": "复制路径",
-    "resetColumnWidths": "重置列宽"
+    "resetColumnWidths": "重置列宽",
+    "moveToTrash": "移到废纸篓",
+    "deleteImmediately": "立即永久删除…",
+    "confirmPermanentDelete": "要永久删除所选项目吗？此操作无法撤销。"
   },
   "statusBar": {
     "tabs": {

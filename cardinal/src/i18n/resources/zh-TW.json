@@ -52,7 +52,10 @@
     "copyFilenames": "複製檔名",
     "copyPath": "複製路徑",
     "copyPaths": "複製路徑",
-    "resetColumnWidths": "重設欄寬"
+    "resetColumnWidths": "重設欄寬",
+    "moveToTrash": "移到垃圾桶",
+    "deleteImmediately": "立即永久刪除…",
+    "confirmPermanentDelete": "要永久刪除所選項目嗎？此操作無法復原。"
   },
   "statusBar": {
     "tabs": {

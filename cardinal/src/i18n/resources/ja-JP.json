@@ -52,7 +52,10 @@
     "copyFilenames": "ファイル名をコピー",
     "copyPath": "パスをコピー",
     "copyPaths": "パスをコピー",
-    "resetColumnWidths": "列幅をリセット"
+    "resetColumnWidths": "列幅をリセット",
+    "moveToTrash": "ゴミ箱に入れる",
+    "deleteImmediately": "今すぐ完全に削除…",
+    "confirmPermanentDelete": "選択した項目を完全に削除しますか？この操作は元に戻せません。"
   },
   "statusBar": {
     "tabs": {

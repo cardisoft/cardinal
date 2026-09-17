@@ -52,7 +52,10 @@
     "copyFilenames": "نسخ أسماء الملفات",
     "copyPath": "نسخ المسار",
     "copyPaths": "نسخ المسارات",
-    "resetColumnWidths": "إعادة تعيين عرض الأعمدة"
+    "resetColumnWidths": "إعادة تعيين عرض الأعمدة",
+    "moveToTrash": "نقل إلى سلة المهملات",
+    "deleteImmediately": "حذف نهائيًا…",
+    "confirmPermanentDelete": "هل تريد حذف العناصر المحددة نهائيًا؟ لا يمكن التراجع عن هذا الإجراء."
   },
   "statusBar": {
     "tabs": {

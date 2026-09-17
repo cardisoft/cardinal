@@ -52,7 +52,10 @@
     "copyFilenames": "파일 이름 복사",
     "copyPath": "경로 복사",
     "copyPaths": "경로 복사",
-    "resetColumnWidths": "열 너비 재설정"
+    "resetColumnWidths": "열 너비 재설정",
+    "moveToTrash": "휴지통으로 이동",
+    "deleteImmediately": "즉시 영구 삭제…",
+    "confirmPermanentDelete": "선택한 항목을 영구적으로 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
   },
   "statusBar": {
     "tabs": {

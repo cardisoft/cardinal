@@ -24,6 +24,7 @@ type UseAppHotkeysOptions = {
   clearSelection: () => void;
   navigateSelection: (delta: 1 | -1, options?: MoveSelectionOptions) => void;
   triggerQuickLook: () => void;
+  onDeletePaths: (paths: string[], permanentlyDelete: boolean) => void | Promise<void>;
 };
 
 const QUICK_LOOK_KEYCODE_DOWN = 125;
@@ -46,6 +47,7 @@ export function useAppHotkeys({
   clearSelection,
   navigateSelection,
   triggerQuickLook,
+  onDeletePaths,
 }: UseAppHotkeysOptions): void {
   const keyboardStateRef = useRef<{ activeTab: StatusTabKey; activeRowIndex: number | null }>({
     activeTab,
@@ -94,6 +96,14 @@ export function useAppHotkeys({
       void invoke('copy_files_to_clipboard', { paths: selectedPaths }).catch((error) => {
         console.error('Failed to copy files to clipboard', error);
       });
+      return true;
+    }
+
+    if (key === 'backspace' && selectedPaths.length > 0) {
+      event.preventDefault();
+      if (!event.repeat) {
+        void onDeletePaths(selectedPaths, event.shiftKey);
+      }
       return true;
     }
 

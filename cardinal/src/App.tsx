@@ -1,5 +1,6 @@
 import { useRef, useCallback, useEffect, useMemo } from 'react';
 import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import './App.css';
 import { FileRow } from './components/FileRow';
 import { SearchBar } from './components/SearchBar';
@@ -144,16 +145,6 @@ function App() {
   });
 
   const {
-    showContextMenu: showFilesContextMenu,
-    showHeaderContextMenu: showFilesHeaderContextMenu,
-  } = useContextMenu(autoFitColumns, toggleQuickLook);
-
-  const {
-    showContextMenu: showEventsContextMenu,
-    showHeaderContextMenu: showEventsHeaderContextMenu,
-  } = useContextMenu(autoFitEventColumns);
-
-  const {
     status: fullDiskAccessStatus,
     isChecking: isCheckingFullDiskAccess,
     requestPermission: requestFullDiskAccessPermission,
@@ -183,6 +174,40 @@ function App() {
   const refreshSearchResults = useCallback(() => {
     queueSearch(currentQuery, { immediate: true });
   }, [currentQuery, queueSearch]);
+
+  const handleDeletePaths = useCallback(
+    async (paths: string[], permanentlyDelete: boolean) => {
+      if (paths.length === 0) {
+        return;
+      }
+
+      if (
+        permanentlyDelete &&
+        !window.confirm(t('contextMenu.confirmPermanentDelete', { count: paths.length }))
+      ) {
+        return;
+      }
+
+      try {
+        await invoke('delete_paths', { paths, permanentlyDelete });
+        clearSelection();
+        refreshSearchResults();
+      } catch (error) {
+        console.error('Failed to delete files', error);
+      }
+    },
+    [clearSelection, refreshSearchResults, t],
+  );
+
+  const {
+    showContextMenu: showFilesContextMenu,
+    showHeaderContextMenu: showFilesHeaderContextMenu,
+  } = useContextMenu(autoFitColumns, toggleQuickLook, handleDeletePaths);
+
+  const {
+    showContextMenu: showEventsContextMenu,
+    showHeaderContextMenu: showEventsHeaderContextMenu,
+  } = useContextMenu(autoFitEventColumns);
 
   const {
     isPreferencesOpen,
@@ -228,6 +253,7 @@ function App() {
     clearSelection,
     navigateSelection,
     triggerQuickLook,
+    onDeletePaths: handleDeletePaths,
   });
 
   useFilesTabEffects({

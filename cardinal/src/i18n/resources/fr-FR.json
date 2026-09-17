@@ -52,7 +52,10 @@
     "copyFilenames": "Copier les noms de fichier",
     "copyPath": "Copier le chemin",
     "copyPaths": "Copier les chemins",
-    "resetColumnWidths": "Réinitialiser la largeur des colonnes"
+    "resetColumnWidths": "Réinitialiser la largeur des colonnes",
+    "moveToTrash": "Mettre à la corbeille",
+    "deleteImmediately": "Supprimer immédiatement…",
+    "confirmPermanentDelete": "Supprimer définitivement les éléments sélectionnés ? Cette action est irréversible."
   },
   "statusBar": {
     "tabs": {

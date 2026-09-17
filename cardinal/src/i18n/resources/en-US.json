@@ -52,7 +52,10 @@
     "copyFilenames": "Copy Filenames",
     "copyPath": "Copy Path",
     "copyPaths": "Copy Paths",
-    "resetColumnWidths": "Reset Column Widths"
+    "resetColumnWidths": "Reset Column Widths",
+    "moveToTrash": "Move to Trash",
+    "deleteImmediately": "Delete Immediately…",
+    "confirmPermanentDelete": "Permanently delete the selected item(s)? This cannot be undone."
   },
   "statusBar": {
     "tabs": {

@@ -52,7 +52,10 @@
     "copyFilenames": "Copiar nombres de archivos",
     "copyPath": "Copiar ruta",
     "copyPaths": "Copiar rutas",
-    "resetColumnWidths": "Restablecer ancho de columnas"
+    "resetColumnWidths": "Restablecer ancho de columnas",
+    "moveToTrash": "Mover a la papelera",
+    "deleteImmediately": "Eliminar inmediatamente…",
+    "confirmPermanentDelete": "¿Eliminar permanentemente los elementos seleccionados? Esta acción no se puede deshacer."
   },
   "statusBar": {
     "tabs": {

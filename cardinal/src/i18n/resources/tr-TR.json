@@ -52,7 +52,10 @@
     "copyFilenames": "Dosya adlarını kopyala",
     "copyPath": "Yolu kopyala",
     "copyPaths": "Yolları kopyala",
-    "resetColumnWidths": "Sütun genişliklerini sıfırla"
+    "resetColumnWidths": "Sütun genişliklerini sıfırla",
+    "moveToTrash": "Çöp Kutusuna Taşı",
+    "deleteImmediately": "Kalıcı Olarak Sil…",
+    "confirmPermanentDelete": "Seçili öğeler kalıcı olarak silinsin mi? Bu işlem geri alınamaz."
   },
   "statusBar": {
     "tabs": {

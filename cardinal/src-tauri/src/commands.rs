@@ -17,7 +17,7 @@ use objc2::{
     runtime::ProtocolObject,
 };
 use objc2_app_kit::{NSPasteboard, NSPasteboardItem, NSPasteboardTypeString, NSPasteboardWriting};
-use objc2_foundation::{NSArray, NSString, NSURL};
+use objc2_foundation::{NSArray, NSFileManager, NSString, NSURL};
 use parking_lot::Mutex;
 use search_cache::{
     SearchOptions, SearchOutcome, SearchQuery, SearchResultNode, SlabIndex, SlabNodeMetadata,
@@ -448,6 +448,35 @@ pub async fn open_path(path: String) {
     if let Err(e) = Command::new("open").arg(&path).spawn() {
         error!("Failed to open path: {e}");
     }
+}
+
+#[tauri::command]
+pub async fn delete_paths(paths: Vec<String>, permanently_delete: bool) -> Result<(), String> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+
+    let paths = paths
+        .into_iter()
+        .filter(|path| !path.is_empty() && path != "/")
+        .collect::<Vec<_>>();
+    if paths.is_empty() {
+        return Err("No deletable paths were provided".to_string());
+    }
+
+    autoreleasepool(|_| {
+        let file_manager = NSFileManager::defaultManager();
+        for path in paths {
+            let url = NSURL::fileURLWithPath(&NSString::from_str(&path));
+            let result = if permanently_delete {
+                file_manager.removeItemAtURL_error(&url)
+            } else {
+                file_manager.trashItemAtURL_resultingItemURL_error(&url, None)
+            };
+            result.map_err(|error| error.localizedDescription().to_string())?;
+        }
+        Ok(())
+    })
 }
 
 #[tauri::command]
