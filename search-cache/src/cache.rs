@@ -38,6 +38,9 @@ pub struct SearchCache {
     rescan_count: u64,
     pub(crate) name_index: NameIndex,
     stop: &'static AtomicBool,
+    /// True when in-memory state differs from the last persisted snapshot. Lets callers skip
+    /// periodic flushes of an unchanged index (each snapshot rewrites the whole cache file).
+    pub(crate) dirty: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -271,7 +274,10 @@ impl SearchCache {
             slab_root,
         );
         // metadata cache inits later
-        Some(Self::new(slab, last_event_id, 0, name_index, cancel))
+        let mut cache = Self::new(slab, last_event_id, 0, name_index, cancel);
+        // A freshly walked index has never been persisted.
+        cache.dirty = true;
+        Some(cache)
     }
 
     fn new(
@@ -287,6 +293,7 @@ impl SearchCache {
             rescan_count,
             name_index,
             stop: cancel,
+            dirty: false,
         }
     }
 
@@ -310,6 +317,7 @@ impl SearchCache {
             rescan_count: 0,
             name_index: NameIndex::default(),
             stop: cancel,
+            dirty: false,
         }
     }
 
@@ -687,9 +695,29 @@ impl SearchCache {
         let parent = path.parent().expect(
             "scan_path_recursive doesn't expected to scan root(should be filtered outside)",
         );
+        // Walk the changed subtree BEFORE touching the slab. The walk returns `None` as soon as
+        // the stop flag is raised (app quitting); removing the old subtree first and then failing
+        // to re-insert it silently dropped whole directories from the index, and the truncated
+        // cache was then persisted on exit.
+        let walked = {
+            // For incremental data, we need metadata
+            let walk_data = WalkData::new(
+                path,
+                self.file_nodes.ignore_paths(),
+                self.file_nodes.include_paths(),
+                true,
+                || self.stop.load(Ordering::Relaxed),
+            );
+            walk_it_without_root_chain(&walk_data)
+        };
+        if walked.is_none() && self.stop.load(Ordering::Relaxed) {
+            // Cancelled: keep the existing (possibly stale) subtree; the event is replayed later.
+            return None;
+        }
+        self.dirty = true;
         // Ensure node of the path parent is existed
         let parent = self.create_node_chain(parent);
-        // Remove node(if exists) and do a full rescan
+        // Remove node(if exists) and replace it with the freshly walked subtree
         if let Some(&old_node) = self.file_nodes[parent]
             .children
             .iter()
@@ -697,15 +725,7 @@ impl SearchCache {
         {
             self.remove_node(old_node);
         }
-        // For incremental data, we need metadata
-        let walk_data = WalkData::new(
-            path,
-            self.file_nodes.ignore_paths(),
-            self.file_nodes.include_paths(),
-            true,
-            || self.stop.load(Ordering::Relaxed),
-        );
-        walk_it_without_root_chain(&walk_data).map(|node| {
+        walked.map(|node| {
             let node = self.create_node_slab_update_name_index_and_name_pool(Some(parent), &node);
             // Push the newly created node to the parent's children
             self.file_nodes[parent].add_children(node);
@@ -781,6 +801,9 @@ impl SearchCache {
             }
         }
 
+        // Mark at the mutation point so a removal counts even when the surrounding FSEvents
+        // batch is interrupted before `last_event_id` advances.
+        self.dirty = true;
         // Remove parent reference, make whole subtree unreachable.
         if let Some(parent) = self.file_nodes[index].parent() {
             self.file_nodes[parent].children.retain(|&x| x != index);
@@ -814,7 +837,15 @@ impl SearchCache {
         let PersistentStorage { slab, .. } = storage;
         self.file_nodes.put_slab(slab);
 
+        if flush_result.is_ok() {
+            self.dirty = false;
+        }
         flush_result
+    }
+
+    /// Whether the in-memory index has changed since it was last loaded from or written to disk.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
     }
 
     pub fn flush_to_file(self, cache_path: &Path) -> Result<()> {
@@ -824,6 +855,7 @@ impl SearchCache {
             rescan_count,
             name_index,
             stop: _,
+            dirty: _,
         } = self;
         let (path, ignore_paths, include_paths, slab_root, slab) = file_nodes.into_parts();
         let name_index = name_index.into_persistent();
@@ -850,6 +882,7 @@ impl SearchCache {
         } else {
             debug!("last_event_id {} => {event_id}", self.last_event_id);
             self.last_event_id = event_id;
+            self.dirty = true;
         }
     }
 
@@ -885,7 +918,8 @@ impl SearchCache {
         &mut self,
         nodes: &[SlabIndex],
     ) -> Vec<SearchResultNode> {
-        nodes
+        let mut fetched_any = false;
+        let expanded: Vec<SearchResultNode> = nodes
             .iter()
             .copied()
             .map(|node_index| {
@@ -902,6 +936,7 @@ impl SearchCache {
                                     Err(_) => SlabNodeMetadataCompact::unaccessible(),
                                 };
                                 node.metadata = metadata;
+                                fetched_any = true;
                                 metadata
                             }
                             _ => node.metadata,
@@ -913,7 +948,11 @@ impl SearchCache {
                     metadata,
                 }
             })
-            .collect()
+            .collect();
+        if fetched_any {
+            self.dirty = true;
+        }
+        expanded
     }
 
     pub fn handle_fs_events(&mut self, events: Vec<FsEvent>) -> Result<(), HandleFSEError> {
@@ -931,14 +970,27 @@ impl SearchCache {
             }
         }) {
             self.rescan_count = self.rescan_count.saturating_add(1);
+            // `rescan_count` is persisted, so this is a change worth flushing.
+            self.dirty = true;
             return Err(HandleFSEError::Rescan);
         }
         for scan_path in scan_paths(events) {
+            if self.stop.load(Ordering::Relaxed) {
+                // Shutting down: stop rescanning and, crucially, do NOT advance
+                // `last_event_id`, so the whole batch is replayed on the next launch and
+                // the paths we did not get to are rescanned then.
+                info!("Stop requested; leaving FSEvents batch for replay on next launch");
+                return Ok(());
+            }
             info!("Scanning path: {scan_path:?}");
             let folder = self.scan_path_recursive(&scan_path);
             if folder.is_some() {
                 info!("Node changed: {folder:?}");
             }
+        }
+        if self.stop.load(Ordering::Relaxed) {
+            info!("Stop requested during rescan; FSEvents batch will be replayed on next launch");
+            return Ok(());
         }
         if let Some(max_event_id) = max_event_id {
             self.update_last_event_id(max_event_id);

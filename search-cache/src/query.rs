@@ -1048,6 +1048,7 @@ impl SearchCache {
             Err(_) => SlabNodeMetadataCompact::unaccessible(),
         };
         self.file_nodes[index].metadata = metadata;
+        self.dirty = true;
         metadata
     }
 }

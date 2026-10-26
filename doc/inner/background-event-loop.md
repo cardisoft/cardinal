@@ -70,14 +70,15 @@ event_watcher          -> apply FSEvents, emit recent activity, advance lifecycl
 - `lib.rs` batches those payloads and emits a single `icon_update` event containing an array.
 
 ## Flush behavior
-- Flush checks run every 10 seconds.
-- Hide flush:
-  - when the main window leaves the foreground, a two-tick countdown starts
-  - if the window is still hidden/unfocused on the second tick, the cache snapshot is written
-- Idle flush:
-  - `search_activity::note_search_activity()` records the last search time
-  - after 5 minutes without searches, the next tick writes a snapshot
-- Flushes only run while the lifecycle is `Ready`.
+Every snapshot rewrites the whole cache file (~100 MB for a full-disk index), so writes are scheduled as *checkpoints* (`search_activity.rs`, `background.rs::decide_flush`). Before this policy existed an idle Mac rewrote the file every 5 minutes, again right after every wake, and on every hide of the window (8.6 GB/day was observed).
+
+- Flush checks run every 10 seconds, only while the lifecycle is `Ready`.
+- A checkpoint is **due** when `SearchCache::is_dirty()` (something changed since the last load/flush: FSEvents applied, removals, rescans, rescan counter, lazily fetched metadata) and at least `CHECKPOINT_INTERVAL` (6 hours) has passed since the previous write attempt. Failed attempts count, so a broken disk cannot cause a retry storm. A freshly walked index has never been persisted, so its baseline is due immediately; a snapshot loaded at startup starts the interval at launch.
+- A due checkpoint is written at the next **quiet moment**: the window was just hidden (two-tick countdown, 10-20 s), or no search has run for 5 minutes, or, once the checkpoint is already waiting, a 30-second gap between searches. If no quiet moment occurs within `CHECKPOINT_DEFERRAL` (5 minutes) it is written anyway, so continuous searching cannot starve persistence.
+- A clean index is never written, including at exit.
+- All clocks are monotonic (`Instant`, `CLOCK_UPTIME_RAW` on macOS), so time asleep never counts as idle time and never brings a checkpoint forward.
+- Worst case under continuous change: about 4 automatic snapshots per awake day (~400 MB) plus one at a dirty exit.
+- Foreground state comes from an atomic maintained on the main thread (`window_controls::main_window_is_foreground`); the background loop never calls blocking window getters.
 
 ## Shutdown
 - `RunEvent::Exit` / `ExitRequested` set `APP_QUIT`.

@@ -34,7 +34,7 @@ use std::{
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 use tracing::{info, level_filters::LevelFilter, warn};
 use tracing_subscriber::EnvFilter;
-use window_controls::{activate_window, hide_window};
+use window_controls::{activate_window, hide_window, set_main_window_foreground};
 
 static DB_PATH: OnceCell<PathBuf> = OnceCell::new();
 pub(crate) static LOGIC_START: OnceCell<Sender<LogicStartConfig>> = OnceCell::new();
@@ -88,7 +88,11 @@ pub fn run() -> Result<()> {
             }
 
             match event {
-                WindowEvent::Focused(_) => {
+                WindowEvent::Focused(focused) => {
+                    // Record the foreground state here, on the main thread, so the background
+                    // loop can read an atomic instead of round-tripping window getters through
+                    // the event loop (those block the caller until the main thread answers).
+                    set_main_window_foreground(*focused);
                     let _ = update_window_state_tx_for_window.try_send(());
                 }
                 WindowEvent::CloseRequested { api, .. } => {
@@ -249,6 +253,8 @@ fn run_logic_thread(
     ) {
         Ok(cached) => {
             info!("Loaded existing cache");
+            // The on-disk snapshot is a valid baseline: start the checkpoint interval now.
+            search_activity::note_loaded_baseline();
             emit_status_bar_update(app_handle, cached.get_total_files(), 0, 0);
             cached
         }
@@ -327,6 +333,10 @@ fn flush_cache_to_file_once(finish_tx: &Sender<Sender<Option<SearchCache>>>, db_
             .context("cache_tx is closed")
             .unwrap();
         if let Some(cache) = cache_rx.recv().context("cache_tx is closed").unwrap() {
+            if !cache.is_dirty() {
+                info!("Cache unchanged since last snapshot; skipping exit flush");
+                return;
+            }
             cache
                 .flush_to_file(db_path)
                 .context("Failed to write cache to file")

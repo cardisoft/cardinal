@@ -43,7 +43,7 @@ Persistence uses `PersistentStorage` in `persistent.rs`:
 - encoded with `postcard`
 - compressed with `zstd`
 - written atomically via `path.with_extension(".sctmp")`
-- currently versioned as `5`
+- currently versioned as `6`
 
 Persisted fields:
 - watch root

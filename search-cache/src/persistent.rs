@@ -1,10 +1,10 @@
 use crate::{SlabIndex, SlabNode, ThinSlab, name_index::SortedSlabIndices};
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     fs::{self, File},
-    io::{BufReader, BufWriter},
+    io::{BufReader, BufWriter, Write},
     path::{Path, PathBuf},
     thread::available_parallelism,
     time::Instant,
@@ -50,15 +50,28 @@ pub fn write_cache_to_file(path: &Path, storage: &PersistentStorage) -> Result<(
     let cache_encode_time = Instant::now();
     let _ = fs::create_dir_all(path.parent().unwrap());
     let tmp_path = &path.with_extension(".sctmp");
-    {
+    let write_result = (|| -> Result<()> {
         let output = File::create(tmp_path).context("Failed to create cache file")?;
-        let mut output = zstd::Encoder::new(output, 6).context("Failed to create zstd encoder")?;
-        output
+        let mut encoder = zstd::Encoder::new(output, 6).context("Failed to create zstd encoder")?;
+        encoder
             .multithread(available_parallelism().map(|x| x.get() as u32).unwrap_or(4))
             .context("Failed to create parallel zstd encoder")?;
-        let output = output.auto_finish();
-        let mut output = BufWriter::new(output);
-        postcard::to_io(storage, &mut output).context("Failed to encode cache")?;
+        let mut writer = BufWriter::new(encoder);
+        postcard::to_io(storage, &mut writer).context("Failed to encode cache")?;
+        // Finish every layer explicitly. Relying on the BufWriter / AutoFinishEncoder
+        // destructors silently discarded flush and zstd-finalisation errors (e.g. disk full),
+        // after which a truncated snapshot was renamed over the previous good cache.
+        writer.flush().context("Failed to flush cache writer")?;
+        let encoder = writer
+            .into_inner()
+            .map_err(|err| anyhow!("Failed to flush cache writer: {}", err.error()))?;
+        let file = encoder.finish().context("Failed to finish zstd stream")?;
+        file.sync_all().context("Failed to sync cache file")?;
+        Ok(())
+    })();
+    if let Err(err) = write_result {
+        let _ = fs::remove_file(tmp_path);
+        return Err(err);
     }
     fs::rename(tmp_path, path).context("Failed to rename cache file")?;
     info!("Cache encode time: {:?}", cache_encode_time.elapsed());

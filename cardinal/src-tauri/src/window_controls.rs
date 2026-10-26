@@ -1,6 +1,24 @@
 use crate::commands::SearchState;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow};
 use tracing::{error, info, warn};
+
+/// Whether the main window is currently visible and focused.
+///
+/// Written on the main thread (window focus events in `lib.rs`, plus the show/hide helpers
+/// below) and read by the background loop. The background loop used to ask Tauri's
+/// `is_visible()/is_focused()/is_minimized()` getters instead; each of those sends a message to
+/// the main event loop and blocks the calling thread until it is serviced, so a busy main
+/// thread stalled the indexing loop (and a hide-flush decision could be delayed indefinitely).
+static MAIN_WINDOW_FOREGROUND: AtomicBool = AtomicBool::new(false);
+
+pub fn set_main_window_foreground(foreground: bool) {
+    MAIN_WINDOW_FOREGROUND.store(foreground, Ordering::Release);
+}
+
+pub fn main_window_is_foreground() -> bool {
+    MAIN_WINDOW_FOREGROUND.load(Ordering::Acquire)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowToggle {
@@ -24,6 +42,10 @@ pub fn activate_window<R: Runtime>(window: &WebviewWindow<R>) {
 
     if let Err(err) = window.set_focus() {
         error!(?err, "Failed to focus window");
+    } else {
+        // The Focused(true) window event will confirm this shortly; set it eagerly so a
+        // hide-flush countdown started before activation is cancelled right away.
+        set_main_window_foreground(true);
     }
 }
 
@@ -32,6 +54,7 @@ pub fn hide_window<R: Runtime>(window: &WebviewWindow<R>) -> bool {
         error!(?err, "Failed to hide window");
         return false;
     }
+    set_main_window_foreground(false);
     true
 }
 
@@ -58,18 +81,6 @@ pub fn toggle_window<R: Runtime>(window: &WebviewWindow<R>) -> WindowToggle {
         trigger_quick_launch(window);
         WindowToggle::Shown
     }
-}
-
-pub fn is_main_window_foreground(app_handle: &AppHandle) -> bool {
-    let Some(window) = app_handle.get_webview_window("main") else {
-        return false;
-    };
-
-    let visible = window.is_visible().unwrap_or(false);
-    let focused = window.is_focused().unwrap_or(false);
-    let minimized = window.is_minimized().unwrap_or(false);
-
-    visible && focused && !minimized
 }
 
 pub fn activate_main_window_impl(app: &AppHandle) {

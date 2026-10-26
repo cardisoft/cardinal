@@ -2,7 +2,7 @@ use crate::{
     commands::{NodeInfoRequest, SearchJob, WatchConfigUpdate},
     lifecycle::{APP_QUIT, AppLifecycleState, load_app_state, update_app_state},
     search_activity,
-    window_controls::is_main_window_foreground,
+    window_controls::main_window_is_foreground,
 };
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
@@ -22,7 +22,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Emitter};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -186,24 +186,33 @@ struct RecentEvent {
     timestamp: i64,
 }
 
-fn handle_flush_tick(
-    app_handle: &AppHandle,
-    cache: &mut SearchCache,
-    db_path: &Path,
-    hide_flush_remaining_ticks: &mut u8,
-) {
+fn handle_flush_tick(cache: &mut SearchCache, db_path: &Path, hide_flush_remaining_ticks: &mut u8) {
     if load_app_state() != AppLifecycleState::Ready {
         return;
     }
     let mut flush_search_cache = FlushSearchCache { cache, db_path };
-    let flushed = start_flush_checks(
-        || is_main_window_foreground(app_handle),
-        search_activity::search_idles,
+    let waiting_for = search_activity::checkpoint_waiting_for();
+    // A quiet moment is 5 minutes without searches; once a checkpoint is already waiting, a
+    // 30-second gap between searches is enough.
+    let is_quiet = || {
+        search_activity::search_idles()
+            || (waiting_for.is_some() && search_activity::search_quiet())
+    };
+    let outcome = start_flush_checks(
+        main_window_is_foreground,
+        is_quiet,
+        search_activity::since_last_flush_attempt(),
+        waiting_for,
         &mut flush_search_cache,
         hide_flush_remaining_ticks,
     );
-    if flushed {
-        search_activity::note_search_activity();
+    match outcome {
+        FlushOutcome::Deferred => search_activity::note_checkpoint_due(),
+        // Recorded on failure too, so a broken disk does not cause a 100 MB retry every tick.
+        FlushOutcome::Written | FlushOutcome::Failed => search_activity::note_flush_attempt(),
+        FlushOutcome::NotDue | FlushOutcome::SkippedClean => {
+            search_activity::clear_checkpoint_due()
+        }
     }
 }
 
@@ -337,8 +346,9 @@ pub fn run_background_event_loop(
                 return;
             }
             recv(update_window_state_rx) -> _ => {
-                // Recompute foreground state on demand instead of mirroring events.
-                let new_foreground = is_main_window_foreground(app_handle);
+                // Read the foreground flag maintained on the main thread (no blocking
+                // round trip through the event loop).
+                let new_foreground = main_window_is_foreground();
                 if window_is_foreground && !new_foreground {
                     hide_flush_remaining_ticks = 2; // allow 10~20s before running hide flush
                 } else if new_foreground {
@@ -347,12 +357,7 @@ pub fn run_background_event_loop(
                 window_is_foreground = new_foreground;
             }
             recv(flush_ticker) -> _ => {
-                handle_flush_tick(
-                    app_handle,
-                    &mut cache,
-                    &db_path,
-                    &mut hide_flush_remaining_ticks,
-                );
+                handle_flush_tick(&mut cache, &db_path, &mut hide_flush_remaining_ticks);
             }
             recv(search_rx) -> job => {
                 let SearchJob {
@@ -550,6 +555,8 @@ struct FlushSearchCache<'cache> {
 trait FlushSnapshot {
     fn flush_snapshot_to_file(&mut self) -> Result<()>;
     fn db_path(&self) -> &Path;
+    /// Whether anything changed since the last snapshot was written or loaded.
+    fn is_dirty(&self) -> bool;
 }
 
 impl FlushSnapshot for FlushSearchCache<'_> {
@@ -559,24 +566,94 @@ impl FlushSnapshot for FlushSearchCache<'_> {
     fn db_path(&self) -> &Path {
         self.db_path
     }
+    fn is_dirty(&self) -> bool {
+        self.cache.is_dirty()
+    }
 }
 
-/// This function should be called periodically to check if a flush is needed.
-/// Returns true if a flush was performed (either hide or idle).
+/// Result of one flush-policy evaluation (one 10 s tick).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FlushOutcome {
+    /// Nothing to do: the index is clean and no trigger fired, or it is dirty but a snapshot
+    /// was attempted less than `CHECKPOINT_INTERVAL` ago.
+    NotDue,
+    /// A trigger fired but the index is unchanged since the last snapshot.
+    SkippedClean,
+    /// A checkpoint is due but is waiting (bounded by `CHECKPOINT_DEFERRAL`) for a quiet moment.
+    Deferred,
+    Written,
+    Failed,
+}
+
+impl FlushOutcome {
+    #[cfg(test)]
+    fn attempted(self) -> bool {
+        matches!(self, Self::Written | Self::Failed)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FlushDecision {
+    NotDue,
+    Clean,
+    Defer,
+    Write,
+}
+
+/// Pure scheduling decision for one tick.
+///
+/// - `opportunity`: the window was just hidden, or no search has run for a while, so writing
+///   now will not delay a user's searches (a snapshot blocks the background loop for seconds).
+/// - `since_last_attempt`: time since this process last attempted a snapshot. `None` means
+///   never: a freshly walked index is due immediately so its baseline is not lost to a crash
+///   (recreating it costs a full-disk walk). A snapshot loaded at startup counts as an attempt.
+/// - `waiting_for`: how long a due checkpoint has already been deferred.
+///
+/// Guarantees: a clean index is never written; dirty or not, no two automatic writes are
+/// closer than `CHECKPOINT_INTERVAL`; a due checkpoint is written within
+/// `CHECKPOINT_DEFERRAL` even if the user never stops searching.
+fn decide_flush(
+    dirty: bool,
+    opportunity: bool,
+    since_last_attempt: Option<Duration>,
+    waiting_for: Option<Duration>,
+) -> FlushDecision {
+    if !dirty {
+        return if opportunity {
+            FlushDecision::Clean
+        } else {
+            FlushDecision::NotDue
+        };
+    }
+    if since_last_attempt.is_some_and(|elapsed| elapsed < search_activity::CHECKPOINT_INTERVAL) {
+        return FlushDecision::NotDue;
+    }
+    if opportunity {
+        return FlushDecision::Write;
+    }
+    match waiting_for {
+        Some(waited) if waited >= search_activity::CHECKPOINT_DEFERRAL => FlushDecision::Write,
+        _ => FlushDecision::Defer,
+    }
+}
+
+/// Called on every flush tick. Consumes the hide countdown, evaluates [`decide_flush`] and
+/// performs the write when due. The caller updates the scheduling state from the outcome.
 fn start_flush_checks<F, I, C>(
     is_foreground: F,
     is_idle: I,
+    since_last_attempt: Option<Duration>,
+    waiting_for: Option<Duration>,
     cache: &mut C,
     hide_flush_remaining_ticks: &mut u8,
-) -> bool
+) -> FlushOutcome
 where
     F: Fn() -> bool,
     I: Fn() -> bool,
     C: FlushSnapshot,
 {
-    let idle_flush = is_idle();
-    let hide_flush = {
-        // Consume the pending hide flush counter; only fire once.
+    let hide_due = {
+        // Consume the pending hide countdown; it fires once.
         if *hide_flush_remaining_ticks > 0 {
             *hide_flush_remaining_ticks -= 1;
             *hide_flush_remaining_ticks == 0
@@ -584,49 +661,216 @@ where
             false
         }
     };
-    let hide_flush = hide_flush && !is_foreground();
+    let hide_due = hide_due && !is_foreground();
+    let idle = is_idle();
+    let opportunity = hide_due || idle;
 
-    if hide_flush {
-        let label = "hide_flush";
-        match cache.flush_snapshot_to_file() {
-            Ok(()) => info!(
-                "Cache flushed successfully ({label}) to {:?}",
-                cache.db_path()
-            ),
-            Err(e) => error!(
-                "Cache flush failed ({label}) to {:?}: {e:?}",
-                cache.db_path()
-            ),
+    match decide_flush(
+        cache.is_dirty(),
+        opportunity,
+        since_last_attempt,
+        waiting_for,
+    ) {
+        FlushDecision::NotDue => FlushOutcome::NotDue,
+        FlushDecision::Clean => {
+            debug!("Skipping snapshot: cache unchanged since last snapshot");
+            FlushOutcome::SkippedClean
         }
-        true
-    } else if idle_flush {
-        let label = "idle_flush";
-        match cache.flush_snapshot_to_file() {
-            Ok(()) => info!(
-                "Cache flushed successfully ({label}) to {:?}",
-                cache.db_path()
-            ),
-            Err(e) => error!(
-                "Cache flush failed ({label}) to {:?}: {e:?}",
-                cache.db_path()
-            ),
+        FlushDecision::Defer => {
+            debug!(
+                "Checkpoint due; waiting up to {:?} for a quiet moment",
+                search_activity::CHECKPOINT_DEFERRAL
+            );
+            FlushOutcome::Deferred
         }
-        true
-    } else {
-        false
+        FlushDecision::Write => {
+            let label = if hide_due {
+                "hide"
+            } else if idle {
+                "idle"
+            } else {
+                "forced"
+            };
+            match cache.flush_snapshot_to_file() {
+                Ok(()) => {
+                    info!(
+                        "Cache flushed successfully ({label}) to {:?}",
+                        cache.db_path()
+                    );
+                    FlushOutcome::Written
+                }
+                Err(e) => {
+                    error!(
+                        "Cache flush failed ({label}) to {:?}: {e:?}",
+                        cache.db_path()
+                    );
+                    FlushOutcome::Failed
+                }
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use search_activity::{CHECKPOINT_DEFERRAL, CHECKPOINT_INTERVAL};
 
-    #[derive(Default)]
+    const HOUR: Duration = Duration::from_secs(3600);
+
+    #[test]
+    fn policy_clean_index_never_writes() {
+        assert_eq!(decide_flush(false, true, None, None), FlushDecision::Clean);
+        assert_eq!(
+            decide_flush(false, false, Some(HOUR * 24), None),
+            FlushDecision::NotDue
+        );
+    }
+
+    #[test]
+    fn policy_rate_limits_every_trigger() {
+        // Hide/idle opportunities inside the interval do not write, however dirty the index.
+        let one_minute = Duration::from_secs(60);
+        assert_eq!(
+            decide_flush(true, true, Some(one_minute), None),
+            FlushDecision::NotDue
+        );
+        assert_eq!(
+            decide_flush(true, true, Some(CHECKPOINT_INTERVAL - one_minute), None),
+            FlushDecision::NotDue
+        );
+        // Once the interval has elapsed, the next opportunity writes.
+        assert_eq!(
+            decide_flush(true, true, Some(CHECKPOINT_INTERVAL), None),
+            FlushDecision::Write
+        );
+    }
+
+    #[test]
+    fn policy_fresh_index_baseline_is_due_immediately() {
+        // Never attempted: due now. Waits for a quiet moment, then forces.
+        assert_eq!(decide_flush(true, false, None, None), FlushDecision::Defer);
+        assert_eq!(
+            decide_flush(true, false, None, Some(Duration::from_secs(60))),
+            FlushDecision::Defer
+        );
+        assert_eq!(
+            decide_flush(true, false, None, Some(CHECKPOINT_DEFERRAL)),
+            FlushDecision::Write
+        );
+        assert_eq!(decide_flush(true, true, None, None), FlushDecision::Write);
+    }
+
+    #[test]
+    fn policy_continuous_searching_cannot_starve_checkpoints() {
+        // Dirty, interval elapsed, user keeps searching in the foreground (no opportunity).
+        assert_eq!(
+            decide_flush(true, false, Some(HOUR * 7), None),
+            FlushDecision::Defer
+        );
+        assert_eq!(
+            decide_flush(true, false, Some(HOUR * 7), Some(CHECKPOINT_DEFERRAL)),
+            FlushDecision::Write
+        );
+    }
+
+    #[test]
+    fn worst_case_daily_volume_is_bounded() {
+        // Continuously dirty index, an opportunity on every 10 s tick, snapshot loaded at
+        // launch: count automatic writes over 24 awake hours.
+        let tick = Duration::from_secs(10);
+        let mut elapsed = Duration::ZERO;
+        let mut last_attempt = Duration::ZERO;
+        let mut writes = 0;
+        while elapsed < HOUR * 24 {
+            if decide_flush(true, true, Some(elapsed - last_attempt), None) == FlushDecision::Write
+            {
+                writes += 1;
+                last_attempt = elapsed;
+            }
+            elapsed += tick;
+        }
+        assert_eq!(
+            writes, 3,
+            "6-hour spacing after a loaded baseline: 6 h, 12 h, 18 h"
+        );
+    }
+
+    #[test]
+    fn start_flush_checks_reports_clean_and_deferred_outcomes() {
+        let mut fake = FakeCache {
+            flushes: 0,
+            dirty: false,
+        };
+        let mut pending = 0;
+        assert_eq!(
+            start_flush_checks(|| true, || true, None, None, &mut fake, &mut pending),
+            FlushOutcome::SkippedClean
+        );
+        assert_eq!(fake.flushes, 0, "unchanged cache must not be rewritten");
+
+        fake.dirty = true;
+        // Inside the interval: nothing happens, even on a hide trigger.
+        let mut pending = 1;
+        assert_eq!(
+            start_flush_checks(
+                || false,
+                || false,
+                Some(HOUR),
+                None,
+                &mut fake,
+                &mut pending
+            ),
+            FlushOutcome::NotDue
+        );
+        assert_eq!(pending, 0, "the hide countdown is still consumed");
+        assert_eq!(fake.flushes, 0, "hide flush is rate limited too");
+
+        // Interval elapsed but the user is active: deferred, then forced after the bound.
+        let mut pending = 0;
+        assert_eq!(
+            start_flush_checks(
+                || true,
+                || false,
+                Some(HOUR * 7),
+                None,
+                &mut fake,
+                &mut pending
+            ),
+            FlushOutcome::Deferred
+        );
+        assert_eq!(
+            start_flush_checks(
+                || true,
+                || false,
+                Some(HOUR * 7),
+                Some(CHECKPOINT_DEFERRAL),
+                &mut fake,
+                &mut pending
+            ),
+            FlushOutcome::Written
+        );
+        assert_eq!(fake.flushes, 1);
+    }
+
     struct FakeCache {
         pub flushes: usize,
+        pub dirty: bool,
+    }
+
+    impl Default for FakeCache {
+        fn default() -> Self {
+            Self {
+                flushes: 0,
+                dirty: true,
+            }
+        }
     }
 
     impl FlushSnapshot for FakeCache {
+        // Stays dirty after a flush on purpose: the existing tests model repeated flushes of a
+        // continuously changing index. `start_flush_checks_reports_clean_and_deferred_outcomes`
+        // toggles `dirty` explicitly.
         fn flush_snapshot_to_file(&mut self) -> Result<()> {
             self.flushes += 1;
             Ok(())
@@ -635,18 +879,22 @@ mod tests {
         fn db_path(&self) -> &Path {
             Path::new("db")
         }
+
+        fn is_dirty(&self) -> bool {
+            self.dirty
+        }
     }
 
     #[test]
     fn hide_flush_resets_idle_window() {
         let mut cache = FakeCache::default();
         let mut pending = 1;
-        let flushed = start_flush_checks(|| false, || true, &mut cache, &mut pending);
+        let flushed = start_flush_checks(|| false, || true, None, None, &mut cache, &mut pending);
 
         assert_eq!(cache.flushes, 1, "hide flush should run once");
         assert_eq!(pending, 0, "pending hide flush should be consumed");
         assert!(
-            flushed,
+            flushed.attempted(),
             "hide flush should satisfy idle window to avoid immediate idle flush"
         );
     }
@@ -655,10 +903,10 @@ mod tests {
     fn idle_flush_runs_when_due() {
         let mut cache = FakeCache::default();
         let mut pending = 0;
-        let flushed = start_flush_checks(|| true, || true, &mut cache, &mut pending);
+        let flushed = start_flush_checks(|| true, || true, None, None, &mut cache, &mut pending);
 
         assert_eq!(cache.flushes, 1, "idle flush should run once when due");
-        assert!(flushed, "idle flush should advance idle window");
+        assert!(flushed.attempted(), "idle flush should advance idle window");
     }
 
     #[test]
@@ -666,8 +914,11 @@ mod tests {
         let mut cache = FakeCache::default();
         let mut pending = 1;
         // Foreground -> pending should be consumed but no hide flush should run
-        let flushed = start_flush_checks(|| true, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush satisfied in foreground");
+        let flushed = start_flush_checks(|| true, || false, None, None, &mut cache, &mut pending);
+        assert!(
+            !flushed.attempted(),
+            "no idle flush satisfied in foreground"
+        );
 
         assert_eq!(
             cache.flushes, 0,
@@ -687,14 +938,17 @@ mod tests {
         let mut pending = 2;
 
         // First tick consumes one counter, no flush yet
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush satisfied on first tick");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(
+            !flushed.attempted(),
+            "no idle flush satisfied on first tick"
+        );
         assert_eq!(cache.flushes, 0, "no flush on first tick");
         assert_eq!(pending, 1, "pending decremented to 1");
 
         // Second tick should trigger the hide flush
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(flushed, "hide flush was performed");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "hide flush was performed");
         assert_eq!(cache.flushes, 1, "flush should run on second tick");
         assert_eq!(pending, 0, "pending should be consumed after flush");
     }
@@ -706,11 +960,11 @@ mod tests {
 
         // When both an idle flush is due and a hide flush fires, hide flush
         // should run and it should satisfy the idle window so we don't double-flush.
-        let flushed = start_flush_checks(|| false, || true, &mut cache, &mut pending);
+        let flushed = start_flush_checks(|| false, || true, None, None, &mut cache, &mut pending);
 
         assert_eq!(cache.flushes, 1, "only one flush should run");
         assert_eq!(pending, 0, "pending hide flush should be consumed");
-        assert!(flushed, "hide flush should satisfy idle window");
+        assert!(flushed.attempted(), "hide flush should satisfy idle window");
     }
 
     use anyhow::anyhow;
@@ -725,6 +979,10 @@ mod tests {
         fn db_path(&self) -> &Path {
             Path::new("db")
         }
+
+        fn is_dirty(&self) -> bool {
+            true
+        }
     }
 
     #[test]
@@ -734,12 +992,12 @@ mod tests {
 
         // Hide flush attempt fails; the hide flush logic treats the flush as
         // satisfying the idle window (it bumps the idle timestamp even on errors).
-        let flushed = start_flush_checks(|| false, || true, &mut cache, &mut pending);
+        let flushed = start_flush_checks(|| false, || true, None, None, &mut cache, &mut pending);
 
         // pending should be consumed (counter is decremented), but since flush failed,
         // idle window should still be considered idle and search_idles() should be true.
         assert!(
-            flushed,
+            flushed.attempted(),
             "failed hide flush should still satisfy idle window (bumped)"
         );
         assert_eq!(
@@ -761,8 +1019,8 @@ mod tests {
 
         // First tick after going to background: pending=2, decrements to 1, no hide flush yet
         // idle not due, so no flush at all
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush on first tick");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush on first tick");
         assert_eq!(
             cache.flushes, 0,
             "no flush on first tick after backgrounding (idle not due)"
@@ -778,14 +1036,14 @@ mod tests {
         let mut pending = 2;
 
         // Tick 1: decrement but no flush
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush on tick 1");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush on tick 1");
         assert_eq!(cache.flushes, 0);
         assert_eq!(pending, 1);
 
         // Tick 2: should trigger hide flush
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(flushed, "hide flush was performed");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "hide flush was performed");
         assert_eq!(cache.flushes, 1, "flush should trigger on second tick");
         assert_eq!(pending, 0);
     }
@@ -800,18 +1058,18 @@ mod tests {
         // Make sure idle is NOT due initially
 
         // Tick 1: pending=2, decrements to 1, idle not due, no flush
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush when idle not due");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush when idle not due");
         assert_eq!(cache.flushes, 0, "no flush when idle not due");
         assert_eq!(pending, 1, "pending still decrements");
 
         // Now make idle due
 
         // Tick 2: pending=1, becomes 0, hide_flush fires (takes priority over idle)
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
         assert_eq!(cache.flushes, 1, "hide flush fires on second tick");
         assert_eq!(pending, 0);
-        assert!(flushed, "hide flush satisfies idle");
+        assert!(flushed.attempted(), "hide flush satisfies idle");
     }
 
     #[test]
@@ -823,8 +1081,11 @@ mod tests {
         let mut pending = 1; // simulates partial countdown
 
         // User brings window back to foreground before flush triggers
-        let flushed = start_flush_checks(|| true, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush when returning to foreground");
+        let flushed = start_flush_checks(|| true, || false, None, None, &mut cache, &mut pending);
+        assert!(
+            !flushed.attempted(),
+            "no idle flush when returning to foreground"
+        );
         assert_eq!(
             cache.flushes, 0,
             "no flush when returning to foreground (idle not due)"
@@ -842,24 +1103,24 @@ mod tests {
 
         // First background entry
         let mut pending = 2;
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush on first background");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush on first background");
         assert_eq!(pending, 1);
 
         // User returns to foreground briefly
-        let flushed = start_flush_checks(|| true, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush in foreground");
+        let flushed = start_flush_checks(|| true, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush in foreground");
         assert_eq!(pending, 0);
 
         // Goes to background again - in real code, this sets pending=2 again
         pending = 2;
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush on countdown restart");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush on countdown restart");
         assert_eq!(cache.flushes, 0, "countdown restarts");
         assert_eq!(pending, 1);
 
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(flushed, "hide flush was performed");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "hide flush was performed");
         assert_eq!(cache.flushes, 1, "flush after second countdown");
         assert_eq!(pending, 0);
     }
@@ -872,8 +1133,8 @@ mod tests {
         let mut cache = FakeCache::default();
         let mut pending = 0;
 
-        let flushed = start_flush_checks(|| false, || true, &mut cache, &mut pending);
-        assert!(flushed, "idle flush should be satisfied");
+        let flushed = start_flush_checks(|| false, || true, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "idle flush should be satisfied");
         assert_eq!(cache.flushes, 1, "idle flush should run even in background");
         assert_eq!(pending, 0);
     }
@@ -885,12 +1146,15 @@ mod tests {
         let mut cache = FakeCache::default();
         let mut pending = 0;
 
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush when conditions not met");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(
+            !flushed.attempted(),
+            "no idle flush when conditions not met"
+        );
         assert_eq!(cache.flushes, 0, "no flush when neither condition is met");
 
-        let flushed = start_flush_checks(|| true, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush in foreground");
+        let flushed = start_flush_checks(|| true, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush in foreground");
         assert_eq!(cache.flushes, 0, "still no flush in foreground");
     }
 
@@ -901,8 +1165,8 @@ mod tests {
         let mut cache = FakeCache::default();
         let mut pending = 1;
 
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(flushed, "hide flush was performed");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "hide flush was performed");
         assert_eq!(cache.flushes, 1, "pending=1 in background should flush");
         assert_eq!(pending, 0);
     }
@@ -915,18 +1179,18 @@ mod tests {
         let mut cache = FakeCache::default();
         let mut pending = 3;
 
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush during countdown");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush during countdown");
         assert_eq!(cache.flushes, 0);
         assert_eq!(pending, 2);
 
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush during countdown");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush during countdown");
         assert_eq!(cache.flushes, 0);
         assert_eq!(pending, 1);
 
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(flushed, "hide flush was performed");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "hide flush was performed");
         assert_eq!(cache.flushes, 1, "flush triggers when countdown reaches 0");
         assert_eq!(pending, 0);
     }
@@ -939,25 +1203,31 @@ mod tests {
 
         // Go to background
         let mut pending = 2;
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush on background transition");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(
+            !flushed.attempted(),
+            "no idle flush on background transition"
+        );
         assert_eq!(pending, 1);
 
         // Immediately back to foreground
-        let flushed = start_flush_checks(|| true, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush when returning to foreground");
+        let flushed = start_flush_checks(|| true, || false, None, None, &mut cache, &mut pending);
+        assert!(
+            !flushed.attempted(),
+            "no idle flush when returning to foreground"
+        );
         assert_eq!(pending, 0);
         assert_eq!(cache.flushes, 0);
 
         // Back to background again
         pending = 2;
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush on re-background");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush on re-background");
         assert_eq!(pending, 1);
 
         // Back to foreground before flush
-        let flushed = start_flush_checks(|| true, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush on cancellation");
+        let flushed = start_flush_checks(|| true, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush on cancellation");
         assert_eq!(pending, 0);
         assert_eq!(cache.flushes, 0, "should never flush due to cancellations");
     }
@@ -970,17 +1240,17 @@ mod tests {
         let mut pending = 2;
 
         // First tick: pending=2->1, idle not quite due yet
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "idle not due yet during countdown");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "idle not due yet during countdown");
         assert_eq!(cache.flushes, 0);
         assert_eq!(pending, 1);
 
         // Second tick: pending=1->0, both background and idle are ready,
         // background should preempt
-        let flushed = start_flush_checks(|| false, || true, &mut cache, &mut pending);
+        let flushed = start_flush_checks(|| false, || true, None, None, &mut cache, &mut pending);
         assert_eq!(cache.flushes, 1, "single flush (background preempts idle)");
         assert_eq!(pending, 0);
-        assert!(flushed, "idle satisfied by hide flush");
+        assert!(flushed.attempted(), "idle satisfied by hide flush");
     }
 
     #[test]
@@ -993,32 +1263,32 @@ mod tests {
         // Set up so we won't hit idle initially
 
         // First hide flush
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(flushed, "hide flush was performed");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "hide flush was performed");
         assert_eq!(cache.flushes, 1);
         assert_eq!(pending, 0);
 
         // Ticks continue, but pending is 0 and idle not due -> no more flushes
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush without new trigger");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush without new trigger");
         assert_eq!(
             cache.flushes, 1,
             "no second flush without new pending or idle"
         );
 
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "still no idle flush");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "still no idle flush");
         assert_eq!(cache.flushes, 1, "still no flush");
 
         // Simulate window coming back and going to background again
         pending = 2;
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush during countdown");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush during countdown");
         assert_eq!(pending, 1);
         assert_eq!(cache.flushes, 1, "no flush yet, still counting down");
 
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(flushed, "second hide flush was performed");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "second hide flush was performed");
         assert_eq!(cache.flushes, 2, "second hide flush after re-backgrounding");
         assert_eq!(pending, 0);
     }
@@ -1030,13 +1300,13 @@ mod tests {
         let mut cache = FakeCacheErr;
         let mut pending = 1;
 
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(flushed, "hide flush was attempted");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "hide flush was attempted");
         assert_eq!(pending, 0, "pending consumed even on flush error");
 
         // Should not re-attempt flush on next tick unless pending is set again
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush on retry");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush on retry");
         assert_eq!(pending, 0, "stays at 0");
     }
 
@@ -1047,9 +1317,9 @@ mod tests {
         let mut cache = FakeCache::default();
         let mut pending = 0;
 
-        let flushed = start_flush_checks(|| true, || true, &mut cache, &mut pending);
+        let flushed = start_flush_checks(|| true, || true, None, None, &mut cache, &mut pending);
         assert_eq!(cache.flushes, 1, "idle flush runs in foreground");
-        assert!(flushed, "idle window advanced");
+        assert!(flushed.attempted(), "idle window advanced");
     }
 
     #[test]
@@ -1059,8 +1329,8 @@ mod tests {
         let mut cache = FakeCache::default();
         let mut pending = 0;
 
-        let flushed = start_flush_checks(|| true, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush when not due");
+        let flushed = start_flush_checks(|| true, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush when not due");
         assert_eq!(cache.flushes, 0, "no flush when idle not due");
     }
 
@@ -1072,14 +1342,14 @@ mod tests {
         let mut pending = 2;
 
         // Tick at ~10s
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush at ~10s mark");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush at ~10s mark");
         assert_eq!(cache.flushes, 0, "no flush at ~10s mark");
         assert_eq!(pending, 1);
 
         // Tick at ~20s
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(flushed, "hide flush was performed at ~20s");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "hide flush was performed at ~20s");
         assert_eq!(cache.flushes, 1, "flush at ~20s mark");
         assert_eq!(pending, 0);
     }
@@ -1091,10 +1361,13 @@ mod tests {
         let mut cache = FakeCacheErr;
         let mut pending = 0;
 
-        let flushed = start_flush_checks(|| true, || true, &mut cache, &mut pending);
+        let flushed = start_flush_checks(|| true, || true, None, None, &mut cache, &mut pending);
 
         // Even though flush failed, idle window should be advanced
-        assert!(flushed, "idle window should be advanced even on error");
+        assert!(
+            flushed.attempted(),
+            "idle window should be advanced even on error"
+        );
     }
 
     #[test]
@@ -1103,8 +1376,11 @@ mod tests {
         let mut pending = 0;
 
         // At exactly 5 minutes, should trigger
-        let flushed = start_flush_checks(|| true, || true, &mut cache, &mut pending);
-        assert!(flushed, "idle flush should be satisfied at exact boundary");
+        let flushed = start_flush_checks(|| true, || true, None, None, &mut cache, &mut pending);
+        assert!(
+            flushed.attempted(),
+            "idle flush should be satisfied at exact boundary"
+        );
         assert_eq!(cache.flushes, 1, "flush should trigger at exact boundary");
     }
 
@@ -1115,8 +1391,8 @@ mod tests {
         let mut cache = FakeCache::default();
         let mut pending = 0;
 
-        let flushed = start_flush_checks(|| true, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush when under threshold");
+        let flushed = start_flush_checks(|| true, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush when under threshold");
         assert_eq!(cache.flushes, 0, "no flush when under threshold");
     }
 
@@ -1131,8 +1407,8 @@ mod tests {
         // Returns to foreground with idle due
         // Since we're in foreground, hide_flush won't fire (even if pending becomes 0)
         // But idle_flush will fire because it's due
-        let flushed = start_flush_checks(|| true, || true, &mut cache, &mut pending);
-        assert!(flushed, "idle flush should be satisfied");
+        let flushed = start_flush_checks(|| true, || true, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "idle flush should be satisfied");
         assert_eq!(cache.flushes, 1, "idle flush should trigger in foreground");
         assert_eq!(pending, 0, "pending should be consumed");
     }
@@ -1144,20 +1420,21 @@ mod tests {
         let mut cache = FakeCache::default();
         let mut pending = u8::MAX;
 
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush during MAX countdown");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush during MAX countdown");
         assert_eq!(pending, u8::MAX - 1, "should decrement from MAX");
         assert_eq!(cache.flushes, 0, "no flush at MAX");
 
         // Continue decrementing
         for _ in 0..(u8::MAX - 2) {
-            let _flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
+            let _flushed =
+                start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
         }
         assert_eq!(pending, 1, "should reach 1");
 
         // Final tick triggers flush
-        let flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
-        assert!(flushed, "hide flush was performed");
+        let flushed = start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "hide flush was performed");
         assert_eq!(cache.flushes, 1, "flush when reaching 0");
         assert_eq!(pending, 0);
     }
@@ -1171,20 +1448,20 @@ mod tests {
 
         // First idle flush
 
-        let flushed = start_flush_checks(|| true, || true, &mut cache, &mut pending);
-        assert!(flushed, "first idle flush should be satisfied");
+        let flushed = start_flush_checks(|| true, || true, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "first idle flush should be satisfied");
         assert_eq!(cache.flushes, 1, "first idle flush");
 
         // Second idle flush - set idle again
 
-        let flushed = start_flush_checks(|| true, || true, &mut cache, &mut pending);
-        assert!(flushed, "second idle flush should be satisfied");
+        let flushed = start_flush_checks(|| true, || true, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "second idle flush should be satisfied");
         assert_eq!(cache.flushes, 2, "second idle flush");
 
         // Third idle flush
 
-        let flushed = start_flush_checks(|| true, || true, &mut cache, &mut pending);
-        assert!(flushed, "third idle flush should be satisfied");
+        let flushed = start_flush_checks(|| true, || true, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "third idle flush should be satisfied");
         assert_eq!(cache.flushes, 3, "third idle flush");
     }
 
@@ -1195,11 +1472,14 @@ mod tests {
         let mut cache = FakeCache::default();
         let mut pending = 1;
 
-        let flushed = start_flush_checks(|| false, || true, &mut cache, &mut pending);
-        assert!(flushed, "hide flush satisfies idle when both ready");
+        let flushed = start_flush_checks(|| false, || true, None, None, &mut cache, &mut pending);
+        assert!(
+            flushed.attempted(),
+            "hide flush satisfies idle when both ready"
+        );
         assert_eq!(cache.flushes, 1, "single flush (hide wins)");
         assert_eq!(pending, 0);
-        assert!(flushed, "idle satisfied by hide flush");
+        assert!(flushed.attempted(), "idle satisfied by hide flush");
     }
 
     #[test]
@@ -1209,14 +1489,15 @@ mod tests {
         let mut cache_err = FakeCacheErr;
         let mut pending = 0;
 
-        let flushed = start_flush_checks(|| true, || true, &mut cache_err, &mut pending);
-        assert!(flushed, "idle advanced even on error");
+        let flushed =
+            start_flush_checks(|| true, || true, None, None, &mut cache_err, &mut pending);
+        assert!(flushed.attempted(), "idle advanced even on error");
 
         // Time passes again
 
         let mut cache_ok = FakeCache::default();
-        let flushed = start_flush_checks(|| true, || true, &mut cache_ok, &mut pending);
-        assert!(flushed, "idle flush satisfied on success");
+        let flushed = start_flush_checks(|| true, || true, None, None, &mut cache_ok, &mut pending);
+        assert!(flushed.attempted(), "idle flush satisfied on success");
         assert_eq!(cache_ok.flushes, 1, "should succeed on retry");
     }
 
@@ -1228,7 +1509,8 @@ mod tests {
         let mut pending = 0;
 
         for _ in 0..10 {
-            let _flushed = start_flush_checks(|| false, || false, &mut cache, &mut pending);
+            let _flushed =
+                start_flush_checks(|| false, || false, None, None, &mut cache, &mut pending);
             assert_eq!(pending, 0, "pending should stay at 0");
         }
         assert_eq!(
@@ -1244,13 +1526,13 @@ mod tests {
         let mut cache = FakeCache::default();
         let mut pending = 5;
 
-        let flushed = start_flush_checks(|| true, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush in foreground");
+        let flushed = start_flush_checks(|| true, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush in foreground");
         assert_eq!(pending, 4, "pending decrements in foreground");
         assert_eq!(cache.flushes, 0, "no flush");
 
-        let flushed = start_flush_checks(|| true, || false, &mut cache, &mut pending);
-        assert!(!flushed, "no idle flush in foreground");
+        let flushed = start_flush_checks(|| true, || false, None, None, &mut cache, &mut pending);
+        assert!(!flushed.attempted(), "no idle flush in foreground");
         assert_eq!(pending, 3);
         assert_eq!(cache.flushes, 0);
     }
@@ -1262,15 +1544,18 @@ mod tests {
         let mut pending = 1;
 
         // Hide flush triggers
-        let flushed = start_flush_checks(|| false, || true, &mut cache, &mut pending);
-        assert!(flushed, "hide flush satisfies idle");
+        let flushed = start_flush_checks(|| false, || true, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "hide flush satisfies idle");
         assert_eq!(cache.flushes, 1);
         assert_eq!(pending, 0);
 
         // Now idle becomes due
 
-        let flushed = start_flush_checks(|| false, || true, &mut cache, &mut pending);
-        assert!(flushed, "idle flush should be satisfied after hide");
+        let flushed = start_flush_checks(|| false, || true, None, None, &mut cache, &mut pending);
+        assert!(
+            flushed.attempted(),
+            "idle flush should be satisfied after hide"
+        );
         assert_eq!(cache.flushes, 2, "idle flush should trigger after hide");
     }
 
@@ -1282,31 +1567,31 @@ mod tests {
         // Hide flush (make sure idle is not due)
 
         let mut pending = 1;
-        let flushed = start_flush_checks(|| false, || true, &mut cache, &mut pending);
-        assert!(flushed, "hide flush satisfies idle");
+        let flushed = start_flush_checks(|| false, || true, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "hide flush satisfies idle");
         assert_eq!(cache.flushes, 1, "first hide flush");
         assert_eq!(pending, 0);
 
         // Idle flush (set idle to be due)
         pending = 0;
 
-        let flushed = start_flush_checks(|| true, || true, &mut cache, &mut pending);
-        assert!(flushed, "idle flush should be satisfied");
+        let flushed = start_flush_checks(|| true, || true, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "idle flush should be satisfied");
         assert_eq!(cache.flushes, 2, "first idle flush");
 
         // Hide flush again (reset idle to not due)
 
         pending = 1;
-        let flushed = start_flush_checks(|| false, || true, &mut cache, &mut pending);
-        assert!(flushed, "hide flush satisfies idle");
+        let flushed = start_flush_checks(|| false, || true, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "hide flush satisfies idle");
         assert_eq!(cache.flushes, 3, "second hide flush");
         assert_eq!(pending, 0);
 
         // Idle again (set idle to be due)
         pending = 0;
 
-        let flushed = start_flush_checks(|| false, || true, &mut cache, &mut pending);
-        assert!(flushed, "idle flush should be satisfied");
+        let flushed = start_flush_checks(|| false, || true, None, None, &mut cache, &mut pending);
+        assert!(flushed.attempted(), "idle flush should be satisfied");
         assert_eq!(cache.flushes, 4, "second idle flush");
     }
 }
