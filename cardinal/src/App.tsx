@@ -302,7 +302,10 @@ function App() {
           style={{ ...rowStyle, width: 'var(--columns-total)' }}
           isSelected={selectedIndexSet.has(rowIndex)}
           selectedPathsForDrag={selectedPaths}
-          caseInsensitive={!caseSensitive}
+          // Highlight terms from the backend are always lowercased and de-duplicated, so the
+          // row highlighter has to compare case-insensitively even when the search itself is
+          // case-sensitive; otherwise a query such as `README` highlights nothing.
+          caseInsensitive
           highlightTerms={highlightTerms}
           onContextMenu={handleRowContextMenu}
           onSelect={handleRowSelect}

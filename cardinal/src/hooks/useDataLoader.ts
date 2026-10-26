@@ -102,7 +102,16 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
       }
       if (needLoading.length === 0) return;
       const versionAtRequest = versionRef.current;
-      const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', { results: needLoading });
+      let fetched: NodeInfoResponse[];
+      try {
+        fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', { results: needLoading });
+      } catch (error) {
+        // A failed request must not leave its rows marked as in-flight forever; otherwise
+        // every later viewport load skips them until the result set changes.
+        releaseLoadingBatch(needLoading);
+        console.error('get_nodes_info failed', error);
+        return;
+      }
       if (versionRef.current !== versionAtRequest) {
         // The result-set changed while this request was in flight. Drop the payload instead of
         // merging stale rows into the cache for the new query.
