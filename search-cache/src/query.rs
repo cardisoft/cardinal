@@ -12,7 +12,7 @@ use hashbrown::HashSet;
 use jiff::{Timestamp, civil::Date, tz::TimeZone};
 use memchr::arch::all::rabinkarp;
 use query_segmentation::query_segmentation;
-use rayon::iter::{ParallelBridge, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use regex::RegexBuilder;
 use search_cancel::CancellationToken;
 use std::{collections::BTreeSet, fs::File, io::Read, path::Path};
@@ -803,11 +803,13 @@ impl SearchCache {
             return Ok(None);
         };
 
+        // `into_par_iter` is an indexed parallel iterator, so `collect` keeps the input order.
+        // `par_bridge` does not, which made identical `content:` searches render rows in a
+        // different order on every run.
         let matched_indices = nodes
-            .into_iter()
+            .into_par_iter()
             .filter(|index| self.file_nodes[*index].file_type_hint() == NodeFileType::File)
             .filter_map(|index| self.node_path(index).map(|path| (index, path)))
-            .par_bridge()
             .filter_map(|(index, path)| {
                 self.node_content_matches(&path, needle, options.case_insensitive, token)?
                     .then_some(index)
@@ -865,10 +867,10 @@ impl SearchCache {
         // If base is a small set, filtering it by accessing file metadata;
         // otherwise use mdfind to quickly narrow down.
         let matched_indices = if nodes.len() <= TAG_FILTER_MDFIND_THRESHOLD {
+            // Indexed parallel iterator: preserves the input order on collect (see content filter).
             nodes
-                .into_iter()
+                .into_par_iter()
                 .filter_map(|index| self.node_path(index).map(|path| (index, path)))
-                .par_bridge()
                 .filter_map(|(index, path)| {
                     self.node_tags_match_any(&path, &needles, options.case_insensitive, token)?
                         .then_some(index)

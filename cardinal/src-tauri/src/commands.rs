@@ -1,5 +1,6 @@
 use crate::{
     DEFAULT_SYSTEM_IGNORE_PATH, LOGIC_START, LogicStartConfig,
+    background::index_generation,
     lifecycle::load_app_state,
     quicklook::{
         QuickLookItemInput, close_preview_panel, toggle_preview_panel, update_preview_panel,
@@ -67,6 +68,10 @@ pub struct NodeInfoRequest {
 struct SortedViewCache {
     slab_indices: Vec<SlabIndex>,
     nodes: Vec<SearchResultNode>,
+    /// `background::index_generation()` at fill time. Equal slab indices do not imply equal
+    /// metadata: a file can change size or dates between two identical searches, and a slab
+    /// slot can even be reused by a different file. Any index change invalidates this cache.
+    index_generation: u64,
 }
 
 pub struct SearchState {
@@ -124,10 +129,13 @@ impl SearchState {
             return Vec::new();
         }
 
+        let generation = index_generation();
         let mut cache_guard = self.sorted_view_cache.lock();
         if let Some(cached) = cache_guard
             .as_ref()
-            .filter(|cache| cache.slab_indices == slab_indices)
+            .filter(|cache| {
+                cache.index_generation == generation && cache.slab_indices == slab_indices
+            })
             .map(|cache| cache.nodes.clone())
         {
             return cached;
@@ -137,6 +145,7 @@ impl SearchState {
         *cache_guard = Some(SortedViewCache {
             slab_indices: slab_indices.to_vec(),
             nodes: nodes.clone(),
+            index_generation: generation,
         });
         nodes
     }

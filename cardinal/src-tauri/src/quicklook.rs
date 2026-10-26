@@ -318,22 +318,27 @@ fn update_preview_items(
         .collect();
     *controller.ivars().items.borrow_mut() = preview_items;
 
-    let mut frames = controller.ivars().frames.borrow_mut();
-    frames.clear();
-    let mut transitions = controller.ivars().transitions.borrow_mut();
-    transitions.clear();
+    // Scope the RefCell guards so they are released before `reloadData`: Quick Look may call
+    // back into the data source (frames/transitions) synchronously while reloading, and a
+    // live `borrow_mut` would make that re-borrow panic inside an ObjC callback.
+    {
+        let mut frames = controller.ivars().frames.borrow_mut();
+        frames.clear();
+        let mut transitions = controller.ivars().transitions.borrow_mut();
+        transitions.clear();
 
-    for item in items {
-        if let Some(rect) = item.rect {
-            frames.insert(item.path.clone(), rect);
-        }
-        if let Some(base64_data_uri) = &item.transition_image
-            && let Some(base64_data) = base64_data_uri.split(',').nth(1)
-            && let Ok(image_bytes) = general_purpose::STANDARD.decode(base64_data)
-        {
-            let data = NSData::from_vec(image_bytes);
-            if let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) {
-                transitions.insert(item.path.clone(), image);
+        for item in items {
+            if let Some(rect) = item.rect {
+                frames.insert(item.path.clone(), rect);
+            }
+            if let Some(base64_data_uri) = &item.transition_image
+                && let Some(base64_data) = base64_data_uri.split(',').nth(1)
+                && let Ok(image_bytes) = general_purpose::STANDARD.decode(base64_data)
+            {
+                let data = NSData::from_vec(image_bytes);
+                if let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) {
+                    transitions.insert(item.path.clone(), image);
+                }
             }
         }
     }

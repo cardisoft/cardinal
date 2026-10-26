@@ -39,6 +39,19 @@ pub struct IconPayload {
     pub icon: String,
 }
 
+/// Incremented whenever the index contents change (FSEvents applied, rescan, watch-config
+/// rebuild). Caches derived from node metadata (e.g. the sorted-view cache in `commands.rs`)
+/// compare against it so they never serve metadata from before a filesystem change.
+static INDEX_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+pub fn index_generation() -> u64 {
+    INDEX_GENERATION.load(Ordering::Acquire)
+}
+
+fn bump_index_generation() {
+    INDEX_GENERATION.fetch_add(1, Ordering::AcqRel);
+}
+
 pub struct BackgroundLoopChannels {
     pub finish_rx: Receiver<Sender<Option<SearchCache>>>,
     pub update_window_state_rx: Receiver<()>,
@@ -119,6 +132,18 @@ fn handle_watch_config_update(
         .map(PathBuf::from)
         .collect::<Vec<_>>();
 
+    // Rescan and watch-config requests arrive on separate channels, so a manual rescan queued
+    // after this update may already have been processed and cancelled our token. Building
+    // with a stale token would be cancelled immediately and leave a permanent noop cache
+    // (no indexing, no watcher). The config change is still the user's latest intent, so
+    // apply it with a fresh token instead.
+    let scan_cancellation_token = if scan_cancellation_token.is_cancelled().is_none() {
+        info!("Watch config token is stale; applying the config change with a fresh scan token");
+        CancellationToken::new_scan()
+    } else {
+        scan_cancellation_token
+    };
+
     *event_watcher = EventWatcher::noop();
     update_app_state(app_handle, AppLifecycleState::Initializing);
     reset_status_bar(app_handle);
@@ -155,6 +180,7 @@ fn handle_watch_config_update(
 
     *cache = next_cache;
     *watch_root = next_watch_root.to_string();
+    bump_index_generation();
     *event_watcher = if cache.is_noop() {
         EventWatcher::noop()
     } else {
@@ -239,6 +265,7 @@ fn handle_event_watcher_events(
     }
 
     let handle_result = cache.handle_fs_events(events);
+    bump_index_generation();
     if let Err(HandleFSEError::Rescan) = handle_result {
         info!("!!!!!!!!!! Rescan triggered !!!!!!!!");
         emit_status_bar_update(
@@ -495,6 +522,9 @@ fn perform_rescan(
         walking_done.store(true, Ordering::Relaxed);
         stopped
     });
+    if !stopped {
+        bump_index_generation();
+    }
 
     *event_watcher = if stopped {
         EventWatcher::noop()
