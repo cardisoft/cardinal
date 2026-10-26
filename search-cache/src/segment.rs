@@ -41,15 +41,45 @@ impl SegmentMatcherConcrete {
     }
 }
 
+/// Splits a segment value into (has_unescaped_wildcard, literal_text).
+///
+/// `\*`, `\?` and `\\` denote literal characters (the query preprocessor emits `\*` / `\?` for
+/// quoted wildcards such as `"*.rs"` and `\\` for every literal backslash); any other
+/// backslash is an ordinary character.
+fn unescape_wildcards(value: &str) -> (bool, String) {
+    let mut has_wildcard = false;
+    let mut literal = String::with_capacity(value.len());
+    let mut chars = value.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '\\' if matches!(chars.peek(), Some('*') | Some('?') | Some('\\')) => {
+                literal.push(chars.next().expect("peeked value exists"));
+            }
+            '*' | '?' => {
+                has_wildcard = true;
+                literal.push(ch);
+            }
+            _ => literal.push(ch),
+        }
+    }
+    (has_wildcard, literal)
+}
+
 fn wildcard_to_regex(pattern: &str) -> String {
     let mut regex = String::with_capacity(pattern.len() + 3);
+    let mut buf = [0u8; 4];
     regex.push('^');
-    for ch in pattern.chars() {
+    let mut chars = pattern.chars().peekable();
+    while let Some(ch) = chars.next() {
         match ch {
+            '\\' if matches!(chars.peek(), Some('*') | Some('?') | Some('\\')) => {
+                // Escaped wildcard or backslash: match the character literally.
+                let literal = chars.next().expect("peeked value exists");
+                regex.push_str(&regex::escape(literal.encode_utf8(&mut buf)));
+            }
             '*' => regex.push_str(".*"),
             '?' => regex.push('.'),
             _ => {
-                let mut buf = [0u8; 4];
                 let encoded = ch.encode_utf8(&mut buf);
                 regex.push_str(&regex::escape(encoded));
             }
@@ -79,14 +109,16 @@ fn build_concrete_segment_matcher(
 ) -> Result<SegmentMatcher, regex::Error> {
     let kind = segment_kind(segment);
     let value = segment_value(segment);
-    let is_wildcard = value.contains('*') || value.contains('?');
+    // Only unescaped `*` / `?` make this a wildcard segment; `\*` / `\?` come from quoted
+    // tokens and must match literally.
+    let (is_wildcard, literal) = unescape_wildcards(value);
     if options.case_insensitive || is_wildcard {
         let pattern = if is_wildcard {
             // Wildcard pattern is /exact/ by default, so we don't need to
             // adjust it based on SegmentKind.
             wildcard_to_regex(value)
         } else {
-            let base = regex::escape(value);
+            let base = regex::escape(&literal);
             match kind {
                 SegmentKind::Substr => base,
                 SegmentKind::Prefix => format!("^(?:{base})"),
@@ -102,7 +134,7 @@ fn build_concrete_segment_matcher(
     } else {
         Ok(SegmentMatcher::Concrete(SegmentMatcherConcrete::Plain {
             kind,
-            needle: value.to_string(),
+            needle: literal,
         }))
     }
 }
@@ -645,6 +677,73 @@ mod tests {
             }
             _ => panic!("Expected plain matcher"),
         }
+    }
+
+    // --- Escaped wildcards (from quoted tokens) are literal ---
+
+    #[test]
+    fn escaped_wildcards_are_literal() {
+        use super::unescape_wildcards;
+        assert_eq!(unescape_wildcards("\\*.rs"), (false, "*.rs".to_string()));
+        assert_eq!(unescape_wildcards("a\\?b"), (false, "a?b".to_string()));
+        assert_eq!(unescape_wildcards("*.rs"), (true, "*.rs".to_string()));
+        // Mixed: one literal star, one real wildcard.
+        assert_eq!(unescape_wildcards("\\*x*"), (true, "*x*".to_string()));
+        // Other backslashes are ordinary characters.
+        assert_eq!(unescape_wildcards("a\\b"), (false, "a\\b".to_string()));
+        // `\\` is a literal backslash; a wildcard after it is still a wildcard
+        // (the preprocessor emits this for a user-typed `foo\*.txt`).
+        assert_eq!(
+            unescape_wildcards("foo\\\\*.txt"),
+            (true, "foo\\*.txt".to_string())
+        );
+        let regex = regex::Regex::new(&super::wildcard_to_regex("foo\\\\*.txt")).unwrap();
+        assert!(regex.is_match("foo\\report.txt"));
+        assert!(!regex.is_match("foo*.txt"));
+        assert!(!regex.is_match("foo_x.txt"));
+    }
+
+    #[test]
+    fn quoted_star_matches_literally_in_plain_and_regex_modes() {
+        // Case-sensitive: plain substring matcher with the unescaped needle.
+        let segments = [Segment::substr("\\*.rs")];
+        let matchers = build_segment_matchers(
+            &segments,
+            SearchOptions {
+                case_insensitive: false,
+            },
+        )
+        .unwrap();
+        match &matchers[0] {
+            SegmentMatcher::Concrete(matcher @ SegmentMatcherConcrete::Plain { needle, .. }) => {
+                assert_eq!(needle, "*.rs");
+                assert!(matcher.matches("weird*.rs"));
+                assert!(!matcher.matches("main.rs"));
+            }
+            other => panic!("Expected plain matcher, got {other:?}"),
+        }
+
+        // Case-insensitive: regex matcher, star still literal.
+        let matchers = build_segment_matchers(
+            &segments,
+            SearchOptions {
+                case_insensitive: true,
+            },
+        )
+        .unwrap();
+        match &matchers[0] {
+            SegmentMatcher::Concrete(matcher @ SegmentMatcherConcrete::Regex { .. }) => {
+                assert!(matcher.matches("WEIRD*.RS"));
+                assert!(!matcher.matches("main.rs"));
+            }
+            other => panic!("Expected regex matcher, got {other:?}"),
+        }
+
+        // Mixed: literal star followed by a real wildcard.
+        let regex = super::wildcard_to_regex("\\*x*");
+        let regex = regex::Regex::new(&regex).unwrap();
+        assert!(regex.is_match("*xanything"));
+        assert!(!regex.is_match("yxanything"));
     }
 
     fn expect_concrete<'a>(segment: &'a Segment<'a>) -> &'a SegmentConcrete<'a> {

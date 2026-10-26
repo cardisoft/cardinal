@@ -793,9 +793,17 @@ impl<'a> Parser<'a> {
                 }
                 break;
             }
+            let before = self.pos;
             let expr = self.parse_or()?;
             if matches!(expr, Expr::Empty) {
-                break;
+                // An empty operand such as `""` contributes nothing to the conjunction, so
+                // keep parsing the rest of the query (`foo "" bar`). Breaking here used to
+                // leave `bar` unparsed and fail the whole query with "trailing characters".
+                // Bail out only if nothing was consumed, so this loop can never spin.
+                if self.pos == before {
+                    break;
+                }
+                continue;
             }
             parts.push(expr);
             if pending_keyword_and {
@@ -894,11 +902,17 @@ impl<'a> Parser<'a> {
 
     fn parse_group(&mut self, closing: char) -> Result<Expr, ParseError> {
         self.advance_char(); // consume opening token
+        let inner_start = self.pos;
         self.group_stack.push(closing);
         let expr = self.parse_and()?;
         self.group_stack.pop();
         self.skip_ws();
         if self.peek_char() == Some(closing) {
+            // `()` / `<>` with nothing inside is a syntax error. Previously this was only
+            // rejected by accident (and only when more input followed the group).
+            if self.input[inner_start..self.pos].trim().is_empty() {
+                return Err(self.error("empty group"));
+            }
             self.advance_char();
             Ok(expr)
         } else {
@@ -1056,7 +1070,13 @@ impl<'a> Parser<'a> {
             return Ok(None);
         }
 
-        if self.is_at_group_close() || matches!(self.peek_char(), Some('|')) {
+        if matches!(self.peek_char(), Some('|')) {
+            return Ok(None);
+        }
+
+        // Inside `<...>` the closer `>` is ambiguous with the comparison operator in
+        // `<size:>1gb>`. Read it as an operator when an operand follows it directly.
+        if self.is_at_group_close() && !self.closer_starts_comparison(kind) {
             return Ok(None);
         }
 
@@ -1084,14 +1104,17 @@ impl<'a> Parser<'a> {
                 break;
             }
 
-            if self.current_closer_is(ch) {
-                break;
-            }
-
             if (ch == '<' || ch == '>') && buffer.is_empty() {
+                if self.current_closer_is(ch) && !self.closer_starts_comparison(kind) {
+                    break;
+                }
                 buffer.push(ch);
                 self.advance_char();
                 continue;
+            }
+
+            if self.current_closer_is(ch) {
+                break;
             }
 
             if (ch == '<' || ch == '>') && !buffer.is_empty() {
@@ -1188,6 +1211,24 @@ impl<'a> Parser<'a> {
         matches!((self.group_stack.last(), self.peek_char()), (Some(&closer), Some(ch)) if closer == ch)
     }
 
+    /// True when the cursor is on the current group closer `>` but, for a filter that takes
+    /// comparisons (`<size:>1gb>`, `<dm:>2024-01-01>`), an operand follows it directly, in
+    /// which case it is a comparison operator rather than the end of the group. For every
+    /// other filter the `>` closes the group as before (`<folder:>foo`, `<folder:><ext:rs>`),
+    /// and a `>` followed by whitespace, `|`, another closer, or end of input always does.
+    fn closer_starts_comparison(&self, kind: &FilterKind) -> bool {
+        if !kind_accepts_comparison(kind) {
+            return false;
+        }
+        if !self.is_at_group_close() || self.peek_char() != Some('>') {
+            return false;
+        }
+        match self.peek_next_char() {
+            None => false,
+            Some(next) => !next.is_whitespace() && next != '|' && !self.current_closer_is(next),
+        }
+    }
+
     fn remaining(&self) -> &'a str {
         &self.input[self.pos..]
     }
@@ -1244,6 +1285,25 @@ impl<'a> Parser<'a> {
         }
         false
     }
+}
+
+/// Filters whose argument can be a comparison (`size:>1gb`, `dm:>2024-01-01`). Only for these
+/// is a `>` directly inside an angle group read as an operator.
+fn kind_accepts_comparison(kind: &FilterKind) -> bool {
+    matches!(
+        kind,
+        FilterKind::Size
+            | FilterKind::DateModified
+            | FilterKind::DateCreated
+            | FilterKind::DateAccessed
+            | FilterKind::DateRun
+            | FilterKind::Width
+            | FilterKind::Height
+            | FilterKind::Dimensions
+            | FilterKind::BitDepth
+            | FilterKind::Year
+            | FilterKind::Track
+    )
 }
 
 fn is_term_breaker(ch: char) -> bool {
@@ -2080,5 +2140,57 @@ mod tests {
         ];
 
         assert_doc_examples(EXAMPLES);
+    }
+}
+
+#[cfg(test)]
+mod parser_regression_tests {
+    use super::*;
+
+    #[test]
+    fn empty_phrase_in_the_middle_does_not_stop_parsing() {
+        let query = parse_query("foo \"\" bar").expect("parses");
+        assert!(
+            matches!(&query.expr, Expr::And(parts) if parts.len() == 2),
+            "{:?}",
+            query.expr
+        );
+        assert!(parse_query("\"\" report").is_ok());
+    }
+
+    #[test]
+    fn empty_group_is_an_error_everywhere() {
+        assert!(parse_query("foo () bar").is_err());
+        assert!(parse_query("foo ()").is_err());
+        assert!(parse_query("<>").is_err());
+    }
+
+    #[test]
+    fn comparison_inside_angle_group() {
+        let query = parse_query("<size:>1gb>").expect("parses");
+        let Expr::Term(Term::Filter(filter)) = query.expr else {
+            panic!("expected a filter, got {:?}", query.expr);
+        };
+        assert!(matches!(filter.kind, FilterKind::Size));
+        assert!(matches!(
+            filter.argument.map(|argument| argument.kind),
+            Some(ArgumentKind::Comparison(_))
+        ));
+        assert!(parse_query("<dm:>2024-01-01>").is_ok());
+    }
+
+    #[test]
+    fn angle_closer_after_non_comparison_filter_still_closes() {
+        // `folder:` takes no comparison, so `>` closes the group and `foo` is a separate word.
+        let query = parse_query("<folder:>foo").expect("parses");
+        assert!(
+            matches!(&query.expr, Expr::And(parts) if parts.len() == 2),
+            "{:?}",
+            query.expr
+        );
+        assert!(parse_query("<folder:><ext:rs>").is_ok());
+        // A closer followed by whitespace or end of input closes even for comparison filters.
+        assert!(parse_query("<size:> 1gb").is_ok());
+        assert!(parse_query("<size:>").is_ok());
     }
 }

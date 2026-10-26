@@ -33,14 +33,23 @@ impl HighlightCollector {
             Term::Word(word) => self.collect_text(word),
             Term::Filter(filter) => {
                 if let Some(argument) = &filter.argument {
-                    self.collect_argument(argument);
+                    self.collect_argument(&filter.kind, argument);
                 }
             }
             Term::Regex(_) => {}
         }
     }
 
-    fn collect_argument(&mut self, argument: &FilterArgument) {
+    fn collect_argument(&mut self, kind: &cardinal_syntax::FilterKind, argument: &FilterArgument) {
+        // The matcher evaluates a `file:` / `folder:` / type-macro argument as one name
+        // pattern (`evaluate_phrase(&arg.raw)`), whatever the parser classified it as, and the
+        // preprocessor gives it the same encoding as a bare word. Highlight it exactly like a
+        // bare word, so partial quotes (`file:"foo"*`), lists and globstars behave
+        // identically to their unquoted forms.
+        if crate::query_preprocessor::filter_uses_word_encoding(kind) {
+            self.collect_text(argument.raw.as_str());
+            return;
+        }
         match &argument.kind {
             ArgumentKind::Bare => self.collect_text(argument.raw.as_str()),
             ArgumentKind::Phrase => self.collect_literal_text(argument.raw.as_str()),
@@ -63,29 +72,22 @@ impl HighlightCollector {
         }
 
         let segments = query_segmentation(value);
-        if let Some(segment) = segments.last() {
-            let segment = match segment {
-                Segment::Concrete(concrete) => concrete,
-                Segment::GlobStar => {
-                    // "**" does not contribute to highlight terms
-                    return;
-                }
-                Segment::Star => {
-                    // "*" does not contribute to highlight terms
-                    return;
-                }
-            };
-            let candidates = literal_chunks(segment.as_value());
-            if !candidates.is_empty() {
-                for candidate in candidates {
-                    self.push(candidate);
-                }
-                // Return last segment only(which is the filename part in a path)
-                return;
+        let Some(segment) = segments.last() else {
+            // No segments at all (e.g. a bare separator): fall back to the raw text.
+            for candidate in literal_chunks(value) {
+                self.push(candidate);
             }
-        }
-
-        for candidate in literal_chunks(value) {
+            return;
+        };
+        let segment = match segment {
+            Segment::Concrete(concrete) => concrete,
+            // "*" and "**" do not contribute to highlight terms.
+            Segment::GlobStar | Segment::Star => return,
+        };
+        // Only the last segment (the file-name part of a path) contributes. A last segment
+        // made solely of wildcards (`foo/??`) contributes nothing either; it used to fall
+        // back to chunking the whole query and emit `foo/`, which can never match a name.
+        for candidate in literal_chunks(segment.as_value()) {
             self.push(candidate);
         }
     }
@@ -108,20 +110,44 @@ impl HighlightCollector {
     }
 }
 
+/// Splits a (quote-stripped) token into the literal pieces between wildcards.
+///
+/// `\*` / `\?` are literal characters: the query preprocessor emits them for wildcards that
+/// were inside quotes (`"*.rs"` searches for the literal text `*.rs`), so they must stay part
+/// of the chunk instead of splitting it.
 fn literal_chunks(value: &str) -> Vec<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return Vec::new();
     }
 
-    let chunks: Vec<String> = trimmed
-        .split(['*', '?'])
-        .map(str::trim)
-        .filter(|chunk| !chunk.is_empty())
-        .map(|chunk| chunk.to_string())
-        .collect();
+    fn push_chunk(chunks: &mut Vec<String>, current: &mut String) {
+        let chunk = current.trim();
+        if !chunk.is_empty() {
+            chunks.push(chunk.to_string());
+        }
+        current.clear();
+    }
 
-    if chunks.is_empty() && !trimmed.contains(['*', '?']) {
+    let mut chunks = Vec::new();
+    let mut current = String::new();
+    let mut saw_wildcard = false;
+    let mut chars = trimmed.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '\\' if matches!(chars.peek(), Some('*') | Some('?') | Some('\\')) => {
+                current.push(chars.next().expect("peeked value exists"));
+            }
+            '*' | '?' => {
+                saw_wildcard = true;
+                push_chunk(&mut chunks, &mut current);
+            }
+            _ => current.push(ch),
+        }
+    }
+    push_chunk(&mut chunks, &mut current);
+
+    if chunks.is_empty() && !saw_wildcard {
         vec![trimmed.to_string()]
     } else {
         chunks
@@ -467,8 +493,10 @@ mod tests {
 
     #[test]
     fn test_wildcard_in_phrase() {
+        // A quoted wildcard is literal text (see search-syntax.md), so the whole phrase is
+        // one highlight term.
         let terms = parse_and_highlight("\"test * file\"").unwrap();
-        assert_eq!(terms, vec!["file", "test"]);
+        assert_eq!(terms, vec!["test * file"]);
     }
 
     #[test]
@@ -1597,8 +1625,9 @@ mod tests {
 
     #[test]
     fn test_sanitize_in_phrase() {
+        // Quoted stars are literal characters, not wildcards to sanitise away.
         let terms = parse_and_highlight("\"***test***\"").unwrap();
-        assert_eq!(terms, vec!["test"]);
+        assert_eq!(terms, vec!["***test***"]);
     }
 
     #[test]
@@ -1678,8 +1707,42 @@ mod tests {
     }
 
     #[test]
-    fn test_quoted_with_wildcards_extracts_segments() {
+    fn test_pure_wildcard_last_segment_contributes_nothing() {
+        // `foo/??` matches two-character names under `foo`; `foo/` can never be a match.
+        assert!(parse_and_highlight("foo/??").unwrap().is_empty());
+        assert!(parse_and_highlight("foo/*?").unwrap().is_empty());
+        // A partly literal last segment still contributes its literal part.
+        assert_eq!(parse_and_highlight("foo/?x").unwrap(), vec!["x"]);
+    }
+
+    #[test]
+    fn test_matcher_filter_phrase_arguments_are_decoded() {
+        // `file:` / `folder:` arguments carry the word encoding; the highlight term must be
+        // the decoded literal text, not the encoded form.
+        let terms = parse_and_highlight("file:\"*.rs\"").unwrap();
+        assert_eq!(terms, vec!["*.rs"]);
+        let terms = parse_and_highlight(r#"folder:"a\\\\b""#).unwrap();
+        assert_eq!(terms, vec![r"a\\b"]);
+        // Same rules as bare words: a partial quote followed by a wildcard chunks on the
+        // wildcard, a trailing globstar segment contributes nothing, and a list is one
+        // literal pattern (that is how the matcher evaluates it).
+        let terms = parse_and_highlight("file:\"foo\"*").unwrap();
+        assert_eq!(terms, vec!["foo"]);
+        let terms = parse_and_highlight("file:\"Application Support\"/**").unwrap();
+        assert!(terms.is_empty(), "{terms:?}");
+        let terms = parse_and_highlight("file:\"*.rs\";\"*.txt\"").unwrap();
+        assert_eq!(terms, vec!["*.rs;*.txt"]);
+        // Non-matcher filters are untouched.
+        let terms = parse_and_highlight("content:\"a*b\"").unwrap();
+        assert_eq!(terms, vec!["a*b"]);
+    }
+
+    #[test]
+    fn test_quoted_with_wildcards_is_literal() {
         let terms = parse_and_highlight("\"test * file\"").unwrap();
+        assert_eq!(terms, vec!["test * file"]);
+        // Unquoted, the same text is a wildcard pattern and splits into literal chunks.
+        let terms = parse_and_highlight("test*file").unwrap();
         assert_eq!(terms, vec!["file", "test"]);
     }
 
@@ -1778,7 +1841,7 @@ mod tests {
     #[test]
     fn test_quoted_special_chars_preserved() {
         let terms = parse_and_highlight("\"!@#$%^&*()\"").unwrap();
-        assert_eq!(terms, vec!["!@#$%^&", "()"]);
+        assert_eq!(terms, vec!["!@#$%^&*()"]);
     }
 
     #[test]
