@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import type { RefObject } from 'react';
 import type { StatusTabKey } from '../components/StatusBar';
 import type { FSEventsPanelHandle } from '../components/FSEventsPanel';
-import type { VirtualListHandle } from '../components/VirtualList';
+import type { ResultsViewHandle } from '../types/viewResults';
 
 type UseFilesTabEffectsOptions = {
   activeTab: StatusTabKey;
@@ -12,7 +12,7 @@ type UseFilesTabEffectsOptions = {
   updateQuickLook: () => void;
   clearSelection: () => void;
   resultsVersion: number;
-  virtualListRef: RefObject<VirtualListHandle | null>;
+  virtualListRef: RefObject<ResultsViewHandle | null>;
   eventsPanelRef: RefObject<FSEventsPanelHandle | null>;
 };
 

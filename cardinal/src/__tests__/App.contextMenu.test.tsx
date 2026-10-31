@@ -130,6 +130,7 @@ vi.mock('../hooks/useFileSearch', () => ({
     queueSearch: vi.fn(),
     queueDirectorySearch: vi.fn(),
     queueDirectoryScopeOpen: vi.fn(),
+    queueFilterQuery: vi.fn(),
     handleStatusUpdate: vi.fn(),
     setLifecycleState: vi.fn(),
     requestRescan: vi.fn(),
@@ -191,6 +192,7 @@ vi.mock('../hooks/useSelection', () => ({
     selectedIndicesRef: { current: testState.selectedIndices },
     activeRowIndex: null,
     selectedPaths: testState.selectedPaths,
+    selectedItems: [],
     handleRowSelect: vi.fn(),
     selectSingleRow: mocks.selectSingleRow,
     clearSelection: vi.fn(),
@@ -281,6 +283,11 @@ describe('App context menu regression', () => {
     testState.selectedIndices = [0];
     testState.selectedPaths = ['/stale-a', '/stale-b'];
 
+    // Default result for any extra render pass (e.g. StrictMode double-render).
+    mocks.useContextMenuMock.mockReturnValue({
+      showContextMenu: mocks.showFilesContextMenu,
+      showHeaderContextMenu: vi.fn(),
+    });
     mocks.useContextMenuMock
       .mockReturnValueOnce({
         showContextMenu: mocks.showFilesContextMenu,

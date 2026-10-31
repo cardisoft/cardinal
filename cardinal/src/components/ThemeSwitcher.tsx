@@ -6,6 +6,7 @@ import {
   persistThemePreference,
   type ThemePreference,
 } from '../theme';
+import { broadcastUiPreferencesChanged } from '../runtime/uiPreferences';
 
 type ThemeSwitcherProps = {
   className?: string;
@@ -31,6 +32,8 @@ const ThemeSwitcher = ({ className, resetToken }: ThemeSwitcherProps): React.JSX
   useEffect(() => {
     persistThemePreference(preference);
     applyThemePreference(preference);
+    // The bookmarks window is a separate webview; tell it to repaint too.
+    broadcastUiPreferencesChanged();
   }, [preference]);
 
   useEffect(() => {

@@ -116,6 +116,11 @@ impl SlabNode {
         self.metadata.file_type_hint()
     }
 
+    /// Metadata for this node. Callers should check [`Self::state`] before using it.
+    pub fn metadata(&self) -> &SlabNodeMetadataCompact {
+        &self.metadata
+    }
+
     pub fn state(&self) -> State {
         self.metadata.state()
     }

@@ -9,6 +9,19 @@
       "caseSensitive": "大文字と小文字を区別する",
       "directoryScope": "フォルダ範囲を切り替え"
     },
+    "filters": {
+      "all": "すべての種類",
+      "manage": "フィルタを管理",
+      "presets": {
+        "audio": "オーディオ",
+        "archives": "アーカイブ",
+        "documents": "書類",
+        "executables": "実行ファイル",
+        "folders": "フォルダ",
+        "images": "画像",
+        "videos": "動画"
+      }
+    },
     "aria": {
       "searchInput": "検索入力"
     }
@@ -81,7 +94,8 @@
     "resultsCount_other": "{{formatted}} 件",
     "duration": "{{value}} ミリ秒",
     "resultsWithDuration": "{{results}} • {{duration}}",
-    "resultsTitle": "結果 • 所要時間"
+    "resultsTitle": "結果 • 所要時間",
+    "selectionCount": "{{count}} selected"
   },
   "app": {
     "fullDiskAccess": {
@@ -90,13 +104,15 @@
       "steps": {
         "one": "システム設定 > プライバシーとセキュリティ > フルディスクアクセス を開きます。",
         "two": "変更を許可するために錠前をクリックし、Cardinal を有効にします。",
-        "three": "求められたら、macOS に Cardinal の再起動を許可します。"
+        "three": "Return to Cardinal — the permission is detected automatically."
       },
       "status": {
         "checking": "権限の状態を確認しています...",
         "disabled": "フルディスクアクセスが無効です。"
       },
-      "openSettings": "システム設定を開く"
+      "openSettings": "システム設定を開く",
+      "retry": "Check again",
+      "autoDetect": "Access is detected automatically — no restart needed."
     }
   },
   "menu": {
@@ -118,7 +134,8 @@
     "maximize": "ズーム",
     "closeWindow": "ウインドウを閉じる",
     "help": "ヘルプ",
-    "getUpdates": "アップデートを入手"
+    "getUpdates": "アップデートを入手",
+    "bookmarks": "ブックマーク"
   },
   "preferences": {
     "title": "環境設定",
@@ -136,7 +153,13 @@
     },
     "save": "保存",
     "reset": "既定値に戻す",
-    "close": "閉じる"
+    "close": "閉じる",
+    "fontSize": {
+      "label": "Font size",
+      "description": "Applies to results, bookmarks and filter dialogs.",
+      "value": "{{size}} px",
+      "reset": "Reset"
+    }
   },
   "language": {
     "label": "言語",
@@ -179,5 +202,82 @@
     "errors": {
       "absolute": "各パスは「/」または「~」で始まる必要があります。"
     }
+  },
+  "view": {
+    "list": "リスト表示",
+    "grid": "グリッド表示",
+    "iconSizes": {
+      "small": "小さいアイコン",
+      "medium": "中くらいのアイコン",
+      "large": "大きいアイコン",
+      "xlarge": "特大アイコン"
+    },
+    "created": "Created",
+    "modified": "Modified"
+  },
+  "bookmarks": {
+    "title": "ブックマーク",
+    "close": "ブックマークを閉じる",
+    "newCategory": "新しいカテゴリ",
+    "renameCategory": "カテゴリ名を変更",
+    "deleteCategory": "カテゴリを削除",
+    "name": "名前",
+    "query": "検索内容",
+    "add": "追加",
+    "save": "保存",
+    "moveUp": "上へ移動",
+    "moveDown": "下へ移動",
+    "edit": "編集",
+    "delete": "削除",
+    "searchCurrent": "現在のタブで検索",
+    "searchNew": "新しいタブで検索",
+    "empty": "カテゴリを選択または作成してください。",
+    "import": "Import",
+    "export": "Export",
+    "csvFileType": "CSV file",
+    "exported": "Bookmarks exported.",
+    "imported": "Imported {{count}} bookmarks.",
+    "ioFailed": "Import/export failed.",
+    "savedToast": "Bookmark saved to the default category.",
+    "filterLabel": "Filter",
+    "filterNone": "No filter",
+    "filterFallback": "Custom filter",
+    "dragHint": "Drag to move",
+    "resizeWidth": "Drag to resize width",
+    "resizeHeight": "Drag to resize height",
+    "resizeTop": "Drag to resize from the top",
+    "resizeRight": "Drag to resize from the right",
+    "resizeCorner": "Drag to resize both edges"
+  },
+  "filters": {
+    "title": "Filters",
+    "close": "Close filters",
+    "new": "New",
+    "edit": "Edit",
+    "import": "Import",
+    "export": "Export",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "columns": {
+      "name": "Name",
+      "search": "Search"
+    },
+    "searchPlaceholder": "e.g. ext:mp4;mkv or folder:",
+    "created": "Filter created.",
+    "saved": "Filter saved.",
+    "exported": "Filters exported.",
+    "imported": "Imported {{count}} filters.",
+    "ioFailed": "Import/export failed.",
+    "csvFileType": "CSV file"
+  },
+  "sortMenu": {
+    "bySize": "Sort by size",
+    "byCreated": "Sort by creation time",
+    "byModified": "Sort by modification time",
+    "byName": "Sort by name",
+    "ascending": "Ascending",
+    "descending": "Descending",
+    "clear": "Clear sorting"
   }
 }

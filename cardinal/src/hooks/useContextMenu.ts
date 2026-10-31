@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Menu } from '@tauri-apps/api/menu';
@@ -7,9 +7,15 @@ import { useTranslation } from 'react-i18next';
 import { openResultPath } from '../utils/openResultPath';
 import { splitPath } from '../utils/path';
 
+/** Where the HTML "open with" submenu should appear, and which file it belongs to. */
+type OpenWithAnchor = { path: string; x: number; y: number };
+
 type UseContextMenuResult = {
   showContextMenu: (event: ReactMouseEvent<HTMLElement>, targetPaths: string[]) => void;
   showHeaderContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
+  /** Non-null while the "open with" submenu is open. */
+  openWithAnchor: OpenWithAnchor | null;
+  closeOpenWith: () => void;
 };
 
 export function useContextMenu(
@@ -17,6 +23,9 @@ export function useContextMenu(
   onQuickLookRequest?: () => void | Promise<void>,
 ): UseContextMenuResult {
   const { t } = useTranslation();
+  const [openWithAnchor, setOpenWithAnchor] = useState<OpenWithAnchor | null>(null);
+  // Screen position of the last right-click; the native menu cannot report its own position.
+  const menuAnchorRef = useRef({ x: 0, y: 0 });
   const writeClipboard = useCallback((text: string) => {
     if (!navigator?.clipboard?.writeText) {
       return;
@@ -43,6 +52,21 @@ export function useContextMenu(
           accelerator: 'Cmd+O',
           action: () => {
             targetPaths.forEach((itemPath) => openResultPath(itemPath));
+          },
+        },
+        {
+          // The native menu has no submenus, so this opens an HTML popup anchored next to it.
+          id: 'context_menu.open_with',
+          text: t('contextMenu.openWith'),
+          enabled: targetPaths.length === 1,
+          action: () => {
+            // The native menu does not report where it was clicked, so anchor the popup at the
+            // cursor position captured when the menu opened.
+            setOpenWithAnchor({
+              path: targetPaths[0],
+              x: menuAnchorRef.current.x,
+              y: menuAnchorRef.current.y,
+            });
           },
         },
         {
@@ -134,6 +158,7 @@ export function useContextMenu(
     (event: ReactMouseEvent<HTMLElement>, targetPaths: string[]) => {
       event.preventDefault();
       event.stopPropagation();
+      menuAnchorRef.current = { x: event.clientX, y: event.clientY };
       void showMenu(buildFileMenuItems(targetPaths));
     },
     [buildFileMenuItems, showMenu],
@@ -148,8 +173,12 @@ export function useContextMenu(
     [buildHeaderMenuItems, showMenu],
   );
 
+  const closeOpenWith = useCallback(() => setOpenWithAnchor(null), []);
+
   return {
     showContextMenu,
     showHeaderContextMenu,
+    openWithAnchor,
+    closeOpenWith,
   };
 }

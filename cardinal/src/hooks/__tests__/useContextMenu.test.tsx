@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -83,6 +83,64 @@ describe('useContextMenu', () => {
     }>;
     const copyPaths = items.find((item) => item.id === 'context_menu.copy_paths');
     expect(copyPaths?.text).toBe('Copy Path');
+  });
+
+  it('offers "Open With" for a single file and anchors the popup at the click position', async () => {
+    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+
+    const event = {
+      ...createEvent(),
+      clientX: 320,
+      clientY: 240,
+    } as React.MouseEvent<HTMLElement>;
+
+    result.current.showContextMenu(event, ['/movies/a.mp4']);
+
+    await waitFor(() => {
+      expect(mocks.menuNewMock).toHaveBeenCalled();
+    });
+
+    const items = mocks.menuNewMock.mock.calls[0][0].items as Array<{
+      id: string;
+      text?: string;
+      enabled?: boolean;
+      action?: () => void;
+    }>;
+    const openWith = items.find((item) => item.id === 'context_menu.open_with');
+    expect(openWith?.text).toBe('Open With');
+    expect(openWith?.enabled).toBe(true);
+
+    // State updates must be wrapped in `act` for the hook result to be observable.
+    act(() => {
+      openWith?.action?.();
+    });
+    expect(result.current.openWithAnchor).toEqual({
+      path: '/movies/a.mp4',
+      x: 320,
+      y: 240,
+    });
+
+    act(() => {
+      result.current.closeOpenWith();
+    });
+    expect(result.current.openWithAnchor).toBeNull();
+  });
+
+  it('disables "Open With" when several files are selected', async () => {
+    // Finder only shows the submenu for a single selection, and the panel applies to one file.
+    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+
+    result.current.showContextMenu(createEvent(), ['/a.mp4', '/b.mp4']);
+
+    await waitFor(() => {
+      expect(mocks.menuNewMock).toHaveBeenCalled();
+    });
+
+    const items = mocks.menuNewMock.mock.calls[0][0].items as Array<{
+      id: string;
+      enabled?: boolean;
+    }>;
+    expect(items.find((item) => item.id === 'context_menu.open_with')?.enabled).toBe(false);
   });
 
   it('uses provided target paths and ignores empty entries', async () => {

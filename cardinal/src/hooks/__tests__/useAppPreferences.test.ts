@@ -122,6 +122,46 @@ describe('useAppPreferences', () => {
     expect(mockedInvoke).toHaveBeenCalledTimes(1);
   });
 
+  it('retries the start hand-off when the first attempt fails', async () => {
+    // Regression: a rejected `start_logic` used to leave the latch set, so the backend waited
+    // forever for a grant and the first search never completed.
+    mockedInvoke.mockImplementationOnce(() => Promise.reject(new Error('not ready')));
+
+    const { rerender } = renderHook((props) => useAppPreferences(props), {
+      initialProps: {
+        fullDiskAccessStatus: 'granted' as const,
+        isCheckingFullDiskAccess: false,
+        refreshSearchResults,
+        i18n: { changeLanguage },
+      },
+    });
+
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenCalledWith('start_logic', expect.anything());
+    });
+
+    // Any later dependency change must be able to retry (the latch was cleared on failure).
+    rerender({
+      fullDiskAccessStatus: 'granted' as const,
+      isCheckingFullDiskAccess: true,
+      refreshSearchResults,
+      i18n: { changeLanguage },
+    });
+    rerender({
+      fullDiskAccessStatus: 'granted' as const,
+      isCheckingFullDiskAccess: false,
+      refreshSearchResults,
+      i18n: { changeLanguage },
+    });
+
+    await waitFor(() => {
+      const successCalls = mockedInvoke.mock.calls.filter(
+        ([command, payload]) => command === 'start_logic' && payload !== undefined,
+      );
+      expect(successCalls.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
   it('updates watch config and refreshes search when preferences change', async () => {
     const { result } = renderHook(() =>
       useAppPreferences({

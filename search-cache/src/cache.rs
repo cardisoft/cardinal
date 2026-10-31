@@ -9,7 +9,8 @@ use anyhow::{Context, Result, anyhow};
 use cardinal_sdk::{EventFlag, FsEvent, ScanType, current_event_id};
 use cardinal_syntax::{Expr, Filter, FilterKind, Term, optimize_query, parse_query};
 use fswalk::{
-    Node, NodeMetadata, WalkData, should_ignore_path, walk_it, walk_it_without_root_chain,
+    Node, NodeFileType, NodeMetadata, WalkData, should_ignore_path, walk_it,
+    walk_it_without_root_chain,
 };
 use hashbrown::HashSet;
 use namepool::NamePool;
@@ -22,7 +23,7 @@ use std::{
         LazyLock,
         atomic::{AtomicBool, Ordering},
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 use thin_vec::ThinVec;
 use tracing::{debug, info};
@@ -39,6 +40,21 @@ pub struct SearchCache {
     pub(crate) name_index: NameIndex,
     stop: &'static AtomicBool,
 }
+
+/// Upper bound on rows produced when browsing a directory scope with no text query.
+/// Keeps the IPC payload and the first paint bounded for very large trees.
+pub const DIRECTORY_BROWSE_LIMIT: usize = 20_000;
+
+/// How many "newest files" the empty query returns on launch.
+pub const RECENT_NODE_LIMIT: usize = 200;
+
+/// How many index entries the launch scan may inspect. Bounds the worst case on a disk with
+/// millions of files (see `most_recent_nodes`).
+pub const RECENT_SCAN_LIMIT: usize = 20_000;
+
+/// Wall-clock budget for `stat` calls while building the launch list. Once exceeded the scan
+/// stops and whatever was collected is returned, so startup never blocks on the disk.
+pub const RECENT_STAT_BUDGET_MS: u64 = 60;
 
 #[derive(Debug, Clone, Default)]
 pub struct SearchQuery {
@@ -321,6 +337,96 @@ impl SearchCache {
         self.name_index.all_indices(cancellation_token)
     }
 
+    /// The newest `limit` nodes found within a bounded scan, descending by timestamp.
+    ///
+    /// Used as the initial result set so a fresh window has something to show. The scan is
+    /// deliberately capped: metadata is not collected during the walk, so ranking the whole
+    /// index would mean one `stat` per file — hundreds of thousands of syscalls on a real
+    /// disk, which blocks the search thread for minutes. Instead we examine at most
+    /// `RECENT_SCAN_LIMIT` nodes and spend at most `RECENT_STAT_BUDGET_MS` on `stat` calls.
+    /// The result is therefore "recent among a bounded sample", which is what the empty
+    /// state needs, not a globally exact ranking.
+    pub fn most_recent_nodes(
+        &mut self,
+        limit: usize,
+        cancellation_token: CancellationToken,
+    ) -> Option<Vec<SlabIndex>> {
+        self.most_recent_nodes_with(
+            limit,
+            RECENT_SCAN_LIMIT,
+            RECENT_STAT_BUDGET_MS,
+            cancellation_token,
+        )
+    }
+
+    /// `most_recent_nodes` with an explicit scan budget. Split out so tests can assert the
+    /// bound instead of relying on wall-clock timing.
+    pub(crate) fn most_recent_nodes_with(
+        &mut self,
+        limit: usize,
+        scan_limit: usize,
+        stat_budget_ms: u64,
+        cancellation_token: CancellationToken,
+    ) -> Option<Vec<SlabIndex>> {
+        // Only pull the entries we are allowed to inspect; collecting the full index first
+        // costs hundreds of milliseconds on multi-million-file disks.
+        let indices = self
+            .name_index
+            .take_indices(scan_limit, cancellation_token)?;
+        let deadline = Instant::now() + Duration::from_millis(stat_budget_ms);
+        let mut candidates: Vec<(u32, SlabIndex)> =
+            Vec::with_capacity(limit.saturating_mul(2).max(16));
+
+        for (i, index) in indices.into_iter().enumerate() {
+            cancellation_token.is_cancelled_sparse(i)?;
+
+            // Cached metadata (directories from the walk, plus anything the event watcher
+            // touched) is free to use.
+            let cached = self.file_nodes[index]
+                .metadata()
+                .as_ref()
+                .and_then(|meta| meta.ctime().or(meta.mtime()))
+                .map(|time| time.get());
+
+            let timestamp = match cached {
+                Some(time) => Some(time),
+                None => {
+                    if Instant::now() >= deadline {
+                        // Out of budget: keep what we have instead of stalling the search.
+                        break;
+                    }
+                    self.stat_timestamp(index)
+                }
+            };
+            if let Some(timestamp) = timestamp {
+                candidates.push((timestamp, index));
+            }
+        }
+
+        // Newest first, with a stable tiebreak on the slab index.
+        candidates.sort_unstable_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+        candidates.truncate(limit);
+        Some(candidates.into_iter().map(|(_, index)| index).collect())
+    }
+
+    /// Reads `ctime` (falling back to `mtime`) for a node straight from the filesystem and
+    /// caches the metadata so later sorts/columns don't repeat the `stat`.
+    fn stat_timestamp(&mut self, index: SlabIndex) -> Option<u32> {
+        let path = self.node_path(index)?;
+        let metadata = match std::fs::symlink_metadata(&path) {
+            Ok(metadata) => SlabNodeMetadataCompact::some(metadata.into()),
+            Err(_) => return None,
+        };
+        let timestamp = metadata
+            .as_ref()
+            .and_then(|meta| meta.ctime().or(meta.mtime()))
+            .map(|time| time.get());
+        if let Some(node) = self.file_nodes.get_mut(index) {
+            node.metadata = metadata;
+        }
+        timestamp
+    }
+
     #[cfg(test)]
     pub fn search(&mut self, line: &str) -> Result<Vec<SlabIndex>> {
         self.search_with_options(line, SearchOptions::default(), CancellationToken::noop())
@@ -344,15 +450,18 @@ impl SearchCache {
             ),
             // Only the main search box is active: keep the existing single-pass behavior.
             (None, Some(query)) => self.search_with_options(query, options, cancellation_token),
-            // Only the folder scope box is active: run a single-pass folder-only search.
+            // Only the folder scope box is active: show the matched folders followed by
+            // everything they contain, so the scope input behaves like opening a directory.
             (Some(directory_query), None) => {
-                self.search_folder_with_options(directory_query, options, cancellation_token)
+                self.search_directory_contents(directory_query, options, cancellation_token)
             }
-            // No user input: return the existing empty-query result set directly.
-            (None, None) => Ok(self
-                .search_empty(cancellation_token)
-                .map(|nodes| SearchOutcome::new(Some(nodes), vec![]))
-                .unwrap_or_else(SearchOutcome::cancelled)),
+            // No user input: show the most recently created files instead of an empty
+            // screen. A hard cap keeps the IPC payload (and first paint) tiny — returning the
+            // whole index would mean serialising millions of indices on every new tab.
+            (None, None) => Ok(SearchOutcome::new(
+                self.most_recent_nodes(RECENT_NODE_LIMIT, cancellation_token),
+                vec![],
+            )),
         }
     }
 
@@ -457,6 +566,55 @@ impl SearchCache {
 
         let scoped_nodes = SearchOutcome::merge_preserve_order(Vec::new(), scoped_nodes);
         Ok(SearchOutcome::new(Some(scoped_nodes), highlights))
+    }
+
+    /// Browses a directory scope: the matched folders come first, followed by everything
+    /// they contain. Used when the scope box is the only input, so `.../tick_data` reads
+    /// like opening that folder rather than returning the folder alone.
+    fn search_directory_contents(
+        &mut self,
+        directory_query: &str,
+        options: SearchOptions,
+        cancellation_token: CancellationToken,
+    ) -> Result<SearchOutcome> {
+        let outcome =
+            self.search_folder_with_options(directory_query, options, cancellation_token)?;
+        if outcome.is_cancelled() {
+            return Ok(SearchOutcome::cancelled());
+        }
+
+        let SearchOutcome { nodes, highlights } = outcome;
+        let Some(nodes) = nodes else {
+            return Ok(SearchOutcome::cancelled());
+        };
+
+        let mut folders = Vec::new();
+        let mut descendants = Vec::new();
+        for (i, index) in nodes.into_iter().enumerate() {
+            if cancellation_token.is_cancelled_sparse(i).is_none() {
+                return Ok(SearchOutcome::cancelled());
+            }
+            // An empty scope matches every node, files included; browsing only expands
+            // directories (a file has no children to list).
+            if self.file_nodes[index].file_type_hint() != NodeFileType::Dir {
+                continue;
+            }
+            let Some(children) = self.all_subnodes(index, cancellation_token) else {
+                return Ok(SearchOutcome::cancelled());
+            };
+            folders.push(index);
+            descendants.extend(children);
+            // Browsing a very large tree would otherwise build (and send) millions of
+            // indices before the first screen can paint. The cap keeps tab switches snappy;
+            // a narrower scope (or a filter) is the way to see the rest.
+            if folders.len() + descendants.len() >= DIRECTORY_BROWSE_LIMIT {
+                break;
+            }
+        }
+        descendants.truncate(DIRECTORY_BROWSE_LIMIT.saturating_sub(folders.len()));
+
+        let ordered = SearchOutcome::merge_preserve_order(folders, descendants);
+        Ok(SearchOutcome::new(Some(ordered), highlights))
     }
 
     fn search_with_directory_scope(
@@ -1344,7 +1502,7 @@ mod tests {
     }
 
     #[test]
-    fn directory_query_only_returns_matching_directories() {
+    fn directory_query_lists_the_folder_first_then_its_contents() {
         let temp_dir = TempDir::new("directory_query_only").unwrap();
         let root = temp_dir.path();
         fs::create_dir_all(root.join("Projects/Alpha/src")).unwrap();
@@ -1357,12 +1515,21 @@ mod tests {
         let nodes = scoped_search(&mut cache, Some("Projects/Alpha"), None);
         let paths = paths_from_nodes(&nodes);
 
-        assert_eq!(paths.len(), 1);
-        assert!(paths[0].ends_with("/Projects/Alpha"));
+        // Browsing a scope mirrors opening the folder: the folder itself, then its contents.
+        assert_eq!(paths.len(), 3, "paths: {paths:?}");
         assert!(
-            !paths
+            paths[0].ends_with("/Projects/Alpha"),
+            "scope folder should come first, got {paths:?}"
+        );
+        assert!(
+            paths
                 .iter()
                 .any(|path| path.ends_with("/Projects/Alpha/src"))
+        );
+        assert!(
+            paths
+                .iter()
+                .any(|path| path.ends_with("/Projects/Alpha/src/notes.md"))
         );
         assert!(
             !paths
@@ -1386,7 +1553,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_search_query_returns_all_nodes() {
+    fn empty_search_query_returns_only_the_newest_nodes() {
         let temp_dir = TempDir::new("directory_query_none").unwrap();
         let root = temp_dir.path();
         fs::create_dir_all(root.join("Projects/Alpha")).unwrap();
@@ -1394,14 +1561,58 @@ mod tests {
 
         let mut cache = SearchCache::walk_fs(root);
         let nodes = scoped_search(&mut cache, None, None);
-        let paths = paths_from_nodes(&nodes);
 
-        assert!(paths.iter().any(|path| path.ends_with("/Projects")));
-        assert!(paths.iter().any(|path| path.ends_with("/Projects/Alpha")));
+        // An empty search shows a bounded "newest files" list, never the whole index.
+        assert!(!nodes.is_empty());
+        assert!(nodes.len() <= RECENT_NODE_LIMIT);
+    }
+
+    #[test]
+    fn most_recent_nodes_respects_the_scan_cap() {
+        let temp_dir = TempDir::new("most_recent_scan_cap").unwrap();
+        let root = temp_dir.path();
+        for i in 0..40 {
+            fs::write(root.join(format!("file-{i:02}.txt")), b"x").unwrap();
+        }
+
+        let mut cache = SearchCache::walk_fs(root);
+
+        // A tiny scan window must bound the result even though the index holds far more
+        // nodes. This is what keeps startup from `stat`-ing an entire disk.
+        let scanned = cache
+            .most_recent_nodes_with(200, 5, 1_000, CancellationToken::noop())
+            .expect("not cancelled");
+        assert!(scanned.len() <= 5, "scan cap ignored: {scanned:?}");
+
+        let all = cache
+            .most_recent_nodes_with(200, 1_000, 1_000, CancellationToken::noop())
+            .expect("not cancelled");
         assert!(
-            paths
-                .iter()
-                .any(|path| path.ends_with("/Projects/Alpha/notes.md"))
+            all.len() > scanned.len(),
+            "wider scan should see more nodes"
+        );
+    }
+
+    #[test]
+    fn most_recent_nodes_is_bounded_and_includes_files() {
+        let temp_dir = TempDir::new("most_recent_nodes").unwrap();
+        let root = temp_dir.path();
+        for i in 0..5 {
+            fs::write(root.join(format!("file-{i}.txt")), b"x").unwrap();
+        }
+
+        let mut cache = SearchCache::walk_fs(root);
+        let nodes = cache
+            .most_recent_nodes(3, CancellationToken::noop())
+            .expect("not cancelled");
+
+        assert_eq!(nodes.len(), 3, "the cap must bound the result");
+        // Files are stat'ed on demand, so they must be reachable even though the walk left
+        // their metadata uncached.
+        let paths = paths_from_nodes(&cache.expand_file_nodes(&nodes));
+        assert!(
+            paths.iter().any(|path| path.contains("file-")),
+            "files should appear in the newest list: {paths:?}"
         );
     }
 
@@ -1419,12 +1630,12 @@ mod tests {
 
         assert!(paths.iter().any(|path| path.ends_with("/Projects")));
         assert!(paths.iter().any(|path| path.ends_with("/Projects/Alpha")));
+        // An empty scope still means "browse", so the contents show up too.
         assert!(
-            !paths
+            paths
                 .iter()
                 .any(|path| path.ends_with("/Projects/Alpha/notes.md"))
         );
-        assert!(!paths.iter().any(|path| path.ends_with("/root.txt")));
     }
 
     #[test]
@@ -1439,14 +1650,15 @@ mod tests {
         let nodes = scoped_search(&mut cache, Some("   "), None);
         let paths = paths_from_nodes(&nodes);
 
+        // Whitespace is a real (matching-nothing-on-purpose) scope, not "no scope", so the
+        // result set is a browse of whatever matched rather than the whole filesystem.
         assert!(paths.iter().any(|path| path.ends_with("/Projects")));
         assert!(paths.iter().any(|path| path.ends_with("/Projects/Alpha")));
         assert!(
-            !paths
+            paths
                 .iter()
                 .any(|path| path.ends_with("/Projects/Alpha/notes.md"))
         );
-        assert!(!paths.iter().any(|path| path.ends_with("/root.txt")));
     }
 
     #[test]
@@ -1535,6 +1747,64 @@ mod tests {
 
         assert_eq!(paths.len(), 1);
         assert!(paths[0].ends_with("/Work/Docs/report.md"));
+    }
+
+    #[test]
+    fn filter_preset_ext_list_narrows_results() {
+        let temp_dir = TempDir::new("filter_preset_ext").unwrap();
+        let root = temp_dir.path();
+        fs::write(root.join("movie.mp4"), b"video").unwrap();
+        fs::write(root.join("song.flac"), b"audio").unwrap();
+        fs::write(root.join("notes.md"), b"text").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+
+        // Mirrors what the filter dropdown sends when "视频"/Videos is selected.
+        let videos = query(&mut cache, "ext:mp4;mkv;flac;md");
+        let video_paths = paths_from_nodes(&videos);
+        assert_eq!(video_paths.len(), 3, "paths: {video_paths:?}");
+
+        // And what it sends once the user also types something.
+        let combined = query(&mut cache, "(mo*) ext:mp4;mkv");
+        let combined_paths = paths_from_nodes(&combined);
+        assert_eq!(combined_paths.len(), 1, "paths: {combined_paths:?}");
+        assert!(combined_paths[0].ends_with("/movie.mp4"));
+    }
+
+    #[test]
+    fn directory_browse_is_capped_for_huge_trees() {
+        let temp_dir = TempDir::new("directory_browse_cap").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("big")).unwrap();
+        for i in 0..50 {
+            fs::write(root.join(format!("big/file-{i}.txt")), b"x").unwrap();
+        }
+
+        let mut cache = SearchCache::walk_fs(root);
+        let nodes = scoped_search(&mut cache, Some("big"), None);
+
+        // The cap is far above this fixture, so the assertion documents intent: browsing is
+        // bounded (see DIRECTORY_BROWSE_LIMIT) rather than "all descendants, unbounded".
+        assert!(nodes.len() <= DIRECTORY_BROWSE_LIMIT);
+        assert!(
+            nodes.len() >= 51,
+            "expected folder + 50 files, got {}",
+            nodes.len()
+        );
+    }
+
+    #[test]
+    fn filter_preset_folder_only_returns_directories() {
+        let temp_dir = TempDir::new("filter_preset_folder").unwrap();
+        let root = temp_dir.path();
+        fs::create_dir_all(root.join("dir")).unwrap();
+        fs::write(root.join("file.txt"), b"text").unwrap();
+
+        let mut cache = SearchCache::walk_fs(root);
+        let paths = paths_from_nodes(&query(&mut cache, "folder:"));
+
+        assert!(paths.iter().any(|path| path.ends_with("/dir")));
+        assert!(!paths.iter().any(|path| path.ends_with("/file.txt")));
     }
 
     #[test]

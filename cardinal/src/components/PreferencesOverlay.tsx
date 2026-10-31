@@ -25,6 +25,12 @@ type PreferencesOverlayProps = {
   defaultIncludePaths: string[];
   onReset: () => void;
   themeResetToken: number;
+  fontSize: number;
+  defaultFontSize: number;
+  fontSizeMin: number;
+  fontSizeMax: number;
+  onFontSizeChange: (value: number) => void;
+  onFontSizeReset: () => void;
 };
 
 export function PreferencesOverlay({
@@ -44,12 +50,21 @@ export function PreferencesOverlay({
   defaultIncludePaths,
   onReset,
   themeResetToken,
+  fontSize,
+  defaultFontSize,
+  fontSizeMin,
+  fontSizeMax,
+  onFontSizeChange,
+  onFontSizeReset,
 }: PreferencesOverlayProps): React.JSX.Element | null {
   const { t } = useTranslation();
   const [thresholdInput, setThresholdInput] = useState<string>(() => sortThreshold.toString());
   const [watchRootInput, setWatchRootInput] = useState<string>(() => watchRoot);
   const [ignorePathsInput, setIgnorePathsInput] = useState<string>(() => ignorePaths.join('\n'));
   const [includePathsInput, setIncludePathsInput] = useState<string>(() => includePaths.join('\n'));
+  // The slider only previews while dragging; the committed value lands on release so a single
+  // pixel of travel cannot jump the whole range.
+  const [fontSizeDraft, setFontSizeDraft] = useState<number>(() => fontSize);
 
   useEffect(() => {
     if (!open) {
@@ -73,6 +88,12 @@ export function PreferencesOverlay({
     }
     setThresholdInput(sortThreshold.toString());
   }, [open, sortThreshold]);
+
+  useEffect(() => {
+    if (open) {
+      setFontSizeDraft(fontSize);
+    }
+  }, [fontSize, open]);
 
   useEffect(() => {
     if (!open) {
@@ -182,6 +203,42 @@ export function PreferencesOverlay({
           <div className="preferences-row">
             <p className="preferences-label">{t('preferences.language')}</p>
             <LanguageSwitcher className="preferences-control" />
+          </div>
+          <div className="preferences-row">
+            <div className="preferences-row__details">
+              <p className="preferences-label">{t('preferences.fontSize.label')}</p>
+              <p className="preferences-hint">{t('preferences.fontSize.description')}</p>
+            </div>
+            <div className="preferences-control preferences-font-size">
+              <input
+                type="range"
+                min={fontSizeMin}
+                max={fontSizeMax}
+                step={1}
+                value={fontSizeDraft}
+                aria-label={t('preferences.fontSize.label')}
+                onChange={(event) => setFontSizeDraft(Number(event.target.value))}
+                // Commit once the drag/keyboard interaction ends.
+                onPointerUp={() => onFontSizeChange(fontSizeDraft)}
+                onMouseUp={() => onFontSizeChange(fontSizeDraft)}
+                onKeyUp={() => onFontSizeChange(fontSizeDraft)}
+                onBlur={() => onFontSizeChange(fontSizeDraft)}
+              />
+              <span className="preferences-font-size__value">
+                {t('preferences.fontSize.value', { size: fontSizeDraft })}
+              </span>
+              <button
+                type="button"
+                className="preferences-reset-button"
+                onClick={() => {
+                  onFontSizeReset();
+                  setFontSizeDraft(defaultFontSize);
+                }}
+                disabled={fontSize === defaultFontSize}
+              >
+                {t('preferences.fontSize.reset')}
+              </button>
+            </div>
           </div>
           <div className="preferences-row">
             <p className="preferences-label">{t('preferences.trayIcon.label')}</p>

@@ -19,3 +19,32 @@ export function formatTimestamp(timestampSec: number | null | undefined): string
 
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
+
+const SIZE_UNITS = ['B', 'KB', 'MB', 'G', 'T', 'P'] as const;
+
+/** Trims trailing zeros so 1.20 becomes 1.2 and 4.00 becomes 4. */
+const trimZeros = (value: string): string =>
+  value.includes('.') ? value.replace(/\.?0+$/, '') : value;
+
+/**
+ * Human-readable byte size: `4KB`, `50MB`, `200MB`, `1G`, `1.24G`.
+ * Two decimals below 10 (so small differences stay visible), none above.
+ */
+export function formatSize(bytes: number | null | undefined): string | null {
+  if (bytes == null || !Number.isFinite(bytes) || bytes < 0) {
+    return null;
+  }
+  if (bytes < 1024) {
+    return `${Math.round(bytes)}${SIZE_UNITS[0]}`;
+  }
+
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < SIZE_UNITS.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  const formatted = value < 10 ? trimZeros(value.toFixed(2)) : String(Math.round(value));
+  return `${formatted}${SIZE_UNITS[unitIndex]}`;
+}

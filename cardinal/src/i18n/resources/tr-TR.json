@@ -9,6 +9,19 @@
       "caseSensitive": "Büyük/küçük harfe duyarlı eşleşmeyi değiştir",
       "directoryScope": "Klasör kapsamını değiştir"
     },
+    "filters": {
+      "all": "Tüm türler",
+      "manage": "Filtreleri yönet",
+      "presets": {
+        "audio": "Ses",
+        "archives": "Arşivler",
+        "documents": "Belgeler",
+        "executables": "Çalıştırılabilirler",
+        "folders": "Klasörler",
+        "images": "Görseller",
+        "videos": "Videolar"
+      }
+    },
     "aria": {
       "searchInput": "Arama girişi"
     }
@@ -81,7 +94,8 @@
     "resultsCount_other": "{{formatted}} sonuç",
     "duration": "{{value}} ms",
     "resultsWithDuration": "{{results}} • {{duration}}",
-    "resultsTitle": "Sonuçlar • Süre"
+    "resultsTitle": "Sonuçlar • Süre",
+    "selectionCount": "{{count}} selected"
   },
   "app": {
     "fullDiskAccess": {
@@ -90,13 +104,15 @@
       "steps": {
         "one": "Sistem Ayarları > Gizlilik ve Güvenlik > Tam Disk Erişimi'ni açın.",
         "two": "Kilidi açıp değişikliklere izin verin ve Cardinal'i etkinleştirin.",
-        "three": "İstendiğinde macOS'un Cardinal'i yeniden başlatmasına izin verin."
+        "three": "Return to Cardinal — the permission is detected automatically."
       },
       "status": {
         "checking": "İzin durumu kontrol ediliyor...",
         "disabled": "Tam Disk Erişimi devre dışı."
       },
-      "openSettings": "Sistem Ayarlarını aç"
+      "openSettings": "Sistem Ayarlarını aç",
+      "retry": "Check again",
+      "autoDetect": "Access is detected automatically — no restart needed."
     }
   },
   "menu": {
@@ -118,7 +134,8 @@
     "maximize": "Yakınlaştır",
     "closeWindow": "Pencereyi kapat",
     "help": "Yardım",
-    "getUpdates": "Güncellemeleri al"
+    "getUpdates": "Güncellemeleri al",
+    "bookmarks": "Yer imleri"
   },
   "preferences": {
     "title": "Tercihler",
@@ -136,7 +153,13 @@
     },
     "save": "Kaydet",
     "reset": "Varsayılanlara döndür",
-    "close": "Kapat"
+    "close": "Kapat",
+    "fontSize": {
+      "label": "Font size",
+      "description": "Applies to results, bookmarks and filter dialogs.",
+      "value": "{{size}} px",
+      "reset": "Reset"
+    }
   },
   "language": {
     "label": "Dil",
@@ -179,5 +202,82 @@
     "errors": {
       "absolute": "Her yol '/' veya '~' ile başlamalıdır."
     }
+  },
+  "view": {
+    "list": "Liste görünümü",
+    "grid": "Izgara görünümü",
+    "iconSizes": {
+      "small": "Küçük simgeler",
+      "medium": "Orta simgeler",
+      "large": "Büyük simgeler",
+      "xlarge": "Çok büyük simgeler"
+    },
+    "created": "Created",
+    "modified": "Modified"
+  },
+  "bookmarks": {
+    "title": "Yer imleri",
+    "close": "Yer imlerini kapat",
+    "newCategory": "Yeni kategori",
+    "renameCategory": "Kategoriyi yeniden adlandır",
+    "deleteCategory": "Kategoriyi sil",
+    "name": "Ad",
+    "query": "Arama sorgusu",
+    "add": "Ekle",
+    "save": "Kaydet",
+    "moveUp": "Yukarı taşı",
+    "moveDown": "Aşağı taşı",
+    "edit": "Düzenle",
+    "delete": "Sil",
+    "searchCurrent": "Geçerli sekmede ara",
+    "searchNew": "Yeni sekmede ara",
+    "empty": "Bir kategori seçin veya oluşturun.",
+    "import": "Import",
+    "export": "Export",
+    "csvFileType": "CSV file",
+    "exported": "Bookmarks exported.",
+    "imported": "Imported {{count}} bookmarks.",
+    "ioFailed": "Import/export failed.",
+    "savedToast": "Bookmark saved to the default category.",
+    "filterLabel": "Filter",
+    "filterNone": "No filter",
+    "filterFallback": "Custom filter",
+    "dragHint": "Drag to move",
+    "resizeWidth": "Drag to resize width",
+    "resizeHeight": "Drag to resize height",
+    "resizeTop": "Drag to resize from the top",
+    "resizeRight": "Drag to resize from the right",
+    "resizeCorner": "Drag to resize both edges"
+  },
+  "filters": {
+    "title": "Filters",
+    "close": "Close filters",
+    "new": "New",
+    "edit": "Edit",
+    "import": "Import",
+    "export": "Export",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "columns": {
+      "name": "Name",
+      "search": "Search"
+    },
+    "searchPlaceholder": "e.g. ext:mp4;mkv or folder:",
+    "created": "Filter created.",
+    "saved": "Filter saved.",
+    "exported": "Filters exported.",
+    "imported": "Imported {{count}} filters.",
+    "ioFailed": "Import/export failed.",
+    "csvFileType": "CSV file"
+  },
+  "sortMenu": {
+    "bySize": "Sort by size",
+    "byCreated": "Sort by creation time",
+    "byModified": "Sort by modification time",
+    "byName": "Sort by name",
+    "ascending": "Ascending",
+    "descending": "Descending",
+    "clear": "Clear sorting"
   }
 }

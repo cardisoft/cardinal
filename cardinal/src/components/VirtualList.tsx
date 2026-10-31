@@ -17,6 +17,9 @@ import type { SearchResultItem } from '../types/search';
 import type { SlabIndex } from '../types/slab';
 import { useIconViewport } from '../hooks/useIconViewport';
 
+/** Rows from the bottom at which the list asks for another page. */
+const NEAR_END_ROW_THRESHOLD = 20;
+
 export type VirtualListHandle = {
   scrollToTop: () => void;
   scrollToRow: (rowIndex: number, align?: 'nearest' | 'start' | 'end' | 'center') => void;
@@ -39,6 +42,8 @@ type VirtualListProps = {
     rowStyle: CSSProperties,
   ) => React.ReactNode;
   onScrollSync: (scrollLeft: number) => void;
+  /** Called once per approach to the end of the list (used to page the launch list). */
+  onNearEnd?: () => void;
 };
 
 // Virtualized list with lazy row hydration plus a short-lived frozen viewport during
@@ -52,11 +57,13 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
     overscan,
     renderRow,
     onScrollSync,
+    onNearEnd,
   },
   ref,
 ) {
   // ----- refs -----
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
 
   // ----- state -----
   const [scrollTop, setScrollTop] = useState(0);
@@ -122,21 +129,39 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
   );
 
   // ----- effects -----
-  // Ensure the data cache stays warm for the active window
+  // Ensure the data cache stays warm for the active window. `cache` participates so a loader
+  // reset (new result-set or icon raster size) refills the viewport immediately.
   useEffect(() => {
     if (end >= start) ensureRangeLoaded(start, end);
-  }, [start, end, ensureRangeLoaded, displayedResultsVersion]);
+  }, [start, end, ensureRangeLoaded, displayedResultsVersion, cache]);
 
-  // Track container height changes so virtualization recalculates the viewport
+  // Track container height changes so virtualization recalculates the viewport.
+  // Measure the scrolling element rather than the wrapper: its `clientHeight` excludes the
+  // horizontal scrollbar, which would otherwise hide the final rows.
   useLayoutEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
-    const updateViewport = () => setViewportHeight(container.clientHeight);
+    const viewport = viewportRef.current;
+    if (!container || !viewport) return;
+    const updateViewport = () => setViewportHeight(viewport.clientHeight);
     const resizeObserver = new ResizeObserver(updateViewport);
     resizeObserver.observe(container);
+    resizeObserver.observe(viewport);
     updateViewport();
     return () => resizeObserver.disconnect();
   }, []);
+
+  // Ask the owner for the next page when the viewport gets close to the end. Keeping this in
+  // an effect over `scrollTop` means wheel, scrollbar drag and keyboard scrolling all trigger
+  // it, and it only fires once per rendered range because the owner appends more rows.
+  useEffect(() => {
+    if (!onNearEnd || rowCount === 0 || viewportHeight <= 0) {
+      return;
+    }
+    const threshold = rowHeight * NEAR_END_ROW_THRESHOLD;
+    if (scrollTop + viewportHeight >= totalHeight - threshold) {
+      onNearEnd();
+    }
+  }, [onNearEnd, rowCount, rowHeight, scrollTop, totalHeight, viewportHeight]);
 
   // Re-clamp scrollTop whenever total height shrinks (e.g. due to a narrower result set)
   useEffect(() => {
@@ -258,7 +283,7 @@ export const VirtualList = forwardRef<VirtualListHandle, VirtualListProps>(funct
       role="list"
       aria-rowcount={rowCount}
     >
-      <div className="virtual-list-viewport" onScroll={handleHorizontalScroll}>
+      <div ref={viewportRef} className="virtual-list-viewport" onScroll={handleHorizontalScroll}>
         <div className="virtual-list-items">{renderedItems}</div>
         {frozenViewport ? (
           // This sits above the live layer and visually "freezes" the previous viewport.

@@ -24,6 +24,9 @@ type UseAppHotkeysOptions = {
   clearSelection: () => void;
   navigateSelection: (delta: 1 | -1, options?: MoveSelectionOptions) => void;
   triggerQuickLook: () => void;
+  toggleBookmarks: () => void;
+  /** Cmd+S: save the current query + filter as a bookmark. */
+  saveCurrentSearchAsBookmark: () => void;
 };
 
 const QUICK_LOOK_KEYCODE_DOWN = 125;
@@ -46,6 +49,8 @@ export function useAppHotkeys({
   clearSelection,
   navigateSelection,
   triggerQuickLook,
+  toggleBookmarks,
+  saveCurrentSearchAsBookmark,
 }: UseAppHotkeysOptions): void {
   const keyboardStateRef = useRef<{ activeTab: StatusTabKey; activeRowIndex: number | null }>({
     activeTab,
@@ -62,6 +67,22 @@ export function useAppHotkeys({
     if (key === 'f') {
       event.preventDefault();
       focusAndSelectSearchInput();
+      return true;
+    }
+
+    // Cmd+Shift+B toggles the bookmarks manager from anywhere in the app.
+    if (key === 'b' && event.shiftKey) {
+      event.preventDefault();
+      toggleBookmarks();
+      return true;
+    }
+
+    // Cmd+S saves the current search (text + filter) as a bookmark in the default category.
+    // It runs before the editable-target bail-out so it also works while the search box has
+    // focus, and it must not trigger the browser/webview "save page" default.
+    if (key === 's' && !event.shiftKey) {
+      event.preventDefault();
+      saveCurrentSearchAsBookmark();
       return true;
     }
 

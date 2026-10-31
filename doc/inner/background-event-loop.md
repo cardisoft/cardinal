@@ -10,7 +10,8 @@
 ## Channels
 ```text
 search_rx             query + SearchOptionsPayload + CancellationToken + result_tx
-                      result_tx returns SearchOutcome back to the command handler
+                      result_tx returns SearchJobResult
+                      (Completed(Result<SearchOutcome>) | Indexing)
 
 node_info_rx          slab indices -> SearchResultNode expansion
 icon_viewport_rx      visible slab indices for thumbnail prefetch
@@ -18,6 +19,7 @@ icon_update_tx        IconPayload batches back to the UI
 
 rescan_rx             manual full-rescan requests
 watch_config_rx       watch-root / ignore-path changes
+index_build_rx        IndexBuildResult from the index worker thread
 update_window_state_rx
                       recompute foreground/hidden state for delayed flush
 finish_rx             one-shot final cache handoff during shutdown
@@ -25,59 +27,69 @@ finish_rx             one-shot final cache handoff during shutdown
 
 ## Startup path
 1. `wait_for_logic_start()` blocks until the frontend has permission and sends `start_logic`.
-2. `run_logic_thread()` normalizes the watch config.
-3. The backend tries `SearchCache::try_read_persistent_cache(...)`.
-4. If that fails, `build_search_cache(...)` runs `fswalk` with a scan cancellation token and emits progress every 100 ms.
-5. Once a non-noop cache exists, the lifecycle moves to `Updating` and an `EventWatcher` starts at `cache.last_event_id()`.
+2. `run_logic_thread()` normalizes the watch config and immediately enters
+   `run_background_event_loop(...)` with a **noop** cache and `Some(IndexingState { .. })`.
+3. `spawn_index_load(...)` runs on its own thread: it tries
+   `SearchCache::try_read_persistent_cache(...)` and falls back to `build_search_cache(...)`
+   (which emits progress every 100 ms). Manual rescans pass `force_walk = true`.
+4. The worker sends `IndexBuildResult` over `index_build_tx`; the loop installs it only when
+   the build token still matches the active one (a cancelled/superseded walk is ignored).
+5. On install: `indexing = None`, the launch snapshot is dropped, the lifecycle moves to
+   `Updating`, and an `EventWatcher` starts at `cache.last_event_id()`. `HistoryDone` then
+   moves the lifecycle to `Ready`.
 
-## Main select loop
-```text
-finish_rx              -> return the final cache snapshot
-update_window_state_rx -> recompute foreground status
-flush_ticker           -> idle/hide flush checks
-search_rx              -> cache.search_with_options(...)
-node_info_rx           -> cache.expand_file_nodes(...)
-icon_viewport_rx       -> Quick Look thumbnail jobs
-rescan_rx              -> perform_rescan(...)
-watch_config_rx        -> rebuild cache/watcher for new config
-event_watcher          -> apply FSEvents, emit recent activity, advance lifecycle
-```
-
-## FSEvents handling
-- `handle_event_watcher_events(...)` increments `processed_events` and emits `status_bar_update`.
-- `HistoryDone` flips `history_ready` and moves the lifecycle to `Ready`.
-- Only events received after `history_ready` are forwarded to the UI as `fs_events_batch`.
-- `SearchCache::handle_fs_events(...)` performs incremental subtree rescans through `scan_path_recursive(...)`.
-- If the cache returns `HandleFSEError::Rescan`, Cardinal increments `rescan_count` and surfaces that in the status bar. It does **not** automatically run a full rebuild today.
-
-## Rescans and watch-config changes
-- `trigger_rescan()` sends a new scan token to `perform_rescan(...)`.
-- A manual rescan:
-  - swaps the watcher to `EventWatcher::noop()`
-  - resets lifecycle and progress counters
-  - rebuilds the current watch root with `cache.rescan_with_walk_data(...)`
-  - restarts the watcher if the rebuild completed
-- If a manual rescan is cancelled, the old cache is kept, but the watcher remains `noop()` until a later rebuild/restart.
-- A watch-config change is stricter:
-  - paths are renormalized in `commands.rs`
-  - a cancelled rebuild falls back to `SearchCache::noop(...)`
-  - a successful rebuild replaces both cache and watcher completely
-
-## Icon pipeline
-- `update_icon_viewport` sends the visible `SlabIndex` slice to the background loop.
-- `handle_icon_viewport_update(...)` expands those indices to paths, drops cloud-backed paths such as OneDrive/iCloud/Google Drive/Dropbox, and spawns Rayon jobs.
-- Each job calls `fs_icon::icon_of_path_ql(...)` and pushes a base64 PNG through `icon_update_tx`.
-- `lib.rs` batches those payloads and emits a single `icon_update` event containing an array.
+## Searching while the index builds
+- With `indexing.is_some()` the loop never blocks on the walk. A request returns
+  `SearchJobResult::Indexing` (status `2`) or `SearchJobResult::ScopedIndexing { scope }`
+  (status `3`), and the frontend retries.
+- **Literal folder scopes** are walked on a dedicated `cardinal-scoped-index` thread:
+  - `parse_scope_path` only expands `~`/quotes and never touches the disk; a network mount can
+    block for seconds, so `is_dir()` runs on the worker.
+  - `decide_search_action(scope, indexing, scoped, covered_by_full)` is the pure precedence
+    rule: installed scope index → full index that covers the folder → start a new walk →
+    wait. It is unit-tested because getting the order wrong makes scope searches return
+    nothing.
+  - One walk runs at a time. Changing the scope cancels the previous walk through its own
+    leaked `AtomicBool`, so the full index is never cancelled by a scope change.
+- **Slab indices are cache-local**, so a scope index temporarily *replaces* the active cache
+  and the full index is parked in `ScopedIndexState::parked_full`. Any query that does not
+  need the scope index restores it and restarts the `EventWatcher` from its `last_event_id`
+  (FSEvents replays anything missed).
+- While a scope index is active the watcher is `noop()`: FSEvents must not be applied to a
+  cache whose slab does not contain those paths.
+- A scope inside an ignored path (e.g. `/Volumes` is ignored by default) is *never* part of
+  the full index. After indexing finishes such a scope still gets its own temporary index,
+  because `node_index_for_path` returns `None` for it.
+- `ignore_paths_for_scope` drops ignore entries that are ancestors of the scope. Without it a
+  scope like `/Volumes/nfs_D` would filter out every child and produce an empty index (there
+  is a regression test for exactly that).
+- When the full index finishes while a scope index is active, the full index is parked instead
+  of replacing it: swapping would invalidate the rows on screen and force another walk of the
+  folder. The full index is installed by the next query that does not need the scope.
+- Cache flushes and the shutdown snapshot are refused while a scope index is active, so a
+  temporary index can never overwrite `cardinal.db`.
+- Scope snapshots live in `<app config>/scopes/scope-<fnv1a(path)>.db`:
+  - reused when younger than `SCOPE_CACHE_TTL` (30 min) and written with the same ignore list
+  - written after a walk when the index is at most `SCOPE_CACHE_MAX_NODES` (500k) entries
+  - snapshots untouched for `SCOPE_CACHE_RETENTION` (7 days) are pruned
+  - the hash is FNV-1a, not `DefaultHasher`, so an upgrade cannot invalidate every snapshot
+- The frontend polls every `SCOPE_INDEX_POLL_MS` (800 ms) while `indexingScope` is set, and
+  re-runs the query when the lifecycle leaves `Initializing`.
 
 ## Flush behavior
 - Flush checks run every 10 seconds.
+- Fresh-index persistence:
+  - a freshly walked (or re-walked) index is written by `spawn_index_load` on its worker thread
+    before it is handed to the loop, so the first run is durable even if it is quit before
+    `Ready`
+  - a superseded build skips the write and leaves it to the newer build
 - Hide flush:
   - when the main window leaves the foreground, a two-tick countdown starts
   - if the window is still hidden/unfocused on the second tick, the cache snapshot is written
 - Idle flush:
   - `search_activity::note_search_activity()` records the last search time
   - after 5 minutes without searches, the next tick writes a snapshot
-- Flushes only run while the lifecycle is `Ready`.
+- Hide/idle flushes only run while the lifecycle is `Ready`.
 
 ## Shutdown
 - `RunEvent::Exit` / `ExitRequested` set `APP_QUIT`.

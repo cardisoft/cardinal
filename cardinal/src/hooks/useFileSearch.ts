@@ -1,7 +1,7 @@
 import { useReducer, useRef, useCallback, useEffect, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { SEARCH_DEBOUNCE_MS } from '../constants';
+import { SCOPE_INDEX_POLL_MS, SEARCH_DEBOUNCE_MS } from '../constants';
 import {
   SearchStatusCode,
   type AppLifecycleStatus,
@@ -25,11 +25,21 @@ type SearchState = {
   durationMs: number | null;
   resultCount: number;
   searchError: SearchError;
+  /** True when the backend answered with INDEXING because the initial index is still building. */
+  indexing: boolean;
+  /** Folder scope whose temporary index is being built, if any. */
+  indexingScope: string | null;
+  /** Bumped on every retry; the poll effect depends on it (the rest of the state is stable). */
+  indexingPoll: number;
+  /** Folder scope that turned out not to be a directory, if any. */
+  unavailableScope: string | null;
   lifecycleState: AppLifecycleStatus;
 };
 
 type SearchParams = {
   query: string;
+  // Filter preset fragment (e.g. `ext:mp4;mkv`) AND-ed with the typed query.
+  filterQuery: string;
   directoryQuery: string;
   directoryScopeOpen: boolean;
   caseSensitive: boolean;
@@ -67,7 +77,16 @@ type SearchAction =
         duration: number;
       };
     }
+  | { type: 'SEARCH_APPEND'; payload: { results: SlabIndex[] } }
   | { type: 'SEARCH_CANCELLED' }
+  | {
+      type: 'SEARCH_INDEXING';
+      payload: { query: string; directoryQuery: string; scope: string | null };
+    }
+  | {
+      type: 'SEARCH_SCOPE_UNAVAILABLE';
+      payload: { query: string; directoryQuery: string; scope: string };
+    }
   | { type: 'SET_LIFECYCLE_STATE'; payload: { status: AppLifecycleStatus } };
 
 const initialSearchState: SearchState = {
@@ -84,11 +103,16 @@ const initialSearchState: SearchState = {
   durationMs: null,
   resultCount: 0,
   searchError: null,
+  indexing: false,
+  indexingScope: null,
+  indexingPoll: 0,
+  unavailableScope: null,
   lifecycleState: 'Initializing',
 };
 
 const initialSearchParams: SearchParams = {
   query: '',
+  filterQuery: '',
   directoryQuery: '',
   directoryScopeOpen: false,
   caseSensitive: false,
@@ -157,6 +181,8 @@ function reducer(state: SearchState, action: SearchAction): SearchState {
         durationMs: action.payload.duration,
         resultCount: action.payload.count,
         searchError: null,
+        indexing: false,
+        indexingScope: null,
       };
     case 'SEARCH_FAILURE':
       return {
@@ -167,12 +193,71 @@ function reducer(state: SearchState, action: SearchAction): SearchState {
         durationMs: action.payload.duration,
         resultCount: 0,
         highlightTerms: [],
+        indexing: false,
+        indexingScope: null,
+      };
+    case 'SEARCH_APPEND':
+      // Appending (paging the launch list) must not bump `resultsVersion`: that would reset
+      // the row cache and scroll position, undoing the very scroll that triggered the load.
+      return {
+        ...state,
+        results: [...state.results, ...action.payload.results],
+        resultCount: state.resultCount + action.payload.results.length,
       };
     case 'SEARCH_CANCELLED':
       return {
         ...state,
         showLoadingUI: false,
         initialFetchCompleted: true,
+        indexing: false,
+        indexingScope: null,
+      };
+    case 'SEARCH_INDEXING':
+      // Retries poll while an index is building. Do not bump `resultsVersion` (that would
+      // wipe the row cache every second), but do produce a new object and bump
+      // `indexingPoll`, otherwise the poll effect's dependencies never change and polling
+      // stops after the first retry.
+      if (
+        state.indexing &&
+        state.indexingScope === action.payload.scope &&
+        state.currentQuery === action.payload.query &&
+        state.currentDirectoryQuery === action.payload.directoryQuery
+      ) {
+        return { ...state, indexingPoll: state.indexingPoll + 1 };
+      }
+      return {
+        ...state,
+        results: [],
+        resultsVersion: state.resultsVersion + 1,
+        currentQuery: action.payload.query,
+        currentDirectoryQuery: action.payload.directoryQuery,
+        highlightTerms: [],
+        showLoadingUI: false,
+        initialFetchCompleted: true,
+        durationMs: null,
+        resultCount: 0,
+        searchError: null,
+        indexing: true,
+        indexingScope: action.payload.scope,
+        indexingPoll: state.indexingPoll + 1,
+        unavailableScope: null,
+      };
+    case 'SEARCH_SCOPE_UNAVAILABLE':
+      return {
+        ...state,
+        results: [],
+        resultsVersion: state.resultsVersion + 1,
+        currentQuery: action.payload.query,
+        currentDirectoryQuery: action.payload.directoryQuery,
+        highlightTerms: [],
+        showLoadingUI: false,
+        initialFetchCompleted: true,
+        durationMs: null,
+        resultCount: 0,
+        searchError: null,
+        indexing: false,
+        indexingScope: null,
+        unavailableScope: action.payload.scope,
       };
     case 'SET_LIFECYCLE_STATE':
       return {
@@ -193,13 +278,39 @@ const searchParamOrNull = (value: string): string | null => (value.length > 0 ? 
 const activeDirectoryQuery = ({ directoryQuery, directoryScopeOpen }: SearchParams): string =>
   directoryScopeOpen ? directoryQuery : '';
 
+/**
+ * Combines the typed query with the filter preset. A filter with no text query is sent as the
+ * query itself so the backend evaluates it (e.g. choosing "Folders" alone browses folders).
+ */
+export const combineQueryWithFilter = (query: string, filterQuery: string): string => {
+  const trimmedQuery = query.trim();
+  const trimmedFilter = filterQuery.trim();
+  if (!trimmedFilter) {
+    return query;
+  }
+  if (!trimmedQuery) {
+    return trimmedFilter;
+  }
+  return `(${trimmedQuery}) ${trimmedFilter}`;
+};
+
 type UseFileSearchResult = {
   state: SearchState;
   searchParams: SearchParams;
   updateSearchParams: (patch: Partial<SearchParams>) => void;
   queueSearch: (query: string, options?: QueueSearchOptions) => void;
+  /** Appends a page to the current result set without resetting scroll or row caches. */
+  appendResults: (results: SlabIndex[]) => void;
+  queueFilterQuery: (filterQuery: string, options?: QueueSearchOptions) => void;
+  /** Applies a query and a filter together; used when a tab or bookmark restores both. */
+  queueSearchWithFilter: (query: string, filterQuery: string, options?: QueueSearchOptions) => void;
   queueDirectorySearch: (directoryQuery: string, options?: QueueSearchOptions) => void;
   queueDirectoryScopeOpen: (directoryScopeOpen: boolean) => void;
+  /** Restores a tab's query, filter and folder scope in a single search. */
+  queueTabSearch: (
+    next: { query: string; filterQuery: string; directoryQuery: string },
+    options?: QueueSearchOptions,
+  ) => void;
   handleStatusUpdate: (scannedFiles: number, processedEvents: number, rescanErrors: number) => void;
   setLifecycleState: (status: AppLifecycleStatus) => void;
   requestRescan: () => Promise<void>;
@@ -278,7 +389,8 @@ export function useFileSearch(): UseFileSearchResult {
     const requestVersion = searchVersionRef.current + 1;
     searchVersionRef.current = requestVersion;
 
-    const { query, caseSensitive } = nextSearch;
+    const { query, filterQuery, caseSensitive } = nextSearch;
+    const effectiveQuery = combineQueryWithFilter(query, filterQuery);
     const directoryQuery = activeDirectoryQuery(nextSearch);
     const startTs = performance.now();
     const isInitial = !hasInitialSearchRunRef.current;
@@ -295,7 +407,7 @@ export function useFileSearch(): UseFileSearchResult {
 
     try {
       const rawResults = await invoke<SearchResponsePayload>('search', {
-        query: searchParamOrNull(query),
+        query: searchParamOrNull(effectiveQuery),
         directoryQuery: searchParamOrNull(directoryQuery),
         options: {
           caseInsensitive: !caseSensitive,
@@ -309,6 +421,38 @@ export function useFileSearch(): UseFileSearchResult {
       if (rawResults.statusCode === SearchStatusCode.CANCELLED) {
         cancelTimer(loadingDelayTimerRef);
         dispatch({ type: 'SEARCH_CANCELLED' });
+        return;
+      }
+
+      if (rawResults.statusCode === SearchStatusCode.SCOPE_UNAVAILABLE) {
+        cancelTimer(loadingDelayTimerRef);
+        dispatch({
+          type: 'SEARCH_SCOPE_UNAVAILABLE',
+          payload: {
+            query,
+            directoryQuery,
+            scope: rawResults.scope ?? directoryQuery,
+          },
+        });
+        return;
+      }
+
+      if (
+        rawResults.statusCode === SearchStatusCode.INDEXING ||
+        rawResults.statusCode === SearchStatusCode.SCOPED_INDEXING
+      ) {
+        cancelTimer(loadingDelayTimerRef);
+        dispatch({
+          type: 'SEARCH_INDEXING',
+          payload: {
+            query,
+            directoryQuery,
+            scope:
+              rawResults.statusCode === SearchStatusCode.SCOPED_INDEXING
+                ? (rawResults.scope ?? null)
+                : null,
+          },
+        });
         return;
       }
 
@@ -360,6 +504,40 @@ export function useFileSearch(): UseFileSearchResult {
     }
   }, []);
 
+  // While the index is building the backend answers with INDEXING instead of blocking the
+  // search thread. Refresh the current query as soon as the index becomes available. This
+  // also replaces results that were served from a temporary folder-scope index: slab
+  // indices are only valid for the cache that produced them.
+  const previousLifecycleRef = useRef<AppLifecycleStatus | null>(null);
+  useEffect(() => {
+    const previous = previousLifecycleRef.current;
+    previousLifecycleRef.current = state.lifecycleState;
+    if (previous === null) {
+      // The first value only reports the status fetched on mount; the mount search covers it.
+      return;
+    }
+    const indexJustBecameAvailable =
+      previous === 'Initializing' && state.lifecycleState !== 'Initializing';
+    const stillIndexing = state.indexing && state.lifecycleState !== 'Initializing';
+    if (!indexJustBecameAvailable && !stillIndexing) {
+      return;
+    }
+    void handleSearch();
+  }, [handleSearch, state.indexing, state.lifecycleState]);
+
+  // A temporary folder-scope index finishes independently of the lifecycle (the full index
+  // may still be walking). Poll the backend while one is being built; the reducer keeps the
+  // state stable so this does not reset the result list on every tick.
+  useEffect(() => {
+    if (!state.indexing || state.indexingScope === null) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      void handleSearch();
+    }, SCOPE_INDEX_POLL_MS);
+    return () => clearTimeout(timer);
+  }, [handleSearch, state.indexing, state.indexingScope, state.indexingPoll]);
+
   const queueSearchParams = useCallback(
     (patch: Partial<SearchParams>, options?: QueueSearchOptions) => {
       updateSearchParams(patch);
@@ -385,6 +563,20 @@ export function useFileSearch(): UseFileSearchResult {
     [queueSearchParams],
   );
 
+  const queueFilterQuery = useCallback(
+    (filterQuery: string, options?: QueueSearchOptions) => {
+      queueSearchParams({ filterQuery }, options);
+    },
+    [queueSearchParams],
+  );
+
+  const queueSearchWithFilter = useCallback(
+    (query: string, filterQuery: string, options?: QueueSearchOptions) => {
+      queueSearchParams({ query, filterQuery }, options);
+    },
+    [queueSearchParams],
+  );
+
   const queueDirectorySearch = useCallback(
     (directoryQuery: string, options?: QueueSearchOptions) => {
       queueSearchParams({ directoryQuery }, options);
@@ -395,6 +587,28 @@ export function useFileSearch(): UseFileSearchResult {
   const queueDirectoryScopeOpen = useCallback(
     (directoryScopeOpen: boolean) => {
       queueSearchParams({ directoryScopeOpen }, { immediate: true });
+    },
+    [queueSearchParams],
+  );
+
+  /**
+   * Applies everything a tab owns (text query, filter and folder scope) in one search.
+   * Switching tabs must restore the triple together, otherwise a scope typed in one tab keeps
+   * narrowing every other tab.
+   */
+  const queueTabSearch = useCallback(
+    (
+      next: { query: string; filterQuery: string; directoryQuery: string },
+      options?: QueueSearchOptions,
+    ) => {
+      queueSearchParams(
+        {
+          query: next.query,
+          filterQuery: next.filterQuery,
+          directoryQuery: next.directoryQuery,
+        },
+        options,
+      );
     },
     [queueSearchParams],
   );
@@ -415,6 +629,13 @@ export function useFileSearch(): UseFileSearchResult {
     void handleSearch();
   }, [handleSearch, searchParams.caseSensitive]);
 
+  const appendResults = useCallback((appended: SlabIndex[]) => {
+    if (appended.length === 0) {
+      return;
+    }
+    dispatch({ type: 'SEARCH_APPEND', payload: { results: appended } });
+  }, []);
+
   const requestRescan = useCallback(async () => {
     await invoke('trigger_rescan');
   }, []);
@@ -424,8 +645,12 @@ export function useFileSearch(): UseFileSearchResult {
     searchParams,
     updateSearchParams,
     queueSearch,
+    appendResults,
+    queueFilterQuery,
+    queueSearchWithFilter,
     queueDirectorySearch,
     queueDirectoryScopeOpen,
+    queueTabSearch,
     handleStatusUpdate,
     setLifecycleState,
     requestRescan,

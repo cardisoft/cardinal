@@ -42,6 +42,8 @@ const persistSortThreshold = (value: number): void => {
 
 export type RemoteSortControls = {
   sortState: SortState;
+  /** Applies an explicit sort (from the right-click menu); `null` clears it. */
+  setSortState: (next: SortState) => void;
   displayedResults: SlabIndex[];
   // Monotonic token for consumers that must invalidate when visible rows/order changes.
   displayedResultsVersion: number;
@@ -59,8 +61,30 @@ export const useRemoteSort = (
   resultsVersion: number,
   locale: string,
   formatDisabledTooltip: (limit: string) => string | null,
+  // Sort is scoped per search tab: switching tabs restores that tab's own sort instead of
+  // leaking the previous tab's ordering.
+  sortScopeKey?: string,
 ): RemoteSortControls => {
-  const [sortState, setSortState] = useState<SortState>(null);
+  const [sortByScope, setSortByScope] = useState<Record<string, SortState>>({});
+  const scopeKey = sortScopeKey ?? 'default';
+  const sortState = useMemo<SortState>(
+    () => sortByScope[scopeKey] ?? null,
+    [sortByScope, scopeKey],
+  );
+
+  const setSortState = useCallback(
+    (next: SortState | ((prev: SortState) => SortState)) => {
+      setSortByScope((prev) => {
+        const current = prev[scopeKey] ?? null;
+        const resolved = typeof next === 'function' ? next(current) : next;
+        if (resolved === current) {
+          return prev;
+        }
+        return { ...prev, [scopeKey]: resolved };
+      });
+    },
+    [scopeKey],
+  );
   const [sortedResults, setSortedResults] = useState<SlabIndex[]>([]);
   const [sortThreshold, setSortThresholdState] = useState<number>(() => readStoredSortThreshold());
   const [isSorting, setIsSorting] = useState(false);
@@ -148,6 +172,7 @@ export const useRemoteSort = (
 
   return {
     sortState,
+    setSortState,
     displayedResults,
     displayedResultsVersion,
     sortThreshold,

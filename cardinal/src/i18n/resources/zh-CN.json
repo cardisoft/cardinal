@@ -9,12 +9,32 @@
       "caseSensitive": "切换区分大小写匹配",
       "directoryScope": "切换文件夹范围"
     },
+    "filters": {
+      "all": "所有",
+      "manage": "管理筛选器",
+      "presets": {
+        "audio": "音频",
+        "archives": "压缩文件",
+        "documents": "文档",
+        "executables": "可执行文件",
+        "folders": "文件夹",
+        "images": "图片",
+        "videos": "视频"
+      }
+    },
     "aria": {
       "searchInput": "搜索输入"
     }
   },
   "stateDisplay": {
     "loading": "正在搜索…",
+    "indexingTitle": "正在建立文件索引…",
+    "indexingMessage": "首次启动可能需要一些时间。想立即搜索，可在文件夹范围中输入完整路径（例如 ~/Documents）。",
+    "indexingProgress": "已扫描 {{formatted}} 个文件。想立即搜索，可在文件夹范围中输入完整路径（例如 ~/Documents）。",
+    "scopeIndexingTitle": "正在索引所选文件夹…",
+    "scopeIndexingMessage": "已在 {{scope}} 中扫描 {{formatted}} 项，索引完成后会自动显示结果。",
+    "scopeUnavailableTitle": "“{{scope}}” 不是文件夹",
+    "scopeUnavailableMessage": "文件夹范围需要一个已存在的目录，例如 /Users/you/Documents 或 ~/Downloads。清空范围框即可搜索全部位置。",
     "error": "搜索出现错误",
     "emptyTitle": "\"{{query}}\" 没有匹配结果",
     "emptyMessage": "尝试调整关键字或筛选条件。",
@@ -44,6 +64,11 @@
   },
   "contextMenu": {
     "openItem": "打开",
+    "openWith": "打开方式",
+    "openWithLoading": "正在查找应用程序…",
+    "openWithEmpty": "未找到可用的应用程序",
+    "openWithOther": "其他…",
+    "openWithDefault": "默认",
     "quickLook": "快速查看",
     "revealInFinder": "在 Finder 中显示",
     "copyFile": "复制文件",
@@ -80,7 +105,8 @@
     "resultsCount_other": "{{formatted}} 个结果",
     "duration": "{{value}} 毫秒",
     "resultsWithDuration": "{{results}} • {{duration}}",
-    "resultsTitle": "结果 • 耗时"
+    "resultsTitle": "结果 • 耗时",
+    "selectionCount": "已选 {{count}} 项"
   },
   "app": {
     "fullDiskAccess": {
@@ -89,13 +115,15 @@
       "steps": {
         "one": "打开 系统设置 > 隐私与安全性 > 完全磁盘访问。",
         "two": "点击锁形图标以允许更改，并启用 Cardinal。",
-        "three": "按提示允许 macOS 重新启动 Cardinal。"
+        "three": "回到 Cardinal，权限会自动检测并立即生效。"
       },
       "status": {
         "checking": "正在检查权限状态…",
         "disabled": "完全磁盘访问权限已禁用。"
       },
-      "openSettings": "打开系统设置"
+      "openSettings": "打开系统设置",
+      "retry": "重新检测",
+      "autoDetect": "授权后会自动检测并立即生效，无需重启。"
     }
   },
   "menu": {
@@ -117,7 +145,8 @@
     "maximize": "缩放窗口",
     "closeWindow": "关闭窗口",
     "help": "帮助",
-    "getUpdates": "获取更新"
+    "getUpdates": "获取更新",
+    "bookmarks": "书签"
   },
   "preferences": {
     "title": "偏好设置",
@@ -135,7 +164,13 @@
     },
     "save": "保存",
     "reset": "恢复默认设置",
-    "close": "关闭"
+    "close": "关闭",
+    "fontSize": {
+      "label": "字体大小",
+      "description": "作用于搜索结果、书签与筛选器弹窗。",
+      "value": "{{size}} 像素",
+      "reset": "恢复默认"
+    }
   },
   "language": {
     "label": "语言",
@@ -178,5 +213,82 @@
     "errors": {
       "absolute": "每个路径需以“/”或“~”开头。"
     }
+  },
+  "view": {
+    "list": "列表视图",
+    "grid": "平铺视图",
+    "iconSizes": {
+      "small": "小图标",
+      "medium": "中等图标",
+      "large": "大图标",
+      "xlarge": "超大图标"
+    },
+    "created": "创建",
+    "modified": "修改"
+  },
+  "bookmarks": {
+    "title": "书签",
+    "close": "关闭书签",
+    "newCategory": "新建分类",
+    "renameCategory": "重命名分类",
+    "deleteCategory": "删除分类",
+    "name": "名称",
+    "query": "搜索内容",
+    "add": "添加",
+    "save": "保存",
+    "moveUp": "上移",
+    "moveDown": "下移",
+    "edit": "编辑",
+    "delete": "删除",
+    "searchCurrent": "在当前标签页搜索",
+    "searchNew": "在新标签页搜索",
+    "empty": "请选择或创建一个分类。",
+    "import": "导入",
+    "export": "导出",
+    "csvFileType": "CSV 文件",
+    "exported": "已导出书签。",
+    "imported": "已导入 {{count}} 个书签。",
+    "ioFailed": "导入/导出失败。",
+    "savedToast": "已保存到默认分类。",
+    "filterLabel": "过滤器",
+    "filterNone": "不过滤",
+    "filterFallback": "自定义过滤器",
+    "dragHint": "拖动可移动面板",
+    "resizeWidth": "拖动调整宽度",
+    "resizeHeight": "拖动调整高度",
+    "resizeTop": "拖动调整上边缘",
+    "resizeRight": "拖动调整右边缘",
+    "resizeCorner": "拖动同时调整两条边"
+  },
+  "filters": {
+    "title": "筛选器",
+    "close": "关闭筛选器",
+    "new": "新建",
+    "edit": "编辑",
+    "import": "导入",
+    "export": "导出",
+    "delete": "删除",
+    "save": "保存",
+    "cancel": "取消",
+    "columns": {
+      "name": "名称",
+      "search": "搜索内容"
+    },
+    "searchPlaceholder": "例如 ext:mp4;mkv 或 folder:",
+    "created": "已新建筛选器。",
+    "saved": "已保存筛选器。",
+    "exported": "已导出筛选器。",
+    "imported": "已导入 {{count}} 个筛选器。",
+    "ioFailed": "导入/导出失败。",
+    "csvFileType": "CSV 文件"
+  },
+  "sortMenu": {
+    "bySize": "按大小排序",
+    "byCreated": "按创建时间排序",
+    "byModified": "按修改时间排序",
+    "byName": "按名称排序",
+    "ascending": "正序",
+    "descending": "倒序",
+    "clear": "取消排序"
   }
 }

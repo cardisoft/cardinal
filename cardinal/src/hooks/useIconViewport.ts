@@ -7,14 +7,24 @@ type UseIconViewportProps = {
   resultsVersion: number;
   start: number;
   end: number;
+  // Raster edge length requested for the current view; omitted keeps the list-size default.
+  iconSize?: number;
 };
 
 // Deduplicates and throttles icon viewport updates to the backend.
-export function useIconViewport({ results, resultsVersion, start, end }: UseIconViewportProps) {
+export function useIconViewport({
+  results,
+  resultsVersion,
+  start,
+  end,
+  iconSize,
+}: UseIconViewportProps) {
   const requestIdRef = useRef(0);
   const lastRangeRef = useRef<{ start: number; end: number } | null>(null);
   const pendingRef = useRef<SlabIndex[] | null>(null);
   const rafRef = useRef<number | null>(null);
+  const iconSizeRef = useRef(iconSize);
+  iconSizeRef.current = iconSize;
 
   const flushIconViewport = useCallback(() => {
     rafRef.current = null;
@@ -22,7 +32,11 @@ export function useIconViewport({ results, resultsVersion, start, end }: UseIcon
     if (!viewport) return;
     pendingRef.current = null;
     requestIdRef.current += 1;
-    void invoke('update_icon_viewport', { id: requestIdRef.current, viewport });
+    void invoke('update_icon_viewport', {
+      id: requestIdRef.current,
+      viewport,
+      iconSize: iconSizeRef.current,
+    });
   }, []);
 
   const scheduleIconViewport = useCallback(

@@ -9,12 +9,32 @@
       "caseSensitive": "切換區分大小寫比對",
       "directoryScope": "切換資料夾範圍"
     },
+    "filters": {
+      "all": "所有",
+      "manage": "管理篩選器",
+      "presets": {
+        "audio": "音訊",
+        "archives": "壓縮檔",
+        "documents": "文件",
+        "executables": "可執行檔",
+        "folders": "資料夾",
+        "images": "圖片",
+        "videos": "影片"
+      }
+    },
     "aria": {
       "searchInput": "搜尋輸入"
     }
   },
   "stateDisplay": {
     "loading": "正在搜尋…",
+    "indexingTitle": "正在建立檔案索引…",
+    "indexingMessage": "首次啟動可能需要一些時間。想立即搜尋，可在資料夾範圍中輸入完整路徑（例如 ~/Documents）。",
+    "indexingProgress": "已掃描 {{formatted}} 個檔案。想立即搜尋，可在資料夾範圍中輸入完整路徑（例如 ~/Documents）。",
+    "scopeIndexingTitle": "正在索引所選資料夾…",
+    "scopeIndexingMessage": "已在 {{scope}} 中掃描 {{formatted}} 個項目，索引完成後會自動顯示結果。",
+    "scopeUnavailableTitle": "「{{scope}}」不是資料夾",
+    "scopeUnavailableMessage": "資料夾範圍需要一個既存的目錄，例如 /Users/you/Documents 或 ~/Downloads。清空範圍框即可搜尋全部位置。",
     "error": "搜尋發生錯誤",
     "emptyTitle": "「{{query}}」沒有符合結果",
     "emptyMessage": "試著調整關鍵字或篩選條件。",
@@ -44,6 +64,11 @@
   },
   "contextMenu": {
     "openItem": "打開",
+    "openWith": "打開方式",
+    "openWithLoading": "正在尋找應用程式…",
+    "openWithEmpty": "找不到可用的應用程式",
+    "openWithOther": "其他…",
+    "openWithDefault": "預設",
     "quickLook": "快速檢視",
     "revealInFinder": "在 Finder 中顯示",
     "copyFile": "複製檔案",
@@ -80,7 +105,8 @@
     "resultsCount_other": "{{formatted}} 個結果",
     "duration": "{{value}} 毫秒",
     "resultsWithDuration": "{{results}} • {{duration}}",
-    "resultsTitle": "結果 • 耗時"
+    "resultsTitle": "結果 • 耗時",
+    "selectionCount": "已選 {{count}} 項"
   },
   "app": {
     "fullDiskAccess": {
@@ -89,13 +115,15 @@
       "steps": {
         "one": "打開 系統設定 > 隱私權與安全性 > 完整磁碟存取。",
         "two": "點擊鎖頭圖示以允許變更，並啟用 Cardinal。",
-        "three": "依提示允許 macOS 重新啟動 Cardinal。"
+        "three": "回到 Cardinal，權限會自動偵測並立即生效。"
       },
       "status": {
         "checking": "正在檢查權限狀態…",
         "disabled": "完整磁碟存取已停用。"
       },
-      "openSettings": "打開系統設定"
+      "openSettings": "打開系統設定",
+      "retry": "重新偵測",
+      "autoDetect": "授權後會自動偵測並立即生效，無需重啟。"
     }
   },
   "menu": {
@@ -117,7 +145,8 @@
     "maximize": "縮放視窗",
     "closeWindow": "關閉視窗",
     "help": "說明",
-    "getUpdates": "取得更新"
+    "getUpdates": "取得更新",
+    "bookmarks": "書籤"
   },
   "preferences": {
     "title": "偏好設定",
@@ -135,7 +164,13 @@
     },
     "save": "儲存",
     "reset": "恢復預設設定",
-    "close": "關閉"
+    "close": "關閉",
+    "fontSize": {
+      "label": "Font size",
+      "description": "Applies to results, bookmarks and filter dialogs.",
+      "value": "{{size}} px",
+      "reset": "Reset"
+    }
   },
   "language": {
     "label": "語言",
@@ -178,5 +213,82 @@
     "errors": {
       "absolute": "每個路徑需以「/」或「~」開頭。"
     }
+  },
+  "view": {
+    "list": "列表檢視",
+    "grid": "平鋪檢視",
+    "iconSizes": {
+      "small": "小圖示",
+      "medium": "中等圖示",
+      "large": "大圖示",
+      "xlarge": "超大圖示"
+    },
+    "created": "建立",
+    "modified": "修改"
+  },
+  "bookmarks": {
+    "title": "書籤",
+    "close": "關閉書籤",
+    "newCategory": "新增分類",
+    "renameCategory": "重新命名分類",
+    "deleteCategory": "刪除分類",
+    "name": "名稱",
+    "query": "搜尋內容",
+    "add": "新增",
+    "save": "儲存",
+    "moveUp": "上移",
+    "moveDown": "下移",
+    "edit": "編輯",
+    "delete": "刪除",
+    "searchCurrent": "在目前分頁搜尋",
+    "searchNew": "在新分頁搜尋",
+    "empty": "請選擇或建立一個分類。",
+    "import": "匯入",
+    "export": "匯出",
+    "csvFileType": "CSV 檔案",
+    "exported": "已匯出書籤。",
+    "imported": "已匯入 {{count}} 個書籤。",
+    "ioFailed": "匯入/匯出失敗。",
+    "savedToast": "已儲存到預設分類。",
+    "filterLabel": "篩選器",
+    "filterNone": "不過濾",
+    "filterFallback": "自訂篩選器",
+    "dragHint": "拖曳可移動面板",
+    "resizeWidth": "拖曳調整寬度",
+    "resizeHeight": "拖曳調整高度",
+    "resizeTop": "拖曳調整上邊緣",
+    "resizeRight": "拖曳調整右邊緣",
+    "resizeCorner": "拖曳同時調整兩條邊"
+  },
+  "filters": {
+    "title": "Filters",
+    "close": "Close filters",
+    "new": "New",
+    "edit": "Edit",
+    "import": "Import",
+    "export": "Export",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "columns": {
+      "name": "Name",
+      "search": "Search"
+    },
+    "searchPlaceholder": "e.g. ext:mp4;mkv or folder:",
+    "created": "Filter created.",
+    "saved": "Filter saved.",
+    "exported": "Filters exported.",
+    "imported": "Imported {{count}} filters.",
+    "ioFailed": "Import/export failed.",
+    "csvFileType": "CSV file"
+  },
+  "sortMenu": {
+    "bySize": "按大小排序",
+    "byCreated": "按建立時間排序",
+    "byModified": "按修改時間排序",
+    "byName": "按名稱排序",
+    "ascending": "正序",
+    "descending": "倒序",
+    "clear": "取消排序"
   }
 }

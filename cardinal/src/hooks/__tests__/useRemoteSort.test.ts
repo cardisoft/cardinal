@@ -278,3 +278,61 @@ describe('useRemoteSort', () => {
     });
   });
 });
+
+describe('useRemoteSort per-tab scoping', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    mockedInvoke.mockImplementation((command: string) => {
+      if (command === 'get_sorted_view') {
+        return Promise.resolve(toSlabIndices([2, 1, 0]));
+      }
+      return Promise.resolve(null);
+    });
+  });
+
+  it('keeps a separate sort for each tab', async () => {
+    const results = toSlabIndices([0, 1, 2]);
+    const { result, rerender } = renderHook(
+      ({ tabId }: { tabId: string }) => useRemoteSort(results, 1, 'en-US', () => null, tabId),
+      { initialProps: { tabId: 'tab-a' } },
+    );
+
+    act(() => {
+      result.current.setSortState({ key: 'size', direction: 'desc' });
+    });
+    await waitFor(() =>
+      expect(result.current.sortState).toEqual({ key: 'size', direction: 'desc' }),
+    );
+
+    // Switching to another tab must not inherit the first tab's sort.
+    rerender({ tabId: 'tab-b' });
+    expect(result.current.sortState).toBeNull();
+
+    act(() => {
+      result.current.setSortState({ key: 'mtime', direction: 'asc' });
+    });
+    await waitFor(() =>
+      expect(result.current.sortState).toEqual({ key: 'mtime', direction: 'asc' }),
+    );
+
+    // Switching back restores tab A's own sort rather than tab B's.
+    rerender({ tabId: 'tab-a' });
+    expect(result.current.sortState).toEqual({ key: 'size', direction: 'desc' });
+  });
+
+  it('clears the sort with null', async () => {
+    const results = toSlabIndices([0, 1, 2]);
+    const { result } = renderHook(() => useRemoteSort(results, 1, 'en-US', () => null, 'tab-a'));
+
+    act(() => {
+      result.current.setSortState({ key: 'filename', direction: 'asc' });
+    });
+    await waitFor(() => expect(result.current.sortState).not.toBeNull());
+
+    act(() => {
+      result.current.setSortState(null);
+    });
+    await waitFor(() => expect(result.current.sortState).toBeNull());
+  });
+});

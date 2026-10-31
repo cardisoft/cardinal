@@ -16,6 +16,17 @@ type StatusBarProps = {
   onTabChange: (tab: StatusTabKey) => void;
   onRequestRescan: () => void;
   rescanErrorCount: number;
+  /** Path / size of the current selection, shown in the spare space of the bar. */
+  selection: SelectionSummary | null;
+};
+
+export type SelectionSummary = {
+  /** Absolute path of the first selected entry. */
+  path: string;
+  /** Human-readable size (`4KB`), already formatted by the caller. */
+  size: string | null;
+  /** Total number of selected entries (>1 means the path is only representative). */
+  count: number;
 };
 
 const TABS: StatusTabKey[] = ['files', 'events'];
@@ -36,6 +47,7 @@ const StatusBar = ({
   onTabChange,
   onRequestRescan,
   rescanErrorCount,
+  selection,
 }: StatusBarProps): React.JSX.Element => {
   const { t } = useTranslation();
   const tabsRef = useRef<HTMLDivElement | null>(null);
@@ -185,6 +197,18 @@ const StatusBar = ({
           </button>
         </div>
       </div>
+
+      {selection ? (
+        <div className="status-selection" title={selection.path}>
+          <span className="status-selection__path">{selection.path}</span>
+          {selection.size ? <span className="status-selection__size">{selection.size}</span> : null}
+          {selection.count > 1 ? (
+            <span className="status-selection__count">
+              {t('statusBar.selectionCount', { count: selection.count })}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="status-right">
         <div className="status-section">

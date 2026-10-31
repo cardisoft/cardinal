@@ -8,6 +8,10 @@ vi.mock('react-i18next', () => ({
       switch (key) {
         case 'stateDisplay.loading':
           return 'Loading...';
+        case 'stateDisplay.indexingTitle':
+          return 'Building the file index...';
+        case 'stateDisplay.indexingMessage':
+          return 'Folder paths can be searched right away.';
         case 'stateDisplay.error':
           return 'Something went wrong';
         case 'stateDisplay.emptyTitleWithDirectory':
@@ -28,6 +32,18 @@ describe('StateDisplay', () => {
     const { container } = render(<StateDisplay state="loading" />);
     expect(screen.getByText('Loading...')).toBeInTheDocument();
     expect(container.querySelector('.spinner')).not.toBeNull();
+  });
+
+  it('explains that the index is still being built', () => {
+    const { container } = render(<StateDisplay state="indexing" />);
+    expect(screen.getByText('Building the file index...')).toBeInTheDocument();
+    expect(screen.getByText('Folder paths can be searched right away.')).toBeInTheDocument();
+    expect(container.querySelector('.spinner')).not.toBeNull();
+  });
+
+  it('prefers the provided progress message while indexing', () => {
+    render(<StateDisplay state="indexing" message="1,234 files scanned." />);
+    expect(screen.getByText('1,234 files scanned.')).toBeInTheDocument();
   });
 
   it('renders the error message from props', () => {

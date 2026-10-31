@@ -9,6 +9,19 @@
       "caseSensitive": "تفعيل/إيقاف حساسية حالة الأحرف",
       "directoryScope": "تبديل نطاق المجلد"
     },
+    "filters": {
+      "all": "كل الأنواع",
+      "manage": "إدارة عوامل التصفية",
+      "presets": {
+        "audio": "صوت",
+        "archives": "أرشيفات",
+        "documents": "مستندات",
+        "executables": "ملفات تنفيذية",
+        "folders": "مجلدات",
+        "images": "صور",
+        "videos": "فيديو"
+      }
+    },
     "aria": {
       "searchInput": "إدخال البحث"
     }
@@ -81,7 +94,8 @@
     "resultsCount_other": "{{formatted}} نتائج",
     "duration": "{{value}} مللي ثانية",
     "resultsWithDuration": "{{results}} • {{duration}}",
-    "resultsTitle": "النتائج • المدة"
+    "resultsTitle": "النتائج • المدة",
+    "selectionCount": "{{count}} selected"
   },
   "app": {
     "fullDiskAccess": {
@@ -90,13 +104,15 @@
       "steps": {
         "one": "افتح إعدادات النظام > الخصوصية والأمان > الوصول الكامل للقرص.",
         "two": "انقر القفل للسماح بالتغييرات ثم فعّل Cardinal.",
-        "three": "عند الطلب، اسمح لـ macOS بإعادة تشغيل Cardinal."
+        "three": "Return to Cardinal — the permission is detected automatically."
       },
       "status": {
         "checking": "جارٍ التحقق من حالة الصلاحيات...",
         "disabled": "الوصول الكامل للقرص معطّل."
       },
-      "openSettings": "فتح إعدادات النظام"
+      "openSettings": "فتح إعدادات النظام",
+      "retry": "Check again",
+      "autoDetect": "Access is detected automatically — no restart needed."
     }
   },
   "menu": {
@@ -118,7 +134,8 @@
     "maximize": "تكبير",
     "closeWindow": "إغلاق النافذة",
     "help": "مساعدة",
-    "getUpdates": "الحصول على التحديثات"
+    "getUpdates": "الحصول على التحديثات",
+    "bookmarks": "الإشارات المرجعية"
   },
   "preferences": {
     "title": "التفضيلات",
@@ -136,7 +153,13 @@
     },
     "save": "حفظ",
     "reset": "إعادة الإعدادات الافتراضية",
-    "close": "إغلاق"
+    "close": "إغلاق",
+    "fontSize": {
+      "label": "Font size",
+      "description": "Applies to results, bookmarks and filter dialogs.",
+      "value": "{{size}} px",
+      "reset": "Reset"
+    }
   },
   "language": {
     "label": "اللغة",
@@ -179,5 +202,82 @@
     "errors": {
       "absolute": "يجب أن يبدأ كل مسار بـ '/' أو '~'."
     }
+  },
+  "view": {
+    "list": "عرض القائمة",
+    "grid": "عرض الشبكة",
+    "iconSizes": {
+      "small": "أيقونات صغيرة",
+      "medium": "أيقونات متوسطة",
+      "large": "أيقونات كبيرة",
+      "xlarge": "أيقونات كبيرة جدًا"
+    },
+    "created": "Created",
+    "modified": "Modified"
+  },
+  "bookmarks": {
+    "title": "الإشارات المرجعية",
+    "close": "إغلاق الإشارات المرجعية",
+    "newCategory": "فئة جديدة",
+    "renameCategory": "إعادة تسمية الفئة",
+    "deleteCategory": "حذف الفئة",
+    "name": "الاسم",
+    "query": "نص البحث",
+    "add": "إضافة",
+    "save": "حفظ",
+    "moveUp": "تحريك لأعلى",
+    "moveDown": "تحريك لأسفل",
+    "edit": "تحرير",
+    "delete": "حذف",
+    "searchCurrent": "البحث في علامة التبويب الحالية",
+    "searchNew": "البحث في علامة تبويب جديدة",
+    "empty": "حدد فئة أو أنشئ فئة.",
+    "import": "Import",
+    "export": "Export",
+    "csvFileType": "CSV file",
+    "exported": "Bookmarks exported.",
+    "imported": "Imported {{count}} bookmarks.",
+    "ioFailed": "Import/export failed.",
+    "savedToast": "Bookmark saved to the default category.",
+    "filterLabel": "Filter",
+    "filterNone": "No filter",
+    "filterFallback": "Custom filter",
+    "dragHint": "Drag to move",
+    "resizeWidth": "Drag to resize width",
+    "resizeHeight": "Drag to resize height",
+    "resizeTop": "Drag to resize from the top",
+    "resizeRight": "Drag to resize from the right",
+    "resizeCorner": "Drag to resize both edges"
+  },
+  "filters": {
+    "title": "Filters",
+    "close": "Close filters",
+    "new": "New",
+    "edit": "Edit",
+    "import": "Import",
+    "export": "Export",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "columns": {
+      "name": "Name",
+      "search": "Search"
+    },
+    "searchPlaceholder": "e.g. ext:mp4;mkv or folder:",
+    "created": "Filter created.",
+    "saved": "Filter saved.",
+    "exported": "Filters exported.",
+    "imported": "Imported {{count}} filters.",
+    "ioFailed": "Import/export failed.",
+    "csvFileType": "CSV file"
+  },
+  "sortMenu": {
+    "bySize": "Sort by size",
+    "byCreated": "Sort by creation time",
+    "byModified": "Sort by modification time",
+    "byName": "Sort by name",
+    "ascending": "Ascending",
+    "descending": "Descending",
+    "clear": "Clear sorting"
   }
 }

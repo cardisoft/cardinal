@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+- Fix the ignore-path migration never running: it used a single "user edited" flag that a Preferences save set, so `/Volumes` was never added and the app indexed every NFS/SMB share (2.9M files and an endless "Updating"). Defaults are now tracked individually, so a new default is added once and a later deletion stays deleted.
+- Detect `HistoryDone` with `contains` instead of exact equality, so the lifecycle can reach `Ready` even when the replay's final event carries other flag bits.
+- Keep the background thread alive: a panicking search is converted into an error result, event-batch handling is guarded, and channel sends/emits no longer panic. Previously one panic killed the thread and every later search failed with `RecvError`.
+- Write panics to `~/Library/Logs/Cardinal/panic.log` (a Finder-launched bundle has no stderr, so crashes left no trace).
+- Report a stopped background thread as an actionable message instead of `RecvError`.
+- Add "Open With" to the file context menu: lists every application LaunchServices can use for the selection (default handler first) and can launch any of them by bundle id, falling back to the bundle path.
+- Ignore the nested `winnfsd/` checkout so its files can never be committed here.
+- Reopening a hidden window (Dock click, tray, Cmd+Shift+Space) now shows it on the Desktop you are currently on instead of yanking you back to the Desktop where it was last visible.
+- Bookmarks window follows the theme, font size and language immediately: UI preferences are now broadcast between the two windows instead of only being read when a window boots.
+- The bookmarks manager (Cmd+Shift+B) is now its own window: drag it anywhere on screen, including outside the Cardinal window, so it no longer covers the result list.
+- Bookmarks changed in one window (Cmd+S, CSV import) appear immediately in the other.
+- Fix: "search in new tab" opened one tab per re-render. The bookmark-open effect depended on a callback that `useSearchTabs` rebuilt every render, and because `listen()` resolves asynchronously the cleanup could not unsubscribe — each render leaked a listener.
+- Folder scope is now per search tab: typing a scope in one tab no longer narrows every other tab (including tabs opened from a bookmark).
+- Tiled view fills each name line greedily: a name like `白咲碧122614_0...` used to leave `白咲碧` alone on line 1 because `overflow-wrap: anywhere` moves a whole word down before splitting it.
+- Fix imported bookmark lists collapsing into 2px lines: rows are flex items inside a scroll container, so `overflow: hidden` zeroed their automatic minimum size and let them shrink.
+- Tiled view: names wrap to at most three lines of six CJK characters with an ellipsis. The icon box and the label box are both fixed height, so icons never shift between rows and the last text line of every tile shares one baseline.
+- Tiled view: square document/folder icons (which fill the icon box) get two text lines; 16:9 video covers keep three.
+- Merge newly added default ignore paths into lists saved by older releases. Without this, upgrades kept indexing `/Volumes` (network mounts), which made the first scan run for hours.
+- Persist folder-scope indexes (`scopes/scope-<hash>.db`) and reuse them for 30 minutes, so searching a slow network folder is instant on the next visit instead of re-walking it.
+- Load and build the index on a worker thread so searches answer immediately instead of queueing behind the initial walk.
+- Show index-build progress in the results pane, with a hint that a full folder path can be searched right away.
+- Allow searching a literal folder path through the folder scope box while the index is still building (temporary per-folder index).
+- Re-run the current query once the full index is ready so result rows always belong to the active cache.
+- Never persist a noop or temporary folder-scope index over the real cache snapshot.
+- Persist the first complete index right after it is built, so quitting before the app reaches `Ready` no longer forces a full re-walk on the next launch.
+
 ## 0.1.23 — 2026-03-25
 - Reduce power consumption by expanding the default ignored paths to cover more macOS cache, log, metadata, and runtime directories.
 - Further reduce background work by making the filesystem event watcher honor ignored paths.

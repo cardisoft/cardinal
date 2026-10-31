@@ -27,12 +27,14 @@ type HookProps = {
       onSearchCommitted?: () => void;
     },
   ) => void;
+  onDirectoryCommitted: (directoryQuery: string) => void;
   onNavigateFromSearchToResults?: () => void;
 };
 
 describe('useFilesTabState', () => {
   const queueSearch = vi.fn();
   const queueDirectorySearch = vi.fn();
+  const onDirectoryCommitted = vi.fn();
   const handleInputChange = vi.fn();
   const navigate = vi.fn();
   const ensureTailValue = vi.fn();
@@ -45,6 +47,7 @@ describe('useFilesTabState', () => {
         directoryQuery: 'scope',
         queueSearch,
         queueDirectorySearch,
+        onDirectoryCommitted,
         ...overrides,
       },
     });
@@ -85,6 +88,7 @@ describe('useFilesTabState', () => {
       directoryQuery: 'scope-updated',
       queueSearch,
       queueDirectorySearch,
+      onDirectoryCommitted,
     });
     expect(result.current.searchInputValue).toBe('evt');
 

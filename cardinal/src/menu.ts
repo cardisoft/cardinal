@@ -4,6 +4,7 @@ import { Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/men
 import { openUrl } from '@tauri-apps/plugin-opener';
 import i18n from './i18n/config';
 import { openPreferences } from './utils/openPreferences';
+import { openBookmarks } from './utils/openBookmarks';
 
 const HELP_UPDATES_URL = 'https://github.com/cardisoft/cardinal/releases';
 
@@ -31,6 +32,14 @@ async function buildAppMenu(): Promise<void> {
       openPreferences();
     },
   });
+  const bookmarksItem = await MenuItem.new({
+    id: 'menu.bookmarks',
+    text: i18n.t('menu.bookmarks'),
+    accelerator: 'CmdOrCtrl+Shift+B',
+    action: () => {
+      openBookmarks();
+    },
+  });
   const hideItem = await MenuItem.new({
     id: 'menu.hide',
     text: i18n.t('menu.hide'),
@@ -46,6 +55,7 @@ async function buildAppMenu(): Promise<void> {
       aboutItem,
       await PredefinedMenuItem.new({ item: 'Separator' }),
       preferencesItem,
+      bookmarksItem,
       hideItem,
       await PredefinedMenuItem.new({ item: 'Separator' }),
       await PredefinedMenuItem.new({

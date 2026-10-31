@@ -2,16 +2,24 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": [
+    "main",
+    "bookmarks"
+  ],
   "permissions": [
     "core:default",
     "core:app:allow-default-window-icon",
     "core:window:allow-set-focus",
+    "core:window:allow-start-dragging",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-close",
     "opener:default",
     "macos-permissions:default",
     "drag:default",
     "global-shortcut:allow-is-registered",
     "global-shortcut:allow-register",
-    "global-shortcut:allow-unregister"
+    "global-shortcut:allow-unregister",
+    "dialog:default"
   ]
 }

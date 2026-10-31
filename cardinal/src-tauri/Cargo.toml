@@ -31,8 +31,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 base64 = "0.22"
 rayon = "1.10"
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", features = ["NSArray", "NSString", "NSURL"] }
-objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSPasteboard", "NSPanel", "NSResponder", "NSWindow"] }
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSBundle", "NSString", "NSURL"] }
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSPasteboard", "NSPanel", "NSResponder", "NSWorkspace", "NSWindow"] }
 objc2-quick-look-ui = "0.3"
 parking_lot = "0.12"
 tauri-plugin-prevent-default = "4"
@@ -46,6 +46,7 @@ fswalk.path = "../../fswalk"
 fs-icon.path = "../../fs-icon"
 search-cancel.path = "../../search-cancel"
 camino = "1.2.1"
+tauri-plugin-dialog = "2"
 
 [features]
 default = []

@@ -9,6 +9,19 @@
       "caseSensitive": "Перемкнути врахування регістру",
       "directoryScope": "Перемкнути область папок"
     },
+    "filters": {
+      "all": "Усі типи",
+      "manage": "Керування фільтрами",
+      "presets": {
+        "audio": "Аудіо",
+        "archives": "Архіви",
+        "documents": "Документи",
+        "executables": "Програми",
+        "folders": "Теки",
+        "images": "Зображення",
+        "videos": "Відео"
+      }
+    },
     "aria": {
       "searchInput": "Поле пошуку"
     }
@@ -81,7 +94,8 @@
     "resultsCount_other": "{{formatted}} результатів",
     "duration": "{{value}}мс",
     "resultsWithDuration": "{{results}} • {{duration}}",
-    "resultsTitle": "Результати • Тривалість"
+    "resultsTitle": "Результати • Тривалість",
+    "selectionCount": "{{count}} selected"
   },
   "app": {
     "fullDiskAccess": {
@@ -90,13 +104,15 @@
       "steps": {
         "one": "Відкрийте Системні параметри > Конфіденційність і безпека > Повний доступ до диска.",
         "two": "Натисніть на замок, щоб внести зміни, й дозвольте Cardinal.",
-        "three": "Коли з'явиться запит, дозвольте macOS перезапустити Cardinal."
+        "three": "Return to Cardinal — the permission is detected automatically."
       },
       "status": {
         "checking": "Перевірка стану дозволу...",
         "disabled": "Повний доступ до диска вимкнено."
       },
-      "openSettings": "Відкрити Системні параметри"
+      "openSettings": "Відкрити Системні параметри",
+      "retry": "Check again",
+      "autoDetect": "Access is detected automatically — no restart needed."
     }
   },
   "menu": {
@@ -118,7 +134,8 @@
     "maximize": "Збільшити",
     "closeWindow": "Закрити вікно",
     "help": "Довідка",
-    "getUpdates": "Отримати оновлення"
+    "getUpdates": "Отримати оновлення",
+    "bookmarks": "Закладки"
   },
   "preferences": {
     "title": "Налаштування",
@@ -136,7 +153,13 @@
     },
     "save": "Зберегти",
     "reset": "Скинути до значень за замовчуванням",
-    "close": "Закрити"
+    "close": "Закрити",
+    "fontSize": {
+      "label": "Font size",
+      "description": "Applies to results, bookmarks and filter dialogs.",
+      "value": "{{size}} px",
+      "reset": "Reset"
+    }
   },
   "language": {
     "label": "Мова",
@@ -179,5 +202,82 @@
     "errors": {
       "absolute": "Кожен шлях має починатися з '/' або '~'."
     }
+  },
+  "view": {
+    "list": "Список",
+    "grid": "Сітка",
+    "iconSizes": {
+      "small": "Дрібні значки",
+      "medium": "Середні значки",
+      "large": "Великі значки",
+      "xlarge": "Дуже великі значки"
+    },
+    "created": "Created",
+    "modified": "Modified"
+  },
+  "bookmarks": {
+    "title": "Закладки",
+    "close": "Закрити закладки",
+    "newCategory": "Нова категорія",
+    "renameCategory": "Перейменувати категорію",
+    "deleteCategory": "Видалити категорію",
+    "name": "Назва",
+    "query": "Пошуковий запит",
+    "add": "Додати",
+    "save": "Зберегти",
+    "moveUp": "Перемістити вгору",
+    "moveDown": "Перемістити вниз",
+    "edit": "Редагувати",
+    "delete": "Видалити",
+    "searchCurrent": "Шукати в поточній вкладці",
+    "searchNew": "Шукати в новій вкладці",
+    "empty": "Виберіть або створіть категорію.",
+    "import": "Import",
+    "export": "Export",
+    "csvFileType": "CSV file",
+    "exported": "Bookmarks exported.",
+    "imported": "Imported {{count}} bookmarks.",
+    "ioFailed": "Import/export failed.",
+    "savedToast": "Bookmark saved to the default category.",
+    "filterLabel": "Filter",
+    "filterNone": "No filter",
+    "filterFallback": "Custom filter",
+    "dragHint": "Drag to move",
+    "resizeWidth": "Drag to resize width",
+    "resizeHeight": "Drag to resize height",
+    "resizeTop": "Drag to resize from the top",
+    "resizeRight": "Drag to resize from the right",
+    "resizeCorner": "Drag to resize both edges"
+  },
+  "filters": {
+    "title": "Filters",
+    "close": "Close filters",
+    "new": "New",
+    "edit": "Edit",
+    "import": "Import",
+    "export": "Export",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "columns": {
+      "name": "Name",
+      "search": "Search"
+    },
+    "searchPlaceholder": "e.g. ext:mp4;mkv or folder:",
+    "created": "Filter created.",
+    "saved": "Filter saved.",
+    "exported": "Filters exported.",
+    "imported": "Imported {{count}} filters.",
+    "ioFailed": "Import/export failed.",
+    "csvFileType": "CSV file"
+  },
+  "sortMenu": {
+    "bySize": "Sort by size",
+    "byCreated": "Sort by creation time",
+    "byModified": "Sort by modification time",
+    "byName": "Sort by name",
+    "ascending": "Ascending",
+    "descending": "Descending",
+    "clear": "Clear sorting"
   }
 }

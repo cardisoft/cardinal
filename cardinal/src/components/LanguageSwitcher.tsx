@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { LANGUAGE_OPTIONS, normalizeLanguageTag } from '../i18n/config';
+import { broadcastUiPreferencesChanged } from '../runtime/uiPreferences';
 
 type LanguageSwitcherProps = {
   className: string;
@@ -11,7 +12,8 @@ const LanguageSwitcher = ({ className }: LanguageSwitcherProps): React.JSX.Eleme
 
   const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const nextLang = event.target.value;
-    void i18n.changeLanguage(nextLang);
+    // `changeLanguage` persists the choice; the other window has its own i18n instance.
+    void i18n.changeLanguage(nextLang).then(() => broadcastUiPreferencesChanged());
   };
 
   const currentCode = normalizeLanguageTag(i18n.language);

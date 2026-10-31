@@ -6,7 +6,7 @@ This chapter documents the Tauri commands exposed from `cardinal/src-tauri/src/c
 
 | Command | Purpose | Notes |
 | --- | --- | --- |
-| `search(query, options?, version)` | Run a query and return `{ results, highlights }` | Uses `CancellationToken::new(version)`; cancelled searches become empty result lists at the command layer. |
+| `search(directory_query?, query?, options?)` | Run a query and return `{ results, highlights, statusCode }` | Uses `CancellationToken::new_search()`; `statusCode` is `0` (ok), `1` (cancelled), `2` (index still building — the request was not evaluated) or `3` (a temporary index for the folder scope in `scope` is being built). A literal folder scope is walked on a worker thread and answered from its own index when ready. |
 | `get_nodes_info(results, include_icons?)` | Expand slab indices into `{ path, metadata, icon }` | `include_icons` defaults to `true`; icons come from `fs_icon::icon_of_path_ns`. |
 | `get_sorted_view(results, sort?)` | Sort the current result set on the backend | Reuses a small `SearchState` cache when the same slab-index slice is sorted repeatedly. |
 | `update_icon_viewport(id, viewport)` | Send the visible slab indices for thumbnail prefetch | Fire-and-forget; the backend responds via `icon_update` events. |

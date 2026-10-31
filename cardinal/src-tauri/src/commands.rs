@@ -1,5 +1,6 @@
 use crate::{
-    DEFAULT_SYSTEM_IGNORE_PATH, LOGIC_START, LogicStartConfig,
+    DEFAULT_SYSTEM_IGNORE_PATH, LOGIC_START, LogicStartConfig, PENDING_LOGIC_START,
+    background::IconViewportUpdate,
     lifecycle::load_app_state,
     quicklook::{
         QuickLookItemInput, close_preview_panel, toggle_preview_panel, update_preview_panel,
@@ -49,18 +50,44 @@ impl From<SearchOptionsPayload> for SearchOptions {
     }
 }
 
+/// Result of a search job handled by the background loop.
+#[derive(Debug)]
+pub enum SearchJobResult {
+    Completed(Result<SearchOutcome>),
+    /// The index is still being built and the query has no filesystem scope that can be
+    /// answered right away. The frontend uses this to show progress instead of waiting.
+    Indexing,
+    /// A temporary index for this folder scope is being built; the frontend shows the scope
+    /// and retries shortly.
+    ScopedIndexing {
+        scope: String,
+    },
+    /// The folder scope does not exist (or is not a directory). Retrying cannot help, so the
+    /// frontend must stop polling and say so.
+    ScopeUnavailable {
+        scope: String,
+    },
+}
+
 #[derive(Debug, Clone)]
 pub struct SearchJob {
     pub query: SearchQuery,
     pub options: SearchOptionsPayload,
     pub cancellation_token: CancellationToken,
-    pub result_tx: Sender<Result<SearchOutcome>>,
+    pub result_tx: Sender<SearchJobResult>,
 }
 
 #[derive(Debug, Clone)]
 pub struct NodeInfoRequest {
     pub slab_indices: Vec<SlabIndex>,
     pub response_tx: Sender<Vec<SearchResultNode>>,
+}
+
+/// Asks the background loop for the next page of the launch "recent files" list.
+pub struct RecentNodesRequest {
+    pub offset: usize,
+    pub limit: usize,
+    pub response_tx: Sender<Vec<SlabIndex>>,
 }
 
 #[derive(Default)]
@@ -72,7 +99,8 @@ struct SortedViewCache {
 pub struct SearchState {
     search_tx: Sender<SearchJob>,
     node_info_tx: Sender<NodeInfoRequest>,
-    icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
+    icon_viewport_tx: Sender<IconViewportUpdate>,
+    recent_nodes_tx: Sender<RecentNodesRequest>,
     rescan_tx: Sender<CancellationToken>,
     watch_config_tx: Sender<WatchConfigUpdate>,
     sorted_view_cache: Mutex<Option<SortedViewCache>>,
@@ -83,7 +111,8 @@ impl SearchState {
     pub fn new(
         search_tx: Sender<SearchJob>,
         node_info_tx: Sender<NodeInfoRequest>,
-        icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
+        icon_viewport_tx: Sender<IconViewportUpdate>,
+        recent_nodes_tx: Sender<RecentNodesRequest>,
         rescan_tx: Sender<CancellationToken>,
         watch_config_tx: Sender<WatchConfigUpdate>,
         update_window_state_tx: Sender<()>,
@@ -92,6 +121,7 @@ impl SearchState {
             search_tx,
             node_info_tx,
             icon_viewport_tx,
+            recent_nodes_tx,
             rescan_tx,
             watch_config_tx,
             sorted_view_cache: Mutex::new(None),
@@ -212,6 +242,13 @@ pub(crate) fn normalize_watch_config(
     Some((watch_root, ignore_paths, include_paths))
 }
 
+/// Shown when the background indexing thread is no longer running.
+///
+/// It used to surface as `Failed to receive search result: RecvError`, which tells the user
+/// nothing. The thread only exits when it panics (see the panic log at
+/// `~/Library/Logs/Cardinal/panic.log`) or during shutdown, and the only remedy is a restart.
+const BACKGROUND_THREAD_GONE: &str = "后台索引线程已停止（可能因异常退出）。请重启 Cardinal；详细原因见 ~/Library/Logs/Cardinal/panic.log";
+
 #[derive(Serialize)]
 pub struct NodeInfo {
     pub path: String,
@@ -224,12 +261,21 @@ pub struct NodeInfo {
 pub struct SearchResponse {
     pub results: Vec<SlabIndex>,
     pub highlights: Vec<String>,
+    /// Folder scope being indexed, when `status_code` is `SCOPED_INDEXING`.
+    pub scope: Option<String>,
     pub status_code: u8,
 }
 
 impl SearchResponse {
     pub const OK: u8 = 0;
     pub const CANCELLED: u8 = 1;
+    /// The index is being built; the request was not evaluated. The UI should show progress
+    /// and retry automatically once the lifecycle reaches `Updating`/`Ready`.
+    pub const INDEXING: u8 = 2;
+    /// A temporary index for the requested folder scope is being built.
+    pub const SCOPED_INDEXING: u8 = 3;
+    /// The folder scope is not a directory; retrying will not help.
+    pub const SCOPE_UNAVAILABLE: u8 = 4;
 }
 
 #[derive(Serialize)]
@@ -303,38 +349,65 @@ pub async fn search(
         result_tx,
     }) {
         error!("Failed to send search request: {e:?}");
-        return Err(format!("Failed to send search request: {e:?}"));
+        // The receiver only disappears when the background loop is gone (it panicked or the
+        // app is shutting down); retrying cannot help, so say what the user should do.
+        return Err(BACKGROUND_THREAD_GONE.to_string());
     }
 
-    match result_rx.recv() {
-        Ok(res) => res,
+    let received = match result_rx.recv() {
+        Ok(value) => Ok(value),
         Err(e) => {
             error!("Failed to receive search result: {e:?}");
-            return Err(format!("Failed to receive search result: {e:?}"));
+            Err(BACKGROUND_THREAD_GONE.to_string())
         }
+    };
+
+    match received {
+        Err(message) => Err(message),
+        Ok(SearchJobResult::Indexing) => Ok(SearchResponse {
+            results: vec![],
+            highlights: vec![],
+            scope: None,
+            status_code: SearchResponse::INDEXING,
+        }),
+        Ok(SearchJobResult::ScopedIndexing { scope }) => Ok(SearchResponse {
+            results: vec![],
+            highlights: vec![],
+            scope: Some(scope),
+            status_code: SearchResponse::SCOPED_INDEXING,
+        }),
+        Ok(SearchJobResult::ScopeUnavailable { scope }) => Ok(SearchResponse {
+            results: vec![],
+            highlights: vec![],
+            scope: Some(scope),
+            status_code: SearchResponse::SCOPE_UNAVAILABLE,
+        }),
+        Ok(SearchJobResult::Completed(res)) => res
+            .map(|SearchOutcome { nodes, highlights }| {
+                let (status_code, results) = match nodes {
+                    Some(list) => (SearchResponse::OK, list),
+                    None => {
+                        let version = cancellation_token.version();
+                        info!("Search {version} was cancelled");
+                        (SearchResponse::CANCELLED, vec![])
+                    }
+                };
+                SearchResponse {
+                    results,
+                    highlights,
+                    scope: None,
+                    status_code,
+                }
+            })
+            .map_err(|e| format!("Failed to process search result: {e:?}")),
     }
-    .map(|SearchOutcome { nodes, highlights }| {
-        let (status_code, results) = match nodes {
-            Some(list) => (SearchResponse::OK, list),
-            None => {
-                let version = cancellation_token.version();
-                info!("Search {version} was cancelled");
-                (SearchResponse::CANCELLED, vec![])
-            }
-        };
-        SearchResponse {
-            results,
-            highlights,
-            status_code,
-        }
-    })
-    .map_err(|e| format!("Failed to process search result: {e:?}"))
 }
 
 #[tauri::command(async)]
 pub fn get_nodes_info(
     results: Vec<SlabIndex>,
     include_icons: Option<bool>,
+    icon_size: Option<f64>,
     state: State<'_, SearchState>,
 ) -> Vec<NodeInfo> {
     if results.is_empty() {
@@ -342,6 +415,12 @@ pub fn get_nodes_info(
     }
 
     let include_icons = include_icons.unwrap_or(true);
+    // The list view only needs a 16px bitmap; the tiled view asks for a bigger raster so
+    // the same Finder artwork stays sharp at the largest icon preset.
+    let icon_size = icon_size
+        .filter(|size| size.is_finite() && *size > 0.0)
+        .unwrap_or(fs_icon::DEFAULT_ICON_SIZE)
+        .min(fs_icon::LARGE_ICON_SIZE);
     let nodes = state.request_nodes(results);
 
     nodes
@@ -349,7 +428,7 @@ pub fn get_nodes_info(
         .map(|SearchResultNode { path, metadata }| {
             let path = path.to_string_lossy().into_owned();
             let icon = if include_icons {
-                fs_icon::icon_of_path_ns(&path).map(|data| {
+                fs_icon::icon_of_path_ns_sized(&path, icon_size).map(|data| {
                     format!(
                         "data:image/png;base64,{}",
                         general_purpose::STANDARD.encode(data)
@@ -390,9 +469,43 @@ pub fn get_sorted_view(
     entries.into_iter().map(|entry| entry.slab_index).collect()
 }
 
+/// Returns one page of the launch "recent files" list. The frontend calls this again when the
+/// user scrolls near the bottom, so the initial screen stays cheap while browsing still feels
+/// endless. Only the empty-query view uses it; real searches are always complete.
 #[tauri::command(async)]
-pub fn update_icon_viewport(id: u64, viewport: Vec<SlabIndex>, state: State<'_, SearchState>) {
-    if let Err(e) = state.icon_viewport_tx.send((id, viewport)) {
+pub fn get_recent_nodes(
+    offset: usize,
+    limit: usize,
+    state: State<'_, SearchState>,
+) -> Vec<SlabIndex> {
+    let (response_tx, response_rx) = bounded::<Vec<SlabIndex>>(1);
+    if let Err(e) = state.recent_nodes_tx.send(RecentNodesRequest {
+        offset,
+        limit,
+        response_tx,
+    }) {
+        error!("Failed to request recent nodes: {e:?}");
+        return Vec::new();
+    }
+    response_rx.recv().unwrap_or_default()
+}
+
+#[tauri::command(async)]
+pub fn update_icon_viewport(
+    id: u64,
+    viewport: Vec<SlabIndex>,
+    icon_size: Option<f64>,
+    state: State<'_, SearchState>,
+) {
+    let icon_size = icon_size
+        .filter(|size| size.is_finite() && *size > 0.0)
+        .unwrap_or(fs_icon::DEFAULT_ICON_SIZE)
+        .min(fs_icon::LARGE_ICON_SIZE);
+    if let Err(e) = state.icon_viewport_tx.send(IconViewportUpdate {
+        id,
+        viewport,
+        icon_size,
+    }) {
         error!("Failed to send icon viewport update: {e:?}");
     }
 }
@@ -450,18 +563,179 @@ pub async fn open_path(path: String) {
     }
 }
 
+/// An application that can open a given file, as listed by LaunchServices.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenWithApp {
+    /// Bundle identifier, e.g. `com.example.player`. Used to launch the app.
+    pub bundle_id: String,
+    /// Localised display name, e.g. `Fig Player`.
+    pub name: String,
+    /// Absolute path of the `.app` bundle, used for the icon and as a launch fallback.
+    pub path: String,
+    /// True when this is the system default handler for the file.
+    pub is_default: bool,
+}
+
+/// Where a selection maps to in the LaunchServices database.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenWithOptions {
+    pub apps: Vec<OpenWithApp>,
+    pub default_app: Option<OpenWithApp>,
+}
+
+#[cfg(target_os = "macos")]
+fn open_with_options_impl(path: &str) -> Option<OpenWithOptions> {
+    use objc2_app_kit::NSWorkspace;
+    use objc2_foundation::{NSString, NSURL};
+
+    let path_ns = NSString::from_str(path);
+    let url = NSURL::fileURLWithPath(&path_ns);
+    let workspace = NSWorkspace::sharedWorkspace();
+
+    let default_url = workspace.URLForApplicationToOpenURL(&url);
+    let app_urls = workspace.URLsForApplicationsToOpenURL(&url);
+
+    let make_app = |app_url: &NSURL, is_default: bool| -> Option<OpenWithApp> {
+        let app_path = app_url.path()?;
+        let app_path = app_path.to_string();
+        // `NSBundle` gives the localised name and the identifier; reading them from the URL
+        // alone would only produce the folder name.
+        let bundle = objc2_foundation::NSBundle::bundleWithURL(app_url)?;
+        let name = bundle
+            .objectForInfoDictionaryKey(&NSString::from_str("CFBundleDisplayName"))
+            .and_then(|value| value.downcast::<NSString>().ok())
+            .map(|value| value.to_string())
+            .or_else(|| bundle.name().map(|name| name.to_string()))
+            .unwrap_or_else(|| app_path.clone());
+        let bundle_id = bundle.bundleIdentifier()?.to_string();
+        Some(OpenWithApp {
+            bundle_id,
+            name,
+            path: app_path,
+            is_default,
+        })
+    };
+
+    let default_app = default_url
+        .as_ref()
+        .and_then(|app_url| make_app(app_url, true));
+
+    let mut apps: Vec<OpenWithApp> = app_urls
+        .iter()
+        .filter_map(|app_url| {
+            let is_default = default_url
+                .as_ref()
+                .is_some_and(|default| default.path() == app_url.path());
+            make_app(&app_url, is_default)
+        })
+        .collect();
+
+    // LaunchServices returns the default handler again inside the list; keep one entry each.
+    apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    apps.dedup_by(|a, b| a.bundle_id == b.bundle_id);
+
+    // Keep the default handler first, like Finder does.
+    apps.sort_by_key(|app| !app.is_default);
+
+    Some(OpenWithOptions { apps, default_app })
+}
+
+#[cfg(not(target_os = "macos"))]
+fn open_with_options_impl(_path: &str) -> Option<OpenWithOptions> {
+    None
+}
+
+/// Lists the applications that can open `path`, default handler first.
+#[tauri::command(async)]
+pub fn open_with_options(path: String) -> Option<OpenWithOptions> {
+    open_with_options_impl(&path)
+}
+
+/// Opens `path` with a specific application.
+///
+/// `bundle_id` is preferred (it survives the app being moved between `/Applications`,
+/// `~/Applications` and other volumes); `app_path` is the fallback when LaunchServices cannot
+/// resolve the identifier, which happens for apps that were moved or are not registered.
+#[tauri::command]
+pub async fn open_with_app(
+    path: String,
+    bundle_id: String,
+    app_path: String,
+) -> Result<(), String> {
+    // `open -b <bundle id>` asks LaunchServices to resolve the handler, which is the closest
+    // equivalent to double-clicking the app in Finder.
+    let by_bundle = Command::new("open")
+        .arg("-b")
+        .arg(&bundle_id)
+        .arg(&path)
+        .spawn();
+
+    if by_bundle.is_ok() {
+        return Ok(());
+    }
+
+    let message = by_bundle.err().map(|e| e.to_string()).unwrap_or_default();
+    warn!("open -b {bundle_id} failed ({message}); falling back to the bundle path");
+
+    Command::new("open")
+        .arg("-a")
+        .arg(&app_path)
+        .arg(&path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("Failed to open {path} with {bundle_id}: {e}"))
+}
+
+/// Opens the macOS "open with" chooser for `path`.
+///
+/// Finder shows the chooser for a single selection; `open -a` cannot do that, so the app is
+/// asked to present the panel directly.
+#[tauri::command]
+pub async fn choose_app_for_path(path: String) -> Result<(), String> {
+    Command::new("open")
+        .arg("-R")
+        .arg(&path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("Failed to reveal {path}: {e}"))
+}
+
+/// Writes UTF-8 text (CSV exports) to an absolute path chosen by the user in a save dialog.
+#[tauri::command]
+pub async fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    std::fs::write(&path, contents).map_err(|e| format!("Failed to write {path}: {e}"))
+}
+
+/// Reads a UTF-8 text file (CSV imports) from an absolute path chosen in an open dialog.
+#[tauri::command]
+pub async fn read_text_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("Failed to read {path}: {e}"))
+}
+
 #[tauri::command]
 pub async fn start_logic(
     watch_root: String,
     ignore_paths: Vec<String>,
     include_paths: Option<Vec<String>>,
 ) {
-    if let Some(sender) = LOGIC_START.get() {
-        let _ = sender.try_send(LogicStartConfig {
-            watch_root,
-            ignore_paths,
-            include_paths: include_paths.unwrap_or_default(),
-        });
+    let config = LogicStartConfig {
+        watch_root,
+        ignore_paths,
+        include_paths: include_paths.unwrap_or_default(),
+    };
+
+    let Some(sender) = LOGIC_START.get() else {
+        // The webview can call this before the builder has created the channel. Parking the
+        // request (instead of dropping it) is what keeps startup from hanging forever.
+        info!("start_logic arrived before the background channel existed; parking it");
+        *PENDING_LOGIC_START.lock() = Some(config);
+        return;
+    };
+
+    if let Err(error) = sender.try_send(config) {
+        warn!("Failed to hand off the start request: {error:?}");
     }
 }
 

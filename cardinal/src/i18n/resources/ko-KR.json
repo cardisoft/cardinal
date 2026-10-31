@@ -9,6 +9,19 @@
       "caseSensitive": "대소문자 구분 검색 전환",
       "directoryScope": "폴더 범위 전환"
     },
+    "filters": {
+      "all": "모든 유형",
+      "manage": "필터 관리",
+      "presets": {
+        "audio": "오디오",
+        "archives": "압축 파일",
+        "documents": "문서",
+        "executables": "실행 파일",
+        "folders": "폴더",
+        "images": "이미지",
+        "videos": "동영상"
+      }
+    },
     "aria": {
       "searchInput": "검색 입력"
     }
@@ -81,7 +94,8 @@
     "resultsCount_other": "{{formatted}}개 결과",
     "duration": "{{value}}ms",
     "resultsWithDuration": "{{results}} • {{duration}}",
-    "resultsTitle": "결과 • 소요 시간"
+    "resultsTitle": "결과 • 소요 시간",
+    "selectionCount": "{{count}} selected"
   },
   "app": {
     "fullDiskAccess": {
@@ -90,13 +104,15 @@
       "steps": {
         "one": "시스템 설정 > 개인정보 보호 및 보안 > 전체 디스크 접근을 엽니다.",
         "two": "잠금을 해제한 뒤 Cardinal을 활성화합니다.",
-        "three": "요청이 뜨면 macOS가 Cardinal을 다시 시작하도록 허용하세요."
+        "three": "Return to Cardinal — the permission is detected automatically."
       },
       "status": {
         "checking": "권한 상태 확인 중...",
         "disabled": "전체 디스크 접근이 비활성화되어 있습니다."
       },
-      "openSettings": "시스템 설정 열기"
+      "openSettings": "시스템 설정 열기",
+      "retry": "Check again",
+      "autoDetect": "Access is detected automatically — no restart needed."
     }
   },
   "menu": {
@@ -118,7 +134,8 @@
     "maximize": "줌",
     "closeWindow": "윈도우 닫기",
     "help": "도움말",
-    "getUpdates": "업데이트 받기"
+    "getUpdates": "업데이트 받기",
+    "bookmarks": "북마크"
   },
   "preferences": {
     "title": "환경설정",
@@ -136,7 +153,13 @@
     },
     "save": "저장",
     "reset": "기본값으로 복원",
-    "close": "닫기"
+    "close": "닫기",
+    "fontSize": {
+      "label": "Font size",
+      "description": "Applies to results, bookmarks and filter dialogs.",
+      "value": "{{size}} px",
+      "reset": "Reset"
+    }
   },
   "language": {
     "label": "언어",
@@ -179,5 +202,82 @@
     "errors": {
       "absolute": "각 경로는 '/' 또는 '~'로 시작해야 합니다."
     }
+  },
+  "view": {
+    "list": "목록 보기",
+    "grid": "격자 보기",
+    "iconSizes": {
+      "small": "작은 아이콘",
+      "medium": "중간 아이콘",
+      "large": "큰 아이콘",
+      "xlarge": "초대형 아이콘"
+    },
+    "created": "Created",
+    "modified": "Modified"
+  },
+  "bookmarks": {
+    "title": "북마크",
+    "close": "북마크 닫기",
+    "newCategory": "새 카테고리",
+    "renameCategory": "카테고리 이름 변경",
+    "deleteCategory": "카테고리 삭제",
+    "name": "이름",
+    "query": "검색어",
+    "add": "추가",
+    "save": "저장",
+    "moveUp": "위로 이동",
+    "moveDown": "아래로 이동",
+    "edit": "편집",
+    "delete": "삭제",
+    "searchCurrent": "현재 탭에서 검색",
+    "searchNew": "새 탭에서 검색",
+    "empty": "카테고리를 선택하거나 만드세요.",
+    "import": "Import",
+    "export": "Export",
+    "csvFileType": "CSV file",
+    "exported": "Bookmarks exported.",
+    "imported": "Imported {{count}} bookmarks.",
+    "ioFailed": "Import/export failed.",
+    "savedToast": "Bookmark saved to the default category.",
+    "filterLabel": "Filter",
+    "filterNone": "No filter",
+    "filterFallback": "Custom filter",
+    "dragHint": "Drag to move",
+    "resizeWidth": "Drag to resize width",
+    "resizeHeight": "Drag to resize height",
+    "resizeTop": "Drag to resize from the top",
+    "resizeRight": "Drag to resize from the right",
+    "resizeCorner": "Drag to resize both edges"
+  },
+  "filters": {
+    "title": "Filters",
+    "close": "Close filters",
+    "new": "New",
+    "edit": "Edit",
+    "import": "Import",
+    "export": "Export",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "columns": {
+      "name": "Name",
+      "search": "Search"
+    },
+    "searchPlaceholder": "e.g. ext:mp4;mkv or folder:",
+    "created": "Filter created.",
+    "saved": "Filter saved.",
+    "exported": "Filters exported.",
+    "imported": "Imported {{count}} filters.",
+    "ioFailed": "Import/export failed.",
+    "csvFileType": "CSV file"
+  },
+  "sortMenu": {
+    "bySize": "Sort by size",
+    "byCreated": "Sort by creation time",
+    "byModified": "Sort by modification time",
+    "byName": "Sort by name",
+    "ascending": "Ascending",
+    "descending": "Descending",
+    "clear": "Clear sorting"
   }
 }

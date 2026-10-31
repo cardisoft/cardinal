@@ -1,3 +1,8 @@
 target
 .DS_Store
 .vscode
+node_modules
+
+# Separate git repositories checked out inside this directory; never commit their files.
+winnfsd/
+HypoMux/

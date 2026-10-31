@@ -23,8 +23,19 @@ type SearchBarProps = {
   caseSensitive: boolean;
   onToggleCaseSensitive: (event: ChangeEvent<HTMLInputElement>) => void;
   caseSensitiveLabel: string;
+  filterOptions: FilterOption[];
+  filterValue: string | null;
+  filterLabel: string;
+  filterManageLabel: string;
+  onSelectFilter: (id: string | null) => void;
+  onManageFilters: () => void;
   onFocus: FocusEventHandler<HTMLInputElement>;
   onBlur: FocusEventHandler<HTMLInputElement>;
+};
+
+export type FilterOption = {
+  id: string;
+  label: string;
 };
 
 const isCollapsedAtStart = (input: HTMLInputElement): boolean =>
@@ -53,6 +64,12 @@ export function SearchBar({
   caseSensitive,
   onToggleCaseSensitive,
   caseSensitiveLabel,
+  filterOptions,
+  filterValue,
+  filterLabel,
+  filterManageLabel,
+  onSelectFilter,
+  onManageFilters,
   onFocus,
   onBlur,
 }: SearchBarProps): React.JSX.Element {
@@ -174,6 +191,31 @@ export function SearchBar({
             onFocus={onFocus}
             onBlur={onBlur}
           />
+        </div>
+        <div className="search-segment search-filter">
+          <select
+            className="search-filter__select"
+            aria-label={filterLabel}
+            title={filterLabel}
+            value={filterValue ?? ''}
+            onChange={(event) => onSelectFilter(event.target.value || null)}
+          >
+            <option value="">{filterLabel}</option>
+            {filterOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="search-filter__manage"
+            title={filterManageLabel}
+            aria-label={filterManageLabel}
+            onClick={onManageFilters}
+          >
+            ⚙
+          </button>
         </div>
         <div className="search-segment search-options">
           <label className="search-option" title={caseSensitiveLabel}>

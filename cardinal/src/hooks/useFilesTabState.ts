@@ -14,6 +14,8 @@ type UseFilesTabStateOptions = {
   directoryQuery: string;
   queueSearch: (query: string, options?: QueueSearchOptions) => void;
   queueDirectorySearch: (directoryQuery: string, options?: QueueSearchOptions) => void;
+  /** Lets the caller mirror the scope into the active tab's own state. */
+  onDirectoryCommitted: (directoryQuery: string) => void;
   maxSearchHistoryEntries?: number;
   onNavigateFromSearchToResults?: () => void;
 };
@@ -44,6 +46,7 @@ export function useFilesTabState({
   directoryQuery,
   queueSearch,
   queueDirectorySearch,
+  onDirectoryCommitted,
   maxSearchHistoryEntries = 50,
   onNavigateFromSearchToResults,
 }: UseFilesTabStateOptions): UseFilesTabStateResult {
@@ -150,9 +153,11 @@ export function useFilesTabState({
         return;
       }
 
-      queueDirectorySearch(event.target.value);
+      const value = event.target.value;
+      onDirectoryCommitted(value);
+      queueDirectorySearch(value);
     },
-    [activeTab, queueDirectorySearch],
+    [activeTab, onDirectoryCommitted, queueDirectorySearch],
   );
 
   const onTabChange = useCallback(

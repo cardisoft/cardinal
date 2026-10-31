@@ -91,6 +91,29 @@ impl NameIndex {
             .ok()
     }
 
+    /// At most `limit` indices, without materialising the whole index first.
+    /// Used by bounded scans (e.g. the launch "recent files" list) where collecting every
+    /// index would allocate a huge vector only to throw most of it away.
+    pub fn take_indices(
+        &self,
+        limit: usize,
+        cancellation_token: CancellationToken,
+    ) -> Option<Vec<SlabIndex>> {
+        self.map
+            .values()
+            .flat_map(|indices| indices.iter().copied())
+            .take(limit)
+            .enumerate()
+            .map(|(i, index)| {
+                cancellation_token
+                    .is_cancelled_sparse(i)
+                    .map(|()| index)
+                    .ok_or(())
+            })
+            .try_collect()
+            .ok()
+    }
+
     pub fn get(&self, name: &str) -> Option<&SortedSlabIndices> {
         self.map.get(name)
     }

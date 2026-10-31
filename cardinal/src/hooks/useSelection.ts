@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject, RefObject } from 'react';
-import type { VirtualListHandle } from '../components/VirtualList';
+import type { ResultsViewHandle } from '../types/viewResults';
+import type { SearchResultItem } from '../types/search';
 import type { SlabIndex } from '../types/slab';
 
 type RowSelectOptions = {
@@ -15,6 +16,8 @@ export type SelectionController = {
   activeRowIndex: number | null;
   shiftAnchorIndex: number | null;
   selectedPaths: string[];
+  /** Full row data for the selection (size/timestamps power the status bar + toolbar). */
+  selectedItems: SearchResultItem[];
   handleRowSelect: (rowIndex: number, options: RowSelectOptions) => void;
   selectSingleRow: (rowIndex: number) => void;
   clearSelection: () => void;
@@ -31,7 +34,7 @@ export type SelectionController = {
 export const useSelection = (
   displayedResults: SlabIndex[],
   resultsVersion: number,
-  virtualListRef: RefObject<VirtualListHandle | null>,
+  virtualListRef: RefObject<ResultsViewHandle | null>,
 ): SelectionController => {
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
@@ -144,20 +147,25 @@ export const useSelection = (
     clearSelection();
   }, [resultsVersion, clearSelection]);
 
-  const selectedPaths = useMemo(() => {
+  const selectedItems = useMemo(() => {
     const list = virtualListRef.current;
     if (!list) {
       return [];
     }
-    const paths: string[] = [];
+    const items: SearchResultItem[] = [];
     selectedIndices.forEach((index) => {
       const item = list.getItem(index);
-      if (item?.path) {
-        paths.push(item.path);
+      if (item) {
+        items.push(item);
       }
     });
-    return paths;
+    return items;
   }, [selectedIndices, virtualListRef]);
+
+  const selectedPaths = useMemo(
+    () => selectedItems.map((item) => item.path).filter(Boolean),
+    [selectedItems],
+  );
 
   return {
     selectedIndices,
@@ -165,6 +173,7 @@ export const useSelection = (
     activeRowIndex,
     shiftAnchorIndex,
     selectedPaths,
+    selectedItems,
     handleRowSelect,
     selectSingleRow,
     clearSelection,

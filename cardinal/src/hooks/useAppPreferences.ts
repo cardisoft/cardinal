@@ -4,6 +4,7 @@ import type { i18n as I18nInstance } from 'i18next';
 import { OPEN_PREFERENCES_EVENT } from '../constants/appEvents';
 import { getBrowserLanguage } from '../i18n/config';
 import { applyThemePreference, persistThemePreference } from '../theme';
+import { broadcastUiPreferencesChanged } from '../runtime/uiPreferences';
 import { setTrayEnabled } from '../tray';
 import { getStoredTrayIconEnabled, persistTrayIconEnabled } from '../trayIconPreference';
 import { setWatchConfig } from '../utils/watchConfig';
@@ -78,6 +79,8 @@ export function useAppPreferences({
   }, []);
 
   useEffect(() => {
+    // These gates must all be satisfied before the backend is told to start indexing; when
+    // one of them never clears the app sits on the loading screen forever.
     if (isCheckingFullDiskAccess) {
       return;
     }
@@ -92,7 +95,12 @@ export function useAppPreferences({
     }
 
     logicStartedRef.current = true;
-    void invoke('start_logic', { watchRoot, ignorePaths, includePaths });
+    // If the hand-off fails, clear the latch so the effect can retry on the next dependency
+    // change instead of leaving the backend waiting forever.
+    void invoke('start_logic', { watchRoot, ignorePaths, includePaths }).catch((error) => {
+      console.error('Failed to start background logic, will retry', error);
+      logicStartedRef.current = false;
+    });
   }, [fullDiskAccessStatus, ignorePaths, includePaths, isCheckingFullDiskAccess, watchRoot]);
 
   const applyWatchConfig = useCallback(
@@ -140,6 +148,7 @@ export function useAppPreferences({
     setTrayIconEnabled(false);
     persistThemePreference('system');
     applyThemePreference('system');
+    broadcastUiPreferencesChanged();
     const nextLanguage = getBrowserLanguage();
     void i18n.changeLanguage(nextLanguage);
     setPreferencesResetToken((token) => token + 1);

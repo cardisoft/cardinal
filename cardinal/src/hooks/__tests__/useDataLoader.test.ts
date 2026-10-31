@@ -153,6 +153,21 @@ describe('useDataLoader', () => {
     expect(result.current.cache.get(slab22)?.path).toBe('/tmp/file-22');
   });
 
+  it('requests metadata only so first paint never waits on icon rasterisation', async () => {
+    const slab = 77 as SlabIndex;
+    const { result } = renderDataLoader({ results: [slab], version: 1 });
+
+    await act(async () => {
+      await result.current.ensureRangeLoaded(0, 0);
+    });
+
+    await waitFor(() => expect(mockedInvoke).toHaveBeenCalledTimes(1));
+    expect(mockedInvoke).toHaveBeenCalledWith(
+      'get_nodes_info',
+      expect.objectContaining({ includeIcons: false }),
+    );
+  });
+
   it('cleans up icon update subscription on unmount', async () => {
     const { unmount } = renderDataLoader({ results: [11 as SlabIndex], version: 1 });
     unmount();

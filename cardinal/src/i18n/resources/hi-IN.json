@@ -9,6 +9,19 @@
       "caseSensitive": "केस-सेंसिटिव मिलान टॉगल करें",
       "directoryScope": "फ़ोल्डर स्कोप टॉगल करें"
     },
+    "filters": {
+      "all": "सभी प्रकार",
+      "manage": "फ़िल्टर प्रबंधित करें",
+      "presets": {
+        "audio": "ऑडियो",
+        "archives": "संग्रह",
+        "documents": "दस्तावेज़",
+        "executables": "निष्पादन योग्य",
+        "folders": "फ़ोल्डर",
+        "images": "छवियाँ",
+        "videos": "वीडियो"
+      }
+    },
     "aria": {
       "searchInput": "खोज इनपुट"
     }
@@ -81,7 +94,8 @@
     "resultsCount_other": "{{formatted}} परिणाम",
     "duration": "{{value}} मि.से.",
     "resultsWithDuration": "{{results}} • {{duration}}",
-    "resultsTitle": "परिणाम • अवधि"
+    "resultsTitle": "परिणाम • अवधि",
+    "selectionCount": "{{count}} selected"
   },
   "app": {
     "fullDiskAccess": {
@@ -90,13 +104,15 @@
       "steps": {
         "one": "सिस्टम सेटिंग्स > गोपनीयता व सुरक्षा > पूर्ण डिस्क एक्सेस खोलें.",
         "two": "ताला खोलें, बदलाव की अनुमति दें और Cardinal सक्षम करें.",
-        "three": "प्रॉम्प्ट आने पर macOS को Cardinal पुनः आरंभ करने दें."
+        "three": "Return to Cardinal — the permission is detected automatically."
       },
       "status": {
         "checking": "अनुमति स्थिति जाँची जा रही है...",
         "disabled": "पूर्ण डिस्क एक्सेस बंद है."
       },
-      "openSettings": "सिस्टम सेटिंग्स खोलें"
+      "openSettings": "सिस्टम सेटिंग्स खोलें",
+      "retry": "Check again",
+      "autoDetect": "Access is detected automatically — no restart needed."
     }
   },
   "menu": {
@@ -108,7 +124,8 @@
     "view": "दृश्य",
     "window": "विंडो",
     "help": "सहायता",
-    "getUpdates": "अपडेट प्राप्त करें"
+    "getUpdates": "अपडेट प्राप्त करें",
+    "bookmarks": "बुकमार्क"
   },
   "preferences": {
     "title": "प्राथमिकताएँ",
@@ -126,7 +143,13 @@
     },
     "save": "सहेजें",
     "reset": "डिफ़ॉल्ट पर लौटाएँ",
-    "close": "बंद करें"
+    "close": "बंद करें",
+    "fontSize": {
+      "label": "Font size",
+      "description": "Applies to results, bookmarks and filter dialogs.",
+      "value": "{{size}} px",
+      "reset": "Reset"
+    }
   },
   "language": {
     "label": "भाषा",
@@ -169,5 +192,82 @@
     "errors": {
       "absolute": "हर पाथ '/' या '~' से शुरू होना चाहिए।"
     }
+  },
+  "view": {
+    "list": "सूची दृश्य",
+    "grid": "ग्रिड दृश्य",
+    "iconSizes": {
+      "small": "छोटे चिह्न",
+      "medium": "मध्यम चिह्न",
+      "large": "बड़े चिह्न",
+      "xlarge": "बहुत बड़े चिह्न"
+    },
+    "created": "Created",
+    "modified": "Modified"
+  },
+  "bookmarks": {
+    "title": "बुकमार्क",
+    "close": "बुकमार्क बंद करें",
+    "newCategory": "नई श्रेणी",
+    "renameCategory": "श्रेणी का नाम बदलें",
+    "deleteCategory": "श्रेणी हटाएं",
+    "name": "नाम",
+    "query": "खोज टेक्स्ट",
+    "add": "जोड़ें",
+    "save": "सहेजें",
+    "moveUp": "ऊपर ले जाएं",
+    "moveDown": "नीचे ले जाएं",
+    "edit": "संपादित करें",
+    "delete": "हटाएं",
+    "searchCurrent": "वर्तमान टैब में खोजें",
+    "searchNew": "नए टैब में खोजें",
+    "empty": "श्रेणी चुनें या बनाएं।",
+    "import": "Import",
+    "export": "Export",
+    "csvFileType": "CSV file",
+    "exported": "Bookmarks exported.",
+    "imported": "Imported {{count}} bookmarks.",
+    "ioFailed": "Import/export failed.",
+    "savedToast": "Bookmark saved to the default category.",
+    "filterLabel": "Filter",
+    "filterNone": "No filter",
+    "filterFallback": "Custom filter",
+    "dragHint": "Drag to move",
+    "resizeWidth": "Drag to resize width",
+    "resizeHeight": "Drag to resize height",
+    "resizeTop": "Drag to resize from the top",
+    "resizeRight": "Drag to resize from the right",
+    "resizeCorner": "Drag to resize both edges"
+  },
+  "filters": {
+    "title": "Filters",
+    "close": "Close filters",
+    "new": "New",
+    "edit": "Edit",
+    "import": "Import",
+    "export": "Export",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "columns": {
+      "name": "Name",
+      "search": "Search"
+    },
+    "searchPlaceholder": "e.g. ext:mp4;mkv or folder:",
+    "created": "Filter created.",
+    "saved": "Filter saved.",
+    "exported": "Filters exported.",
+    "imported": "Imported {{count}} filters.",
+    "ioFailed": "Import/export failed.",
+    "csvFileType": "CSV file"
+  },
+  "sortMenu": {
+    "bySize": "Sort by size",
+    "byCreated": "Sort by creation time",
+    "byModified": "Sort by modification time",
+    "byName": "Sort by name",
+    "ascending": "Ascending",
+    "descending": "Descending",
+    "clear": "Clear sorting"
   }
 }

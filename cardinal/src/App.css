@@ -5,8 +5,10 @@
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'San Francisco',
     'Helvetica Neue', Helvetica, Arial, sans-serif;
   font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 24px;
+  /* Overridden at runtime by useFontSize through the `--app-font-size` custom property. */
+  --app-font-size: 1rem;
+  font-size: var(--app-font-size);
+  line-height: 1.85;
   font-weight: 400;
 
   --color-text: #212529;
@@ -48,7 +50,8 @@
   -webkit-text-size-adjust: 100%;
 
   /* Layout tokens */
-  --row-height: 24px; /* Keep in sync with the virtual list rowHeight. */
+  /* Keep in sync with rowHeightForFontSize() in src/types/fontSize.ts. */
+  --row-height: calc(var(--app-font-size) * 1.85);
   --col-min-width: 30px; /* Minimum column width. */
   --col-max-width: 10000px; /* Maximum column width. */
   --container-padding: 10px;
@@ -56,6 +59,9 @@
   --virtual-scrollbar-thumb-min: 24px; /* Shared JS/CSS scrollbar-thumb minimum height (overrideable). */
   /* Horizontal padding for header & data cells */
   --cell-hpad: 0.4rem;
+  /* Bookmark list separator: deliberately darker than --color-border so rows stay visually
+     separated at 1px. */
+  --bookmark-row-border: #495057;
 }
 
 /* Grey out selected rows in the files panel when the window loses focus. */
@@ -110,11 +116,13 @@ main,
 
 .container {
   margin: 0;
-  display: grid;
-  grid-template-rows: auto 1fr auto; /* search bar | scroll area | status bar */
-  grid-template-columns: 100%;
+  /* Flex column so the optional tabs bar does not shift the single flexible region. */
+  display: flex;
+  flex-direction: column;
   text-align: center;
   height: 100vh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* === Search Bar === */
@@ -122,6 +130,7 @@ main,
   margin: var(--container-padding) var(--container-padding) 0;
   padding: 0;
   width: calc(100% - var(--container-padding) * 2);
+  flex: 0 0 auto;
 }
 
 .search-bar {
@@ -339,6 +348,62 @@ main,
   padding: 0 0.4rem;
 }
 
+/* === Search filter dropdown === */
+.search-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  padding: 0 0.35rem;
+}
+
+.search-filter__select {
+  appearance: none;
+  height: calc(var(--search-segment-height) - 0.6rem);
+  max-width: 9.5rem;
+  padding: 0 1.1rem 0 0.5rem;
+  border: 1px solid var(--color-elevated-border, var(--color-border));
+  border-radius: 8px;
+  background-color: var(--color-elevated-bg);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  /* Chevron drawn with gradients so no extra asset is needed. */
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--color-muted) 50%),
+    linear-gradient(135deg, var(--color-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 0.75rem) 50%,
+    calc(100% - 0.45rem) 50%;
+  background-size: 0.3rem 0.3rem;
+  background-repeat: no-repeat;
+}
+
+.search-filter__select:focus-visible {
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.5);
+  outline-offset: 2px;
+}
+
+.search-filter__manage {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.search-filter__manage:hover {
+  background-color: var(--search-toggle-hover-bg);
+  color: var(--color-text);
+}
+
 .search-option {
   position: relative;
   display: inline-flex;
@@ -452,11 +517,13 @@ button:active:not(:disabled) {
 .results-container {
   text-align: left;
   width: 100%;
-  /* Height is dictated by the second grid row. */
+  /* Fills the space left by tabs + search bar + status bar. */
+  flex: 1 1 auto;
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 0; /* Allow content to shrink without stretching the grid row. */
+  min-height: 0; /* Allow content to shrink so the virtual list can scroll. */
+  overflow: hidden;
   /* Allow absolutely positioned vertical scrollbars inside. */
   --columns-total: calc(
     var(--w-filename) + var(--w-path) + var(--w-size) + var(--w-modified) + var(--w-created)
@@ -616,7 +683,7 @@ button:active:not(:disabled) {
   background: inherit;
   padding: 6px 0;
   border-bottom: 1px solid var(--color-border);
-  font-size: 12px;
+  font-size: 0.9231rem;
   /* Include scrollbar width so the header lines up with the content region. */
   width: calc(var(--columns-total) + var(--virtual-scrollbar-width));
 }
@@ -828,13 +895,13 @@ button:active:not(:disabled) {
 }
 
 .empty-title {
-  font-size: 18px;
+  font-size: 1.3846rem;
   font-weight: 600;
   color: var(--color-header);
 }
 
 .empty-desc {
-  font-size: 13px;
+  font-size: 1rem;
   color: var(--color-muted);
   max-width: 360px;
 }
@@ -843,7 +910,7 @@ button:active:not(:disabled) {
   list-style: none;
   margin: 4px 0 0 0;
   padding: 0;
-  font-size: 12px;
+  font-size: 0.9231rem;
   line-height: 1.5;
   color: var(--color-muted);
   max-width: 360px;
@@ -885,8 +952,10 @@ button:active:not(:disabled) {
 /* Rows (rendered inside virtual list) */
 /* === Rows & Cells === */
 .row {
-  /* Remove horizontal padding to avoid width overflow (columns + padding). */
-  padding: 5px 0; /* Previously 5px 10px. */
+  /* No vertical padding: the row slot itself carries the height, and line-height matching
+     --row-height keeps text vertically centred at every font size without overflowing. */
+  padding: 0;
+  line-height: var(--row-height);
   box-sizing: border-box;
   white-space: nowrap; /* Prevent text wrapping. */
   overflow: visible; /* Keep column content visible during horizontal scroll. */
@@ -958,6 +1027,8 @@ button:active:not(:disabled) {
 
 .file-icon-placeholder {
   display: inline-block;
+  width: 100%;
+  height: 100%;
   border-radius: 4px;
   background-color: var(--color-border);
   opacity: 0.55;
@@ -1016,7 +1087,7 @@ button:active:not(:disabled) {
   align-items: center;
   gap: 16px;
   color: var(--color-accent);
-  font-size: 16px;
+  font-size: 1.2308rem;
   font-weight: 500;
 }
 
@@ -1118,6 +1189,7 @@ button:active:not(:disabled) {
 }
 
 :root[data-theme='dark'] {
+  --bookmark-row-border: #868e96;
   --color-text: #e9ecef;
   --color-bg: rgb(32, 32, 32);
   --color-muted: #adb5bd;
@@ -1205,13 +1277,14 @@ button:active:not(:disabled) {
 /* === Merged: StatusBar.css === */
 .status-bar {
   height: 30px;
+  flex: 0 0 auto;
   background: var(--color-elevated-bg);
   border-top: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
-  font-size: 12px;
+  font-size: 0.9231rem;
   color: var(--color-text);
   font-family: var(--font-sans);
 }
@@ -1252,7 +1325,7 @@ button:active:not(:disabled) {
   border: none;
   background: rgba(255, 255, 255, 0.9);
   color: rgba(33, 37, 41, 0.9);
-  font-size: 14px;
+  font-size: 1.0769rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   transition:
@@ -1309,7 +1382,7 @@ button:active:not(:disabled) {
   border-radius: 999px;
   background: transparent;
   color: rgba(73, 80, 87, 0.75);
-  font-size: 12px;
+  font-size: 0.9231rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
@@ -1341,7 +1414,7 @@ button:active:not(:disabled) {
 }
 
 .status-tab__icon {
-  font-size: 13px;
+  font-size: 1rem;
   line-height: 1;
   filter: saturate(0.85);
 }
@@ -1389,7 +1462,7 @@ button:active:not(:disabled) {
   }
 
   :root:not([data-theme]) .status-rescan-icon {
-    font-size: 12px;
+    font-size: 0.9231rem;
     line-height: 1;
   }
 
@@ -1446,7 +1519,7 @@ button:active:not(:disabled) {
 }
 
 [data-theme='dark'] .status-rescan-icon {
-  font-size: 12px;
+  font-size: 0.9231rem;
   line-height: 1;
 }
 
@@ -1500,7 +1573,7 @@ button:active:not(:disabled) {
   background: var(--color-elevated-bg);
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 1rem;
   transition: all 0.2s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
@@ -1602,7 +1675,7 @@ button:active:not(:disabled) {
 }
 
 .error-icon {
-  font-size: 48px;
+  font-size: 3.6923rem;
   font-weight: bold;
   color: var(--color-error, #dc3545);
 }
@@ -2050,4 +2123,1208 @@ button:active:not(:disabled) {
   flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+/* === Search Tabs Bar === */
+.search-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px var(--container-padding) 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 0 0 auto;
+  scrollbar-width: none;
+}
+
+.search-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.search-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* A short query ("dd") still needs breathing room so the label never looks smaller than
+     the close button next to it. */
+  min-width: 4.5rem;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px 8px 0 0;
+  background: var(--color-elevated-bg);
+  color: var(--color-muted);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 200px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.search-tab.is-active {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-bottom-color: var(--color-bg);
+}
+
+.search-tab__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  padding-right: 2px;
+}
+
+.search-tab__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.search-tab__close:hover {
+  background: rgba(var(--color-accent-rgb), 0.12);
+  color: var(--color-text);
+}
+
+.search-tab--add {
+  justify-content: center;
+  width: 28px;
+  padding: 0;
+  font-size: 1rem;
+}
+
+/* === View Toolbar (list/grid toggle + icon sizes) === */
+.view-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px var(--container-padding) 4px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+  /* Anchors the absolutely-centred selection timestamps. */
+  position: relative;
+}
+
+.view-toolbar__group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 2px;
+}
+
+.view-toolbar__toggle,
+.view-toolbar__size {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.view-toolbar__toggle.is-active,
+.view-toolbar__size.is-active {
+  background: rgba(var(--color-accent-rgb), 0.14);
+  color: var(--color-accent);
+}
+
+/* === Icon Grid === */
+.icon-grid {
+  padding: 4px var(--container-padding);
+}
+
+.icon-grid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Icon box (fixed) + label box (fixed three lines) exactly fill the cell, so there is no
+     free space to distribute: the icon never moves and the last text line always lands on the
+     same baseline, however many lines a name wraps to. This mirrors the tiled view of
+     Explorer/Everything. */
+  justify-content: flex-end;
+  gap: 2px;
+  border-radius: 8px;
+  padding: 0 2px;
+  cursor: default;
+}
+
+.icon-grid-item:hover {
+  background: var(--row-hover);
+}
+
+.icon-grid-item.is-selected {
+  background: var(--row-selected-bg);
+}
+
+.icon-grid-item__icon {
+  display: flex;
+  /* Bottom-align the artwork: a 16:9 video cover is letterboxed inside a square box while a
+     tall document icon fills it, so centring made the gap between picture and name depend on
+     the artwork's aspect ratio. Anchoring both to the bottom keeps that gap identical. */
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  /* Fixed box, never stretched nor shrunk by the label: a three-line name must not steal
+     height from the icon, otherwise icons of the same file type stop lining up row to row. */
+  flex: 0 0 var(--icon-size, 100%);
+  height: var(--icon-size, 100%);
+  overflow: hidden;
+}
+
+.icon-grid-item__icon img {
+  /* Letterbox inside the fixed box. `object-position` pins the artwork to the bottom edge, so
+     a 16:9 cover and a tall document icon end up the same distance from the name below them. */
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  border-radius: 4px;
+}
+
+/* Fixed three-line label box; the text inside is bottom-aligned. A one-line name therefore
+   leaves its spare space between the icon and the text, and a three-line name fills the box —
+   in both cases the last line sits on the same baseline. `--label-width` / `--label-height`
+   come from IconGrid.tsx; keep the line height in sync with `gridLabelAreaHeight()` there. */
+.icon-grid-item__label {
+  flex: 0 0 var(--label-height, 3.6em);
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: var(--label-height, 3.6em);
+  padding: 0 2px;
+  overflow: hidden;
+  color: var(--color-text);
+}
+
+/* Up to three lines and at most six CJK characters per line, ellipsised when the text no
+   longer fits. Latin letters are narrower, so more of them fit in the same width.
+   `word-break: break-all` is essential: `overflow-wrap: anywhere` only splits a word when it
+   cannot fit on a line of its own, so a name like `白咲碧122614_0...` kept `白咲碧` alone on
+   line 1 and moved the whole number to line 2. Everything/Explorer fill each line greedily. */
+.icon-grid-item__label-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-all;
+  width: max-content;
+  max-width: min(var(--label-width, 6em), 100%);
+  text-align: center;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+/* Tall artwork (poster-shaped covers, portrait thumbnails) already fills the icon box, so it
+   gets two text lines instead of three: the extra line would otherwise make the tile look
+   cramped next to its neighbours. `data-lines` is set by IconGridItem from the artwork's
+   natural aspect ratio. */
+.icon-grid-item__label[data-lines='two'] .icon-grid-item__label-text {
+  -webkit-line-clamp: 2;
+}
+
+.icon-grid-item.is-selected .icon-grid-item__label {
+  color: var(--row-selected-text);
+}
+
+.icon-grid-item--loading {
+  border-radius: 8px;
+}
+
+/* === Bookmarks Overlay === */
+/* Floating, non-modal panel anchored to the right: results stay visible and interactive,
+   so opening several bookmarks in new tabs is immediately visible. */
+.bookmarks-overlay {
+  position: fixed;
+  top: 64px;
+  left: 0;
+  right: 24px;
+  bottom: 48px;
+  z-index: 2400;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.bookmarks-card {
+  pointer-events: auto;
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  max-height: 100%;
+  background: var(--color-elevated-bg, var(--color-bg));
+  color: var(--color-text);
+  border-radius: 16px;
+  padding: 20px 24px 24px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.32);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Once dragged, the panel is positioned in viewport coordinates. It must not stay
+   `position: relative`, otherwise `left/top` would offset it from its flex slot and a stored
+   position could push the panel off-screen (which looks like it never opened). */
+.bookmarks-card.is-floating {
+  position: fixed;
+}
+
+/* --- Standalone bookmarks window (`index.html?window=bookmarks`) -------------------------
+   The manager is its own OS window now, so it can be dragged anywhere on screen instead of
+   covering the result list. No overlay scrim, no resize handles (the OS owns the edges). */
+.bookmarks-overlay--window {
+  position: static;
+  inset: auto;
+  padding: 0;
+  pointer-events: auto;
+  display: block;
+  /* `#root` is already 100% tall; using 100% here keeps the card inside the window when the
+     webview is resized instead of overflowing by the title bar height. */
+  width: 100%;
+  height: 100%;
+  background: var(--color-bg);
+}
+
+.bookmarks-card.is-window {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 12px 16px 16px;
+}
+
+/* Native drag region: the header moves the window, buttons inside keep their own behavior
+   (BookmarksOverlay calls startDragging only when the pointer is not on a control). */
+.bookmarks-card.is-window .bookmarks-card__header.is-drag-handle {
+  cursor: default;
+}
+
+.bookmarks-card.is-window .bookmarks-card__header.is-drag-handle:active {
+  cursor: default;
+}
+
+.bookmarks-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* The header doubles as the drag handle for the floating panel. */
+.bookmarks-card__header.is-drag-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.bookmarks-card__header.is-drag-handle:active {
+  cursor: grabbing;
+}
+
+.bookmarks-card__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-header);
+}
+
+.bookmarks-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.bookmarks-close:hover {
+  background: rgba(var(--color-accent-rgb), 0.1);
+  color: var(--color-text);
+}
+
+.bookmarks-body {
+  display: grid;
+  /* `minmax(0, 1fr)` lets the bookmark column shrink instead of pushing the per-row tool
+     buttons (edit/delete) outside the panel. */
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 16px;
+  min-height: 280px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.bookmarks-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-right: 1px solid var(--color-border);
+  padding-right: 12px;
+  min-height: 0;
+}
+
+.bookmarks-categories__list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bookmarks-category {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.bookmarks-category:hover {
+  background: var(--row-hover);
+}
+
+.bookmarks-category.is-selected {
+  background: var(--row-selected-bg);
+  color: var(--row-selected-text);
+}
+
+.bookmarks-category__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.bookmarks-category__count {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.bookmarks-category.is-selected .bookmarks-category__count {
+  color: var(--row-selected-muted-text);
+}
+
+.bookmarks-category__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  font-size: 0.8rem;
+  visibility: hidden;
+}
+
+.bookmarks-category:hover .bookmarks-category__action {
+  visibility: visible;
+}
+
+.bookmarks-category__rename-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--color-accent);
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
+
+.bookmarks-category-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The editor stacks: filter on its own row, then name/query, then the action button.
+   Squeezing all four controls into one row used to clip the select and the inputs. */
+.bookmarks-bookmark-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.bookmarks-bookmark-add .bookmarks-filter-select {
+  grid-column: 1 / -1;
+  max-width: none;
+  width: 100%;
+}
+
+.bookmarks-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--color-elevated-border, var(--color-border));
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--color-text);
+  background: var(--color-elevated-bg);
+  font-size: 0.85rem;
+}
+
+.bookmarks-input:focus {
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.35);
+  border-color: var(--color-accent);
+}
+
+.bookmarks-button {
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bookmarks-bookmarks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.bookmarks-bookmarks__list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bookmarks-bookmark-row {
+  display: grid;
+  /* Tools keep their own track so edit/delete are never clipped by long names/queries. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  overflow: hidden;
+  /* The list is a column flex container, so rows would shrink to fit instead of scrolling.
+     `overflow: hidden` zeroes each row's automatic minimum size, which is why importing many
+     bookmarks collapsed every row into a 2px line. */
+  flex: 0 0 auto;
+  /* Separator so dense bookmark lists stay scannable. */
+  border-bottom: 1px solid var(--bookmark-row-border);
+}
+
+.bookmarks-bookmark-row:last-child {
+  border-bottom: none;
+}
+
+.bookmarks-card__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bookmarks-status {
+  margin-top: 10px;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.bookmarks-button--danger {
+  background: var(--color-error, #dc3545);
+}
+
+.bookmarks-bookmark-row:hover {
+  background: var(--row-hover);
+}
+
+.bookmarks-bookmark-name,
+.bookmarks-bookmark-query {
+  /* Both are <button>s, so all UA chrome has to be cleared explicitly; otherwise the browser
+     adds padding + a border and the two cells end up different heights. */
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 1.9rem;
+  margin: 0;
+  padding: 0 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-family: inherit;
+  line-height: 1.2;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.bookmarks-bookmark-name {
+  justify-content: center;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.bookmarks-bookmark-query {
+  justify-content: flex-start;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+/* The text child carries the ellipsis; a flex container cannot ellipsize its own text. */
+.bookmarks-bookmark-cell-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmarks-bookmark-name .bookmarks-bookmark-cell-text {
+  text-align: center;
+}
+
+.bookmarks-bookmark-tools {
+  display: inline-flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.bookmarks-bookmark-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.bookmarks-bookmark-tools button:hover {
+  background: rgba(var(--color-accent-rgb), 0.12);
+  color: var(--color-text);
+}
+
+.bookmarks-bookmark-tools button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.bookmarks-empty {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  padding: 16px;
+}
+
+.bookmarks-context-menu {
+  position: fixed;
+  z-index: 2500;
+  background: var(--color-elevated-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.3);
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+}
+
+.bookmarks-context-menu button {
+  text-align: left;
+  background: transparent;
+  color: var(--color-text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.bookmarks-context-menu button:hover {
+  background: rgba(var(--color-accent-rgb), 0.14);
+}
+
+/* === Dark mode for new components === */
+[data-theme='dark'] .bookmarks-card {
+  background: var(--color-elevated-bg);
+  color: var(--color-text);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+}
+
+/* === Filters Overlay === */
+.filters-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2400;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(15, 17, 26, 0.78);
+  backdrop-filter: blur(6px);
+}
+
+.filters-card {
+  width: 100%;
+  max-width: 760px;
+  max-height: calc(100vh - 96px);
+  background: var(--color-elevated-bg, var(--color-bg));
+  color: var(--color-text);
+  border-radius: 16px;
+  padding: 20px 24px 24px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.32);
+  display: flex;
+  flex-direction: column;
+}
+
+.filters-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.filters-card__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-header);
+}
+
+.filters-body {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  min-height: 300px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.filters-table {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.filters-table__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.filters-table__rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.filters-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  /* Dark bottom rule keeps long preset lists readable. */
+  border-bottom: 1px solid var(--color-text);
+}
+
+.filters-row:last-child {
+  border-bottom: none;
+}
+
+.filters-row:hover {
+  background: var(--row-hover);
+}
+
+.filters-row.is-selected {
+  background: var(--row-selected-bg);
+  color: var(--row-selected-text);
+}
+
+.filters-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.filters-row__search {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.filters-row.is-selected .filters-row__search {
+  color: var(--row-selected-muted-text);
+}
+
+.filters-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 6.5rem;
+}
+
+.filters-actions .bookmarks-button {
+  width: 100%;
+}
+
+.filters-actions .bookmarks-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.filters-editor {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* === Preferences: font size === */
+.preferences-font-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.preferences-font-size input[type='range'] {
+  /* Wide track so one pixel of travel is a small fraction of a step. */
+  width: 16rem;
+}
+
+.preferences-font-size__value {
+  min-width: 4.5rem;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.preferences-reset-button {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.preferences-reset-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.preferences-hint {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+[data-theme='dark'] .filters-overlay {
+  background: rgba(7, 9, 14, 0.72);
+}
+
+/* === Transient toast (e.g. Cmd+S bookmark saved) === */
+.app-toast {
+  position: fixed;
+  bottom: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2600;
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: var(--color-elevated-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.3);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+/* Bookmark filter chips inside the list and the editor select. */
+.bookmarks-bookmark-filter {
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: rgba(var(--color-accent-rgb), 0.14);
+  color: var(--color-accent);
+  font-size: 0.78rem;
+}
+
+.bookmarks-filter-select {
+  cursor: pointer;
+}
+
+.bookmarks-category__count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* === Sort context menu (right-click empty results area) === */
+.sort-menu {
+  position: fixed;
+  z-index: 2700;
+  min-width: 200px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--color-elevated-bg);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.32);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sort-menu__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-align: left;
+  outline: none;
+}
+
+.sort-menu__item:hover,
+.sort-menu__item.is-open,
+.sort-menu__item:focus-visible {
+  background: rgba(var(--color-accent-rgb), 0.14);
+}
+
+.sort-menu__chevron {
+  color: var(--color-muted);
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.sort-menu__item--clear {
+  border-top: 1px solid var(--color-border);
+  margin-top: 2px;
+  padding-top: 8px;
+  color: var(--color-muted);
+}
+
+.sort-submenu {
+  position: absolute;
+  left: 100%;
+  top: -4px;
+  margin-left: 4px;
+  min-width: 130px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--color-elevated-bg);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.32);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* Flip the submenu to the left when it would overflow the window. */
+.sort-menu__item.is-open .sort-submenu {
+  max-width: 40vw;
+}
+
+.sort-submenu__item {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.sort-submenu__item:hover {
+  background: rgba(var(--color-accent-rgb), 0.14);
+}
+
+.sort-submenu__item.is-active {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* Secondary action inside the permission card (manual re-check). */
+.permission-actions .permission-retry {
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.permission-actions .permission-retry:hover:not(:disabled) {
+  background: var(--search-toggle-hover-bg);
+  border-color: var(--color-accent);
+}
+
+.permission-hint {
+  margin-top: 8px;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+/* === Bookmark panel resize handles === */
+.bookmarks-card.is-resized {
+  max-width: none;
+}
+
+.bookmarks-resize-handle {
+  position: absolute;
+  z-index: 2;
+  touch-action: none;
+}
+
+/* The four edges. Corners sit on top of them and cover the meeting point. */
+.bookmarks-resize-handle--top {
+  top: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.bookmarks-resize-handle--bottom {
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.bookmarks-resize-handle--left {
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.bookmarks-resize-handle--right {
+  right: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+/* The four corners adjust both edges at once. */
+.bookmarks-resize-handle--topLeft {
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+
+.bookmarks-resize-handle--topRight {
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nesw-resize;
+}
+
+.bookmarks-resize-handle--bottomLeft {
+  bottom: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nesw-resize;
+}
+
+.bookmarks-resize-handle--bottomRight {
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+
+.bookmarks-resize-handle:hover {
+  background: rgba(var(--color-accent-rgb), 0.25);
+}
+
+/* === Status bar: selected entry === */
+.status-selection {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0 0.75rem;
+  overflow: hidden;
+}
+
+.status-selection__path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Keep the filename visible when the path is too long: `rtl` moves the ellipsis to the
+     start, while `plaintext` keeps the characters themselves in logical (LTR) order. */
+  direction: rtl;
+  unicode-bidi: plaintext;
+  text-align: left;
+  color: var(--color-muted);
+}
+
+.status-selection__size {
+  flex-shrink: 0;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.status-selection__count {
+  flex-shrink: 0;
+  color: var(--color-muted);
+}
+
+/* === Toolbar: timestamps of the selected entry === */
+/* Centred against the whole toolbar, not just the space left over by the view controls:
+   absolutely positioning keeps the timestamps visually centred regardless of how wide the
+   icon-size buttons on the left are. */
+.view-toolbar__meta {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  max-width: 60%;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+.view-toolbar__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.view-toolbar__meta-label {
+  color: var(--color-muted);
+}
+
+.view-toolbar__meta-value {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* === Open With submenu === */
+/* The native context menu has no submenu support, so "Open With" opens this HTML popup at the
+   right-click position. Mirrors `.sort-menu` so both popups look the same. */
+.open-with-menu {
+  position: fixed;
+  z-index: 2800;
+  min-width: 240px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--color-elevated-bg);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.32);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.open-with-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.open-with-menu__item:hover,
+.open-with-menu__item:focus-visible {
+  background: rgba(var(--color-accent-rgb), 0.14);
+}
+
+.open-with-menu__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.open-with-menu__default {
+  color: var(--color-muted);
+}
+
+.open-with-menu__status {
+  padding: 6px 10px;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.open-with-menu__separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--color-border);
 }

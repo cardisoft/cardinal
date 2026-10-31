@@ -31,6 +31,8 @@ type HookProps = {
   clearSelection: () => void;
   navigateSelection: (delta: 1 | -1, options?: { extend?: boolean }) => void;
   triggerQuickLook: () => void;
+  toggleBookmarks: () => void;
+  saveCurrentSearchAsBookmark: () => void;
 };
 
 describe('useAppHotkeys', () => {
@@ -40,6 +42,8 @@ describe('useAppHotkeys', () => {
   const clearSelection = vi.fn();
   const navigateSelection = vi.fn();
   const triggerQuickLook = vi.fn();
+  const toggleBookmarks = vi.fn();
+  const saveCurrentSearchAsBookmark = vi.fn();
 
   let quickLookListener: ((payload: any) => void) | null;
 
@@ -55,6 +59,8 @@ describe('useAppHotkeys', () => {
         clearSelection,
         navigateSelection,
         triggerQuickLook,
+        toggleBookmarks,
+        saveCurrentSearchAsBookmark,
         ...overrides,
       },
     });
@@ -117,6 +123,47 @@ describe('useAppHotkeys', () => {
     expect(mockedInvoke).toHaveBeenCalledWith('copy_files_to_clipboard', {
       paths: ['/tmp/a', '/tmp/b'],
     });
+  });
+
+  it('saves the current search as a bookmark on Cmd+S, even from the search box', () => {
+    renderHotkeys();
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+
+    // `bubbles` is required for the event to reach the window listener.
+    const saveEvent = new KeyboardEvent('keydown', {
+      key: 's',
+      metaKey: true,
+      cancelable: true,
+      bubbles: true,
+    });
+    act(() => {
+      input.dispatchEvent(saveEvent);
+    });
+
+    expect(saveCurrentSearchAsBookmark).toHaveBeenCalledTimes(1);
+    // The webview's "save page" default must not run.
+    expect(saveEvent.defaultPrevented).toBe(true);
+
+    input.remove();
+  });
+
+  it('leaves Cmd+Shift+S alone so the shortcut stays distinguishable', () => {
+    renderHotkeys();
+
+    const saveAsEvent = new KeyboardEvent('keydown', {
+      key: 's',
+      metaKey: true,
+      shiftKey: true,
+      cancelable: true,
+    });
+    act(() => {
+      window.dispatchEvent(saveAsEvent);
+    });
+
+    expect(saveCurrentSearchAsBookmark).not.toHaveBeenCalled();
   });
 
   it('does not override native copy shortcuts inside editable fields', () => {
@@ -249,6 +296,8 @@ describe('useAppHotkeys', () => {
       clearSelection,
       navigateSelection,
       triggerQuickLook,
+      toggleBookmarks,
+      saveCurrentSearchAsBookmark,
     });
 
     navigateSelection.mockClear();

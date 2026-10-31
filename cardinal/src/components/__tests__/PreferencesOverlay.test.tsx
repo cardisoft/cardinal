@@ -35,6 +35,12 @@ const baseProps = {
   onReset: vi.fn(),
   themeResetToken: 0,
   onWatchConfigChange: vi.fn(),
+  fontSize: 13,
+  defaultFontSize: 13,
+  fontSizeMin: 11,
+  fontSizeMax: 20,
+  onFontSizeChange: vi.fn(),
+  onFontSizeReset: vi.fn(),
 };
 
 describe('PreferencesOverlay', () => {

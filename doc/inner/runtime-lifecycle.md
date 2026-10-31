@@ -12,11 +12,18 @@ There is intentionally no separate `Stopped` or `Error` state. If background log
 ## Where transitions happen
 - **Process boot**: `APP_LIFECYCLE_STATE` starts at `Initializing`.
 - **Initial startup**:
-  - cache loaded from disk or fresh walk completed -> `run_logic_thread` sets `Updating`
+  - an index worker (`spawn_index_load`) loads the cache from disk or walks the filesystem
+  - the loop installs its `IndexBuildResult` and sets `Updating` when it arrives
   - first `HistoryDone` batch -> `handle_event_watcher_events` sets `Ready`
 - **Manual rescan or watch-config change**:
-  - `perform_rescan` / `handle_watch_config_update` set `Initializing`, reset counters, rebuild state, then move back to `Updating`
+  - `perform_rescan` / `handle_watch_config_update` set `Initializing`, reset counters, then rebuild (asynchronously via `spawn_index_load` for watch-config changes)
+  - installation of the rebuilt cache moves the app back to `Updating`
   - the next `HistoryDone` promotes the app back to `Ready`
+
+While the state is `Initializing` the backend is fully responsive: searches answer
+`INDEXING` (status code 2) instead of blocking, and literal folder scopes are served from a
+temporary index. The frontend re-runs the current query once the state leaves
+`Initializing`.
 
 ## Implementation details
 - `APP_LIFECYCLE_STATE: AtomicU8` stores the enum value.
@@ -32,5 +39,10 @@ There is intentionally no separate `Stopped` or `Error` state. If background log
 - The UI combines lifecycle state with `status_bar_update` counters to decide when to show indexing/rebuild progress.
 
 ## Shutdown and persistence
-- `flush_cache_to_file_once()` refuses to flush if the app never reached `Ready`.
+- `flush_cache_to_file_once()` refuses to flush only while the app is `Initializing`; a
+  complete cache that is still replaying history (`Updating`) is persisted.
+- A freshly built index is persisted by the index worker before the loop installs it, so a run
+  that is quit before `Ready` does not force a full re-walk on the next launch.
 - On close/exit, `APP_QUIT` is set first, then the background loop is asked for the final cache snapshot.
+- The loop only returns a snapshot when no index build is in flight and the cache is not a noop,
+  so a temporary folder-scope index never replaces the persisted full index.

@@ -8,6 +8,16 @@ import type { IconUpdatePayload } from '../types/ipc';
 export type DataLoaderCache = Map<SlabIndex, SearchResultItem>;
 type IconOverrideValue = string | undefined;
 
+// Raster size requested from the backend. The list view draws 16px icons, so the
+// default 32px bitmap is enough; the tiled view needs a much larger raster to stay
+// sharp at the biggest icon preset.
+export const LIST_ICON_SIZE = 32;
+export const GRID_ICON_SIZE = 384;
+
+type UseDataLoaderOptions = {
+  iconSize?: number;
+};
+
 const fromNodeInfo = (node: NodeInfoResponse): SearchResultItem => ({
   path: node.path,
   metadata: node.metadata ?? undefined,
@@ -19,7 +29,13 @@ const fromNodeInfo = (node: NodeInfoResponse): SearchResultItem => ({
 
 // Data-only loader for visible rows. It owns row metadata caching and stale-request rejection;
 // VirtualList handles any temporary frozen-view rendering during result-set swaps.
-export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) {
+export function useDataLoader(
+  results: SlabIndex[],
+  dataResultsVersion: number,
+  { iconSize = LIST_ICON_SIZE }: UseDataLoaderOptions = {},
+) {
+  const iconSizeRef = useRef(iconSize);
+  iconSizeRef.current = iconSize;
   const loadingRef = useRef<Set<SlabIndex>>(new Set());
   // Monotonic epoch for range-load requests. A new search result-set bumps this value so
   // late `get_nodes_info` responses from the previous result-set can be ignored safely.
@@ -35,7 +51,9 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
   resultsRef.current = results;
 
   // Reset cache state whenever the backing result-set changes so slab-index reuse in the
-  // backend cannot surface stale row data for a newer search result-set.
+  // backend cannot surface stale row data for a newer search result-set. The requested
+  // raster size participates too: a cached 32px list icon must not be reused where the
+  // tiled view needs a larger bitmap.
   useLayoutEffect(() => {
     versionRef.current += 1;
     loadingRef.current.clear();
@@ -43,7 +61,7 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
     const nextCache = new Map<SlabIndex, SearchResultItem>();
     cacheRef.current = nextCache;
     setCache(nextCache);
-  }, [dataResultsVersion]);
+  }, [dataResultsVersion, iconSize]);
 
   useEffect(() => {
     const unlistenIconUpdate = subscribeIconUpdate((updates: readonly IconUpdatePayload[]) => {
@@ -102,7 +120,14 @@ export function useDataLoader(results: SlabIndex[], dataResultsVersion: number) 
       }
       if (needLoading.length === 0) return;
       const versionAtRequest = versionRef.current;
-      const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', { results: needLoading });
+      // Metadata only: rasterising an icon per row here (up to 384px in the tiled view) makes
+      // the first paint of a new tab wait on the slowest thumbnail. Icons arrive separately
+      // through `update_icon_viewport`, which renders them on background threads.
+      const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', {
+        results: needLoading,
+        includeIcons: false,
+        iconSize: iconSizeRef.current,
+      });
       if (versionRef.current !== versionAtRequest) {
         // The result-set changed while this request was in flight. Drop the payload instead of
         // merging stale rows into the cache for the new query.
