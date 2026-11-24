@@ -16,6 +16,7 @@ type UseFilesTabStateOptions = {
   queueDirectorySearch: (directoryQuery: string, options?: QueueSearchOptions) => void;
   maxSearchHistoryEntries?: number;
   onNavigateFromSearchToResults?: () => void;
+  onSearchSubmit?: () => void;
 };
 
 type UseFilesTabStateResult = {
@@ -46,6 +47,7 @@ export function useFilesTabState({
   queueDirectorySearch,
   maxSearchHistoryEntries = 50,
   onNavigateFromSearchToResults,
+  onSearchSubmit,
 }: UseFilesTabStateOptions): UseFilesTabStateResult {
   const [activeTab, setActiveTab] = useState<StatusTabKey>('files');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -102,6 +104,7 @@ export function useFilesTabState({
 
       if (event.key === 'Enter') {
         submitFilesQuery(event.currentTarget.value, { immediate: true });
+        onSearchSubmit?.();
         return;
       }
 
@@ -116,7 +119,7 @@ export function useFilesTabState({
       event.preventDefault();
       handleHistoryNavigation(event.key === 'ArrowUp' ? 'older' : 'newer');
     },
-    [activeTab, handleHistoryNavigation, submitFilesQuery],
+    [activeTab, handleHistoryNavigation, onSearchSubmit, submitFilesQuery],
   );
 
   const onDirectoryInputKeyDown = useCallback(

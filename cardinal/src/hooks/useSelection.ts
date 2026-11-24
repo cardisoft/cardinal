@@ -15,6 +15,8 @@ export type SelectionController = {
   activeRowIndex: number | null;
   shiftAnchorIndex: number | null;
   selectedPaths: string[];
+  // Resolves paths at call time; `selectedPaths` can be stale when rows load after selection.
+  getSelectedPaths: () => string[];
   handleRowSelect: (rowIndex: number, options: RowSelectOptions) => void;
   selectSingleRow: (rowIndex: number) => void;
   clearSelection: () => void;
@@ -144,20 +146,33 @@ export const useSelection = (
     clearSelection();
   }, [resultsVersion, clearSelection]);
 
-  const selectedPaths = useMemo(() => {
-    const list = virtualListRef.current;
-    if (!list) {
-      return [];
-    }
-    const paths: string[] = [];
-    selectedIndices.forEach((index) => {
-      const item = list.getItem(index);
-      if (item?.path) {
-        paths.push(item.path);
+  const resolvePaths = useCallback(
+    (indices: number[]) => {
+      const list = virtualListRef.current;
+      if (!list) {
+        return [];
       }
-    });
-    return paths;
-  }, [selectedIndices, virtualListRef]);
+      const paths: string[] = [];
+      indices.forEach((index) => {
+        const item = list.getItem(index);
+        if (item?.path) {
+          paths.push(item.path);
+        }
+      });
+      return paths;
+    },
+    [virtualListRef],
+  );
+
+  const selectedPaths = useMemo(
+    () => resolvePaths(selectedIndices),
+    [resolvePaths, selectedIndices],
+  );
+
+  const getSelectedPaths = useCallback(
+    () => resolvePaths(selectedIndicesRef.current),
+    [resolvePaths],
+  );
 
   return {
     selectedIndices,
@@ -165,6 +180,7 @@ export const useSelection = (
     activeRowIndex,
     shiftAnchorIndex,
     selectedPaths,
+    getSelectedPaths,
     handleRowSelect,
     selectSingleRow,
     clearSelection,

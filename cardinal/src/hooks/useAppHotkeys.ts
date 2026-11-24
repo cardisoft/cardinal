@@ -18,6 +18,7 @@ type UseAppHotkeysOptions = {
   activeTab: StatusTabKey;
   activeRowIndex: number | null;
   selectedPaths: string[];
+  getSelectedPaths?: () => string[];
   selectedIndicesRef: MutableRefObject<number[]>;
   focusSearchInput: () => void;
   focusAndSelectSearchInput: () => void;
@@ -40,6 +41,7 @@ export function useAppHotkeys({
   activeTab,
   activeRowIndex,
   selectedPaths,
+  getSelectedPaths,
   selectedIndicesRef,
   focusSearchInput,
   focusAndSelectSearchInput,
@@ -57,8 +59,12 @@ export function useAppHotkeys({
     keyboardStateRef.current.activeRowIndex = activeRowIndex;
   }, [activeTab, activeRowIndex]);
 
+  // Rows can finish loading after they are selected, so resolve paths when the key is pressed.
+  const resolveSelectedPaths = () => getSelectedPaths?.() ?? selectedPaths;
+
   const handleMetaShortcut = useStableEvent((event: KeyboardEvent, currentTab: StatusTabKey) => {
     const key = event.key.toLowerCase();
+    const selectedPaths = resolveSelectedPaths();
     if (key === 'f') {
       event.preventDefault();
       focusAndSelectSearchInput();
@@ -98,6 +104,36 @@ export function useAppHotkeys({
     }
 
     return false;
+  });
+
+  // Enter opens the selected items; Cmd+Enter reveals them in their folder.
+  const handleEnter = useStableEvent((event: KeyboardEvent) => {
+    if (event.key !== 'Enter' || event.altKey || event.ctrlKey || event.shiftKey) {
+      return false;
+    }
+
+    const target = event.target;
+    if (
+      isEditableTarget(target) ||
+      (target instanceof Element && target.closest('button, select, a'))
+    ) {
+      return false;
+    }
+
+    const selectedPaths = resolveSelectedPaths();
+    if (selectedPaths.length === 0) {
+      return false;
+    }
+
+    event.preventDefault();
+    if (event.metaKey) {
+      selectedPaths.forEach((path) => {
+        void invoke('open_in_finder', { path });
+      });
+    } else {
+      selectedPaths.forEach((path) => openResultPath(path));
+    }
+    return true;
   });
 
   const handleFilesNavigation = useStableEvent((event: KeyboardEvent) => {
@@ -149,6 +185,10 @@ export function useAppHotkeys({
     const handleKeyDown = (event: KeyboardEvent) => {
       const { activeTab: currentTab } = keyboardStateRef.current;
 
+      if (currentTab === 'files' && handleEnter(event)) {
+        return;
+      }
+
       if (event.metaKey && handleMetaShortcut(event, currentTab)) {
         return;
       }
@@ -164,7 +204,7 @@ export function useAppHotkeys({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleMetaShortcut, handleFilesNavigation]);
+  }, [handleMetaShortcut, handleEnter, handleFilesNavigation]);
 
   const handleQuickLookKeydown = useStableEvent((payload: QuickLookKeydownPayload) => {
     if (keyboardStateRef.current.activeTab !== 'files') {

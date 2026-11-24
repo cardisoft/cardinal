@@ -23,13 +23,15 @@ import type { FSEventsPanelHandle } from './components/FSEventsPanel';
 import { useTranslation } from 'react-i18next';
 import { useFullDiskAccessPermission } from './hooks/useFullDiskAccessPermission';
 import type { DisplayState } from './components/StateDisplay';
-import { openResultPath } from './utils/openResultPath';
+import { openResultPath, revealResultPath } from './utils/openResultPath';
 import { useStableEvent } from './hooks/useStableEvent';
 import { useAppHotkeys } from './hooks/useAppHotkeys';
 import { useAppPreferences } from './hooks/useAppPreferences';
 import { useAppWindowListeners } from './hooks/useAppWindowListeners';
 import { useFilesTabEffects } from './hooks/useFilesTabEffects';
 import { useFilesTabState } from './hooks/useFilesTabState';
+
+const SELECT_TOP_REQUEST_TIMEOUT_MS = 3000;
 
 function App() {
   const {
@@ -91,6 +93,7 @@ function App() {
     selectedIndicesRef,
     activeRowIndex,
     selectedPaths,
+    getSelectedPaths,
     handleRowSelect,
     selectSingleRow,
     clearSelection,
@@ -105,6 +108,27 @@ function App() {
     selectSingleRow(0);
     searchInputRef.current?.blur();
   }, [displayedResults.length, selectSingleRow]);
+
+  // Enter in the search box re-runs the search; select the top row once its results land.
+  // Selection is cleared on every results change, so this waits for the next version.
+  const selectTopRequestedAtRef = useRef<number | null>(null);
+  const requestSelectTopResult = useCallback(() => {
+    selectTopRequestedAtRef.current = Date.now();
+  }, []);
+
+  useEffect(() => {
+    const requestedAt = selectTopRequestedAtRef.current;
+    if (requestedAt === null) {
+      return;
+    }
+    selectTopRequestedAtRef.current = null;
+    if (Date.now() - requestedAt > SELECT_TOP_REQUEST_TIMEOUT_MS) {
+      return;
+    }
+    navigateFromSearchToResults();
+    // Only react to new result versions, not to callback identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayedResultsVersion]);
 
   const {
     activeTab,
@@ -127,6 +151,7 @@ function App() {
     queueSearch,
     queueDirectorySearch,
     onNavigateFromSearchToResults: navigateFromSearchToResults,
+    onSearchSubmit: requestSelectTopResult,
   });
   const { filteredEvents } = useRecentFSEvents({
     caseSensitive,
@@ -135,8 +160,8 @@ function App() {
   });
 
   const getQuickLookPaths = useCallback(
-    () => (activeTab === 'files' ? selectedPaths : []),
-    [activeTab, selectedPaths],
+    () => (activeTab === 'files' ? getSelectedPaths() : []),
+    [activeTab, getSelectedPaths],
   );
   // Quick Look controller keeps preview panel in sync with whichever rows are currently selected.
   const { toggleQuickLook, updateQuickLook, closeQuickLook } = useQuickLook({
@@ -222,6 +247,7 @@ function App() {
     activeTab,
     activeRowIndex,
     selectedPaths,
+    getSelectedPaths,
     selectedIndicesRef,
     focusSearchInput,
     focusAndSelectSearchInput,
@@ -307,6 +333,7 @@ function App() {
           onContextMenu={handleRowContextMenu}
           onSelect={handleRowSelect}
           onOpen={openResultPath}
+          onReveal={revealResultPath}
         />
       );
     },
