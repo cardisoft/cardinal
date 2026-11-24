@@ -25,6 +25,7 @@ type HookProps = {
   activeTab: 'files' | 'events';
   activeRowIndex: number | null;
   selectedPaths: string[];
+  getSelectedPaths?: () => string[];
   selectedIndicesRef: { current: number[] };
   focusSearchInput: () => void;
   focusAndSelectSearchInput: () => void;
@@ -299,5 +300,16 @@ describe('useAppHotkeys', () => {
     });
     expect(mockedOpenResultPath).not.toHaveBeenCalled();
     input.remove();
+  });
+
+  it('resolves selected paths when Enter is pressed, not when the row was selected', () => {
+    // Selecting the top row right after a search can happen before its data loads,
+    // leaving the memoized selectedPaths empty.
+    renderHotkeys({ selectedPaths: [], getSelectedPaths: () => ['/tmp/top'] });
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+    });
+    expect(mockedOpenResultPath).toHaveBeenCalledWith('/tmp/top');
   });
 });

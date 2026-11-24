@@ -18,6 +18,7 @@ type UseAppHotkeysOptions = {
   activeTab: StatusTabKey;
   activeRowIndex: number | null;
   selectedPaths: string[];
+  getSelectedPaths?: () => string[];
   selectedIndicesRef: MutableRefObject<number[]>;
   focusSearchInput: () => void;
   focusAndSelectSearchInput: () => void;
@@ -40,6 +41,7 @@ export function useAppHotkeys({
   activeTab,
   activeRowIndex,
   selectedPaths,
+  getSelectedPaths,
   selectedIndicesRef,
   focusSearchInput,
   focusAndSelectSearchInput,
@@ -57,8 +59,12 @@ export function useAppHotkeys({
     keyboardStateRef.current.activeRowIndex = activeRowIndex;
   }, [activeTab, activeRowIndex]);
 
+  // Rows can finish loading after they are selected, so resolve paths when the key is pressed.
+  const resolveSelectedPaths = () => getSelectedPaths?.() ?? selectedPaths;
+
   const handleMetaShortcut = useStableEvent((event: KeyboardEvent, currentTab: StatusTabKey) => {
     const key = event.key.toLowerCase();
+    const selectedPaths = resolveSelectedPaths();
     if (key === 'f') {
       event.preventDefault();
       focusAndSelectSearchInput();
@@ -114,6 +120,7 @@ export function useAppHotkeys({
       return false;
     }
 
+    const selectedPaths = resolveSelectedPaths();
     if (selectedPaths.length === 0) {
       return false;
     }

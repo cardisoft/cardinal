@@ -93,6 +93,7 @@ function App() {
     selectedIndicesRef,
     activeRowIndex,
     selectedPaths,
+    getSelectedPaths,
     handleRowSelect,
     selectSingleRow,
     clearSelection,
@@ -159,8 +160,8 @@ function App() {
   });
 
   const getQuickLookPaths = useCallback(
-    () => (activeTab === 'files' ? selectedPaths : []),
-    [activeTab, selectedPaths],
+    () => (activeTab === 'files' ? getSelectedPaths() : []),
+    [activeTab, getSelectedPaths],
   );
   // Quick Look controller keeps preview panel in sync with whichever rows are currently selected.
   const { toggleQuickLook, updateQuickLook, closeQuickLook } = useQuickLook({
@@ -246,6 +247,7 @@ function App() {
     activeTab,
     activeRowIndex,
     selectedPaths,
+    getSelectedPaths,
     selectedIndicesRef,
     focusSearchInput,
     focusAndSelectSearchInput,
