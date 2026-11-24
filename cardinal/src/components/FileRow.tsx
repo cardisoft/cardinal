@@ -13,6 +13,7 @@ type FileRowProps = {
   style?: CSSProperties;
   onContextMenu?: (event: ReactMouseEvent<HTMLDivElement>, path: string, rowIndex: number) => void;
   onOpen?: (path: string) => void;
+  onReveal?: (path: string) => void;
   onSelect: (
     rowIndex: number,
     options: { isShift: boolean; isMeta: boolean; isCtrl: boolean },
@@ -29,6 +30,7 @@ export const FileRow = memo(function FileRow({
   style,
   onContextMenu,
   onOpen,
+  onReveal,
   onSelect,
   isSelected = false,
   selectedPathsForDrag = [],
@@ -97,7 +99,18 @@ export const FileRow = memo(function FileRow({
 
   const handleDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (path && onOpen) {
+    if (!path) {
+      return;
+    }
+
+    // Double-clicking the folder column opens the containing folder instead of the item.
+    const target = e.target as HTMLElement | null;
+    if (onReveal && target?.closest('.path-text')) {
+      onReveal(path);
+      return;
+    }
+
+    if (onOpen) {
       onOpen(path);
     }
   };

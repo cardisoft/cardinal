@@ -100,6 +100,35 @@ export function useAppHotkeys({
     return false;
   });
 
+  // Enter opens the selected items; Cmd+Enter reveals them in their folder.
+  const handleEnter = useStableEvent((event: KeyboardEvent) => {
+    if (event.key !== 'Enter' || event.altKey || event.ctrlKey || event.shiftKey) {
+      return false;
+    }
+
+    const target = event.target;
+    if (
+      isEditableTarget(target) ||
+      (target instanceof Element && target.closest('button, select, a'))
+    ) {
+      return false;
+    }
+
+    if (selectedPaths.length === 0) {
+      return false;
+    }
+
+    event.preventDefault();
+    if (event.metaKey) {
+      selectedPaths.forEach((path) => {
+        void invoke('open_in_finder', { path });
+      });
+    } else {
+      selectedPaths.forEach((path) => openResultPath(path));
+    }
+    return true;
+  });
+
   const handleFilesNavigation = useStableEvent((event: KeyboardEvent) => {
     const target = event.target as HTMLElement | null;
     if (isEditableTarget(target)) {
@@ -149,6 +178,10 @@ export function useAppHotkeys({
     const handleKeyDown = (event: KeyboardEvent) => {
       const { activeTab: currentTab } = keyboardStateRef.current;
 
+      if (currentTab === 'files' && handleEnter(event)) {
+        return;
+      }
+
       if (event.metaKey && handleMetaShortcut(event, currentTab)) {
         return;
       }
@@ -164,7 +197,7 @@ export function useAppHotkeys({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleMetaShortcut, handleFilesNavigation]);
+  }, [handleMetaShortcut, handleEnter, handleFilesNavigation]);
 
   const handleQuickLookKeydown = useStableEvent((payload: QuickLookKeydownPayload) => {
     if (keyboardStateRef.current.activeTab !== 'files') {

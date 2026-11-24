@@ -268,4 +268,36 @@ describe('useAppHotkeys', () => {
     unmount();
     expect(quickLookUnlisten).toHaveBeenCalled();
   });
+
+  it('opens selected items on Enter and reveals them on Cmd+Enter', () => {
+    renderHotkeys();
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+    });
+    expect(mockedOpenResultPath).toHaveBeenCalledWith('/tmp/a');
+    expect(mockedOpenResultPath).toHaveBeenCalledWith('/tmp/b');
+
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', metaKey: true, cancelable: true }),
+      );
+    });
+    expect(mockedInvoke).toHaveBeenCalledWith('open_in_finder', { path: '/tmp/a' });
+    expect(mockedInvoke).toHaveBeenCalledWith('open_in_finder', { path: '/tmp/b' });
+  });
+
+  it('leaves Enter alone inside the search input', () => {
+    renderHotkeys();
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+
+    act(() => {
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+      );
+    });
+    expect(mockedOpenResultPath).not.toHaveBeenCalled();
+    input.remove();
+  });
 });

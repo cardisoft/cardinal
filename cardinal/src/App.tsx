@@ -23,7 +23,7 @@ import type { FSEventsPanelHandle } from './components/FSEventsPanel';
 import { useTranslation } from 'react-i18next';
 import { useFullDiskAccessPermission } from './hooks/useFullDiskAccessPermission';
 import type { DisplayState } from './components/StateDisplay';
-import { openResultPath } from './utils/openResultPath';
+import { openResultPath, revealResultPath } from './utils/openResultPath';
 import { useStableEvent } from './hooks/useStableEvent';
 import { useAppHotkeys } from './hooks/useAppHotkeys';
 import { useAppPreferences } from './hooks/useAppPreferences';
@@ -307,6 +307,7 @@ function App() {
           onContextMenu={handleRowContextMenu}
           onSelect={handleRowSelect}
           onOpen={openResultPath}
+          onReveal={revealResultPath}
         />
       );
     },

@@ -77,4 +77,22 @@ describe('FileRow selection interactions', () => {
     fireEvent.dragStart(node);
     expect(onSelect).not.toHaveBeenCalled();
   });
+
+  it('opens the item when double-clicking the filename', () => {
+    const onOpen = vi.fn();
+    const onReveal = vi.fn();
+    const { getByTitle } = renderRow({ onOpen, onReveal });
+    fireEvent.doubleClick(getByTitle(baseItem.path));
+    expect(onOpen).toHaveBeenCalledWith(baseItem.path);
+    expect(onReveal).not.toHaveBeenCalled();
+  });
+
+  it('reveals the item in its folder when double-clicking the folder column', () => {
+    const onOpen = vi.fn();
+    const onReveal = vi.fn();
+    const { getByTitle } = renderRow({ onOpen, onReveal });
+    fireEvent.doubleClick(getByTitle('/tmp'));
+    expect(onReveal).toHaveBeenCalledWith(baseItem.path);
+    expect(onOpen).not.toHaveBeenCalled();
+  });
 });
