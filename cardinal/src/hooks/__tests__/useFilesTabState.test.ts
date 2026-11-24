@@ -28,6 +28,7 @@ type HookProps = {
     },
   ) => void;
   onNavigateFromSearchToResults?: () => void;
+  onSearchSubmit?: () => void;
 };
 
 describe('useFilesTabState', () => {
@@ -183,6 +184,29 @@ describe('useFilesTabState', () => {
       } as ChangeEvent<HTMLInputElement>);
     });
     expect(queueDirectorySearch).not.toHaveBeenCalled();
+  });
+
+  it('asks to select the top result when Enter submits the search', () => {
+    const onSearchSubmit = vi.fn();
+    const { result } = renderFilesTabState({ onSearchSubmit });
+
+    act(() => {
+      result.current.onSearchInputKeyDown({
+        key: 'Enter',
+        currentTarget: { value: 'report' },
+        preventDefault: vi.fn(),
+        altKey: false,
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+      } as unknown as ReactKeyboardEvent<HTMLInputElement>);
+    });
+
+    expect(queueSearch).toHaveBeenCalledWith(
+      'report',
+      expect.objectContaining({ immediate: true }),
+    );
+    expect(onSearchSubmit).toHaveBeenCalledTimes(1);
   });
 
   it('handles Enter and history navigation keys on files tab', () => {
